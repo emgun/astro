@@ -30,6 +30,11 @@ def test_packages_import() -> None:
         "rk4_step",
         "two_body_acceleration_km_s2",
     }
+    expected_od_exports = {
+        "generate_synthetic_measurements",
+        "range_km",
+        "range_rate_km_s",
+    }
 
     assert expected_core_exports <= set(astro_core.__all__)
     assert astro_core.MU_EARTH_KM3_S2 == 398600.4418
@@ -40,7 +45,7 @@ def test_packages_import() -> None:
     assert issubclass(astro_core.UnsupportedBackendError, astro_core.AstroError)
     assert issubclass(astro_core.NumericalConvergenceError, astro_core.AstroError)
     assert set(astro_dynamics.__all__) == expected_dynamics_exports
-    assert astro_od.__all__ == []
+    assert set(astro_od.__all__) == expected_od_exports
     assert astro_backends.__all__ == []
     assert astro_cli.__all__ == ["app"]
 
