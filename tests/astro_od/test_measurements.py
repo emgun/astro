@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import timedelta
 from pathlib import Path
 
@@ -48,6 +49,42 @@ def test_generate_synthetic_measurements_is_deterministic_for_local_leo() -> Non
         else:
             assert record.units == "km/s"
             assert record.sigma == scenario.measurements.noise.range_rate_sigma_km_s
+
+
+def test_generate_synthetic_measurements_uses_scenario_noise_seed() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    trajectory = propagate_local(scenario)
+    alternate_noise = scenario.measurements.noise.model_copy(update={"seed": 7})
+    alternate_measurements = scenario.measurements.model_copy(update={"noise": alternate_noise})
+    alternate_scenario = scenario.model_copy(update={"measurements": alternate_measurements})
+
+    default_records = generate_synthetic_measurements(scenario, trajectory)
+    alternate_first = generate_synthetic_measurements(alternate_scenario, trajectory)
+    alternate_second = generate_synthetic_measurements(alternate_scenario, trajectory)
+
+    assert alternate_first == alternate_second
+    assert [record.value for record in default_records] != [
+        record.value for record in alternate_first
+    ]
+
+
+def test_generate_synthetic_measurements_respects_scenario_cadence() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    sparse_measurements = scenario.measurements.model_copy(update={"cadence_s": 120.0})
+    sparse_scenario = scenario.model_copy(update={"measurements": sparse_measurements})
+    trajectory = propagate_local(sparse_scenario)
+
+    records = generate_synthetic_measurements(sparse_scenario, trajectory)
+    expected_epochs = {
+        sparse_scenario.initial_state.epoch + timedelta(seconds=offset_s)
+        for offset_s in (0, 120, 240, 360, 480, 600)
+    }
+
+    assert len(records) == 12
+    assert {record.epoch for record in records} == expected_epochs
+    assert Counter(record.epoch for record in records) == {
+        epoch: 2 for epoch in expected_epochs
+    }
 
 
 def test_generate_synthetic_measurements_returns_empty_without_ground_stations() -> None:
