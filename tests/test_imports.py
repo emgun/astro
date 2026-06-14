@@ -11,7 +11,7 @@ def test_packages_import() -> None:
     import astro_dynamics
     import astro_od
 
-    assert astro_core.__all__ == []
+    assert "Scenario" in astro_core.__all__
     assert astro_dynamics.__all__ == []
     assert astro_od.__all__ == []
     assert astro_backends.__all__ == []
