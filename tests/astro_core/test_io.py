@@ -21,3 +21,27 @@ def test_load_scenario_reports_yaml_parse_errors(tmp_path: Path) -> None:
 
     with pytest.raises(InvalidScenarioError, match="Could not parse scenario file"):
         load_scenario(path)
+
+
+def test_load_scenario_reports_utf8_decode_errors_as_read_errors(tmp_path: Path) -> None:
+    path = tmp_path / "bad-encoding.yaml"
+    path.write_bytes(b"\xff\xfe\xfa")
+
+    with pytest.raises(InvalidScenarioError, match="Could not read scenario file"):
+        load_scenario(path)
+
+
+def test_load_scenario_requires_mapping_yaml(tmp_path: Path) -> None:
+    path = tmp_path / "list.yaml"
+    path.write_text("- not\n- a\n- mapping\n", encoding="utf-8")
+
+    with pytest.raises(InvalidScenarioError, match="must contain a mapping"):
+        load_scenario(path)
+
+
+def test_load_scenario_wraps_validation_errors(tmp_path: Path) -> None:
+    path = tmp_path / "invalid-scenario.yaml"
+    path.write_text("scenario_id: missing-required-fields\n", encoding="utf-8")
+
+    with pytest.raises(InvalidScenarioError, match="is invalid"):
+        load_scenario(path)

@@ -14,7 +14,7 @@ def load_scenario(path: Path | str) -> Scenario:
     scenario_path = Path(path)
     try:
         raw: Any = yaml.safe_load(scenario_path.read_text(encoding="utf-8"))
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         raise InvalidScenarioError(f"Could not read scenario file {scenario_path}: {exc}") from exc
     except yaml.YAMLError as exc:
         raise InvalidScenarioError(f"Could not parse scenario file {scenario_path}: {exc}") from exc
