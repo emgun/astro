@@ -56,7 +56,7 @@ def generate_synthetic_measurements(
 
     rng = np.random.default_rng(scenario.measurements.noise.seed)
     records: list[MeasurementRecord] = []
-    cadence_origin = trajectory.samples[0].epoch
+    cadence_origin = scenario.initial_state.epoch
 
     for sample in trajectory.samples:
         elapsed_s = (sample.epoch - cadence_origin).total_seconds()

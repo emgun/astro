@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 
 import numpy as np
@@ -55,3 +56,15 @@ def test_generate_synthetic_measurements_returns_empty_without_ground_stations()
     trajectory = propagate_local(scenario_without_stations)
 
     assert generate_synthetic_measurements(scenario_without_stations, trajectory) == []
+
+
+def test_generate_synthetic_measurements_skips_samples_off_scenario_cadence() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    trajectory = propagate_local(scenario)
+    offset_samples = [
+        sample.model_copy(update={"epoch": sample.epoch + timedelta(seconds=30.0)})
+        for sample in trajectory.samples
+    ]
+    offset_trajectory = trajectory.model_copy(update={"samples": offset_samples})
+
+    assert generate_synthetic_measurements(scenario, offset_trajectory) == []
