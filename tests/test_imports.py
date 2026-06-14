@@ -31,6 +31,7 @@ def test_packages_import() -> None:
         "two_body_acceleration_km_s2",
     }
     expected_od_exports = {
+        "estimate_initial_state",
         "generate_synthetic_measurements",
         "range_km",
         "range_rate_km_s",

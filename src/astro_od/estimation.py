@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import cast
+
+import numpy as np
+from numpy.typing import NDArray
+from scipy.optimize import least_squares  # type: ignore[import-untyped]
+
+from astro_core.errors import NumericalConvergenceError
+from astro_core.models import (
+    CartesianState,
+    EstimateResult,
+    MeasurementRecord,
+    MeasurementType,
+    Scenario,
+)
+from astro_dynamics.local import propagate_local
+from astro_od.measurements import range_km, range_rate_km_s
+
+FloatArray = NDArray[np.float64]
+
+
+def _vector3_from_state_vector(state_vector: FloatArray, start: int) -> tuple[float, float, float]:
+    return (
+        float(state_vector[start]),
+        float(state_vector[start + 1]),
+        float(state_vector[start + 2]),
+    )
+
+
+def scenario_with_state_vector(scenario: Scenario, state_vector: FloatArray) -> Scenario:
+    cartesian = CartesianState(
+        position_km=_vector3_from_state_vector(state_vector, 0),
+        velocity_km_s=_vector3_from_state_vector(state_vector, 3),
+    )
+    initial_state = scenario.initial_state.model_copy(update={"cartesian": cartesian})
+    return scenario.model_copy(update={"initial_state": initial_state})
+
+
+def _station_position_for_observer(scenario: Scenario, observer: str) -> FloatArray:
+    for station in scenario.ground_stations:
+        if station.name == observer:
+            return station.position_array()
+    raise NumericalConvergenceError(f"Measurement observer {observer!r} is not in the scenario")
+
+
+def _predicted_measurement(
+    scenario: Scenario,
+    measurement: MeasurementRecord,
+    trajectory_index: dict[datetime, CartesianState],
+) -> float:
+    try:
+        sample_state = trajectory_index[measurement.epoch]
+    except KeyError as exc:
+        epoch = measurement.epoch.isoformat()
+        raise NumericalConvergenceError(
+            f"No propagated sample is available for measurement epoch {epoch}"
+        ) from exc
+
+    spacecraft_position = sample_state.position_array()
+    spacecraft_velocity = sample_state.velocity_array()
+    station_position = _station_position_for_observer(scenario, measurement.observer)
+
+    if measurement.measurement_type is MeasurementType.RANGE:
+        return range_km(spacecraft_position, station_position)
+    if measurement.measurement_type is MeasurementType.RANGE_RATE:
+        return range_rate_km_s(spacecraft_position, spacecraft_velocity, station_position)
+    raise NumericalConvergenceError(f"Unsupported measurement type: {measurement.measurement_type}")
+
+
+def residual_vector(
+    state_vector: FloatArray,
+    scenario: Scenario,
+    measurements: list[MeasurementRecord],
+) -> FloatArray:
+    trial_scenario = scenario_with_state_vector(scenario, state_vector)
+    trajectory = propagate_local(trial_scenario)
+    trajectory_index = {sample.epoch: sample.state for sample in trajectory.samples}
+
+    residuals = [
+        (_predicted_measurement(trial_scenario, measurement, trajectory_index) - measurement.value)
+        / measurement.sigma
+        for measurement in measurements
+    ]
+    return np.array(residuals, dtype=np.float64)
+
+
+def covariance_from_jacobian(jacobian: FloatArray, rms: float) -> list[list[float]]:
+    covariance = np.linalg.pinv(jacobian.T @ jacobian) * rms**2
+    return [[float(component) for component in row] for row in covariance]
+
+
+def _initial_state_vector(scenario: Scenario) -> FloatArray:
+    initial = scenario.initial_state.cartesian
+    return cast(
+        FloatArray,
+        np.concatenate([initial.position_array(), initial.velocity_array()]),
+    )
+
+
+def estimate_initial_state(
+    scenario: Scenario,
+    measurements: list[MeasurementRecord],
+) -> EstimateResult:
+    if not measurements:
+        raise NumericalConvergenceError("At least one measurement is required for estimation")
+
+    optimizer_result = least_squares(
+        residual_vector,
+        _initial_state_vector(scenario),
+        args=(scenario, measurements),
+        xtol=1.0e-10,
+        ftol=1.0e-10,
+        gtol=1.0e-10,
+        max_nfev=80,
+    )
+
+    estimated_vector = cast(FloatArray, optimizer_result.x)
+    residuals = residual_vector(estimated_vector, scenario, measurements)
+    rms = float(np.sqrt(np.mean(residuals**2)))
+    estimated_scenario = scenario_with_state_vector(scenario, estimated_vector)
+
+    return EstimateResult(
+        estimated_state=estimated_scenario.initial_state,
+        residuals=[float(value) for value in residuals],
+        covariance=covariance_from_jacobian(cast(FloatArray, optimizer_result.jac), rms),
+        rms=rms,
+        iterations=int(optimizer_result.nfev),
+        converged=bool(optimizer_result.success),
+        metadata={
+            "backend": "local_scipy_least_squares",
+            "message": str(optimizer_result.message),
+        },
+    )
