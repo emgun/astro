@@ -1,5 +1,8 @@
 from datetime import UTC, datetime, tzinfo
+from decimal import Decimal
+from fractions import Fraction
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
@@ -89,6 +92,27 @@ def make_estimate_result(**overrides: object) -> EstimateResult:
     return EstimateResult(**payload)
 
 
+def assert_epoch_rejected(epoch: object) -> None:
+    with pytest.raises(ValidationError, match="datetime"):
+        OrbitState(
+            epoch=epoch,
+            time_scale=TimeScale.UTC,
+            frame=Frame.EME2000,
+            central_body=Body.EARTH,
+            representation=OrbitRepresentation.CARTESIAN,
+            cartesian=CartesianState(
+                position_km=(7000.0, 0.0, 0.0),
+                velocity_km_s=(0.0, 7.5, 1.0),
+            ),
+        )
+
+    with pytest.raises(ValidationError, match="datetime"):
+        make_measurement_record(epoch=epoch)
+
+    with pytest.raises(ValidationError, match="datetime"):
+        TrajectorySample(epoch=epoch, state=make_state().cartesian)
+
+
 def test_model_extra_fields_are_rejected() -> None:
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         Spacecraft(
@@ -117,6 +141,15 @@ def test_scalar_fields_reject_string_and_bool_inputs() -> None:
     with pytest.raises(ValidationError, match="integer"):
         make_estimate_result(iterations=True)
 
+    with pytest.raises(ValidationError, match="numeric scalar"):
+        Spacecraft(
+            name="demo",
+            mass_kg=np.bool_(True),
+            area_m2=2.5,
+            drag_coefficient=2.2,
+            reflectivity_coefficient=1.3,
+        )
+
 
 def test_cartesian_state_rejects_string_and_bool_vector_components() -> None:
     with pytest.raises(ValidationError, match="numeric scalar"):
@@ -128,6 +161,20 @@ def test_cartesian_state_rejects_string_and_bool_vector_components() -> None:
     with pytest.raises(ValidationError, match="numeric scalar"):
         CartesianState(
             position_km=(True, 0, 0),
+            velocity_km_s=(0.0, 7.5, 0.0),
+        )
+
+
+def test_cartesian_state_rejects_numpy_vector_inputs() -> None:
+    with pytest.raises(ValidationError, match="NumPy arrays"):
+        CartesianState(
+            position_km=np.array(["7000", 0, 0], dtype=object),
+            velocity_km_s=(0.0, 7.5, 0.0),
+        )
+
+    with pytest.raises(ValidationError, match="NumPy arrays"):
+        CartesianState(
+            position_km=np.array([True, 0, 0], dtype=object),
             velocity_km_s=(0.0, 7.5, 0.0),
         )
 
@@ -158,30 +205,35 @@ def test_ground_station_rejects_string_and_bool_numeric_inputs() -> None:
         )
 
 
+def test_ground_station_rejects_numpy_position_inputs() -> None:
+    with pytest.raises(ValidationError, match="NumPy arrays"):
+        GroundStation(
+            name="station-a",
+            position_eci_km=np.array(["6378", 0, 0], dtype=object),
+            frame=Frame.EME2000,
+            elevation_mask_deg=0.0,
+        )
+
+
 def test_orbit_state_requires_finite_cartesian_values() -> None:
     with pytest.raises(ValidationError, match="finite"):
         CartesianState(position_km=(7000.0, float("nan"), 0.0), velocity_km_s=(0.0, 7.5, 0.0))
 
 
-def test_epoch_fields_reject_numeric_timestamps() -> None:
-    with pytest.raises(ValidationError, match="datetime"):
-        OrbitState(
-            epoch=0,
-            time_scale=TimeScale.UTC,
-            frame=Frame.EME2000,
-            central_body=Body.EARTH,
-            representation=OrbitRepresentation.CARTESIAN,
-            cartesian=CartesianState(
-                position_km=(7000.0, 0.0, 0.0),
-                velocity_km_s=(0.0, 7.5, 1.0),
-            ),
-        )
-
-    with pytest.raises(ValidationError, match="datetime"):
-        make_measurement_record(epoch=0)
-
-    with pytest.raises(ValidationError, match="datetime"):
-        TrajectorySample(epoch=0, state=make_state().cartesian)
+@pytest.mark.parametrize(
+    "epoch",
+    [
+        0,
+        "0",
+        "0.0",
+        "1704067200",
+        Decimal("0"),
+        Fraction(0, 1),
+        np.int64(0),
+    ],
+)
+def test_epoch_fields_reject_timestamp_like_inputs(epoch: object) -> None:
+    assert_epoch_rejected(epoch)
 
 
 def test_iso_datetime_strings_are_accepted_for_epoch_fields() -> None:
@@ -391,6 +443,14 @@ def test_estimate_result_rejects_non_finite_outputs() -> None:
 
     with pytest.raises(ValidationError, match="finite"):
         make_estimate_result(covariance=bad_covariance)
+
+
+def test_estimate_result_rejects_numpy_array_outputs() -> None:
+    with pytest.raises(ValidationError, match="NumPy arrays"):
+        make_estimate_result(residuals=np.array(["0.1", 0.2], dtype=object))
+
+    with pytest.raises(ValidationError, match="NumPy arrays"):
+        make_estimate_result(covariance=np.array([[True] * 6 for _ in range(6)], dtype=object))
 
 
 def test_spacecraft_requires_positive_mass_and_area() -> None:

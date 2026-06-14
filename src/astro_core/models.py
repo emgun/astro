@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
+from fractions import Fraction
 from math import isfinite
+from numbers import Number
 from typing import Any, Literal
 
 import numpy as np
@@ -23,24 +26,33 @@ def _datetime_must_be_aware(value: datetime, label: str) -> datetime:
 
 
 def _datetime_input_must_be_datetime_or_string(value: Any, label: str) -> Any:
-    if isinstance(value, bool | int | float):
+    if isinstance(value, bool | np.bool_ | Number | np.number | Decimal | Fraction):
         raise ValueError(f"{label} must be a datetime or ISO datetime string")
+    if isinstance(value, str):
+        try:
+            float(value.strip())
+        except ValueError:
+            return value
+        else:
+            raise ValueError(f"{label} must be a datetime or ISO datetime string")
     return value
 
 
 def _numeric_scalar_input_must_be_number(value: Any, label: str) -> Any:
-    if isinstance(value, bool | str):
+    if isinstance(value, bool | np.bool_ | str):
         raise ValueError(f"{label} must be a numeric scalar")
     return value
 
 
 def _integer_input_must_be_int(value: Any, label: str) -> Any:
-    if isinstance(value, bool) or not isinstance(value, int):
+    if isinstance(value, bool | np.bool_) or not isinstance(value, int):
         raise ValueError(f"{label} must be an integer")
     return value
 
 
 def _numeric_sequence_input_must_be_numbers(value: Any, label: str) -> Any:
+    if isinstance(value, np.ndarray):
+        raise ValueError(f"{label} does not accept NumPy arrays")
     if isinstance(value, str | bytes):
         raise ValueError(f"{label} must contain numeric scalar values")
     if not isinstance(value, list | tuple):
@@ -52,6 +64,8 @@ def _numeric_sequence_input_must_be_numbers(value: Any, label: str) -> Any:
 
 
 def _numeric_matrix_input_must_be_numbers(value: Any, label: str) -> Any:
+    if isinstance(value, np.ndarray):
+        raise ValueError(f"{label} does not accept NumPy arrays")
     if isinstance(value, str | bytes):
         raise ValueError(f"{label} must contain numeric scalar values")
     if not isinstance(value, list | tuple):
