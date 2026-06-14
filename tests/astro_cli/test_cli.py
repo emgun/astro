@@ -5,7 +5,7 @@ from typer.testing import CliRunner
 
 from astro_cli.main import app
 
-runner = CliRunner()
+runner = CliRunner(mix_stderr=False)
 
 
 def test_validate_command_accepts_example_scenario() -> None:
@@ -35,3 +35,31 @@ def test_propagate_command_writes_json(tmp_path: Path) -> None:
     assert payload["scenario_id"] == "leo-two-body"
     assert payload["backend"] == "local"
     assert len(payload["samples"]) == 11
+
+
+def test_propagate_command_reports_invalid_scenario(tmp_path: Path) -> None:
+    scenario = tmp_path / "invalid.yaml"
+    scenario.write_text("scenario_id: missing-required-fields\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["propagate", str(scenario)])
+
+    assert result.exit_code == 2
+    assert "is invalid" in result.stderr
+
+
+def test_propagate_command_reports_output_write_error(tmp_path: Path) -> None:
+    output = tmp_path / "missing" / "trajectory.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "propagate",
+            "examples/scenarios/leo_two_body.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "could not write trajectory" in result.stderr
+    assert str(output) in result.stderr
