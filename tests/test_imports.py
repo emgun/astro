@@ -1,6 +1,7 @@
 from importlib.metadata import entry_points
 
 from typer import Typer
+from typer.testing import CliRunner
 
 
 def test_packages_import() -> None:
@@ -24,4 +25,11 @@ def test_console_script_entry_point_loads() -> None:
         if entry_point.name == "astro" and entry_point.value == "astro_cli.main:app"
     )
 
-    assert isinstance(entry_point.load(), Typer)
+    app = entry_point.load()
+
+    assert isinstance(app, Typer)
+
+    result = CliRunner().invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "Usage" in result.output
