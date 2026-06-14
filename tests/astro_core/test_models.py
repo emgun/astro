@@ -6,16 +6,21 @@ from pydantic import ValidationError
 from astro_core.models import (
     Body,
     CartesianState,
+    EstimateResult,
     ForceModelConfig,
     ForceModelName,
     Frame,
     GroundStation,
+    MeasurementRecord,
+    MeasurementType,
     OrbitRepresentation,
     OrbitState,
     PropagationConfig,
     Scenario,
     Spacecraft,
     TimeScale,
+    Trajectory,
+    TrajectorySample,
 )
 
 
@@ -38,6 +43,62 @@ def make_state() -> OrbitState:
     )
 
 
+def make_covariance() -> list[list[float]]:
+    return [[1.0 if row == column else 0.0 for column in range(6)] for row in range(6)]
+
+
+def make_trajectory_sample(epoch: datetime) -> TrajectorySample:
+    return TrajectorySample(epoch=epoch, state=make_state().cartesian)
+
+
+def make_trajectory(samples: list[TrajectorySample]) -> Trajectory:
+    return Trajectory(
+        scenario_id="leo-demo",
+        samples=samples,
+        force_model=ForceModelConfig(gravity=ForceModelName.TWO_BODY),
+        backend="test",
+    )
+
+
+def make_measurement_record(**overrides: object) -> MeasurementRecord:
+    payload = {
+        "measurement_type": MeasurementType.RANGE,
+        "epoch": datetime(2026, 1, 1, tzinfo=UTC),
+        "observer": "station-a",
+        "observed_object": "demo",
+        "value": 1000.0,
+        "sigma": 0.01,
+        "units": "km",
+    }
+    payload.update(overrides)
+    return MeasurementRecord(**payload)
+
+
+def make_estimate_result(**overrides: object) -> EstimateResult:
+    payload = {
+        "estimated_state": make_state(),
+        "residuals": [0.1, -0.1],
+        "covariance": make_covariance(),
+        "rms": 0.1,
+        "iterations": 3,
+        "converged": True,
+    }
+    payload.update(overrides)
+    return EstimateResult(**payload)
+
+
+def test_model_extra_fields_are_rejected() -> None:
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        Spacecraft(
+            name="demo",
+            mass_kg=120.0,
+            area_m2=2.5,
+            drag_coefficient=2.2,
+            reflectivity_coefficient=1.3,
+            unexpected_field=True,
+        )
+
+
 def test_orbit_state_requires_finite_cartesian_values() -> None:
     with pytest.raises(ValidationError, match="finite"):
         CartesianState(position_km=(7000.0, float("nan"), 0.0), velocity_km_s=(0.0, 7.5, 0.0))
@@ -56,6 +117,60 @@ def test_orbit_state_rejects_timezone_without_utc_offset() -> None:
                 velocity_km_s=(0.0, 7.5, 1.0),
             ),
         )
+
+
+@pytest.mark.parametrize(
+    "epoch",
+    [
+        datetime(2026, 1, 1),
+        datetime(2026, 1, 1, tzinfo=UndefinedOffsetTimezone()),
+    ],
+)
+def test_trajectory_sample_rejects_epoch_without_utc_offset(epoch: datetime) -> None:
+    with pytest.raises(ValidationError, match="timezone information"):
+        make_trajectory_sample(epoch)
+
+
+def test_trajectory_requires_samples() -> None:
+    with pytest.raises(ValidationError):
+        make_trajectory([])
+
+
+def test_trajectory_rejects_duplicate_epochs() -> None:
+    epoch = datetime(2026, 1, 1, tzinfo=UTC)
+
+    with pytest.raises(ValidationError, match="strictly increasing"):
+        make_trajectory([make_trajectory_sample(epoch), make_trajectory_sample(epoch)])
+
+
+def test_measurement_record_rejects_non_finite_value_or_sigma() -> None:
+    with pytest.raises(ValidationError, match="finite"):
+        make_measurement_record(value=float("nan"))
+
+    with pytest.raises(ValidationError, match="finite"):
+        make_measurement_record(sigma=float("inf"))
+
+
+def test_estimate_result_rejects_invalid_covariance_shape_and_negative_iterations() -> None:
+    with pytest.raises(ValidationError, match="6x6"):
+        make_estimate_result(covariance=[[1.0]])
+
+    with pytest.raises(ValidationError):
+        make_estimate_result(iterations=-1)
+
+
+def test_estimate_result_rejects_non_finite_outputs() -> None:
+    bad_covariance = make_covariance()
+    bad_covariance[0][0] = float("nan")
+
+    with pytest.raises(ValidationError, match="finite"):
+        make_estimate_result(residuals=[0.0, float("nan")])
+
+    with pytest.raises(ValidationError, match="finite"):
+        make_estimate_result(rms=float("inf"))
+
+    with pytest.raises(ValidationError, match="finite"):
+        make_estimate_result(covariance=bad_covariance)
 
 
 def test_spacecraft_requires_positive_mass_and_area() -> None:

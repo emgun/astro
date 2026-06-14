@@ -12,6 +12,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 Vector3 = tuple[float, float, float]
 
 
+class AstroModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+def _datetime_must_be_aware(value: datetime, label: str) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{label} must include timezone information")
+    return value
+
+
 class Body(StrEnum):
     EARTH = "earth"
 
@@ -39,7 +49,7 @@ class MeasurementType(StrEnum):
     RANGE_RATE = "range_rate"
 
 
-class CartesianState(BaseModel):
+class CartesianState(AstroModel):
     position_km: Vector3
     velocity_km_s: Vector3
 
@@ -57,7 +67,7 @@ class CartesianState(BaseModel):
         return np.array(self.velocity_km_s, dtype=np.float64)
 
 
-class OrbitState(BaseModel):
+class OrbitState(AstroModel):
     epoch: datetime
     time_scale: TimeScale
     frame: Frame
@@ -67,12 +77,11 @@ class OrbitState(BaseModel):
 
     @model_validator(mode="after")
     def validate_epoch(self) -> OrbitState:
-        if self.epoch.tzinfo is None or self.epoch.utcoffset() is None:
-            raise ValueError("OrbitState epoch must include timezone information")
+        _datetime_must_be_aware(self.epoch, "OrbitState epoch")
         return self
 
 
-class Spacecraft(BaseModel):
+class Spacecraft(AstroModel):
     name: str = Field(min_length=1)
     mass_kg: float = Field(gt=0.0)
     area_m2: float = Field(gt=0.0)
@@ -80,11 +89,11 @@ class Spacecraft(BaseModel):
     reflectivity_coefficient: float = Field(ge=0.0, le=5.0)
 
 
-class ForceModelConfig(BaseModel):
+class ForceModelConfig(AstroModel):
     gravity: ForceModelName
 
 
-class PropagationConfig(BaseModel):
+class PropagationConfig(AstroModel):
     duration_s: float = Field(gt=0.0)
     step_s: float = Field(gt=0.0)
 
@@ -100,7 +109,7 @@ class PropagationConfig(BaseModel):
         return self
 
 
-class GroundStation(BaseModel):
+class GroundStation(AstroModel):
     name: str = Field(min_length=1)
     position_eci_km: Vector3
     frame: Frame
@@ -117,19 +126,19 @@ class GroundStation(BaseModel):
         return np.array(self.position_eci_km, dtype=np.float64)
 
 
-class MeasurementNoise(BaseModel):
+class MeasurementNoise(AstroModel):
     range_sigma_km: float = Field(gt=0.0, default=0.01)
     range_rate_sigma_km_s: float = Field(gt=0.0, default=1.0e-5)
     seed: int = 42
 
 
-class MeasurementConfig(BaseModel):
+class MeasurementConfig(AstroModel):
     types: tuple[MeasurementType, ...] = (MeasurementType.RANGE, MeasurementType.RANGE_RATE)
     cadence_s: float = Field(gt=0.0, default=60.0)
     noise: MeasurementNoise = Field(default_factory=MeasurementNoise)
 
 
-class MeasurementRecord(BaseModel):
+class MeasurementRecord(AstroModel):
     measurement_type: MeasurementType
     epoch: datetime
     observer: str
@@ -139,15 +148,27 @@ class MeasurementRecord(BaseModel):
     units: Literal["km", "km/s"]
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("value", "sigma")
+    @classmethod
+    def numeric_values_must_be_finite(cls, value: float) -> float:
+        if not isfinite(value):
+            raise ValueError("Measurement numeric values must be finite")
+        return value
 
-class TrajectorySample(BaseModel):
+
+class TrajectorySample(AstroModel):
     epoch: datetime
     state: CartesianState
 
+    @field_validator("epoch")
+    @classmethod
+    def epoch_must_be_aware(cls, value: datetime) -> datetime:
+        return _datetime_must_be_aware(value, "TrajectorySample epoch")
 
-class Trajectory(BaseModel):
+
+class Trajectory(AstroModel):
     scenario_id: str
-    samples: list[TrajectorySample]
+    samples: list[TrajectorySample] = Field(min_length=1)
     force_model: ForceModelConfig
     backend: str
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -155,23 +176,57 @@ class Trajectory(BaseModel):
     @model_validator(mode="after")
     def epochs_must_be_monotonic(self) -> Trajectory:
         epochs = [sample.epoch for sample in self.samples]
-        if epochs != sorted(epochs):
-            raise ValueError("Trajectory sample epochs must be monotonic")
+        for epoch in epochs:
+            _datetime_must_be_aware(epoch, "Trajectory sample epoch")
+
+        try:
+            is_strictly_increasing = all(
+                previous_epoch < next_epoch
+                for previous_epoch, next_epoch in zip(epochs, epochs[1:], strict=False)
+            )
+        except TypeError as exc:
+            raise ValueError("Trajectory sample epochs must be comparable aware datetimes") from exc
+
+        if not is_strictly_increasing:
+            raise ValueError("Trajectory sample epochs must be strictly increasing")
         return self
 
 
-class EstimateResult(BaseModel):
+class EstimateResult(AstroModel):
     estimated_state: OrbitState
     residuals: list[float]
     covariance: list[list[float]]
     rms: float
-    iterations: int
+    iterations: int = Field(ge=0)
     converged: bool
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("residuals")
+    @classmethod
+    def residuals_must_be_finite(cls, value: list[float]) -> list[float]:
+        if not all(isfinite(residual) for residual in value):
+            raise ValueError("EstimateResult residuals must be finite")
+        return value
 
-class Scenario(BaseModel):
-    model_config = ConfigDict(use_enum_values=False)
+    @field_validator("rms")
+    @classmethod
+    def rms_must_be_finite(cls, value: float) -> float:
+        if not isfinite(value):
+            raise ValueError("EstimateResult rms must be finite")
+        return value
+
+    @field_validator("covariance")
+    @classmethod
+    def covariance_must_be_6x6_and_finite(cls, value: list[list[float]]) -> list[list[float]]:
+        if len(value) != 6 or any(len(row) != 6 for row in value):
+            raise ValueError("EstimateResult covariance must be 6x6")
+        if not all(isfinite(component) for row in value for component in row):
+            raise ValueError("EstimateResult covariance values must be finite")
+        return value
+
+
+class Scenario(AstroModel):
+    model_config = ConfigDict(extra="forbid", use_enum_values=False)
 
     scenario_id: str = Field(min_length=1)
     description: str = ""
