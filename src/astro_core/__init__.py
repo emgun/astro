@@ -5,6 +5,7 @@ from astro_core.errors import (
     NumericalConvergenceError,
     UnsupportedBackendError,
 )
+from astro_core.io import load_scenario
 from astro_core.models import (
     Body,
     CartesianState,
@@ -55,4 +56,5 @@ __all__ = [
     "Trajectory",
     "TrajectorySample",
     "UnsupportedBackendError",
+    "load_scenario",
 ]
