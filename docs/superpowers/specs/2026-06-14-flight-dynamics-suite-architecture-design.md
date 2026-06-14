@@ -274,9 +274,16 @@ Why:
 - CCSDS support.
 - Batch and sequential OD capabilities.
 
+Python adapter choice:
+
+- The Orekit adapter should use the official Orekit Python wrapper path rather than a custom Java bridge.
+- For new-project implementation, evaluate `orekit_jpype` first because it is thinner, pip-installable, closer to the Java API, and is recommended by the wrapper maintainer for new projects.
+- Keep the legacy JCC-based `orekit` wrapper as a compatibility fallback, especially if a workflow needs subclassing behavior that the JPype wrapper does not support cleanly.
+- The adapter boundary must hide wrapper-specific details so the suite can switch between `orekit_jpype`, the legacy wrapper, or a direct Java service later without changing user-facing models.
+
 Tradeoff:
 
-- Java/Python interop adds packaging and runtime complexity.
+- Java runtime, wrapper selection, VM initialization, and Orekit data setup add packaging complexity.
 
 ### Tudat / TudatPy
 
@@ -355,7 +362,8 @@ The base package should install only lightweight dependencies.
 
 Proposed extras:
 
-- `astro[orekit]`: Orekit adapter dependencies.
+- `astro[orekit]`: Orekit adapter dependencies using the selected official Python wrapper path.
+- `astro[orekit-jcc]`: optional legacy JCC wrapper support if needed for compatibility.
 - `astro[tudat]`: TudatPy adapter dependencies.
 - `astro[launch]`: Dymos/OpenMDAO and RocketPy dependencies.
 - `astro[jax]`: differentiable research backend.
@@ -449,6 +457,8 @@ The suite should track tolerances explicitly. When tolerance changes are needed,
 ## External References
 
 - Orekit: https://www.orekit.org/
+- Orekit Python wrapper: https://gitlab.orekit.org/orekit-labs/python-wrapper
+- Orekit JPype wrapper: https://gitlab.orekit.org/orekit/orekit_jpype
 - NASA GMAT: https://etd.gsfc.nasa.gov/capabilities/capabilities-listing/general-mission-analysis-tool-gmat/
 - Tudat: https://docs.tudat.space/
 - Basilisk: https://avslab.github.io/basilisk/
@@ -469,4 +479,3 @@ The suite should track tolerances explicitly. When tolerance changes are needed,
 - Production-grade collision avoidance.
 
 These are important future directions, but including them in the first implementation plan would dilute the validation spine.
-

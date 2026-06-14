@@ -226,15 +226,27 @@ The Orekit adapter should be the first operational adapter.
 
 Responsibilities:
 
+- Use the official Orekit Python wrapper path as the integration surface.
+- Prefer `orekit_jpype` for the first new-project smoke test because it is thinner, pip-installable, and close to the Java API.
+- Keep the legacy JCC-based `orekit` wrapper as a fallback if JPype limitations block a required workflow.
 - Convert suite `OrbitState`, `Spacecraft`, `ForceModelConfig`, and `GroundStation` into Orekit objects.
 - Run propagation.
 - Generate synthetic measurements if supported by the chosen OD path.
 - Run batch least-squares OD once the measurement interface is stable.
 - Convert outputs back to suite products.
 
+First smoke checks:
+
+- Wrapper import.
+- Java runtime and VM initialization.
+- Orekit version check.
+- Orekit data loading.
+- Frame and time-scale access.
+- Simple two-body propagation through the wrapper.
+
 Risk:
 
-- Python/Java packaging and data setup can be frustrating. The first adapter milestone should isolate installation and data-loading checks before deep OD work.
+- Python/Java packaging, wrapper choice, VM initialization, and data setup can be frustrating. The first adapter milestone should isolate installation and data-loading checks before deep OD work.
 
 ### Tudat Adapter
 
@@ -340,6 +352,6 @@ Starting with a local baseline risks duplicated work, but it is useful if it sta
 - Python version target.
 - Package manager.
 - Scenario file format.
+- Whether `orekit_jpype` is sufficient for the first OD workflow or the legacy JCC wrapper is needed for a specific subclassing or extension point.
 - Whether the first OD workflow is implemented through Orekit immediately or after local measurement generation is complete.
 - Reference tolerance values for each propagation case.
-
