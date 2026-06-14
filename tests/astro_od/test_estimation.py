@@ -1,10 +1,11 @@
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from astro_core.errors import NumericalConvergenceError
 from astro_core.io import load_scenario
-from astro_core.models import CartesianState, GroundStation, Scenario
+from astro_core.models import CartesianState, GroundStation, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
 from astro_od.estimation import estimate_initial_state
 from astro_od.measurements import generate_synthetic_measurements
@@ -18,15 +19,11 @@ def _observable_scenario() -> Scenario:
         frame="EME2000",
         elevation_mask_deg=0.0,
     )
-    return scenario.model_copy(update={"ground_stations": (*scenario.ground_stations, station)})
+    return scenario.model_copy(update={"ground_stations": [*scenario.ground_stations, station]})
 
 
-def test_batch_od_recovers_synthetic_initial_state() -> None:
-    truth_scenario = _observable_scenario()
-    truth_trajectory = propagate_local(truth_scenario)
-    measurements = generate_synthetic_measurements(truth_scenario, truth_trajectory)
-
-    perturbed_state = truth_scenario.initial_state.model_copy(
+def _perturbed_scenario(scenario: Scenario) -> Scenario:
+    perturbed_state = scenario.initial_state.model_copy(
         update={
             "cartesian": CartesianState(
                 position_km=(7001.0, -0.8, 0.6),
@@ -34,7 +31,20 @@ def test_batch_od_recovers_synthetic_initial_state() -> None:
             )
         }
     )
-    estimate_scenario = truth_scenario.model_copy(update={"initial_state": perturbed_state})
+    return scenario.model_copy(update={"initial_state": perturbed_state})
+
+
+def test_batch_od_recovers_synthetic_initial_state() -> None:
+    truth_scenario = _observable_scenario()
+    truth_trajectory = propagate_local(truth_scenario)
+    measurements = generate_synthetic_measurements(truth_scenario, truth_trajectory)
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+
+    assert {measurement.observer for measurement in measurements} == {"equator-eci", "north-eci"}
+    assert {measurement.measurement_type for measurement in measurements} == {
+        MeasurementType.RANGE,
+        MeasurementType.RANGE_RATE,
+    }
 
     result = estimate_initial_state(estimate_scenario, measurements)
 
@@ -47,15 +57,50 @@ def test_batch_od_recovers_synthetic_initial_state() -> None:
     assert np.linalg.norm(estimated_position - truth_position) < 0.2
     assert np.linalg.norm(estimated_velocity - truth_velocity) < 2.0e-4
     assert result.rms < 3.0
+    assert len(result.residuals) == len(measurements)
     assert len(result.covariance) == 6
+    assert all(len(row) == 6 for row in result.covariance)
+    assert result.iterations > 0
+    assert result.metadata["backend"] == "local_scipy_least_squares"
+    assert isinstance(result.metadata["message"], str)
+    assert result.metadata["jacobian_rank"] == 6
+    assert len(result.metadata["singular_values"]) == 6
+    assert result.metadata["condition_number"] > 0.0
 
 
 def test_estimate_initial_state_requires_measurements() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
 
-    try:
+    with pytest.raises(
+        NumericalConvergenceError,
+        match="At least one measurement is required for estimation",
+    ):
         estimate_initial_state(scenario, [])
-    except NumericalConvergenceError as exc:
-        assert str(exc) == "At least one measurement is required for estimation"
-    else:
-        raise AssertionError("estimate_initial_state should reject empty measurements")
+
+
+def test_estimate_initial_state_rejects_too_few_measurements() -> None:
+    truth_scenario = _observable_scenario()
+    measurements = generate_synthetic_measurements(truth_scenario, propagate_local(truth_scenario))
+
+    with pytest.raises(NumericalConvergenceError, match="At least 6 measurements"):
+        estimate_initial_state(_perturbed_scenario(truth_scenario), measurements[:5])
+
+
+def test_estimate_initial_state_rejects_rank_deficient_geometry() -> None:
+    truth_scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    measurements = generate_synthetic_measurements(truth_scenario, propagate_local(truth_scenario))
+
+    with pytest.raises(NumericalConvergenceError, match="rank deficient"):
+        estimate_initial_state(_perturbed_scenario(truth_scenario), measurements)
+
+
+def test_estimate_initial_state_rejects_mismatched_observed_object() -> None:
+    truth_scenario = _observable_scenario()
+    measurements = generate_synthetic_measurements(truth_scenario, propagate_local(truth_scenario))
+    mismatched_measurements = [
+        measurements[0].model_copy(update={"observed_object": "other-sat"}),
+        *measurements[1:],
+    ]
+
+    with pytest.raises(NumericalConvergenceError, match="observed object"):
+        estimate_initial_state(_perturbed_scenario(truth_scenario), mismatched_measurements)

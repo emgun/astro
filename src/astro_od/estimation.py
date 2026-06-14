@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -19,6 +19,8 @@ from astro_dynamics.local import propagate_local
 from astro_od.measurements import range_km, range_rate_km_s
 
 FloatArray = NDArray[np.float64]
+STATE_DIMENSION = 6
+JACOBIAN_RANK_RTOL = 1.0e-7
 
 
 def _vector3_from_state_vector(state_vector: FloatArray, start: int) -> tuple[float, float, float]:
@@ -43,6 +45,36 @@ def _station_position_for_observer(scenario: Scenario, observer: str) -> FloatAr
         if station.name == observer:
             return station.position_array()
     raise NumericalConvergenceError(f"Measurement observer {observer!r} is not in the scenario")
+
+
+def _validate_measurements(scenario: Scenario, measurements: list[MeasurementRecord]) -> None:
+    if not measurements:
+        raise NumericalConvergenceError("At least one measurement is required for estimation")
+    if len(measurements) < STATE_DIMENSION:
+        raise NumericalConvergenceError(
+            f"At least {STATE_DIMENSION} measurements are required for 6-state estimation"
+        )
+
+    observer_names = {station.name for station in scenario.ground_stations}
+    for measurement in measurements:
+        if measurement.observed_object != scenario.spacecraft.name:
+            raise NumericalConvergenceError(
+                "Measurement observed object "
+                f"{measurement.observed_object!r} does not match scenario spacecraft "
+                f"{scenario.spacecraft.name!r}"
+            )
+        if measurement.observer not in observer_names:
+            raise NumericalConvergenceError(
+                f"Measurement observer {measurement.observer!r} is not in the scenario"
+            )
+
+    propagated_epochs = {sample.epoch for sample in propagate_local(scenario).samples}
+    for measurement in measurements:
+        if measurement.epoch not in propagated_epochs:
+            epoch = measurement.epoch.isoformat()
+            raise NumericalConvergenceError(
+                f"No propagated sample is available for measurement epoch {epoch}"
+            )
 
 
 def _predicted_measurement(
@@ -91,6 +123,27 @@ def covariance_from_jacobian(jacobian: FloatArray, rms: float) -> list[list[floa
     return [[float(component) for component in row] for row in covariance]
 
 
+def _jacobian_diagnostics(jacobian: FloatArray) -> dict[str, Any]:
+    singular_values = np.linalg.svd(jacobian, compute_uv=False)
+    singular_value_list = [float(value) for value in singular_values]
+    largest_singular_value = singular_value_list[0] if singular_value_list else 0.0
+    smallest_singular_value = singular_value_list[-1] if singular_value_list else 0.0
+    rank_tolerance = largest_singular_value * JACOBIAN_RANK_RTOL
+    rank = int(np.count_nonzero(singular_values > rank_tolerance))
+    condition_number = (
+        float("inf")
+        if smallest_singular_value <= 0.0
+        else float(largest_singular_value / smallest_singular_value)
+    )
+
+    return {
+        "jacobian_rank": rank,
+        "jacobian_rank_tolerance": rank_tolerance,
+        "singular_values": singular_value_list,
+        "condition_number": condition_number,
+    }
+
+
 def _initial_state_vector(scenario: Scenario) -> FloatArray:
     initial = scenario.initial_state.cartesian
     return cast(
@@ -103,8 +156,7 @@ def estimate_initial_state(
     scenario: Scenario,
     measurements: list[MeasurementRecord],
 ) -> EstimateResult:
-    if not measurements:
-        raise NumericalConvergenceError("At least one measurement is required for estimation")
+    _validate_measurements(scenario, measurements)
 
     optimizer_result = least_squares(
         residual_vector,
@@ -120,6 +172,15 @@ def estimate_initial_state(
     residuals = residual_vector(estimated_vector, scenario, measurements)
     rms = float(np.sqrt(np.mean(residuals**2)))
     estimated_scenario = scenario_with_state_vector(scenario, estimated_vector)
+    diagnostics = _jacobian_diagnostics(cast(FloatArray, optimizer_result.jac))
+
+    if diagnostics["jacobian_rank"] < STATE_DIMENSION:
+        raise NumericalConvergenceError(
+            "Orbit determination Jacobian is rank deficient: "
+            f"rank {diagnostics['jacobian_rank']}/{STATE_DIMENSION}, "
+            f"condition_number={diagnostics['condition_number']}, "
+            f"singular_values={diagnostics['singular_values']}"
+        )
 
     return EstimateResult(
         estimated_state=estimated_scenario.initial_state,
@@ -131,5 +192,6 @@ def estimate_initial_state(
         metadata={
             "backend": "local_scipy_least_squares",
             "message": str(optimizer_result.message),
+            **diagnostics,
         },
     )
