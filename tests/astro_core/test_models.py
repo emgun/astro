@@ -101,6 +101,23 @@ def test_model_extra_fields_are_rejected() -> None:
         )
 
 
+def test_scalar_fields_reject_string_and_bool_inputs() -> None:
+    with pytest.raises(ValidationError, match="numeric scalar"):
+        Spacecraft(
+            name="demo",
+            mass_kg="120.0",
+            area_m2=2.5,
+            drag_coefficient=2.2,
+            reflectivity_coefficient=1.3,
+        )
+
+    with pytest.raises(ValidationError, match="integer"):
+        MeasurementNoise(seed="42")
+
+    with pytest.raises(ValidationError, match="integer"):
+        make_estimate_result(iterations=True)
+
+
 def test_orbit_state_requires_finite_cartesian_values() -> None:
     with pytest.raises(ValidationError, match="finite"):
         CartesianState(position_km=(7000.0, float("nan"), 0.0), velocity_km_s=(0.0, 7.5, 0.0))
@@ -136,6 +153,26 @@ def test_trajectory_sample_rejects_epoch_without_utc_offset(epoch: datetime) -> 
 def test_trajectory_requires_samples() -> None:
     with pytest.raises(ValidationError):
         make_trajectory([])
+
+
+def test_trajectory_requires_non_empty_identifiers() -> None:
+    sample = make_trajectory_sample(datetime(2026, 1, 1, tzinfo=UTC))
+
+    with pytest.raises(ValidationError):
+        Trajectory(
+            scenario_id="",
+            samples=[sample],
+            force_model=ForceModelConfig(gravity=ForceModelName.TWO_BODY),
+            backend="test",
+        )
+
+    with pytest.raises(ValidationError):
+        Trajectory(
+            scenario_id="leo-demo",
+            samples=[sample],
+            force_model=ForceModelConfig(gravity=ForceModelName.TWO_BODY),
+            backend="",
+        )
 
 
 def test_trajectory_rejects_duplicate_epochs() -> None:
@@ -213,6 +250,11 @@ def test_measurement_noise_and_config_reject_non_finite_scalars() -> None:
         MeasurementConfig(cadence_s=float("inf"))
 
 
+def test_measurement_config_requires_non_empty_types() -> None:
+    with pytest.raises(ValidationError):
+        MeasurementConfig(types=())
+
+
 @pytest.mark.parametrize(
     "epoch",
     [
@@ -231,6 +273,20 @@ def test_measurement_record_rejects_non_finite_value_or_sigma() -> None:
 
     with pytest.raises(ValidationError, match="finite"):
         make_measurement_record(sigma=float("inf"))
+
+
+@pytest.mark.parametrize(
+    ("measurement_type", "units"),
+    [
+        (MeasurementType.RANGE, "km/s"),
+        (MeasurementType.RANGE_RATE, "km"),
+    ],
+)
+def test_measurement_record_rejects_mismatched_type_and_units(
+    measurement_type: MeasurementType, units: str
+) -> None:
+    with pytest.raises(ValidationError, match="units"):
+        make_measurement_record(measurement_type=measurement_type, units=units)
 
 
 def test_estimate_result_rejects_invalid_covariance_shape_and_negative_iterations() -> None:

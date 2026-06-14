@@ -1,3 +1,10 @@
+from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM, SECONDS_PER_DAY
+from astro_core.errors import (
+    AstroError,
+    InvalidScenarioError,
+    NumericalConvergenceError,
+    UnsupportedBackendError,
+)
 from astro_core.models import (
     Body,
     CartesianState,
@@ -21,6 +28,7 @@ from astro_core.models import (
 )
 
 __all__ = [
+    "AstroError",
     "Body",
     "CartesianState",
     "EstimateResult",
@@ -28,16 +36,23 @@ __all__ = [
     "ForceModelName",
     "Frame",
     "GroundStation",
+    "InvalidScenarioError",
+    "J2_EARTH",
     "MeasurementConfig",
     "MeasurementNoise",
     "MeasurementRecord",
     "MeasurementType",
+    "MU_EARTH_KM3_S2",
+    "NumericalConvergenceError",
     "OrbitRepresentation",
     "OrbitState",
     "PropagationConfig",
+    "R_EARTH_KM",
+    "SECONDS_PER_DAY",
     "Scenario",
     "Spacecraft",
     "TimeScale",
     "Trajectory",
     "TrajectorySample",
+    "UnsupportedBackendError",
 ]

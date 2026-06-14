@@ -22,6 +22,40 @@ def _datetime_must_be_aware(value: datetime, label: str) -> datetime:
     return value
 
 
+def _numeric_scalar_input_must_be_number(value: Any, label: str) -> Any:
+    if isinstance(value, bool | str):
+        raise ValueError(f"{label} must be a numeric scalar")
+    return value
+
+
+def _integer_input_must_be_int(value: Any, label: str) -> Any:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{label} must be an integer")
+    return value
+
+
+def _numeric_sequence_input_must_be_numbers(value: Any, label: str) -> Any:
+    if isinstance(value, str | bytes):
+        raise ValueError(f"{label} must contain numeric scalar values")
+    if not isinstance(value, list | tuple):
+        return value
+
+    for component in value:
+        _numeric_scalar_input_must_be_number(component, label)
+    return value
+
+
+def _numeric_matrix_input_must_be_numbers(value: Any, label: str) -> Any:
+    if isinstance(value, str | bytes):
+        raise ValueError(f"{label} must contain numeric scalar values")
+    if not isinstance(value, list | tuple):
+        return value
+
+    for row in value:
+        _numeric_sequence_input_must_be_numbers(row, label)
+    return value
+
+
 class Body(StrEnum):
     EARTH = "earth"
 
@@ -88,6 +122,17 @@ class Spacecraft(AstroModel):
     drag_coefficient: FiniteFloat = Field(ge=0.0, le=10.0)
     reflectivity_coefficient: FiniteFloat = Field(ge=0.0, le=5.0)
 
+    @field_validator(
+        "mass_kg",
+        "area_m2",
+        "drag_coefficient",
+        "reflectivity_coefficient",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Spacecraft scalar")
+
 
 class ForceModelConfig(AstroModel):
     gravity: ForceModelName
@@ -96,6 +141,11 @@ class ForceModelConfig(AstroModel):
 class PropagationConfig(AstroModel):
     duration_s: FiniteFloat = Field(gt=0.0)
     step_s: FiniteFloat = Field(gt=0.0)
+
+    @field_validator("duration_s", "step_s", mode="before")
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Propagation scalar")
 
     @property
     def sample_count(self) -> int:
@@ -131,11 +181,29 @@ class MeasurementNoise(AstroModel):
     range_rate_sigma_km_s: FiniteFloat = Field(gt=0.0, default=1.0e-5)
     seed: int = 42
 
+    @field_validator("range_sigma_km", "range_rate_sigma_km_s", mode="before")
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Measurement noise scalar")
+
+    @field_validator("seed", mode="before")
+    @classmethod
+    def seed_must_be_integer_input(cls, value: Any) -> Any:
+        return _integer_input_must_be_int(value, "Measurement noise seed")
+
 
 class MeasurementConfig(AstroModel):
-    types: tuple[MeasurementType, ...] = (MeasurementType.RANGE, MeasurementType.RANGE_RATE)
+    types: tuple[MeasurementType, ...] = Field(
+        default=(MeasurementType.RANGE, MeasurementType.RANGE_RATE),
+        min_length=1,
+    )
     cadence_s: FiniteFloat = Field(gt=0.0, default=60.0)
     noise: MeasurementNoise = Field(default_factory=MeasurementNoise)
+
+    @field_validator("cadence_s", mode="before")
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Measurement cadence")
 
 
 class MeasurementRecord(AstroModel):
@@ -153,12 +221,28 @@ class MeasurementRecord(AstroModel):
     def epoch_must_be_aware(cls, value: datetime) -> datetime:
         return _datetime_must_be_aware(value, "MeasurementRecord epoch")
 
+    @field_validator("value", "sigma", mode="before")
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Measurement scalar")
+
     @field_validator("value", "sigma")
     @classmethod
     def numeric_values_must_be_finite(cls, value: float) -> float:
         if not isfinite(value):
             raise ValueError("Measurement numeric values must be finite")
         return value
+
+    @model_validator(mode="after")
+    def measurement_units_must_match_type(self) -> MeasurementRecord:
+        expected_units = {
+            MeasurementType.RANGE: "km",
+            MeasurementType.RANGE_RATE: "km/s",
+        }
+        if self.units != expected_units[self.measurement_type]:
+            expected_unit = expected_units[self.measurement_type]
+            raise ValueError(f"{self.measurement_type} measurements must use units {expected_unit}")
+        return self
 
 
 class TrajectorySample(AstroModel):
@@ -172,10 +256,10 @@ class TrajectorySample(AstroModel):
 
 
 class Trajectory(AstroModel):
-    scenario_id: str
+    scenario_id: str = Field(min_length=1)
     samples: list[TrajectorySample] = Field(min_length=1)
     force_model: ForceModelConfig
-    backend: str
+    backend: str = Field(min_length=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -206,6 +290,11 @@ class EstimateResult(AstroModel):
     converged: bool
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("residuals", mode="before")
+    @classmethod
+    def residual_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_sequence_input_must_be_numbers(value, "EstimateResult residuals")
+
     @field_validator("residuals")
     @classmethod
     def residuals_must_be_finite(cls, value: list[float]) -> list[float]:
@@ -213,12 +302,22 @@ class EstimateResult(AstroModel):
             raise ValueError("EstimateResult residuals must be finite")
         return value
 
+    @field_validator("rms", mode="before")
+    @classmethod
+    def rms_input_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "EstimateResult rms")
+
     @field_validator("rms")
     @classmethod
     def rms_must_be_finite(cls, value: float) -> float:
         if not isfinite(value):
             raise ValueError("EstimateResult rms must be finite")
         return value
+
+    @field_validator("covariance", mode="before")
+    @classmethod
+    def covariance_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_matrix_input_must_be_numbers(value, "EstimateResult covariance")
 
     @field_validator("covariance")
     @classmethod
@@ -228,6 +327,11 @@ class EstimateResult(AstroModel):
         if not all(isfinite(component) for row in value for component in row):
             raise ValueError("EstimateResult covariance values must be finite")
         return value
+
+    @field_validator("iterations", mode="before")
+    @classmethod
+    def iterations_must_be_integer_input(cls, value: Any) -> Any:
+        return _integer_input_must_be_int(value, "EstimateResult iterations")
 
 
 class Scenario(AstroModel):

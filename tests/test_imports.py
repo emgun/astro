@@ -11,7 +11,26 @@ def test_packages_import() -> None:
     import astro_dynamics
     import astro_od
 
-    assert "Scenario" in astro_core.__all__
+    expected_core_exports = {
+        "AstroError",
+        "InvalidScenarioError",
+        "J2_EARTH",
+        "MU_EARTH_KM3_S2",
+        "NumericalConvergenceError",
+        "R_EARTH_KM",
+        "SECONDS_PER_DAY",
+        "Scenario",
+        "UnsupportedBackendError",
+    }
+
+    assert expected_core_exports <= set(astro_core.__all__)
+    assert astro_core.MU_EARTH_KM3_S2 == 398600.4418
+    assert astro_core.R_EARTH_KM == 6378.1363
+    assert astro_core.J2_EARTH == 1.08262668e-3
+    assert astro_core.SECONDS_PER_DAY == 86400.0
+    assert issubclass(astro_core.InvalidScenarioError, astro_core.AstroError)
+    assert issubclass(astro_core.UnsupportedBackendError, astro_core.AstroError)
+    assert issubclass(astro_core.NumericalConvergenceError, astro_core.AstroError)
     assert astro_dynamics.__all__ == []
     assert astro_od.__all__ == []
     assert astro_backends.__all__ == []
