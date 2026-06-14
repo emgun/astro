@@ -182,6 +182,17 @@ def estimate_initial_state(
             f"singular_values={diagnostics['singular_values']}"
         )
 
+    if not optimizer_result.success:
+        raise NumericalConvergenceError(
+            "Orbit determination optimizer failed to converge: "
+            f"scipy_message={str(optimizer_result.message)!r}, "
+            f"nfev={int(optimizer_result.nfev)}, "
+            f"rms={rms}, "
+            f"jacobian_rank={diagnostics['jacobian_rank']}, "
+            f"condition_number={diagnostics['condition_number']}, "
+            f"singular_values={diagnostics['singular_values']}"
+        )
+
     return EstimateResult(
         estimated_state=estimated_scenario.initial_state,
         residuals=[float(value) for value in residuals],

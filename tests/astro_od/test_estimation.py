@@ -1,8 +1,11 @@
+from datetime import timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
+import astro_od.estimation as estimation
 from astro_core.errors import NumericalConvergenceError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, GroundStation, MeasurementType, Scenario
@@ -104,3 +107,56 @@ def test_estimate_initial_state_rejects_mismatched_observed_object() -> None:
 
     with pytest.raises(NumericalConvergenceError, match="observed object"):
         estimate_initial_state(_perturbed_scenario(truth_scenario), mismatched_measurements)
+
+
+def test_estimate_initial_state_rejects_unknown_observer() -> None:
+    truth_scenario = _observable_scenario()
+    measurements = generate_synthetic_measurements(truth_scenario, propagate_local(truth_scenario))
+    unknown_observer_measurements = [
+        measurements[0].model_copy(update={"observer": "missing-station"}),
+        *measurements[1:],
+    ]
+
+    with pytest.raises(NumericalConvergenceError, match="missing-station"):
+        estimate_initial_state(_perturbed_scenario(truth_scenario), unknown_observer_measurements)
+
+
+def test_estimate_initial_state_rejects_missing_propagated_epoch() -> None:
+    truth_scenario = _observable_scenario()
+    measurements = generate_synthetic_measurements(truth_scenario, propagate_local(truth_scenario))
+    off_grid_epoch_measurements = [
+        measurements[0].model_copy(update={"epoch": measurements[0].epoch + timedelta(seconds=30)}),
+        *measurements[1:],
+    ]
+
+    with pytest.raises(NumericalConvergenceError, match="No propagated sample"):
+        estimate_initial_state(_perturbed_scenario(truth_scenario), off_grid_epoch_measurements)
+
+
+def test_estimate_initial_state_rejects_failed_optimizer_with_full_rank_jacobian(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    truth_scenario = _observable_scenario()
+    measurements = generate_synthetic_measurements(truth_scenario, propagate_local(truth_scenario))
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+
+    def failed_least_squares(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            x=estimation._initial_state_vector(estimate_scenario),
+            jac=np.eye(6, dtype=np.float64),
+            nfev=12,
+            success=False,
+            message="forced optimizer failure",
+        )
+
+    monkeypatch.setattr(estimation, "least_squares", failed_least_squares)
+
+    with pytest.raises(NumericalConvergenceError) as exc_info:
+        estimate_initial_state(estimate_scenario, measurements)
+
+    message = str(exc_info.value)
+    assert "forced optimizer failure" in message
+    assert "nfev=12" in message
+    assert "rms=" in message
+    assert "jacobian_rank=6" in message
+    assert "condition_number=" in message
