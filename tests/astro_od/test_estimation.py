@@ -8,7 +8,7 @@ import pytest
 import astro_od.estimation as estimation
 from astro_core.errors import NumericalConvergenceError
 from astro_core.io import load_scenario
-from astro_core.models import CartesianState, GroundStation, MeasurementType, Scenario
+from astro_core.models import CartesianState, Frame, GroundStation, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
 from astro_od.estimation import estimate_initial_state
 from astro_od.measurements import generate_synthetic_measurements
@@ -19,7 +19,7 @@ def _observable_scenario() -> Scenario:
     station = GroundStation(
         name="north-eci",
         position_eci_km=(0.0, 6378.1363, 0.0),
-        frame="EME2000",
+        frame=Frame.EME2000,
         elevation_mask_deg=0.0,
     )
     return scenario.model_copy(update={"ground_stations": [*scenario.ground_stations, station]})
