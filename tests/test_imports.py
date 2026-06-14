@@ -24,6 +24,7 @@ def test_packages_import() -> None:
     }
     expected_dynamics_exports = {
         "acceleration_km_s2",
+        "derivative",
         "j2_acceleration_km_s2",
         "propagate_local",
         "rk4_step",

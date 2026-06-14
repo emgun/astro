@@ -17,17 +17,30 @@ from astro_core.models import (
 )
 
 FloatArray = NDArray[np.float64]
+_SUPPORTED_LOCAL_FORCE_MODELS = {ForceModelName.TWO_BODY, ForceModelName.J2}
+
+
+def _validate_local_force_model(force_model: ForceModelName) -> ForceModelName:
+    if force_model not in _SUPPORTED_LOCAL_FORCE_MODELS:
+        raise ValueError("Local backend supports only two_body and j2 force models")
+    return force_model
+
+
+def _radius_metrics(position_km: FloatArray) -> tuple[float, float]:
+    radius2 = float(np.dot(position_km, position_km))
+    if radius2 == 0.0:
+        raise ValueError("Cannot compute acceleration for zero-radius position")
+    return radius2, radius2**0.5
 
 
 def two_body_acceleration_km_s2(position_km: FloatArray) -> FloatArray:
-    radius = float(np.linalg.norm(position_km))
+    _, radius = _radius_metrics(position_km)
     return -MU_EARTH_KM3_S2 * position_km / radius**3
 
 
 def j2_acceleration_km_s2(position_km: FloatArray) -> FloatArray:
     x, y, z = position_km
-    radius2 = float(np.dot(position_km, position_km))
-    radius = radius2**0.5
+    radius2, radius = _radius_metrics(position_km)
     z2_over_r2 = (z * z) / radius2
     factor = 1.5 * J2_EARTH * MU_EARTH_KM3_S2 * R_EARTH_KM**2 / radius**5
     return cast(
@@ -49,6 +62,7 @@ def _vector3_from_array(values: FloatArray) -> Vector3:
 
 
 def acceleration_km_s2(position_km: FloatArray, force_model: ForceModelName) -> FloatArray:
+    force_model = _validate_local_force_model(force_model)
     acceleration = two_body_acceleration_km_s2(position_km)
     if force_model is ForceModelName.J2:
         acceleration = acceleration + j2_acceleration_km_s2(position_km)
@@ -56,12 +70,14 @@ def acceleration_km_s2(position_km: FloatArray, force_model: ForceModelName) -> 
 
 
 def derivative(state: FloatArray, force_model: ForceModelName) -> FloatArray:
+    force_model = _validate_local_force_model(force_model)
     position = state[:3]
     velocity = state[3:]
     return cast(FloatArray, np.concatenate([velocity, acceleration_km_s2(position, force_model)]))
 
 
 def rk4_step(state: FloatArray, step_s: float, force_model: ForceModelName) -> FloatArray:
+    force_model = _validate_local_force_model(force_model)
     k1 = derivative(state, force_model)
     k2 = derivative(state + 0.5 * step_s * k1, force_model)
     k3 = derivative(state + 0.5 * step_s * k2, force_model)
@@ -70,9 +86,7 @@ def rk4_step(state: FloatArray, step_s: float, force_model: ForceModelName) -> F
 
 
 def propagate_local(scenario: Scenario) -> Trajectory:
-    force_model = scenario.force_model.gravity
-    if force_model is ForceModelName.OREKIT_HIGH_FIDELITY:
-        raise ValueError("Local backend supports only two_body and j2 force models")
+    force_model = _validate_local_force_model(scenario.force_model.gravity)
 
     initial = scenario.initial_state.cartesian
     state = cast(FloatArray, np.concatenate([initial.position_array(), initial.velocity_array()]))

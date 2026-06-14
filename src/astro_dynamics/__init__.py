@@ -1,5 +1,6 @@
 from astro_dynamics.local import (
     acceleration_km_s2,
+    derivative,
     j2_acceleration_km_s2,
     propagate_local,
     rk4_step,
@@ -8,6 +9,7 @@ from astro_dynamics.local import (
 
 __all__ = [
     "acceleration_km_s2",
+    "derivative",
     "j2_acceleration_km_s2",
     "propagate_local",
     "rk4_step",
