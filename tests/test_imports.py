@@ -22,6 +22,13 @@ def test_packages_import() -> None:
         "Scenario",
         "UnsupportedBackendError",
     }
+    expected_dynamics_exports = {
+        "acceleration_km_s2",
+        "j2_acceleration_km_s2",
+        "propagate_local",
+        "rk4_step",
+        "two_body_acceleration_km_s2",
+    }
 
     assert expected_core_exports <= set(astro_core.__all__)
     assert astro_core.MU_EARTH_KM3_S2 == 398600.4418
@@ -31,7 +38,7 @@ def test_packages_import() -> None:
     assert issubclass(astro_core.InvalidScenarioError, astro_core.AstroError)
     assert issubclass(astro_core.UnsupportedBackendError, astro_core.AstroError)
     assert issubclass(astro_core.NumericalConvergenceError, astro_core.AstroError)
-    assert astro_dynamics.__all__ == []
+    assert set(astro_dynamics.__all__) == expected_dynamics_exports
     assert astro_od.__all__ == []
     assert astro_backends.__all__ == []
     assert astro_cli.__all__ == []
