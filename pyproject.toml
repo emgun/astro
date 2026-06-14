@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "astro-suite"
+version = "0.1.0"
+description = "Python flight dynamics suite for orbit propagation, orbit determination, and launch architecture."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Emery Gunselman" }]
+dependencies = [
+  "numpy>=1.26",
+  "pydantic>=2.7",
+  "PyYAML>=6.0",
+  "scipy>=1.12",
+  "typer>=0.12",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.10",
+  "pytest>=8.2",
+  "ruff>=0.5",
+]
+orekit = [
+  "orekit-jpype>=13.1",
+]
+
+[project.scripts]
+astro = "astro_cli.main:app"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+  "src/astro_core",
+  "src/astro_dynamics",
+  "src/astro_od",
+  "src/astro_backends",
+  "src/astro_cli",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["astro_core", "astro_dynamics", "astro_od", "astro_backends", "astro_cli"]
