@@ -21,6 +21,8 @@ _SUPPORTED_LOCAL_FORCE_MODELS = {ForceModelName.TWO_BODY, ForceModelName.J2}
 
 
 def _validate_local_force_model(force_model: ForceModelName) -> ForceModelName:
+    if not isinstance(force_model, ForceModelName):
+        raise ValueError("force_model must be a ForceModelName")
     if force_model not in _SUPPORTED_LOCAL_FORCE_MODELS:
         raise ValueError("Local backend supports only two_body and j2 force models")
     return force_model

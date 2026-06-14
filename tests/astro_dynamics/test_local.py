@@ -8,12 +8,14 @@ from astro_core.io import load_scenario
 from astro_core.models import ForceModelConfig, ForceModelName
 from astro_dynamics.local import (
     acceleration_km_s2,
+    derivative,
     j2_acceleration_km_s2,
     propagate_local,
     rk4_step,
     two_body_acceleration_km_s2,
 )
 
+FORCE_MODEL_TYPE_ERROR = "force_model must be a ForceModelName"
 LOCAL_FORCE_MODEL_ERROR = "Local backend supports only two_body and j2 force models"
 
 
@@ -56,6 +58,16 @@ def test_acceleration_rejects_unsupported_local_force_model() -> None:
         )
 
 
+def test_acceleration_rejects_raw_string_force_model() -> None:
+    with pytest.raises(ValueError, match=FORCE_MODEL_TYPE_ERROR):
+        acceleration_km_s2(np.array([7000.0, 0.0, 0.0]), "j2")
+
+
+def test_derivative_rejects_raw_string_force_model() -> None:
+    with pytest.raises(ValueError, match=FORCE_MODEL_TYPE_ERROR):
+        derivative(np.array([7000.0, 0.0, 0.0, 0.0, 7.5, 1.0]), "two_body")
+
+
 def test_rk4_step_rejects_unsupported_local_force_model() -> None:
     with pytest.raises(ValueError, match=LOCAL_FORCE_MODEL_ERROR):
         rk4_step(
@@ -72,6 +84,19 @@ def test_propagate_local_returns_expected_sample_count() -> None:
     assert trajectory.backend == "local"
     assert len(trajectory.samples) == scenario.propagation.sample_count
     assert trajectory.samples[0].state.position_km == scenario.initial_state.cartesian.position_km
+    assert trajectory.metadata == {"integrator": "rk4", "step_s": scenario.propagation.step_s}
+
+
+def test_propagate_local_rejects_unsupported_local_force_model() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    unsupported_scenario = scenario.model_copy(
+        update={
+            "force_model": ForceModelConfig(gravity=ForceModelName.OREKIT_HIGH_FIDELITY),
+        }
+    )
+
+    with pytest.raises(ValueError, match=LOCAL_FORCE_MODEL_ERROR):
+        propagate_local(unsupported_scenario)
 
 
 def test_j2_and_two_body_propagations_diverge() -> None:
