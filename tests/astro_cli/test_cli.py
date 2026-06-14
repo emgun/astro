@@ -47,6 +47,21 @@ def test_propagate_command_reports_invalid_scenario(tmp_path: Path) -> None:
     assert "is invalid" in result.stderr
 
 
+def test_propagate_command_reports_unsupported_backend() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "propagate",
+            "examples/scenarios/leo_two_body.yaml",
+            "--backend",
+            "orekit",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "unsupported propagation backend: orekit" in result.stderr
+
+
 def test_propagate_command_reports_output_write_error(tmp_path: Path) -> None:
     output = tmp_path / "missing" / "trajectory.json"
 
