@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, tzinfo
 
 import pytest
 from pydantic import ValidationError
@@ -19,6 +19,11 @@ from astro_core.models import (
 )
 
 
+class UndefinedOffsetTimezone(tzinfo):
+    def utcoffset(self, dt: datetime | None) -> None:
+        return None
+
+
 def make_state() -> OrbitState:
     return OrbitState(
         epoch=datetime(2026, 1, 1, tzinfo=UTC),
@@ -36,6 +41,21 @@ def make_state() -> OrbitState:
 def test_orbit_state_requires_finite_cartesian_values() -> None:
     with pytest.raises(ValidationError, match="finite"):
         CartesianState(position_km=(7000.0, float("nan"), 0.0), velocity_km_s=(0.0, 7.5, 0.0))
+
+
+def test_orbit_state_rejects_timezone_without_utc_offset() -> None:
+    with pytest.raises(ValidationError, match="timezone information"):
+        OrbitState(
+            epoch=datetime(2026, 1, 1, tzinfo=UndefinedOffsetTimezone()),
+            time_scale=TimeScale.UTC,
+            frame=Frame.EME2000,
+            central_body=Body.EARTH,
+            representation=OrbitRepresentation.CARTESIAN,
+            cartesian=CartesianState(
+                position_km=(7000.0, 0.0, 0.0),
+                velocity_km_s=(0.0, 7.5, 1.0),
+            ),
+        )
 
 
 def test_spacecraft_requires_positive_mass_and_area() -> None:

@@ -67,7 +67,7 @@ class OrbitState(BaseModel):
 
     @model_validator(mode="after")
     def validate_epoch(self) -> OrbitState:
-        if self.epoch.tzinfo is None:
+        if self.epoch.tzinfo is None or self.epoch.utcoffset() is None:
             raise ValueError("OrbitState epoch must include timezone information")
         return self
 
