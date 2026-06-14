@@ -22,6 +22,12 @@ def _datetime_must_be_aware(value: datetime, label: str) -> datetime:
     return value
 
 
+def _datetime_input_must_be_datetime_or_string(value: Any, label: str) -> Any:
+    if isinstance(value, bool | int | float):
+        raise ValueError(f"{label} must be a datetime or ISO datetime string")
+    return value
+
+
 def _numeric_scalar_input_must_be_number(value: Any, label: str) -> Any:
     if isinstance(value, bool | str):
         raise ValueError(f"{label} must be a numeric scalar")
@@ -87,6 +93,11 @@ class CartesianState(AstroModel):
     position_km: Vector3
     velocity_km_s: Vector3
 
+    @field_validator("position_km", "velocity_km_s", mode="before")
+    @classmethod
+    def vector_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_sequence_input_must_be_numbers(value, "Cartesian state vector")
+
     @field_validator("position_km", "velocity_km_s")
     @classmethod
     def values_must_be_finite(cls, value: Vector3) -> Vector3:
@@ -108,6 +119,11 @@ class OrbitState(AstroModel):
     central_body: Body
     representation: OrbitRepresentation
     cartesian: CartesianState
+
+    @field_validator("epoch", mode="before")
+    @classmethod
+    def epoch_input_must_be_datetime_or_string(cls, value: Any) -> Any:
+        return _datetime_input_must_be_datetime_or_string(value, "OrbitState epoch")
 
     @model_validator(mode="after")
     def validate_epoch(self) -> OrbitState:
@@ -163,7 +179,17 @@ class GroundStation(AstroModel):
     name: str = Field(min_length=1)
     position_eci_km: Vector3
     frame: Frame
-    elevation_mask_deg: float = Field(ge=-90.0, le=90.0)
+    elevation_mask_deg: FiniteFloat = Field(ge=-90.0, le=90.0)
+
+    @field_validator("position_eci_km", mode="before")
+    @classmethod
+    def position_input_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_sequence_input_must_be_numbers(value, "Ground station position")
+
+    @field_validator("elevation_mask_deg", mode="before")
+    @classmethod
+    def elevation_mask_input_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Ground station elevation mask")
 
     @field_validator("position_eci_km")
     @classmethod
@@ -216,6 +242,11 @@ class MeasurementRecord(AstroModel):
     units: Literal["km", "km/s"]
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    @field_validator("epoch", mode="before")
+    @classmethod
+    def epoch_input_must_be_datetime_or_string(cls, value: Any) -> Any:
+        return _datetime_input_must_be_datetime_or_string(value, "MeasurementRecord epoch")
+
     @field_validator("epoch")
     @classmethod
     def epoch_must_be_aware(cls, value: datetime) -> datetime:
@@ -248,6 +279,11 @@ class MeasurementRecord(AstroModel):
 class TrajectorySample(AstroModel):
     epoch: datetime
     state: CartesianState
+
+    @field_validator("epoch", mode="before")
+    @classmethod
+    def epoch_input_must_be_datetime_or_string(cls, value: Any) -> Any:
+        return _datetime_input_must_be_datetime_or_string(value, "TrajectorySample epoch")
 
     @field_validator("epoch")
     @classmethod

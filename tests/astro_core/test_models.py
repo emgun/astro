@@ -118,9 +118,91 @@ def test_scalar_fields_reject_string_and_bool_inputs() -> None:
         make_estimate_result(iterations=True)
 
 
+def test_cartesian_state_rejects_string_and_bool_vector_components() -> None:
+    with pytest.raises(ValidationError, match="numeric scalar"):
+        CartesianState(
+            position_km=["7000", 0, 0],
+            velocity_km_s=(0.0, 7.5, 0.0),
+        )
+
+    with pytest.raises(ValidationError, match="numeric scalar"):
+        CartesianState(
+            position_km=(True, 0, 0),
+            velocity_km_s=(0.0, 7.5, 0.0),
+        )
+
+
+def test_ground_station_rejects_string_and_bool_numeric_inputs() -> None:
+    with pytest.raises(ValidationError, match="numeric scalar"):
+        GroundStation(
+            name="station-a",
+            position_eci_km=["6378", 0, 0],
+            frame=Frame.EME2000,
+            elevation_mask_deg=0.0,
+        )
+
+    with pytest.raises(ValidationError, match="numeric scalar"):
+        GroundStation(
+            name="station-a",
+            position_eci_km=(6378.1363, 0.0, 0.0),
+            frame=Frame.EME2000,
+            elevation_mask_deg=True,
+        )
+
+    with pytest.raises(ValidationError, match="numeric scalar"):
+        GroundStation(
+            name="station-a",
+            position_eci_km=(6378.1363, 0.0, 0.0),
+            frame=Frame.EME2000,
+            elevation_mask_deg="5.0",
+        )
+
+
 def test_orbit_state_requires_finite_cartesian_values() -> None:
     with pytest.raises(ValidationError, match="finite"):
         CartesianState(position_km=(7000.0, float("nan"), 0.0), velocity_km_s=(0.0, 7.5, 0.0))
+
+
+def test_epoch_fields_reject_numeric_timestamps() -> None:
+    with pytest.raises(ValidationError, match="datetime"):
+        OrbitState(
+            epoch=0,
+            time_scale=TimeScale.UTC,
+            frame=Frame.EME2000,
+            central_body=Body.EARTH,
+            representation=OrbitRepresentation.CARTESIAN,
+            cartesian=CartesianState(
+                position_km=(7000.0, 0.0, 0.0),
+                velocity_km_s=(0.0, 7.5, 1.0),
+            ),
+        )
+
+    with pytest.raises(ValidationError, match="datetime"):
+        make_measurement_record(epoch=0)
+
+    with pytest.raises(ValidationError, match="datetime"):
+        TrajectorySample(epoch=0, state=make_state().cartesian)
+
+
+def test_iso_datetime_strings_are_accepted_for_epoch_fields() -> None:
+    iso_epoch = "2026-01-01T00:00:00Z"
+    orbit_state = OrbitState(
+        epoch=iso_epoch,
+        time_scale=TimeScale.UTC,
+        frame=Frame.EME2000,
+        central_body=Body.EARTH,
+        representation=OrbitRepresentation.CARTESIAN,
+        cartesian=CartesianState(
+            position_km=(7000.0, 0.0, 0.0),
+            velocity_km_s=(0.0, 7.5, 1.0),
+        ),
+    )
+    measurement = make_measurement_record(epoch=iso_epoch)
+    sample = TrajectorySample(epoch=iso_epoch, state=make_state().cartesian)
+
+    assert orbit_state.epoch.tzinfo is not None
+    assert measurement.epoch.tzinfo is not None
+    assert sample.epoch.tzinfo is not None
 
 
 def test_orbit_state_rejects_timezone_without_utc_offset() -> None:
