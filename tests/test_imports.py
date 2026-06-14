@@ -42,7 +42,7 @@ def test_packages_import() -> None:
     assert set(astro_dynamics.__all__) == expected_dynamics_exports
     assert astro_od.__all__ == []
     assert astro_backends.__all__ == []
-    assert astro_cli.__all__ == []
+    assert astro_cli.__all__ == ["app"]
 
 
 def test_console_script_entry_point_loads() -> None:

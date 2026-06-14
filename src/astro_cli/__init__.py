@@ -1,1 +1,3 @@
-__all__: list[str] = []
+from astro_cli.main import app
+
+__all__ = ["app"]
