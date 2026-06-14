@@ -37,6 +37,44 @@ def test_propagate_command_writes_json(tmp_path: Path) -> None:
     assert len(payload["samples"]) == 11
 
 
+def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:
+    output = tmp_path / "measurements.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "synth-measurements",
+            "examples/scenarios/leo_two_body.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "leo-two-body"
+    assert len(payload["measurements"]) == 22
+
+
+def test_estimate_command_writes_json(tmp_path: Path) -> None:
+    output = tmp_path / "estimate.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate",
+            "examples/scenarios/leo_two_body.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["converged"] is True
+    assert payload["rms"] < 3.0
+
+
 def test_propagate_command_reports_invalid_scenario(tmp_path: Path) -> None:
     scenario = tmp_path / "invalid.yaml"
     scenario.write_text("scenario_id: missing-required-fields\n", encoding="utf-8")
