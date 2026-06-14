@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, field_validator, model_validator
 
 Vector3 = tuple[float, float, float]
 
@@ -83,10 +83,10 @@ class OrbitState(AstroModel):
 
 class Spacecraft(AstroModel):
     name: str = Field(min_length=1)
-    mass_kg: float = Field(gt=0.0)
-    area_m2: float = Field(gt=0.0)
-    drag_coefficient: float = Field(ge=0.0, le=10.0)
-    reflectivity_coefficient: float = Field(ge=0.0, le=5.0)
+    mass_kg: FiniteFloat = Field(gt=0.0)
+    area_m2: FiniteFloat = Field(gt=0.0)
+    drag_coefficient: FiniteFloat = Field(ge=0.0, le=10.0)
+    reflectivity_coefficient: FiniteFloat = Field(ge=0.0, le=5.0)
 
 
 class ForceModelConfig(AstroModel):
@@ -94,8 +94,8 @@ class ForceModelConfig(AstroModel):
 
 
 class PropagationConfig(AstroModel):
-    duration_s: float = Field(gt=0.0)
-    step_s: float = Field(gt=0.0)
+    duration_s: FiniteFloat = Field(gt=0.0)
+    step_s: FiniteFloat = Field(gt=0.0)
 
     @property
     def sample_count(self) -> int:
@@ -127,14 +127,14 @@ class GroundStation(AstroModel):
 
 
 class MeasurementNoise(AstroModel):
-    range_sigma_km: float = Field(gt=0.0, default=0.01)
-    range_rate_sigma_km_s: float = Field(gt=0.0, default=1.0e-5)
+    range_sigma_km: FiniteFloat = Field(gt=0.0, default=0.01)
+    range_rate_sigma_km_s: FiniteFloat = Field(gt=0.0, default=1.0e-5)
     seed: int = 42
 
 
 class MeasurementConfig(AstroModel):
     types: tuple[MeasurementType, ...] = (MeasurementType.RANGE, MeasurementType.RANGE_RATE)
-    cadence_s: float = Field(gt=0.0, default=60.0)
+    cadence_s: FiniteFloat = Field(gt=0.0, default=60.0)
     noise: MeasurementNoise = Field(default_factory=MeasurementNoise)
 
 
@@ -143,10 +143,15 @@ class MeasurementRecord(AstroModel):
     epoch: datetime
     observer: str
     observed_object: str
-    value: float
-    sigma: float = Field(gt=0.0)
+    value: FiniteFloat
+    sigma: FiniteFloat = Field(gt=0.0)
     units: Literal["km", "km/s"]
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("epoch")
+    @classmethod
+    def epoch_must_be_aware(cls, value: datetime) -> datetime:
+        return _datetime_must_be_aware(value, "MeasurementRecord epoch")
 
     @field_validator("value", "sigma")
     @classmethod
@@ -194,9 +199,9 @@ class Trajectory(AstroModel):
 
 class EstimateResult(AstroModel):
     estimated_state: OrbitState
-    residuals: list[float]
-    covariance: list[list[float]]
-    rms: float
+    residuals: list[FiniteFloat]
+    covariance: list[list[FiniteFloat]]
+    rms: FiniteFloat
     iterations: int = Field(ge=0)
     converged: bool
     metadata: dict[str, Any] = Field(default_factory=dict)

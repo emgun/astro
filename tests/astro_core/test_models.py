@@ -11,6 +11,8 @@ from astro_core.models import (
     ForceModelName,
     Frame,
     GroundStation,
+    MeasurementConfig,
+    MeasurementNoise,
     MeasurementRecord,
     MeasurementType,
     OrbitRepresentation,
@@ -141,6 +143,86 @@ def test_trajectory_rejects_duplicate_epochs() -> None:
 
     with pytest.raises(ValidationError, match="strictly increasing"):
         make_trajectory([make_trajectory_sample(epoch), make_trajectory_sample(epoch)])
+
+
+def test_trajectory_rejects_descending_epochs() -> None:
+    later_epoch = datetime(2026, 1, 1, 0, 1, tzinfo=UTC)
+    earlier_epoch = datetime(2026, 1, 1, tzinfo=UTC)
+
+    with pytest.raises(ValidationError, match="strictly increasing"):
+        make_trajectory(
+            [
+                make_trajectory_sample(later_epoch),
+                make_trajectory_sample(earlier_epoch),
+            ]
+        )
+
+
+@pytest.mark.parametrize("field_name", ["mass_kg", "area_m2"])
+def test_spacecraft_rejects_non_finite_mass_and_area(field_name: str) -> None:
+    payload = {
+        "name": "demo",
+        "mass_kg": 120.0,
+        "area_m2": 2.5,
+        "drag_coefficient": 2.2,
+        "reflectivity_coefficient": 1.3,
+        field_name: float("inf"),
+    }
+
+    with pytest.raises(ValidationError, match="finite"):
+        Spacecraft(**payload)
+
+
+@pytest.mark.parametrize("field_name", ["drag_coefficient", "reflectivity_coefficient"])
+def test_spacecraft_rejects_non_finite_coefficients(field_name: str) -> None:
+    payload = {
+        "name": "demo",
+        "mass_kg": 120.0,
+        "area_m2": 2.5,
+        "drag_coefficient": 2.2,
+        "reflectivity_coefficient": 1.3,
+        field_name: float("nan"),
+    }
+
+    with pytest.raises(ValidationError, match="finite"):
+        Spacecraft(**payload)
+
+
+@pytest.mark.parametrize(
+    ("duration_s", "step_s"),
+    [
+        (float("inf"), 60.0),
+        (600.0, float("inf")),
+    ],
+)
+def test_propagation_config_rejects_non_finite_duration_and_step(
+    duration_s: float, step_s: float
+) -> None:
+    with pytest.raises(ValidationError, match="finite"):
+        PropagationConfig(duration_s=duration_s, step_s=step_s)
+
+
+def test_measurement_noise_and_config_reject_non_finite_scalars() -> None:
+    with pytest.raises(ValidationError, match="finite"):
+        MeasurementNoise(range_sigma_km=float("inf"))
+
+    with pytest.raises(ValidationError, match="finite"):
+        MeasurementNoise(range_rate_sigma_km_s=float("nan"))
+
+    with pytest.raises(ValidationError, match="finite"):
+        MeasurementConfig(cadence_s=float("inf"))
+
+
+@pytest.mark.parametrize(
+    "epoch",
+    [
+        datetime(2026, 1, 1),
+        datetime(2026, 1, 1, tzinfo=UndefinedOffsetTimezone()),
+    ],
+)
+def test_measurement_record_rejects_epoch_without_utc_offset(epoch: datetime) -> None:
+    with pytest.raises(ValidationError, match="timezone information"):
+        make_measurement_record(epoch=epoch)
 
 
 def test_measurement_record_rejects_non_finite_value_or_sigma() -> None:
