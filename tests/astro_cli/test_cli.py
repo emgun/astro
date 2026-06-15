@@ -1,3 +1,4 @@
+import csv
 import json
 from pathlib import Path
 
@@ -48,6 +49,38 @@ def _write_measurements(path: Path, scenario: Scenario) -> None:
         ),
         encoding="utf-8",
     )
+
+
+def _write_measurements_csv(path: Path, scenario: Scenario) -> None:
+    measurements = generate_synthetic_measurements(scenario, propagate_local(scenario))
+    fieldnames = [
+        "scenario_id",
+        "measurement_type",
+        "epoch",
+        "observer",
+        "observed_object",
+        "value",
+        "sigma",
+        "units",
+        "metadata_json",
+    ]
+    with path.open("w", encoding="utf-8", newline="") as measurement_file:
+        writer = csv.DictWriter(measurement_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for record in measurements:
+            payload = record.model_dump(mode="json")
+            writer.writerow(
+                {"scenario_id": scenario.scenario_id}
+                | {
+                    fieldname: (
+                        json.dumps(payload["metadata"])
+                        if fieldname == "metadata_json"
+                        else payload[fieldname]
+                    )
+                    for fieldname in fieldnames
+                    if fieldname != "scenario_id"
+                }
+            )
 
 
 def test_validate_command_accepts_example_scenario() -> None:
@@ -160,8 +193,39 @@ def test_estimate_measurements_command_writes_json(tmp_path: Path) -> None:
     assert payload["metadata"]["workflow"] == "local_measurement_file"
     assert payload["metadata"]["source_scenario_id"] == "leo-two-station-od"
     assert payload["metadata"]["measurement_file"] == str(measurements_path)
+    assert payload["metadata"]["measurement_format"] == "json"
     assert payload["metadata"]["measurement_count"] == 44
     assert "demo_added_ground_stations" not in payload["metadata"]
+
+
+def test_estimate_measurements_command_accepts_csv(tmp_path: Path) -> None:
+    truth_scenario = _observable_scenario()
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+    scenario_path = tmp_path / "estimate_scenario.yaml"
+    measurements_path = tmp_path / "measurements.csv"
+    output = tmp_path / "estimate.json"
+    _write_scenario(scenario_path, estimate_scenario)
+    _write_measurements_csv(measurements_path, truth_scenario)
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate-measurements",
+            str(scenario_path),
+            str(measurements_path),
+            "--format",
+            "csv",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["converged"] is True
+    assert payload["metadata"]["workflow"] == "local_measurement_file"
+    assert payload["metadata"]["measurement_format"] == "csv"
+    assert payload["metadata"]["measurement_count"] == 44
 
 
 def test_propagate_command_reports_invalid_scenario(tmp_path: Path) -> None:

@@ -46,12 +46,21 @@ astro orekit-smoke
 adds in-memory demo geometry for observability, generates synthetic measurements, perturbs the
 initial state as an estimate seed, and records that provenance in the output metadata.
 
-`astro estimate-measurements` is the explicit ingest workflow. It loads a scenario plus a JSON
-measurement file, requires matching `scenario_id` values, and estimates from the caller-provided
-station geometry and measurement records without adding demo geometry. Its measurement-file schema
-matches the output of `astro synth-measurements`. The `leo_two_station_od.yaml` example includes
-two stations because the one-station propagation example is intentionally under-observed for
-six-state OD.
+`astro estimate-measurements` is the explicit ingest workflow. It loads a scenario plus a JSON or
+CSV measurement file, requires matching `scenario_id` values, and estimates from the
+caller-provided station geometry and measurement records without adding demo geometry. JSON inputs
+match the output of `astro synth-measurements`; CSV inputs are auto-detected by `.csv` extension or
+can be forced with `--format csv`.
+
+CSV inputs use one row per measurement with these required columns:
+
+```csv
+scenario_id,measurement_type,epoch,observer,observed_object,value,sigma,units
+```
+
+The optional `metadata_json` column can carry a JSON object for row-level metadata. The
+`leo_two_station_od.yaml` example includes two stations because the one-station propagation example
+is intentionally under-observed for six-state OD.
 
 ## Verification
 

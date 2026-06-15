@@ -16,7 +16,7 @@ from astro_core.io import load_scenario
 from astro_core.models import CartesianState, GroundStation, Scenario
 from astro_dynamics.local import propagate_local
 from astro_od.estimation import estimate_initial_state
-from astro_od.io import load_measurements
+from astro_od.io import load_measurements, resolve_measurement_format
 from astro_od.measurements import generate_synthetic_measurements
 
 app = typer.Typer(help="Astro Suite flight dynamics workflows.")
@@ -132,6 +132,7 @@ def _with_measurement_file_metadata(
     *,
     scenario: Scenario,
     measurement_file: Path,
+    measurement_format: str,
     measurement_count: int,
 ) -> dict[str, object]:
     return {
@@ -139,6 +140,7 @@ def _with_measurement_file_metadata(
         "workflow": "local_measurement_file",
         "source_scenario_id": scenario.scenario_id,
         "measurement_file": str(measurement_file),
+        "measurement_format": measurement_format,
         "measurement_count": measurement_count,
     }
 
@@ -241,13 +243,22 @@ def estimate_measurements(
     scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
     measurements_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
     output: Annotated[Path, typer.Option()],
+    measurement_format: Annotated[
+        str,
+        typer.Option("--format", help="Measurement file format: auto, json, or csv."),
+    ] = "auto",
 ) -> None:
     """Run local batch OD from an explicit measurement file."""
     scenario = _load_scenario_or_exit(scenario_path)
     try:
+        resolved_measurement_format = resolve_measurement_format(
+            measurements_path,
+            measurement_format,
+        )
         measurements = load_measurements(
             measurements_path,
             expected_scenario_id=scenario.scenario_id,
+            measurement_format=resolved_measurement_format,
         )
         result = estimate_initial_state(scenario, measurements)
     except (InvalidMeasurementFileError, NumericalConvergenceError) as exc:
@@ -260,6 +271,7 @@ def estimate_measurements(
                 result.metadata,
                 scenario=scenario,
                 measurement_file=measurements_path,
+                measurement_format=resolved_measurement_format,
                 measurement_count=len(measurements),
             )
         }
