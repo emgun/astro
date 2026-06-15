@@ -88,12 +88,12 @@ research = [
 - Test: `tests/astro_backends/test_jax_propagation.py`
 - Test: `tests/astro_cli/test_cli.py`
 
-- [ ] Add tests showing missing JAX raises `UnsupportedBackendError`.
-- [ ] Add tests with a fake `research_runner` returning `MonteCarloResult`.
-- [ ] Implement `research_propagate_jax(scenario, cases, position_sigma_km, velocity_sigma_km_s, seed, runtime_loader=load_jax_runtime, research_runner=None)`.
-- [ ] Add `astro research-propagate --backend jax`.
-- [ ] Run focused research propagation tests.
-- [ ] Commit with `git commit -m "feat: add jax research propagation boundary"`.
+- [x] Add tests showing missing JAX raises `UnsupportedBackendError`.
+- [x] Add tests with a fake `research_runner` returning `MonteCarloResult`.
+- [x] Implement `research_propagate_jax(scenario, cases, position_sigma_km, velocity_sigma_km_s, seed, runtime_loader=load_jax_runtime, research_runner=None)`.
+- [x] Add `astro research-propagate --backend jax`.
+- [x] Run focused research propagation tests.
+- [x] Commit with `git commit -m "feat: add jax research propagation boundary"`.
 
 ## Task 4: Nyx Evaluation Artifact
 

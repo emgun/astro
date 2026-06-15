@@ -16,6 +16,7 @@ from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
+from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
 from astro_launch.io import load_launch_scenario
 from astro_launch.local import propagate_launch_local
 from astro_launch.models import LaunchScenario, LaunchTrajectory
@@ -249,6 +250,91 @@ def test_monte_carlo_command_writes_json(tmp_path: Path) -> None:
     assert payload["seed"] == 7
     assert len(payload["cases"]) == 4
     assert {case["trajectory"]["backend"] for case in payload["cases"]} == {"local"}
+
+
+def test_research_propagate_command_writes_local_json(tmp_path: Path) -> None:
+    output = tmp_path / "research.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "research-propagate",
+            "examples/scenarios/leo_two_body.yaml",
+            "--backend",
+            "local",
+            "--cases",
+            "2",
+            "--position-sigma-km",
+            "0.01",
+            "--velocity-sigma-km-s",
+            "0.000001",
+            "--seed",
+            "7",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote research propagation" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["backend"] == "local"
+    assert payload["metadata"]["workflow"] == "research_propagation"
+    assert len(payload["cases"]) == 2
+
+
+def test_research_propagate_command_accepts_jax_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "research.json"
+    seen_scenarios: list[str] = []
+
+    def fake_jax(
+        scenario: Scenario,
+        *,
+        cases: int,
+        position_sigma_km: float,
+        velocity_sigma_km_s: float,
+        seed: int,
+    ) -> object:
+        seen_scenarios.append(scenario.scenario_id)
+        result = run_initial_state_monte_carlo(
+            scenario,
+            cases=cases,
+            position_sigma_km=position_sigma_km,
+            velocity_sigma_km_s=velocity_sigma_km_s,
+            seed=seed,
+            backend="local",
+        )
+        return result.model_copy(update={"backend": "jax"})
+
+    monkeypatch.setattr("astro_cli.main.research_propagate_jax", fake_jax)
+
+    result = runner.invoke(
+        app,
+        [
+            "research-propagate",
+            "examples/scenarios/leo_two_body.yaml",
+            "--backend",
+            "jax",
+            "--cases",
+            "2",
+            "--position-sigma-km",
+            "0.01",
+            "--velocity-sigma-km-s",
+            "0.000001",
+            "--seed",
+            "7",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen_scenarios == ["leo-two-body"]
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["backend"] == "jax"
 
 
 def test_launch_command_writes_json(tmp_path: Path) -> None:

@@ -8,7 +8,7 @@ import typer
 import yaml
 
 from astro_backends.dymos import optimize_launch_dymos, run_dymos_smoke
-from astro_backends.jax import run_jax_smoke
+from astro_backends.jax import research_propagate_jax, run_jax_smoke
 from astro_backends.orekit import run_orekit_smoke
 from astro_backends.rocketpy import run_rocketpy_smoke
 from astro_backends.tudat import run_tudat_smoke
@@ -374,6 +374,49 @@ def monte_carlo(
 
     _write_text_or_exit(output, result.model_dump_json(indent=2), "monte carlo")
     typer.echo(f"wrote monte carlo: {output}")
+
+
+@app.command("research-propagate")
+def research_propagate(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    backend: Annotated[str, typer.Option()] = "local",
+    cases: Annotated[int, typer.Option()] = 16,
+    position_sigma_km: Annotated[float, typer.Option()] = 0.0,
+    velocity_sigma_km_s: Annotated[float, typer.Option()] = 0.0,
+    seed: Annotated[int, typer.Option()] = 42,
+) -> None:
+    """Run a seeded research propagation workflow."""
+    scenario = _load_scenario_or_exit(scenario_path)
+    try:
+        if backend == "local":
+            result = run_initial_state_monte_carlo(
+                scenario,
+                cases=cases,
+                position_sigma_km=position_sigma_km,
+                velocity_sigma_km_s=velocity_sigma_km_s,
+                seed=seed,
+                backend="local",
+            )
+        elif backend == "jax":
+            result = research_propagate_jax(
+                scenario,
+                cases=cases,
+                position_sigma_km=position_sigma_km,
+                velocity_sigma_km_s=velocity_sigma_km_s,
+                seed=seed,
+            )
+        else:
+            raise UnsupportedBackendError(f"unsupported research propagation backend: {backend}")
+    except (ValueError, UnsupportedBackendError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    result = result.model_copy(
+        update={"metadata": {**result.metadata, "workflow": "research_propagation"}}
+    )
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "research propagation")
+    typer.echo(f"wrote research propagation: {output}")
 
 
 @app.command()

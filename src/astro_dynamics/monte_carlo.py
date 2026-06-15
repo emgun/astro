@@ -52,6 +52,7 @@ class MonteCarloResult(AstroModel):
     position_sigma_km: FiniteFloat = Field(ge=0.0)
     velocity_sigma_km_s: FiniteFloat = Field(ge=0.0)
     cases: list[MonteCarloCase] = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("seed", mode="before")
     @classmethod
