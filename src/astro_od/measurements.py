@@ -9,6 +9,8 @@ from astro_core.models import MeasurementRecord, MeasurementType, Scenario, Traj
 
 FloatArray = NDArray[np.float64]
 MeasurementUnits = Literal["km", "km/s", "deg"]
+_ECI_NORTH_POLE = np.array([0.0, 0.0, 1.0], dtype=np.float64)
+_ECI_Y_AXIS = np.array([0.0, 1.0, 0.0], dtype=np.float64)
 
 
 def _as_float_array(values: ArrayLike) -> FloatArray:
@@ -63,6 +65,37 @@ def right_ascension_deg(spacecraft_position_km: ArrayLike, station_position_km: 
 def declination_deg(spacecraft_position_km: ArrayLike, station_position_km: ArrayLike) -> float:
     line_of_sight = _relative_line_of_sight(spacecraft_position_km, station_position_km)
     return float(np.degrees(np.arcsin(np.clip(line_of_sight[2], -1.0, 1.0))))
+
+
+def _topocentric_basis(station_position_km: ArrayLike) -> tuple[FloatArray, FloatArray, FloatArray]:
+    station_position = _as_float_array(station_position_km)
+    station_radius = float(np.linalg.norm(station_position))
+    if station_radius == 0.0:
+        raise ValueError("Cannot compute topocentric angles for a station at Earth center")
+
+    up = cast(FloatArray, station_position / station_radius)
+    east = np.cross(_ECI_NORTH_POLE, up)
+    east_norm = float(np.linalg.norm(east))
+    if east_norm == 0.0:
+        east = np.cross(_ECI_Y_AXIS, up)
+        east_norm = float(np.linalg.norm(east))
+    east = cast(FloatArray, east / east_norm)
+    north = cast(FloatArray, np.cross(up, east))
+    return east, north, up
+
+
+def azimuth_deg(spacecraft_position_km: ArrayLike, station_position_km: ArrayLike) -> float:
+    line_of_sight = _relative_line_of_sight(spacecraft_position_km, station_position_km)
+    east, north, _up = _topocentric_basis(station_position_km)
+    east_component = float(np.dot(line_of_sight, east))
+    north_component = float(np.dot(line_of_sight, north))
+    return float(np.degrees(np.arctan2(east_component, north_component)) % 360.0)
+
+
+def elevation_deg(spacecraft_position_km: ArrayLike, station_position_km: ArrayLike) -> float:
+    line_of_sight = _relative_line_of_sight(spacecraft_position_km, station_position_km)
+    _east, _north, up = _topocentric_basis(station_position_km)
+    return float(np.degrees(np.arcsin(np.clip(float(np.dot(line_of_sight, up)), -1.0, 1.0))))
 
 
 def _is_on_cadence(elapsed_s: float, cadence_s: float) -> bool:
@@ -147,6 +180,18 @@ def _measurement_geometry(
     if measurement_type is MeasurementType.DECLINATION:
         return (
             declination_deg(spacecraft_position_km, station_position_km),
+            scenario.measurements.noise.angle_sigma_deg,
+            "deg",
+        )
+    if measurement_type is MeasurementType.AZIMUTH:
+        return (
+            azimuth_deg(spacecraft_position_km, station_position_km),
+            scenario.measurements.noise.angle_sigma_deg,
+            "deg",
+        )
+    if measurement_type is MeasurementType.ELEVATION:
+        return (
+            elevation_deg(spacecraft_position_km, station_position_km),
             scenario.measurements.noise.angle_sigma_deg,
             "deg",
         )

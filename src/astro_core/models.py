@@ -103,6 +103,8 @@ class MeasurementType(StrEnum):
     RANGE_RATE = "range_rate"
     RIGHT_ASCENSION = "right_ascension"
     DECLINATION = "declination"
+    AZIMUTH = "azimuth"
+    ELEVATION = "elevation"
 
 
 class CartesianState(AstroModel):
@@ -288,6 +290,8 @@ class MeasurementRecord(AstroModel):
             MeasurementType.RANGE_RATE: "km/s",
             MeasurementType.RIGHT_ASCENSION: "deg",
             MeasurementType.DECLINATION: "deg",
+            MeasurementType.AZIMUTH: "deg",
+            MeasurementType.ELEVATION: "deg",
         }
         if self.units != expected_units[self.measurement_type]:
             expected_unit = expected_units[self.measurement_type]

@@ -114,6 +114,30 @@ def test_residual_vector_wraps_right_ascension_across_zero_degrees() -> None:
     assert residuals.tolist() == pytest.approx([1.0])
 
 
+def test_residual_vector_wraps_azimuth_across_zero_degrees() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    state = CartesianState(
+        position_km=(6378.1363, 0.0, 1.0),
+        velocity_km_s=scenario.initial_state.cartesian.velocity_km_s,
+    )
+    initial_state = scenario.initial_state.model_copy(update={"cartesian": state})
+    scenario = scenario.model_copy(update={"initial_state": initial_state})
+    state_vector = np.concatenate([state.position_array(), state.velocity_array()])
+    measurement = MeasurementRecord(
+        measurement_type=MeasurementType.AZIMUTH,
+        epoch=scenario.initial_state.epoch,
+        observer="equator-eci",
+        observed_object=scenario.spacecraft.name,
+        value=359.9,
+        sigma=0.1,
+        units="deg",
+    )
+
+    residuals = residual_vector(state_vector, scenario, [measurement], _single_sample_propagator)
+
+    assert residuals.tolist() == pytest.approx([1.0])
+
+
 def test_estimate_initial_state_requires_measurements() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
 

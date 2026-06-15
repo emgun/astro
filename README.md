@@ -99,6 +99,7 @@ astro propagate insertion.yaml --backend local --output insertion_trajectory.jso
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output measurements.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend orekit --output orekit_measurements.json
 astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output angle_measurements.json
+astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output topocentric_measurements.json
 astro export-measurements measurements.json --format csv --output measurements.csv
 astro export-measurements measurements.json --format tdm --output measurements.tdm
 astro estimate examples/scenarios/leo_two_body.yaml --backend local --output estimate.json
@@ -180,10 +181,12 @@ special launch-aware propagation path.
 `--backend orekit`. The explicit ingest workflow loads a scenario plus a JSON, CSV, or CCSDS
 Tracking Data Message (TDM) measurement file, then estimates from the caller-provided station
 geometry and measurement records without adding demo geometry. JSON and CSV can carry the suite's
-range, range-rate, right-ascension, and declination records. The angle records are inertial ECI
-line-of-sight angles in degrees, not topocentric azimuth/elevation. JSON inputs match the output of
-`astro synth-measurements`; CSV and TDM inputs are auto-detected by `.csv` and `.tdm` extensions or
-can be forced with `--format csv` / `--format tdm`.
+range, range-rate, inertial right-ascension/declination, and local-horizon azimuth/elevation
+records. Angle records use degrees. The current azimuth/elevation model derives a local
+east/north/up basis from each station's ECI position vector; it is not yet an Earth-fixed geodetic
+station or EOP-aware pointing model. JSON inputs match the output of `astro synth-measurements`;
+CSV and TDM inputs are auto-detected by `.csv` and `.tdm` extensions or can be forced with
+`--format csv` / `--format tdm`.
 
 `astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
 JSON and CSV preserve all supported suite measurement types. TDM export is intentionally restricted
@@ -213,7 +216,7 @@ TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTE
 mapped to range-rate measurements in `km/s`. TDM does not provide the suite's scenario identifier
 or estimator sigmas directly, so an optional segment-level `SCENARIO_ID` extension is checked when
 present, and the parser uses default sigmas of `0.01 km` for range and `1e-5 km/s` for range-rate.
-TDM ingest/export does not yet support suite right-ascension or declination records.
+TDM ingest/export does not yet support suite angle records.
 
 ## Verification
 

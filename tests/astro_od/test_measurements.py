@@ -44,6 +44,18 @@ def test_inertial_angle_measurements_return_line_of_sight_ra_dec() -> None:
     )
 
 
+def test_topocentric_angle_measurements_return_local_horizon_az_el() -> None:
+    spacecraft_position = np.array([6378.1363, 1.0, 1.0])
+    station_position = np.array([6378.1363, 0.0, 0.0])
+    azimuth_deg = getattr(od_measurements, "azimuth_deg", None)
+    elevation_deg = getattr(od_measurements, "elevation_deg", None)
+
+    assert azimuth_deg is not None
+    assert elevation_deg is not None
+    assert azimuth_deg(spacecraft_position, station_position) == 45.0
+    assert elevation_deg(spacecraft_position, station_position) == 0.0
+
+
 def test_generate_synthetic_measurements_is_deterministic_for_local_leo() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     trajectory = propagate_local(scenario)
@@ -94,6 +106,32 @@ def test_generate_synthetic_measurements_supports_inertial_angles() -> None:
         assert record.units == "deg"
         assert record.sigma == angle_scenario.measurements.noise.angle_sigma_deg
         assert isinstance(record.metadata["truth"], float)
+
+
+def test_generate_synthetic_measurements_supports_topocentric_angles() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    angle_measurements = scenario.measurements.model_copy(
+        update={
+            "types": (
+                MeasurementType.AZIMUTH,
+                MeasurementType.ELEVATION,
+            )
+        }
+    )
+    angle_scenario = scenario.model_copy(update={"measurements": angle_measurements})
+    trajectory = propagate_local(angle_scenario)
+
+    records = generate_synthetic_measurements(angle_scenario, trajectory)
+
+    assert len(records) == 22
+    assert {record.measurement_type for record in records} == {
+        MeasurementType.AZIMUTH,
+        MeasurementType.ELEVATION,
+    }
+    assert {record.units for record in records} == {"deg"}
+    assert all(
+        record.sigma == angle_scenario.measurements.noise.angle_sigma_deg for record in records
+    )
 
 
 def test_generate_synthetic_measurements_uses_scenario_noise_seed() -> None:

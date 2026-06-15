@@ -20,7 +20,7 @@ adapters.
 | Local covariance | `astro propagate examples/scenarios/leo_covariance.yaml --backend local --output /tmp/astro-covariance.json` | Writes covariance history samples using finite-difference state transition. |
 | Ephemeris export | `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv` | Writes CSV samples with epoch, position, and velocity. |
 | Local OD ingest | `astro estimate-measurements examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --output /tmp/astro-local-estimate.json` | Writes `EstimateResult` from explicit measurements. |
-| Optical measurement synthesis | `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json` | Writes right-ascension and declination records in degrees. |
+| Optical measurement synthesis | `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json` and `astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output /tmp/astro-topocentric-measurements.json` | Writes inertial RA/Dec and local-horizon az/el records in degrees. |
 | Local launch report | `astro report-tuned-launch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --iterations 2 --orbit-duration-s 600 --orbit-step-s 60 --output /tmp/astro-launch-report.json` | Writes tuned launch report with insertion and short-arc assessments. |
 | Local research propagation | `astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 2 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output /tmp/astro-research.json` | Writes `MonteCarloResult` with deterministic seeded cases. |
 
@@ -45,7 +45,7 @@ adapters.
 | Local finite burns | Tests compare finite-burn propagation against the no-maneuver local baseline and verify maneuver events/provenance. |
 | Local covariance propagation | Tests verify covariance history length, epoch alignment, symmetry, and finite-difference provenance metadata. |
 | Launch handoff | Tests confirm `LaunchTrajectory.insertion_state` converts into a normal orbital `Scenario` and propagates locally. |
-| OD explicit measurements | Tests validate JSON, CSV, TDM range/range-rate ingest/export, inertial angle generation, and local least-squares convergence. |
+| OD explicit measurements | Tests validate JSON, CSV, TDM range/range-rate ingest/export, inertial and local-horizon angle generation, angle wrapping, and local least-squares convergence. |
 | Research Monte Carlo | Tests confirm seeded repeatability, local Monte Carlo provenance, and built-in JAX two-body runner parity against the local reference for zero dispersion. |
 
 ## Backend Boundary Rule

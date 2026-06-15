@@ -431,7 +431,8 @@ The suite should track tolerances explicitly. When tolerance changes are needed,
 
 - Orekit adapter boundary.
 - LEO/MEO/GEO propagation workflows.
-- Synthetic range/range-rate and inertial right-ascension/declination measurements.
+- Synthetic range/range-rate, inertial right-ascension/declination, and local-horizon
+  azimuth/elevation measurements.
 - Batch least-squares OD recovery.
 - Ephemeris output.
 - Local maneuver schedule propagation for impulsive and finite-burn baselines.

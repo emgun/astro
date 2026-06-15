@@ -18,7 +18,14 @@ from astro_core.models import (
     Trajectory,
 )
 from astro_dynamics.backends import propagate_with_backend
-from astro_od.measurements import declination_deg, range_km, range_rate_km_s, right_ascension_deg
+from astro_od.measurements import (
+    azimuth_deg,
+    declination_deg,
+    elevation_deg,
+    range_km,
+    range_rate_km_s,
+    right_ascension_deg,
+)
 
 FloatArray = NDArray[np.float64]
 Propagator = Callable[[Scenario], Trajectory]
@@ -116,6 +123,10 @@ def _predicted_measurement(
         return right_ascension_deg(spacecraft_position, station_position)
     if measurement.measurement_type is MeasurementType.DECLINATION:
         return declination_deg(spacecraft_position, station_position)
+    if measurement.measurement_type is MeasurementType.AZIMUTH:
+        return azimuth_deg(spacecraft_position, station_position)
+    if measurement.measurement_type is MeasurementType.ELEVATION:
+        return elevation_deg(spacecraft_position, station_position)
     raise NumericalConvergenceError(f"Unsupported measurement type: {measurement.measurement_type}")
 
 
@@ -124,7 +135,7 @@ def _angle_delta_deg(predicted_deg: float, observed_deg: float) -> float:
 
 
 def _measurement_residual(predicted: float, measurement: MeasurementRecord) -> float:
-    if measurement.measurement_type is MeasurementType.RIGHT_ASCENSION:
+    if measurement.measurement_type in {MeasurementType.RIGHT_ASCENSION, MeasurementType.AZIMUTH}:
         return _angle_delta_deg(predicted, measurement.value) / measurement.sigma
     return (predicted - measurement.value) / measurement.sigma
 

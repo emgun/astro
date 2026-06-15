@@ -44,7 +44,9 @@ def test_packages_import() -> None:
         "two_body_acceleration_km_s2",
     }
     expected_od_exports = {
+        "azimuth_deg",
         "declination_deg",
+        "elevation_deg",
         "estimate_initial_state",
         "generate_synthetic_measurements",
         "load_measurements",
