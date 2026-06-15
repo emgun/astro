@@ -9,6 +9,7 @@ def test_packages_import() -> None:
     import astro_cli
     import astro_core
     import astro_dynamics
+    import astro_launch
     import astro_od
 
     expected_core_exports = {
@@ -38,6 +39,22 @@ def test_packages_import() -> None:
         "range_km",
         "range_rate_km_s",
     }
+    expected_launch_exports = {
+        "AtmosphereConfig",
+        "GuidanceConfig",
+        "LaunchEngine",
+        "LaunchEvent",
+        "LaunchPropagationConfig",
+        "LaunchScenario",
+        "LaunchSite",
+        "LaunchStage",
+        "LaunchTrajectory",
+        "LaunchTrajectorySample",
+        "LaunchVehicle",
+        "TargetOrbit",
+        "load_launch_scenario",
+        "propagate_launch_local",
+    }
 
     assert expected_core_exports <= set(astro_core.__all__)
     assert astro_core.MU_EARTH_KM3_S2 == 398600.4418
@@ -50,6 +67,7 @@ def test_packages_import() -> None:
     assert issubclass(astro_core.NumericalConvergenceError, astro_core.AstroError)
     assert set(astro_dynamics.__all__) == expected_dynamics_exports
     assert set(astro_od.__all__) == expected_od_exports
+    assert set(astro_launch.__all__) == expected_launch_exports
     assert astro_backends.__all__ == []
     assert astro_cli.__all__ == ["app"]
 

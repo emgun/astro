@@ -1,6 +1,8 @@
 # Astro Suite
 
-Astro Suite is a Python flight dynamics project for scenario validation, local reference propagation, synthetic orbit-determination measurements, batch OD, and backend adapters.
+Astro Suite is a Python flight dynamics project for scenario validation, local reference
+propagation, launch/ascent sanity cases, synthetic orbit-determination measurements, batch OD,
+and backend adapters.
 
 ## Current Scope
 
@@ -8,13 +10,16 @@ The current implementation slice covers:
 
 - Pydantic scenario validation from YAML.
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
+- Local launch/ascent reference propagation with staged mass depletion, drag, events, and
+  insertion-state handoff.
 - Synthetic range and range-rate measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, synthetic measurements, synthetic OD, and
   measurement-file OD ingest/export.
 - Optional Orekit Python-wrapper smoke checks through `orekit_jpype`.
 
-Launch/ascent is included in the design specs and will be implemented after the shared scenario, trajectory, and backend adapter spine is stable.
+Launch/ascent currently uses a deliberately simple local vertical-ascent baseline. RocketPy and
+Dymos/OpenMDAO remain future backend adapters once the launch product contracts are stable.
 
 ## Setup
 
@@ -36,6 +41,7 @@ If `orekit-jpype` is not installed, `astro orekit-smoke` exits nonzero with stru
 ```bash
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
+astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --output measurements.json
 astro export-measurements measurements.json --format csv --output measurements.csv
 astro export-measurements measurements.json --format tdm --output measurements.tdm
@@ -47,6 +53,12 @@ astro orekit-smoke
 `astro estimate` is an MVP synthetic demonstration workflow. It keeps the source scenario unchanged,
 adds in-memory demo geometry for observability, generates synthetic measurements, perturbs the
 initial state as an estimate seed, and records that provenance in the output metadata.
+
+`astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
+vertical-ascent baseline, and writes a launch trajectory product with samples, stage events,
+dynamic pressure, acceleration, target miss metrics, and an `insertion_state` compatible with the
+shared `OrbitState` product. This local backend is a deterministic data-flow baseline, not a
+production launch simulator.
 
 `astro estimate-measurements` is the explicit ingest workflow. It loads a scenario plus a JSON,
 CSV, or CCSDS Tracking Data Message (TDM) measurement file, then estimates from the

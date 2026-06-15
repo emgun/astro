@@ -14,6 +14,7 @@ from astro_core.models import CartesianState, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
 from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
+from tests.astro_launch.helpers import make_launch_scenario
 
 runner = CliRunner(mix_stderr=False)
 
@@ -36,6 +37,11 @@ def _perturbed_scenario(scenario: Scenario) -> Scenario:
 
 def _write_scenario(path: Path, scenario: Scenario) -> None:
     payload = scenario.model_dump(mode="json")
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _write_launch_scenario(path: Path) -> None:
+    payload = make_launch_scenario().model_dump(mode="json")
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
@@ -148,6 +154,34 @@ def test_propagate_command_writes_json(tmp_path: Path) -> None:
     assert payload["scenario_id"] == "leo-two-body"
     assert payload["backend"] == "local"
     assert len(payload["samples"]) == 11
+
+
+def test_launch_command_writes_json(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "launch.yaml"
+    output = tmp_path / "launch.json"
+    _write_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "launch",
+            str(scenario_path),
+            "--backend",
+            "local",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote launch trajectory" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "vertical-two-stage"
+    assert payload["backend"] == "local"
+    assert len(payload["samples"]) == 15
+    assert payload["events"][-1]["event_type"] == "insertion"
+    assert payload["insertion_state"]["central_body"] == "earth"
+    assert payload["metadata"]["model"] == "vertical_1d"
 
 
 def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:
@@ -435,6 +469,27 @@ def test_propagate_command_reports_unsupported_backend() -> None:
     assert "unsupported propagation backend: orekit" in result.stderr
 
 
+def test_launch_command_reports_unsupported_backend(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "launch.yaml"
+    output = tmp_path / "launch.json"
+    _write_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "launch",
+            str(scenario_path),
+            "--backend",
+            "rocketpy",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "unsupported launch backend: rocketpy" in result.stderr
+
+
 def test_propagate_command_reports_output_write_error(tmp_path: Path) -> None:
     output = tmp_path / "missing" / "trajectory.json"
 
@@ -450,6 +505,26 @@ def test_propagate_command_reports_output_write_error(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "could not write trajectory" in result.stderr
+    assert str(output) in result.stderr
+
+
+def test_launch_command_reports_output_write_error(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "launch.yaml"
+    output = tmp_path / "missing" / "launch.json"
+    _write_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "launch",
+            str(scenario_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "could not write launch trajectory" in result.stderr
     assert str(output) in result.stderr
 
 
@@ -505,6 +580,24 @@ def test_synth_measurements_command_reports_invalid_scenario(tmp_path: Path) -> 
 
     assert result.exit_code == 2
     assert "is invalid" in result.stderr
+
+
+def test_launch_command_reports_invalid_scenario(tmp_path: Path) -> None:
+    scenario = tmp_path / "invalid.yaml"
+    scenario.write_text("scenario_id: missing-required-fields\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "launch",
+            str(scenario),
+            "--output",
+            str(tmp_path / "launch.json"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Launch scenario file" in result.stderr
 
 
 def test_estimate_command_reports_invalid_scenario(tmp_path: Path) -> None:

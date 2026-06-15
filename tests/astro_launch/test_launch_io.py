@@ -1,0 +1,54 @@
+from pathlib import Path
+
+import pytest
+import yaml
+
+from astro_core.errors import InvalidScenarioError
+from astro_launch.io import load_launch_scenario
+from tests.astro_launch.helpers import make_launch_scenario
+
+
+def test_load_launch_scenario_reads_yaml(tmp_path: Path) -> None:
+    path = tmp_path / "launch.yaml"
+    path.write_text(
+        yaml.safe_dump(make_launch_scenario().model_dump(mode="json"), sort_keys=False),
+        encoding="utf-8",
+    )
+
+    scenario = load_launch_scenario(path)
+
+    assert scenario.scenario_id == "vertical-two-stage"
+    assert scenario.vehicle.stages[0].name == "stage-1"
+    assert scenario.propagation.sample_count == 15
+
+
+def test_load_example_launch_scenario() -> None:
+    scenario = load_launch_scenario(Path("examples/launch/vertical_two_stage.yaml"))
+
+    assert scenario.scenario_id == "vertical-two-stage"
+    assert scenario.vehicle.stages[1].name == "stage-2"
+    assert scenario.target_orbit.altitude_km == 160.0
+
+
+def test_load_launch_scenario_reports_yaml_parse_errors(tmp_path: Path) -> None:
+    path = tmp_path / "bad.yaml"
+    path.write_text("scenario_id: [broken", encoding="utf-8")
+
+    with pytest.raises(InvalidScenarioError, match="Could not parse launch scenario file"):
+        load_launch_scenario(path)
+
+
+def test_load_launch_scenario_requires_mapping_yaml(tmp_path: Path) -> None:
+    path = tmp_path / "list.yaml"
+    path.write_text("- not\n- a\n- mapping\n", encoding="utf-8")
+
+    with pytest.raises(InvalidScenarioError, match="must contain a mapping"):
+        load_launch_scenario(path)
+
+
+def test_load_launch_scenario_wraps_validation_errors(tmp_path: Path) -> None:
+    path = tmp_path / "invalid-launch.yaml"
+    path.write_text("scenario_id: missing-required-fields\n", encoding="utf-8")
+
+    with pytest.raises(InvalidScenarioError, match="is invalid"):
+        load_launch_scenario(path)

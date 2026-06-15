@@ -15,6 +15,9 @@ from astro_core.errors import (
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, GroundStation, Scenario
 from astro_dynamics.local import propagate_local
+from astro_launch.io import load_launch_scenario
+from astro_launch.local import propagate_launch_local
+from astro_launch.models import LaunchScenario
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import (
     dump_measurements_csv,
@@ -39,6 +42,14 @@ DEMO_GROUND_STATION_CANDIDATES: tuple[tuple[str, tuple[float, float, float]], ..
 def _load_scenario_or_exit(scenario_path: Path) -> Scenario:
     try:
         return load_scenario(scenario_path)
+    except InvalidScenarioError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+
+def _load_launch_scenario_or_exit(scenario_path: Path) -> LaunchScenario:
+    try:
+        return load_launch_scenario(scenario_path)
     except InvalidScenarioError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
@@ -189,6 +200,27 @@ def propagate(
     else:
         _write_text_or_exit(output, payload, "trajectory")
         typer.echo(f"wrote trajectory: {output}")
+
+
+@app.command()
+def launch(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    backend: Annotated[str, typer.Option()] = "local",
+    output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Run a launch/ascent scenario and write a launch trajectory product."""
+    scenario = _load_launch_scenario_or_exit(scenario_path)
+    if backend != "local":
+        typer.echo(f"unsupported launch backend: {backend}", err=True)
+        raise typer.Exit(code=2)
+
+    trajectory = propagate_launch_local(scenario)
+    payload = trajectory.model_dump_json(indent=2)
+    if output is None:
+        typer.echo(payload)
+    else:
+        _write_text_or_exit(output, payload, "launch trajectory")
+        typer.echo(f"wrote launch trajectory: {output}")
 
 
 @app.command()

@@ -35,6 +35,7 @@ astro = "astro_cli.main:app"
 packages = [
   "src/astro_core",
   "src/astro_dynamics",
+  "src/astro_launch",
   "src/astro_od",
   "src/astro_backends",
   "src/astro_cli",
@@ -55,4 +56,4 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 python_version = "3.12"
 strict = true
 mypy_path = "src"
-packages = ["astro_core", "astro_dynamics", "astro_od", "astro_backends", "astro_cli"]
+packages = ["astro_core", "astro_dynamics", "astro_launch", "astro_od", "astro_backends", "astro_cli"]
