@@ -6,6 +6,7 @@ from typer.testing import CliRunner
 
 def test_packages_import() -> None:
     import astro_backends
+    import astro_backends.orekit
     import astro_cli
     import astro_core
     import astro_dynamics
@@ -79,6 +80,14 @@ def test_packages_import() -> None:
         "sweep_pitch_program",
         "tune_pitch_program",
     }
+    expected_orekit_exports = {
+        "OrekitRuntime",
+        "OrekitRuntimeUnavailable",
+        "OrekitSmokeResult",
+        "load_orekit_runtime",
+        "propagate_orekit",
+        "run_orekit_smoke",
+    }
 
     assert expected_core_exports <= set(astro_core.__all__)
     assert astro_core.MU_EARTH_KM3_S2 == 398600.4418
@@ -93,6 +102,7 @@ def test_packages_import() -> None:
     assert set(astro_od.__all__) == expected_od_exports
     assert set(astro_launch.__all__) == expected_launch_exports
     assert astro_backends.__all__ == []
+    assert set(astro_backends.orekit.__all__) == expected_orekit_exports
     assert astro_cli.__all__ == ["app"]
 
 
