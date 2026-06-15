@@ -20,7 +20,7 @@ from astro_launch.handoff import launch_trajectory_to_orbit_scenario
 from astro_launch.io import load_launch_scenario, load_launch_trajectory
 from astro_launch.local import propagate_launch_local
 from astro_launch.models import LaunchScenario, LaunchTrajectory
-from astro_launch.targeting import sweep_pitch_program
+from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import (
     dump_measurements_csv,
@@ -84,6 +84,23 @@ def _parse_pitch_deg_values_or_exit(pitch_deg_values: str) -> list[float]:
     except ValueError as exc:
         typer.echo("pitch-deg-values must be comma-separated numbers", err=True)
         raise typer.Exit(code=2) from exc
+
+
+def _parse_point_indices_or_exit(point_indices: str) -> tuple[int, int]:
+    raw_values = [raw_value.strip() for raw_value in point_indices.split(",")]
+    if (
+        not point_indices.strip()
+        or len(raw_values) != 2
+        or any(raw_value == "" for raw_value in raw_values)
+    ):
+        typer.echo("point-indices must be two comma-separated integers", err=True)
+        raise typer.Exit(code=2)
+    try:
+        parsed_values = tuple(int(raw_value) for raw_value in raw_values)
+    except ValueError as exc:
+        typer.echo("point-indices must be two comma-separated integers", err=True)
+        raise typer.Exit(code=2) from exc
+    return parsed_values[0], parsed_values[1]
 
 
 def _offset_cartesian_state(
@@ -324,6 +341,56 @@ def sweep_launch_pitch(
 
     _write_text_or_exit(output, result.model_dump_json(indent=2), "launch pitch sweep")
     typer.echo(f"wrote launch pitch sweep: {output}")
+
+
+@app.command("tune-launch-pitch")
+def tune_launch_pitch(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    point_indices: Annotated[
+        str,
+        typer.Option(
+            "--point-indices",
+            help="Two comma-separated pitch-program point indices.",
+        ),
+    ] = "2,3",
+    initial_span_deg: Annotated[float, typer.Option()] = 10.0,
+    iterations: Annotated[int, typer.Option()] = 2,
+    refinement_factor: Annotated[float, typer.Option()] = 0.5,
+    altitude_weight: Annotated[float, typer.Option()] = 1.0,
+    velocity_weight: Annotated[float, typer.Option()] = 1.0,
+    tuned_scenario_output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Tune two launch pitch-program knots and optionally write the tuned scenario."""
+    scenario = _load_launch_scenario_or_exit(scenario_path)
+    parsed_point_indices = _parse_point_indices_or_exit(point_indices)
+    try:
+        result = tune_pitch_program(
+            scenario,
+            point_indices=parsed_point_indices,
+            initial_span_deg=initial_span_deg,
+            iterations=iterations,
+            refinement_factor=refinement_factor,
+            altitude_weight=altitude_weight,
+            velocity_weight=velocity_weight,
+        )
+    except ValueError as exc:
+        typer.echo(f"could not tune launch pitch: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "launch pitch tuning")
+    typer.echo(f"wrote launch pitch tuning: {output}")
+    if tuned_scenario_output is not None:
+        tuned_scenario_payload = yaml.safe_dump(
+            result.tuned_scenario.model_dump(mode="json"),
+            sort_keys=False,
+        )
+        _write_text_or_exit(
+            tuned_scenario_output,
+            tuned_scenario_payload.rstrip("\n"),
+            "tuned launch scenario",
+        )
+        typer.echo(f"wrote tuned launch scenario: {tuned_scenario_output}")
 
 
 @app.command()

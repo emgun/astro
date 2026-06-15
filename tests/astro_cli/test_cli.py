@@ -12,6 +12,7 @@ from astro_core.errors import NumericalConvergenceError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
+from astro_launch.io import load_launch_scenario
 from astro_launch.local import propagate_launch_local
 from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
@@ -303,6 +304,95 @@ def test_sweep_launch_pitch_command_reports_output_write_error(tmp_path: Path) -
     assert result.exit_code == 2
     assert "could not write launch pitch sweep" in result.stderr
     assert str(output) in result.stderr
+
+
+def test_tune_launch_pitch_command_writes_json_and_tuned_scenario(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "tuning.json"
+    tuned_scenario_output = tmp_path / "tuned.yaml"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "tune-launch-pitch",
+            str(scenario_path),
+            "--point-indices",
+            "2,3",
+            "--initial-span-deg",
+            "10",
+            "--iterations",
+            "2",
+            "--output",
+            str(output),
+            "--tuned-scenario-output",
+            str(tuned_scenario_output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote launch pitch tuning" in result.stdout
+    assert "wrote tuned launch scenario" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    tuned_scenario = load_launch_scenario(tuned_scenario_output)
+    tuned_pitches = {
+        point["point_index"]: point["tuned_pitch_deg"] for point in payload["tuned_points"]
+    }
+    assert payload["scenario_id"] == "pitch-program-two-stage"
+    assert payload["point_indices"] == [2, 3]
+    assert len(payload["iterations"]) == 2
+    assert payload["best_case"]["score"] == min(
+        case["score"] for iteration in payload["iterations"] for case in iteration["cases"]
+    )
+    assert tuned_scenario.guidance.pitch_program[2].pitch_deg == tuned_pitches[2]
+    assert tuned_scenario.guidance.pitch_program[3].pitch_deg == tuned_pitches[3]
+
+
+def test_tune_launch_pitch_command_reports_invalid_point_indices(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "tune-launch-pitch",
+            str(scenario_path),
+            "--point-indices",
+            "2,bad",
+            "--output",
+            str(tmp_path / "tuning.json"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "point-indices must be two comma-separated integers" in result.stderr
+
+
+def test_tune_launch_pitch_command_reports_tuned_scenario_write_error(
+    tmp_path: Path,
+) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "tuning.json"
+    tuned_scenario_output = tmp_path / "missing" / "tuned.yaml"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "tune-launch-pitch",
+            str(scenario_path),
+            "--point-indices",
+            "2,3",
+            "--output",
+            str(output),
+            "--tuned-scenario-output",
+            str(tuned_scenario_output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "could not write tuned launch scenario" in result.stderr
+    assert str(tuned_scenario_output) in result.stderr
 
 
 def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:

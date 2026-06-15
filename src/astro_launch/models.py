@@ -437,3 +437,87 @@ class LaunchPitchSweepResult(AstroModel):
     @classmethod
     def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
         return _numeric_scalar_input_must_be_number(value, "Launch pitch sweep scalar")
+
+
+class LaunchPitchTuningPoint(AstroModel):
+    point_index: int = Field(ge=0)
+    time_s: FiniteFloat = Field(ge=0.0)
+    baseline_pitch_deg: FiniteFloat = Field(ge=0.0, le=90.0)
+    tuned_pitch_deg: FiniteFloat = Field(ge=0.0, le=90.0)
+
+    @field_validator(
+        "time_s",
+        "baseline_pitch_deg",
+        "tuned_pitch_deg",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch pitch tuning scalar")
+
+
+class LaunchPitchTuningCase(AstroModel):
+    iteration: int = Field(ge=1)
+    pitch_deg_by_point_index: dict[str, FiniteFloat]
+    score: FiniteFloat = Field(ge=0.0)
+    altitude_miss_km: FiniteFloat
+    velocity_miss_km_s: FiniteFloat
+    final_altitude_km: FiniteFloat
+    final_velocity_km_s: FiniteFloat
+    final_radial_velocity_km_s: FiniteFloat
+    final_horizontal_velocity_km_s: FiniteFloat
+    final_downrange_km: FiniteFloat
+    target_miss: dict[str, FiniteFloat]
+
+    @field_validator(
+        "score",
+        "altitude_miss_km",
+        "velocity_miss_km_s",
+        "final_altitude_km",
+        "final_velocity_km_s",
+        "final_radial_velocity_km_s",
+        "final_horizontal_velocity_km_s",
+        "final_downrange_km",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch pitch tuning scalar")
+
+
+class LaunchPitchTuningIteration(AstroModel):
+    iteration: int = Field(ge=1)
+    span_deg: FiniteFloat = Field(gt=0.0)
+    cases: list[LaunchPitchTuningCase] = Field(min_length=1)
+    best_case: LaunchPitchTuningCase
+
+    @field_validator("span_deg", mode="before")
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch pitch tuning scalar")
+
+
+class LaunchPitchTuningResult(AstroModel):
+    scenario_id: str = Field(min_length=1)
+    point_indices: list[int] = Field(min_length=2, max_length=2)
+    tuned_points: list[LaunchPitchTuningPoint] = Field(min_length=2, max_length=2)
+    initial_span_deg: FiniteFloat = Field(gt=0.0)
+    refinement_factor: FiniteFloat = Field(gt=0.0, lt=1.0)
+    altitude_weight: FiniteFloat = Field(ge=0.0)
+    velocity_weight: FiniteFloat = Field(ge=0.0)
+    iterations: list[LaunchPitchTuningIteration] = Field(min_length=1)
+    best_case: LaunchPitchTuningCase
+    tuned_scenario: LaunchScenario
+    backend: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator(
+        "initial_span_deg",
+        "refinement_factor",
+        "altitude_weight",
+        "velocity_weight",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch pitch tuning scalar")

@@ -46,6 +46,10 @@ def test_packages_import() -> None:
         "LaunchEvent",
         "LaunchPitchSweepCase",
         "LaunchPitchSweepResult",
+        "LaunchPitchTuningCase",
+        "LaunchPitchTuningIteration",
+        "LaunchPitchTuningPoint",
+        "LaunchPitchTuningResult",
         "LaunchPropagationConfig",
         "LaunchScenario",
         "LaunchSite",
@@ -60,6 +64,7 @@ def test_packages_import() -> None:
         "load_launch_trajectory",
         "propagate_launch_local",
         "sweep_pitch_program",
+        "tune_pitch_program",
     }
 
     assert expected_core_exports <= set(astro_core.__all__)

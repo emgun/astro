@@ -12,7 +12,7 @@ The current implementation slice covers:
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
-- Launch pitch-program sweep targeting over repeated local ascent propagations.
+- Launch pitch-program sweep and two-knot tuning over repeated local ascent propagations.
 - Synthetic range and range-rate measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
@@ -46,6 +46,7 @@ astro propagate examples/scenarios/leo_two_body.yaml --backend local --output tr
 astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
 astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output pitch_launch.json
 astro sweep-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-index 3 --pitch-deg-values 10,20,30 --output pitch_sweep.json
+astro tune-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --initial-span-deg 10 --iterations 2 --output pitch_tuning.json --tuned-scenario-output tuned_pitch_program.yaml
 astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
 astro propagate insertion.yaml --backend local --output insertion_trajectory.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --output measurements.json
@@ -71,6 +72,11 @@ runs the local launch propagator for each candidate pitch angle, and writes a JS
 altitude miss, velocity miss, weighted score, final downrange, and the best case. It is a transparent
 grid sweep rather than an optimizer; that keeps the target-miss contract clear before adding Dymos,
 OpenMDAO, or RocketPy-backed targeting.
+
+`astro tune-launch-pitch` is the first multi-knot targeting workflow. It varies two pitch-program
+knots on a deterministic 3x3 grid, shrinks the search span each iteration, writes a JSON trace of
+every evaluated candidate, and can write the best tuned `LaunchScenario` back to YAML. This is still
+a coarse-to-fine targeting analysis tool, not a production optimizer.
 
 `astro handoff-launch` converts a launch trajectory product into a normal orbital propagation
 scenario initialized from `LaunchTrajectory.insertion_state`. The generated YAML is intentionally

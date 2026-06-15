@@ -8,6 +8,10 @@ from astro_launch.models import (
     LaunchEvent,
     LaunchPitchSweepCase,
     LaunchPitchSweepResult,
+    LaunchPitchTuningCase,
+    LaunchPitchTuningIteration,
+    LaunchPitchTuningPoint,
+    LaunchPitchTuningResult,
     LaunchPropagationConfig,
     LaunchScenario,
     LaunchSite,
@@ -18,7 +22,7 @@ from astro_launch.models import (
     PitchProgramPoint,
     TargetOrbit,
 )
-from astro_launch.targeting import sweep_pitch_program
+from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
 
 __all__ = [
     "AtmosphereConfig",
@@ -27,6 +31,10 @@ __all__ = [
     "LaunchEvent",
     "LaunchPitchSweepCase",
     "LaunchPitchSweepResult",
+    "LaunchPitchTuningCase",
+    "LaunchPitchTuningIteration",
+    "LaunchPitchTuningPoint",
+    "LaunchPitchTuningResult",
     "LaunchPropagationConfig",
     "LaunchScenario",
     "LaunchSite",
@@ -41,4 +49,5 @@ __all__ = [
     "load_launch_trajectory",
     "propagate_launch_local",
     "sweep_pitch_program",
+    "tune_pitch_program",
 ]
