@@ -1,6 +1,6 @@
 import pytest
 
-from astro_launch.reporting import generate_tuned_launch_report
+from astro_launch.reporting import compare_tuned_launch_reports, generate_tuned_launch_report
 from tests.astro_launch.helpers import make_launch_scenario, make_pitch_program_launch_scenario
 
 
@@ -82,6 +82,54 @@ def test_generate_tuned_launch_report_passes_with_loose_target_tolerances() -> N
     assert report.short_arc_assessment.passed is True
     assert all(check.passed for check in report.insertion_assessment.checks)
     assert all(check.passed for check in report.short_arc_assessment.checks)
+
+
+def test_compare_tuned_launch_reports_summarizes_pass_and_metric_deltas() -> None:
+    scenario = make_pitch_program_launch_scenario()
+    baseline = generate_tuned_launch_report(
+        scenario,
+        point_indices=(2, 3),
+        initial_span_deg=10.0,
+        iterations=1,
+        orbit_duration_s=600.0,
+        orbit_step_s=60.0,
+    )
+    candidate = generate_tuned_launch_report(
+        scenario,
+        point_indices=(2, 3),
+        initial_span_deg=10.0,
+        iterations=2,
+        orbit_duration_s=600.0,
+        orbit_step_s=60.0,
+    )
+
+    comparison = compare_tuned_launch_reports(baseline, candidate)
+
+    assert comparison.baseline_scenario_id == baseline.scenario_id
+    assert comparison.candidate_scenario_id == candidate.scenario_id
+    assert comparison.baseline_passed == baseline.passed
+    assert comparison.candidate_passed == candidate.passed
+    assert [metric.name for metric in comparison.metric_deltas] == [
+        "insertion_altitude_miss",
+        "insertion_velocity_miss",
+        "short_arc_final_altitude_miss",
+        "short_arc_final_velocity_miss",
+    ]
+    insertion_altitude = comparison.metric_deltas[0]
+    assert insertion_altitude.baseline_value == pytest.approx(
+        baseline.insertion_metrics.altitude_miss_km
+    )
+    assert insertion_altitude.candidate_value == pytest.approx(
+        candidate.insertion_metrics.altitude_miss_km
+    )
+    assert insertion_altitude.delta == pytest.approx(
+        candidate.insertion_metrics.altitude_miss_km
+        - baseline.insertion_metrics.altitude_miss_km
+    )
+    assert insertion_altitude.improvement == pytest.approx(
+        abs(baseline.insertion_metrics.altitude_miss_km)
+        - abs(candidate.insertion_metrics.altitude_miss_km)
+    )
 
 
 def test_generate_tuned_launch_report_requires_pitch_program_guidance() -> None:

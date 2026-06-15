@@ -17,10 +17,10 @@ from astro_core.io import load_scenario
 from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario
 from astro_dynamics.local import propagate_local
 from astro_launch.handoff import launch_trajectory_to_orbit_scenario
-from astro_launch.io import load_launch_scenario, load_launch_trajectory
+from astro_launch.io import load_launch_scenario, load_launch_trajectory, load_tuned_launch_report
 from astro_launch.local import propagate_launch_local
-from astro_launch.models import LaunchScenario, LaunchTrajectory
-from astro_launch.reporting import generate_tuned_launch_report
+from astro_launch.models import LaunchScenario, LaunchTrajectory, TunedLaunchReport
+from astro_launch.reporting import compare_tuned_launch_reports, generate_tuned_launch_report
 from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import (
@@ -62,6 +62,14 @@ def _load_launch_scenario_or_exit(scenario_path: Path) -> LaunchScenario:
 def _load_launch_trajectory_or_exit(trajectory_path: Path) -> LaunchTrajectory:
     try:
         return load_launch_trajectory(trajectory_path)
+    except InvalidScenarioError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+
+def _load_tuned_launch_report_or_exit(report_path: Path) -> TunedLaunchReport:
+    try:
+        return load_tuned_launch_report(report_path)
     except InvalidScenarioError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
@@ -452,6 +460,25 @@ def report_tuned_launch(
 
     _write_text_or_exit(output, report.model_dump_json(indent=2), "tuned launch report")
     typer.echo(f"wrote tuned launch report: {output}")
+
+
+@app.command("compare-tuned-launch-reports")
+def compare_tuned_launch_report_products(
+    baseline_report_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    candidate_report_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+) -> None:
+    """Compare two tuned launch report products and write metric deltas."""
+    baseline_report = _load_tuned_launch_report_or_exit(baseline_report_path)
+    candidate_report = _load_tuned_launch_report_or_exit(candidate_report_path)
+    comparison = compare_tuned_launch_reports(baseline_report, candidate_report)
+
+    _write_text_or_exit(
+        output,
+        comparison.model_dump_json(indent=2),
+        "tuned launch report comparison",
+    )
+    typer.echo(f"wrote tuned launch report comparison: {output}")
 
 
 @app.command()

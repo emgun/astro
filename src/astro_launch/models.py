@@ -622,3 +622,43 @@ class TunedLaunchReport(AstroModel):
     passed: bool
     backend: str = Field(min_length=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class LaunchReportMetricDelta(AstroModel):
+    name: str = Field(min_length=1)
+    baseline_value: FiniteFloat
+    candidate_value: FiniteFloat
+    delta: FiniteFloat
+    baseline_abs_value: FiniteFloat = Field(ge=0.0)
+    candidate_abs_value: FiniteFloat = Field(ge=0.0)
+    improvement: FiniteFloat
+    improved: bool
+    units: str = Field(min_length=1)
+
+    @field_validator(
+        "baseline_value",
+        "candidate_value",
+        "delta",
+        "baseline_abs_value",
+        "candidate_abs_value",
+        "improvement",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch report comparison scalar")
+
+
+class TunedLaunchReportComparison(AstroModel):
+    baseline_scenario_id: str = Field(min_length=1)
+    candidate_scenario_id: str = Field(min_length=1)
+    baseline_passed: bool
+    candidate_passed: bool
+    passed_changed: bool
+    baseline_insertion_passed: bool
+    candidate_insertion_passed: bool
+    baseline_short_arc_passed: bool
+    candidate_short_arc_passed: bool
+    metric_deltas: list[LaunchReportMetricDelta] = Field(min_length=1)
+    backend: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)

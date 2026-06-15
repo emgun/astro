@@ -14,6 +14,7 @@ from astro_core.models import CartesianState, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
 from astro_launch.io import load_launch_scenario
 from astro_launch.local import propagate_launch_local
+from astro_launch.reporting import generate_tuned_launch_report
 from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
 from tests.astro_launch.helpers import make_launch_scenario, make_pitch_program_launch_scenario
@@ -55,6 +56,18 @@ def _write_pitch_program_launch_scenario(path: Path) -> None:
 def _write_launch_trajectory(path: Path) -> None:
     trajectory = propagate_launch_local(make_launch_scenario())
     path.write_text(trajectory.model_dump_json(), encoding="utf-8")
+
+
+def _write_tuned_launch_report(path: Path, *, iterations: int) -> None:
+    report = generate_tuned_launch_report(
+        make_pitch_program_launch_scenario(),
+        point_indices=(2, 3),
+        initial_span_deg=10.0,
+        iterations=iterations,
+        orbit_duration_s=600.0,
+        orbit_step_s=60.0,
+    )
+    path.write_text(report.model_dump_json(), encoding="utf-8")
 
 
 def _write_measurements(path: Path, scenario: Scenario) -> None:
@@ -485,6 +498,39 @@ def test_report_tuned_launch_command_reports_output_write_error(tmp_path: Path) 
     assert result.exit_code == 2
     assert "could not write tuned launch report" in result.stderr
     assert str(output) in result.stderr
+
+
+def test_compare_tuned_launch_reports_command_writes_json(tmp_path: Path) -> None:
+    baseline_path = tmp_path / "baseline.json"
+    candidate_path = tmp_path / "candidate.json"
+    output = tmp_path / "comparison.json"
+    _write_tuned_launch_report(baseline_path, iterations=1)
+    _write_tuned_launch_report(candidate_path, iterations=2)
+
+    result = runner.invoke(
+        app,
+        [
+            "compare-tuned-launch-reports",
+            str(baseline_path),
+            str(candidate_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote tuned launch report comparison" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["baseline_scenario_id"] == "pitch-program-two-stage"
+    assert payload["candidate_scenario_id"] == "pitch-program-two-stage"
+    assert payload["baseline_passed"] is False
+    assert payload["candidate_passed"] is False
+    assert [metric["name"] for metric in payload["metric_deltas"]] == [
+        "insertion_altitude_miss",
+        "insertion_velocity_miss",
+        "short_arc_final_altitude_miss",
+        "short_arc_final_velocity_miss",
+    ]
 
 
 def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:

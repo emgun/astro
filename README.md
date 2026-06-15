@@ -13,7 +13,7 @@ The current implementation slice covers:
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
-  local ascent/orbit propagations.
+  local ascent/orbit propagations, plus report-to-report comparison.
 - Synthetic range and range-rate measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
@@ -49,6 +49,7 @@ astro launch examples/launch/pitch_program_two_stage.yaml --backend local --outp
 astro sweep-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-index 3 --pitch-deg-values 10,20,30 --output pitch_sweep.json
 astro tune-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --initial-span-deg 10 --iterations 2 --output pitch_tuning.json --tuned-scenario-output tuned_pitch_program.yaml
 astro report-tuned-launch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --initial-span-deg 10 --iterations 2 --orbit-duration-s 600 --orbit-step-s 60 --output tuned_launch_report.json
+astro compare-tuned-launch-reports tuned_launch_report_baseline.json tuned_launch_report_candidate.json --output tuned_launch_comparison.json
 astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
 astro propagate insertion.yaml --backend local --output insertion_trajectory.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --output measurements.json
@@ -86,6 +87,10 @@ and write one JSON product with the component products plus insertion and short-
 The report also includes pass/fail assessment gates using the target orbit's configured altitude
 and velocity tolerances, with named checks for insertion and short-arc misses.
 It is a deterministic report over local baselines, not a substitute for high-fidelity ascent design.
+
+`astro compare-tuned-launch-reports` compares two saved tuned launch report JSON products without
+rerunning analysis. It writes signed deltas and absolute-error improvement for insertion and
+short-arc target misses, plus pass/fail changes between the baseline and candidate reports.
 
 `astro handoff-launch` converts a launch trajectory product into a normal orbital propagation
 scenario initialized from `LaunchTrajectory.insertion_state`. The generated YAML is intentionally

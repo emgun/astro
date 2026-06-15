@@ -1,5 +1,5 @@
 from astro_launch.handoff import launch_trajectory_to_orbit_scenario
-from astro_launch.io import load_launch_scenario, load_launch_trajectory
+from astro_launch.io import load_launch_scenario, load_launch_trajectory, load_tuned_launch_report
 from astro_launch.local import propagate_launch_local
 from astro_launch.models import (
     AtmosphereConfig,
@@ -16,6 +16,7 @@ from astro_launch.models import (
     LaunchReportAssessment,
     LaunchReportCheck,
     LaunchReportInsertionMetrics,
+    LaunchReportMetricDelta,
     LaunchReportShortArcMetrics,
     LaunchScenario,
     LaunchSite,
@@ -26,8 +27,9 @@ from astro_launch.models import (
     PitchProgramPoint,
     TargetOrbit,
     TunedLaunchReport,
+    TunedLaunchReportComparison,
 )
-from astro_launch.reporting import generate_tuned_launch_report
+from astro_launch.reporting import compare_tuned_launch_reports, generate_tuned_launch_report
 from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
 
 __all__ = [
@@ -45,6 +47,7 @@ __all__ = [
     "LaunchReportAssessment",
     "LaunchReportCheck",
     "LaunchReportInsertionMetrics",
+    "LaunchReportMetricDelta",
     "LaunchReportShortArcMetrics",
     "LaunchScenario",
     "LaunchSite",
@@ -55,10 +58,13 @@ __all__ = [
     "PitchProgramPoint",
     "TargetOrbit",
     "TunedLaunchReport",
+    "TunedLaunchReportComparison",
+    "compare_tuned_launch_reports",
     "generate_tuned_launch_report",
     "launch_trajectory_to_orbit_scenario",
     "load_launch_scenario",
     "load_launch_trajectory",
+    "load_tuned_launch_report",
     "propagate_launch_local",
     "sweep_pitch_program",
     "tune_pitch_program",

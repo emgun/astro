@@ -12,10 +12,12 @@ from astro_launch.models import (
     LaunchReportAssessment,
     LaunchReportCheck,
     LaunchReportInsertionMetrics,
+    LaunchReportMetricDelta,
     LaunchReportShortArcMetrics,
     LaunchScenario,
     LaunchTrajectory,
     TunedLaunchReport,
+    TunedLaunchReportComparison,
 )
 from astro_launch.targeting import tune_pitch_program
 
@@ -154,6 +156,79 @@ def _short_arc_assessment(
                 units="km/s",
             ),
         ]
+    )
+
+
+def _metric_delta(
+    *,
+    name: str,
+    baseline_value: float,
+    candidate_value: float,
+    units: str,
+) -> LaunchReportMetricDelta:
+    baseline_abs_value = abs(baseline_value)
+    candidate_abs_value = abs(candidate_value)
+    return LaunchReportMetricDelta(
+        name=name,
+        baseline_value=baseline_value,
+        candidate_value=candidate_value,
+        delta=candidate_value - baseline_value,
+        baseline_abs_value=baseline_abs_value,
+        candidate_abs_value=candidate_abs_value,
+        improvement=baseline_abs_value - candidate_abs_value,
+        improved=candidate_abs_value < baseline_abs_value,
+        units=units,
+    )
+
+
+def compare_tuned_launch_reports(
+    baseline: TunedLaunchReport,
+    candidate: TunedLaunchReport,
+) -> TunedLaunchReportComparison:
+    """Compare two tuned launch report products without rerunning propagation."""
+    metric_deltas = [
+        _metric_delta(
+            name="insertion_altitude_miss",
+            baseline_value=baseline.insertion_metrics.altitude_miss_km,
+            candidate_value=candidate.insertion_metrics.altitude_miss_km,
+            units="km",
+        ),
+        _metric_delta(
+            name="insertion_velocity_miss",
+            baseline_value=baseline.insertion_metrics.velocity_miss_km_s,
+            candidate_value=candidate.insertion_metrics.velocity_miss_km_s,
+            units="km/s",
+        ),
+        _metric_delta(
+            name="short_arc_final_altitude_miss",
+            baseline_value=baseline.short_arc_metrics.final_altitude_miss_km,
+            candidate_value=candidate.short_arc_metrics.final_altitude_miss_km,
+            units="km",
+        ),
+        _metric_delta(
+            name="short_arc_final_velocity_miss",
+            baseline_value=baseline.short_arc_metrics.final_velocity_miss_km_s,
+            candidate_value=candidate.short_arc_metrics.final_velocity_miss_km_s,
+            units="km/s",
+        ),
+    ]
+    return TunedLaunchReportComparison(
+        baseline_scenario_id=baseline.scenario_id,
+        candidate_scenario_id=candidate.scenario_id,
+        baseline_passed=baseline.passed,
+        candidate_passed=candidate.passed,
+        passed_changed=baseline.passed != candidate.passed,
+        baseline_insertion_passed=baseline.insertion_assessment.passed,
+        candidate_insertion_passed=candidate.insertion_assessment.passed,
+        baseline_short_arc_passed=baseline.short_arc_assessment.passed,
+        candidate_short_arc_passed=candidate.short_arc_assessment.passed,
+        metric_deltas=metric_deltas,
+        backend="local",
+        metadata={
+            "workflow": "tuned_launch_report_comparison",
+            "baseline_backend": baseline.backend,
+            "candidate_backend": candidate.backend,
+        },
     )
 
 
