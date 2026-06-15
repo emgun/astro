@@ -29,6 +29,8 @@ def test_packages_import() -> None:
         "UnsupportedBackendError",
     }
     expected_dynamics_exports = {
+        "MonteCarloCase",
+        "MonteCarloResult",
         "acceleration_km_s2",
         "apply_impulsive_maneuver",
         "derivative",
@@ -37,6 +39,7 @@ def test_packages_import() -> None:
         "propagate_local",
         "propagate_with_backend",
         "rk4_step",
+        "run_initial_state_monte_carlo",
         "two_body_acceleration_km_s2",
     }
     expected_od_exports = {

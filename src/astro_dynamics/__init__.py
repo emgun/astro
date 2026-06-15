@@ -9,8 +9,15 @@ from astro_dynamics.local import (
     two_body_acceleration_km_s2,
 )
 from astro_dynamics.maneuvers import apply_impulsive_maneuver
+from astro_dynamics.monte_carlo import (
+    MonteCarloCase,
+    MonteCarloResult,
+    run_initial_state_monte_carlo,
+)
 
 __all__ = [
+    "MonteCarloCase",
+    "MonteCarloResult",
     "acceleration_km_s2",
     "apply_impulsive_maneuver",
     "derivative",
@@ -19,5 +26,6 @@ __all__ = [
     "propagate_local",
     "propagate_with_backend",
     "rk4_step",
+    "run_initial_state_monte_carlo",
     "two_body_acceleration_km_s2",
 ]
