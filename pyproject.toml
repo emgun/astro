@@ -27,6 +27,13 @@ dev = [
 orekit = [
   "orekit-jpype>=13.1",
 ]
+launch = [
+  "rocketpy>=1.12,<2",
+]
+optimization = [
+  "dymos>=1.15,<2",
+  "openmdao>=3.44,<4",
+]
 
 [project.scripts]
 astro = "astro_cli.main:app"

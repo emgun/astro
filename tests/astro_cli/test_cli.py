@@ -6,7 +6,9 @@ import pytest
 import yaml
 from typer.testing import CliRunner
 
+from astro_backends.dymos import DymosSmokeResult
 from astro_backends.orekit import OrekitSmokeResult
+from astro_backends.rocketpy import RocketPySmokeResult
 from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
@@ -1366,6 +1368,80 @@ def test_orekit_smoke_command_exits_nonzero_when_wrapper_unavailable(
     monkeypatch.setattr("astro_cli.main.run_orekit_smoke", lambda: smoke_result)
 
     result = runner.invoke(app, ["orekit-smoke"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
+
+
+def test_rocketpy_smoke_command_reports_available_package(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = RocketPySmokeResult(
+        available=True,
+        package="rocketpy",
+        version="1.12.1",
+        message="RocketPy available.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_rocketpy_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["rocketpy-smoke"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
+
+
+def test_rocketpy_smoke_command_exits_nonzero_when_package_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = RocketPySmokeResult(
+        available=False,
+        package="rocketpy",
+        version=None,
+        message="RocketPy unavailable.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_rocketpy_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["rocketpy-smoke"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
+
+
+def test_dymos_smoke_command_reports_available_package(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = DymosSmokeResult(
+        available=True,
+        package="dymos",
+        version="1.15.1",
+        openmdao_version="3.44.0",
+        message="Dymos available.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_dymos_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["dymos-smoke"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
+
+
+def test_dymos_smoke_command_exits_nonzero_when_package_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = DymosSmokeResult(
+        available=False,
+        package="dymos",
+        version=None,
+        openmdao_version=None,
+        message="Dymos unavailable.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_dymos_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["dymos-smoke"])
 
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
