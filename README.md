@@ -197,3 +197,9 @@ python -m pytest -v
 python -m ruff check .
 python -m mypy
 ```
+
+Additional release and backend documentation:
+
+- [Validation matrix](docs/validation-matrix.md)
+- [Backend installation guide](docs/backend-installation.md)
+- [Release checklist](docs/release-checklist.md)

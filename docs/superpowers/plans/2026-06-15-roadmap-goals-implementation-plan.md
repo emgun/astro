@@ -224,7 +224,8 @@ Tradeoff:
 
 ### Goal 6: Release Packaging, Documentation, and Validation Matrix
 
-Status: ongoing across every goal.
+Status: implemented for the current roadmap pass. README, backend installation guide, validation
+matrix, release checklist, and optional smoke-gate semantics are documented.
 
 Definition of done:
 
