@@ -4,7 +4,7 @@
 
 **Goal:** Add product-preserving boundaries for Tudat cross-check propagation, JAX research propagation, and Nyx evaluation without weakening the operational Orekit/local validation spine.
 
-**Architecture:** Keep `Scenario`, `Trajectory`, and `MonteCarloResult` as suite-owned products. Add optional runtime gates and smoke commands first, then dispatch recognized research backends through adapter boundaries that fail clearly when external runtimes or validated runner implementations are unavailable.
+**Architecture:** Keep `Scenario`, `Trajectory`, and `MonteCarloResult` as suite-owned products. Add optional runtime gates and smoke commands first, dispatch recognized research backends through adapter boundaries, and provide a built-in JAX two-body batch runner while keeping richer dynamics behind validated runner implementations.
 
 **Tech Stack:** Python 3.12, Pydantic v2, Typer, pytest, optional JAX/JAXLIB, external TudatPy installation, documentation for Nyx/ANISE evaluation.
 
@@ -90,7 +90,7 @@ research = [
 
 - [x] Add tests showing missing JAX raises `UnsupportedBackendError`.
 - [x] Add tests with a fake `research_runner` returning `MonteCarloResult`.
-- [x] Implement `research_propagate_jax(scenario, cases, position_sigma_km, velocity_sigma_km_s, seed, runtime_loader=load_jax_runtime, research_runner=None)`.
+- [x] Implement `research_propagate_jax(scenario, cases, position_sigma_km, velocity_sigma_km_s, seed, runtime_loader=load_jax_runtime, research_runner=None)` with a built-in vectorized two-body runner.
 - [x] Add `astro research-propagate --backend jax`.
 - [x] Run focused research propagation tests.
 - [x] Commit with `git commit -m "feat: add jax research propagation boundary"`.

@@ -172,8 +172,9 @@ cover all three ingest/export formats.
 
 `astro research-propagate` is the research backend entry point for seeded propagation ensembles.
 With `--backend local`, it runs the deterministic Monte Carlo workflow. With `--backend jax`, it
-loads the optional JAX runtime and requires a validated JAX research runner rather than replacing the
-operational propagation backends.
+loads the optional JAX runtime and runs a vectorized two-body RK4 ensemble for current two-body
+scenarios. JAX remains a research backend, not a replacement for operational Orekit semantics or
+validated higher-fidelity force models.
 
 CSV inputs use one row per measurement with these required columns:
 

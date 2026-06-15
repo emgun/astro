@@ -29,7 +29,7 @@ adapters.
 | RocketPy | `astro rocketpy-smoke` | Exits 0 when RocketPy imports and required classes exist. | Exits 1 with structured JSON explaining missing package/import failure. |
 | Dymos/OpenMDAO | `astro dymos-smoke` | Exits 0 when Dymos and OpenMDAO APIs import. | Exits 1 with structured JSON explaining missing package/import failure. |
 | TudatPy | `astro tudat-smoke` | Exits 0 when TudatPy imports. | Exits 1 with structured JSON; install path is platform-specific and not assumed to be pip-only. |
-| JAX/JAXLIB | `astro jax-smoke` | Exits 0 when JAX and `jax.numpy` import. | Exits 1 with structured JSON explaining missing `astro-suite[research]` runtime. |
+| JAX/JAXLIB | `astro jax-smoke` | Exits 0 when JAX and `jax.numpy` import; `astro research-propagate --backend jax` can run two-body seeded ensembles. | Exits 1 with structured JSON explaining missing `astro-suite[research]` runtime. |
 
 ## Reference Tolerances
 
@@ -39,7 +39,7 @@ adapters.
 | Orekit two-body vs local | `orekit_live` test compares final LEO state with `abs(position) <= 1 km` and `abs(velocity) <= 1e-3 km/s` when `ASTRO_RUN_OREKIT_LIVE=1`. |
 | Launch handoff | Tests confirm `LaunchTrajectory.insertion_state` converts into a normal orbital `Scenario` and propagates locally. |
 | OD explicit measurements | Tests validate JSON, CSV, and TDM ingest/export plus local least-squares convergence. |
-| Research Monte Carlo | Tests confirm seeded repeatability and backend provenance. |
+| Research Monte Carlo | Tests confirm seeded repeatability, local Monte Carlo provenance, and built-in JAX two-body runner parity against the local reference for zero dispersion. |
 
 ## Backend Boundary Rule
 
