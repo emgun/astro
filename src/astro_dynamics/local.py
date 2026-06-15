@@ -80,6 +80,11 @@ def derivative(state: FloatArray, force_model: ForceModelName) -> FloatArray:
     return cast(FloatArray, np.concatenate([velocity, acceleration_km_s2(position, force_model)]))
 
 
+def _internal_step_schedule(step_s: float) -> tuple[int, float]:
+    substep_count = max(1, ceil(abs(step_s) / _MAX_RK4_INTERNAL_STEP_S))
+    return substep_count, step_s / substep_count
+
+
 def _rk4_step_once(state: FloatArray, step_s: float, force_model: ForceModelName) -> FloatArray:
     k1 = derivative(state, force_model)
     k2 = derivative(state + 0.5 * step_s * k1, force_model)
@@ -89,9 +94,9 @@ def _rk4_step_once(state: FloatArray, step_s: float, force_model: ForceModelName
 
 
 def rk4_step(state: FloatArray, step_s: float, force_model: ForceModelName) -> FloatArray:
+    """Advance a state over the requested interval using RK4 substeps capped at 30s."""
     force_model = _validate_local_force_model(force_model)
-    substep_count = max(1, ceil(abs(step_s) / _MAX_RK4_INTERNAL_STEP_S))
-    substep_s = step_s / substep_count
+    substep_count, substep_s = _internal_step_schedule(step_s)
     next_state = state
 
     for _ in range(substep_count):
@@ -102,6 +107,9 @@ def rk4_step(state: FloatArray, step_s: float, force_model: ForceModelName) -> F
 
 def propagate_local(scenario: Scenario) -> Trajectory:
     force_model = _validate_local_force_model(scenario.force_model.gravity)
+    internal_substeps_per_sample, internal_step_s = _internal_step_schedule(
+        scenario.propagation.step_s
+    )
 
     initial = scenario.initial_state.cartesian
     state = cast(FloatArray, np.concatenate([initial.position_array(), initial.velocity_array()]))
@@ -128,5 +136,12 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         samples=samples,
         force_model=scenario.force_model,
         backend="local",
-        metadata={"integrator": "rk4", "step_s": scenario.propagation.step_s},
+        metadata={
+            "integrator": "rk4",
+            "step_s": scenario.propagation.step_s,
+            "sample_step_s": scenario.propagation.step_s,
+            "internal_max_step_s": _MAX_RK4_INTERNAL_STEP_S,
+            "internal_substeps_per_sample": internal_substeps_per_sample,
+            "internal_step_s": internal_step_s,
+        },
     )

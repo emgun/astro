@@ -18,6 +18,10 @@ from astro_od.measurements import generate_synthetic_measurements
 
 MU_EARTH_KM3_S2 = 398600.4418
 REFERENCE_SCENARIO = Path("examples/scenarios/leo_two_body.yaml")
+EXPECTED_J2_FINAL_POSITION_DELTA_KM = np.array(
+    [-2.0115772, -0.47571099, -0.17144279],
+    dtype=np.float64,
+)
 
 
 def _specific_energy_km2_s2(
@@ -70,6 +74,21 @@ def test_two_body_specific_energy_is_stable_over_short_arc() -> None:
     assert abs(last_energy - first_energy) < 1.0e-7
 
 
+def test_local_reference_metadata_discloses_internal_integration_cadence() -> None:
+    scenario = _reference_scenario()
+
+    trajectory = propagate_local(scenario)
+
+    assert trajectory.metadata == {
+        "integrator": "rk4",
+        "step_s": 60.0,
+        "sample_step_s": 60.0,
+        "internal_max_step_s": 30.0,
+        "internal_substeps_per_sample": 2,
+        "internal_step_s": 30.0,
+    }
+
+
 def test_j2_reference_case_diverges_from_two_body_without_breaking_energy_scale() -> None:
     scenario = _reference_scenario()
     j2_scenario = scenario.model_copy(
@@ -79,12 +98,16 @@ def test_j2_reference_case_diverges_from_two_body_without_breaking_energy_scale(
     two_body = propagate_local(scenario)
     j2 = propagate_local(j2_scenario)
 
-    two_body_final_position = two_body.samples[-1].state.position_array()
-    j2_final_position = j2.samples[-1].state.position_array()
-    position_delta_km = float(np.linalg.norm(j2_final_position - two_body_final_position))
+    position_delta_km = (
+        j2.samples[-1].state.position_array() - two_body.samples[-1].state.position_array()
+    )
 
-    assert position_delta_km > 0.0
-    assert position_delta_km < 10.0
+    np.testing.assert_allclose(
+        position_delta_km,
+        EXPECTED_J2_FINAL_POSITION_DELTA_KM,
+        rtol=0.0,
+        atol=1.0e-3,
+    )
 
 
 def test_synthetic_od_reference_case_converges() -> None:
@@ -94,8 +117,14 @@ def test_synthetic_od_reference_case_converges() -> None:
     estimate_scenario = _perturbed_scenario(truth_scenario)
 
     result = estimate_initial_state(estimate_scenario, measurements)
+    truth_position = truth_scenario.initial_state.cartesian.position_array()
+    estimated_position = result.estimated_state.cartesian.position_array()
+    truth_velocity = truth_scenario.initial_state.cartesian.velocity_array()
+    estimated_velocity = result.estimated_state.cartesian.velocity_array()
 
     assert result.converged is True
+    assert np.linalg.norm(estimated_position - truth_position) < 0.2
+    assert np.linalg.norm(estimated_velocity - truth_velocity) < 2.0e-4
     assert result.rms < 3.0
     assert len(result.residuals) == len(measurements)
     assert result.metadata["jacobian_rank"] == 6

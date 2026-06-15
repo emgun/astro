@@ -84,7 +84,9 @@ def test_propagate_local_returns_expected_sample_count() -> None:
     assert trajectory.backend == "local"
     assert len(trajectory.samples) == scenario.propagation.sample_count
     assert trajectory.samples[0].state.position_km == scenario.initial_state.cartesian.position_km
-    assert trajectory.metadata == {"integrator": "rk4", "step_s": scenario.propagation.step_s}
+    assert trajectory.metadata["integrator"] == "rk4"
+    assert trajectory.metadata["step_s"] == scenario.propagation.step_s
+    assert trajectory.metadata["sample_step_s"] == scenario.propagation.step_s
 
 
 def test_propagate_local_rejects_unsupported_local_force_model() -> None:
