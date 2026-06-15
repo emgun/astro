@@ -6,6 +6,7 @@ from typing import Annotated
 
 import typer
 
+from astro_backends.orekit import run_orekit_smoke
 from astro_core.errors import InvalidScenarioError, NumericalConvergenceError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, GroundStation, Scenario
@@ -127,6 +128,16 @@ def validate(scenario_path: Annotated[Path, typer.Argument(exists=True, readable
     scenario = _load_scenario_or_exit(scenario_path)
 
     typer.echo(f"valid scenario: {scenario.scenario_id}")
+
+
+@app.command("orekit-smoke")
+def orekit_smoke() -> None:
+    """Run the optional Orekit JPype wrapper smoke gate."""
+    result = run_orekit_smoke()
+
+    typer.echo(json.dumps(result.to_dict(), indent=2))
+    if not result.available:
+        raise typer.Exit(code=1)
 
 
 @app.command()

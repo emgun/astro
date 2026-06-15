@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from astro_backends.orekit import OrekitSmokeResult
 from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError
 
@@ -229,3 +230,39 @@ def test_estimate_command_reports_numerical_convergence_error(
 
     assert result.exit_code == 2
     assert "forced OD failure" in result.stderr
+
+
+def test_orekit_smoke_command_reports_available_wrapper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = OrekitSmokeResult(
+        available=True,
+        wrapper="orekit_jpype",
+        version="13.1.0",
+        message="Orekit JPype VM, EME2000 frame, and UTC time scale are available.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_orekit_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["orekit-smoke"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
+
+
+def test_orekit_smoke_command_exits_nonzero_when_wrapper_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = OrekitSmokeResult(
+        available=False,
+        wrapper="orekit_jpype",
+        version=None,
+        message="Orekit JPype wrapper is not installed.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_orekit_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["orekit-smoke"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
