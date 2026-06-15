@@ -65,6 +65,7 @@ def test_batch_od_recovers_synthetic_initial_state() -> None:
     assert all(len(row) == 6 for row in result.covariance)
     assert result.iterations > 0
     assert result.metadata["backend"] == "local_scipy_least_squares"
+    assert result.metadata["propagation_backend"] == "local"
     assert isinstance(result.metadata["message"], str)
     assert result.metadata["jacobian_rank"] == 6
     assert len(result.metadata["singular_values"]) == 6
@@ -79,6 +80,31 @@ def test_estimate_initial_state_requires_measurements() -> None:
         match="At least one measurement is required for estimation",
     ):
         estimate_initial_state(scenario, [])
+
+
+def test_estimate_initial_state_supports_orekit_propagation_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    truth_scenario = _observable_scenario()
+    truth_trajectory = propagate_local(truth_scenario)
+    measurements = generate_synthetic_measurements(truth_scenario, truth_trajectory)
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+    seen_backends: list[str] = []
+
+    def fake_backend_propagation(scenario: Scenario, backend: str) -> object:
+        seen_backends.append(backend)
+        trajectory = propagate_local(scenario)
+        return trajectory.model_copy(update={"backend": backend})
+
+    monkeypatch.setattr(estimation, "propagate_with_backend", fake_backend_propagation)
+
+    result = estimate_initial_state(estimate_scenario, measurements, backend="orekit")
+
+    assert result.converged is True
+    assert result.metadata["backend"] == "orekit_scipy_least_squares"
+    assert result.metadata["propagation_backend"] == "orekit"
+    assert seen_backends
+    assert set(seen_backends) == {"orekit"}
 
 
 def test_estimate_initial_state_rejects_too_few_measurements() -> None:

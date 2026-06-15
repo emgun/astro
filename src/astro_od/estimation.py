@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any, cast
 
@@ -14,11 +15,13 @@ from astro_core.models import (
     MeasurementRecord,
     MeasurementType,
     Scenario,
+    Trajectory,
 )
-from astro_dynamics.local import propagate_local
+from astro_dynamics.backends import propagate_with_backend
 from astro_od.measurements import range_km, range_rate_km_s
 
 FloatArray = NDArray[np.float64]
+Propagator = Callable[[Scenario], Trajectory]
 STATE_DIMENSION = 6
 JACOBIAN_RANK_RTOL = 1.0e-7
 
@@ -47,7 +50,18 @@ def _station_position_for_observer(scenario: Scenario, observer: str) -> FloatAr
     raise NumericalConvergenceError(f"Measurement observer {observer!r} is not in the scenario")
 
 
-def _validate_measurements(scenario: Scenario, measurements: list[MeasurementRecord]) -> None:
+def _propagator_for_backend(backend: str) -> Propagator:
+    def propagate(scenario: Scenario) -> Trajectory:
+        return propagate_with_backend(scenario, backend)
+
+    return propagate
+
+
+def _validate_measurements(
+    scenario: Scenario,
+    measurements: list[MeasurementRecord],
+    propagator: Propagator,
+) -> None:
     if not measurements:
         raise NumericalConvergenceError("At least one measurement is required for estimation")
     if len(measurements) < STATE_DIMENSION:
@@ -68,7 +82,7 @@ def _validate_measurements(scenario: Scenario, measurements: list[MeasurementRec
                 f"Measurement observer {measurement.observer!r} is not in the scenario"
             )
 
-    propagated_epochs = {sample.epoch for sample in propagate_local(scenario).samples}
+    propagated_epochs = {sample.epoch for sample in propagator(scenario).samples}
     for measurement in measurements:
         if measurement.epoch not in propagated_epochs:
             epoch = measurement.epoch.isoformat()
@@ -105,9 +119,10 @@ def residual_vector(
     state_vector: FloatArray,
     scenario: Scenario,
     measurements: list[MeasurementRecord],
+    propagator: Propagator,
 ) -> FloatArray:
     trial_scenario = scenario_with_state_vector(scenario, state_vector)
-    trajectory = propagate_local(trial_scenario)
+    trajectory = propagator(trial_scenario)
     trajectory_index = {sample.epoch: sample.state for sample in trajectory.samples}
 
     residuals = [
@@ -155,13 +170,17 @@ def _initial_state_vector(scenario: Scenario) -> FloatArray:
 def estimate_initial_state(
     scenario: Scenario,
     measurements: list[MeasurementRecord],
+    *,
+    backend: str = "local",
+    propagator: Propagator | None = None,
 ) -> EstimateResult:
-    _validate_measurements(scenario, measurements)
+    selected_propagator = propagator or _propagator_for_backend(backend)
+    _validate_measurements(scenario, measurements, selected_propagator)
 
     optimizer_result = least_squares(
         residual_vector,
         _initial_state_vector(scenario),
-        args=(scenario, measurements),
+        args=(scenario, measurements, selected_propagator),
         xtol=1.0e-10,
         ftol=1.0e-10,
         gtol=1.0e-10,
@@ -169,7 +188,7 @@ def estimate_initial_state(
     )
 
     estimated_vector = cast(FloatArray, optimizer_result.x)
-    residuals = residual_vector(estimated_vector, scenario, measurements)
+    residuals = residual_vector(estimated_vector, scenario, measurements, selected_propagator)
     rms = float(np.sqrt(np.mean(residuals**2)))
     estimated_scenario = scenario_with_state_vector(scenario, estimated_vector)
     diagnostics = _jacobian_diagnostics(cast(FloatArray, optimizer_result.jac))
@@ -201,7 +220,8 @@ def estimate_initial_state(
         iterations=int(optimizer_result.nfev),
         converged=bool(optimizer_result.success),
         metadata={
-            "backend": "local_scipy_least_squares",
+            "backend": f"{backend}_scipy_least_squares",
+            "propagation_backend": backend,
             "message": str(optimizer_result.message),
             **diagnostics,
         },
