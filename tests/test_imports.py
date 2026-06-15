@@ -15,14 +15,17 @@ def test_packages_import() -> None:
 
     expected_core_exports = {
         "AstroError",
+        "CovarianceSample",
         "InvalidMeasurementFileError",
         "InvalidScenarioError",
         "J2_EARTH",
+        "Maneuver",
         "MU_EARTH_KM3_S2",
         "NumericalConvergenceError",
         "R_EARTH_KM",
         "SECONDS_PER_DAY",
         "Scenario",
+        "TrajectoryEvent",
         "UnsupportedBackendError",
     }
     expected_dynamics_exports = {

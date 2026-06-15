@@ -290,6 +290,89 @@ class MeasurementRecord(AstroModel):
         return self
 
 
+class TrajectoryEvent(AstroModel):
+    event_type: str = Field(min_length=1)
+    epoch: datetime
+    description: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("epoch", mode="before")
+    @classmethod
+    def epoch_input_must_be_datetime_or_string(cls, value: Any) -> Any:
+        return _datetime_input_must_be_datetime_or_string(value, "TrajectoryEvent epoch")
+
+    @field_validator("epoch")
+    @classmethod
+    def epoch_must_be_aware(cls, value: datetime) -> datetime:
+        return _datetime_must_be_aware(value, "TrajectoryEvent epoch")
+
+
+class Maneuver(AstroModel):
+    name: str = Field(min_length=1)
+    epoch: datetime
+    frame: Frame
+    delta_v_km_s: Vector3
+    duration_s: FiniteFloat = Field(ge=0.0, default=0.0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("epoch", mode="before")
+    @classmethod
+    def epoch_input_must_be_datetime_or_string(cls, value: Any) -> Any:
+        return _datetime_input_must_be_datetime_or_string(value, "Maneuver epoch")
+
+    @field_validator("epoch")
+    @classmethod
+    def epoch_must_be_aware(cls, value: datetime) -> datetime:
+        return _datetime_must_be_aware(value, "Maneuver epoch")
+
+    @field_validator("delta_v_km_s", mode="before")
+    @classmethod
+    def delta_v_input_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_sequence_input_must_be_numbers(value, "Maneuver delta-v")
+
+    @field_validator("delta_v_km_s")
+    @classmethod
+    def delta_v_must_be_finite(cls, value: Vector3) -> Vector3:
+        if not all(isfinite(component) for component in value):
+            raise ValueError("Maneuver delta-v values must be finite")
+        return value
+
+    @field_validator("duration_s", mode="before")
+    @classmethod
+    def duration_input_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Maneuver duration")
+
+
+class CovarianceSample(AstroModel):
+    epoch: datetime
+    covariance: list[list[FiniteFloat]]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("epoch", mode="before")
+    @classmethod
+    def epoch_input_must_be_datetime_or_string(cls, value: Any) -> Any:
+        return _datetime_input_must_be_datetime_or_string(value, "CovarianceSample epoch")
+
+    @field_validator("epoch")
+    @classmethod
+    def epoch_must_be_aware(cls, value: datetime) -> datetime:
+        return _datetime_must_be_aware(value, "CovarianceSample epoch")
+
+    @field_validator("covariance", mode="before")
+    @classmethod
+    def covariance_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_matrix_input_must_be_numbers(value, "CovarianceSample covariance")
+
+    @field_validator("covariance")
+    @classmethod
+    def covariance_must_be_6x6_and_finite(cls, value: list[list[float]]) -> list[list[float]]:
+        if len(value) != 6 or any(len(row) != 6 for row in value):
+            raise ValueError("CovarianceSample covariance must be 6x6")
+        if any(not isfinite(component) for row in value for component in row):
+            raise ValueError("CovarianceSample covariance values must be finite")
+        return value
+
+
 class TrajectorySample(AstroModel):
     epoch: datetime
     state: CartesianState
@@ -310,6 +393,9 @@ class Trajectory(AstroModel):
     samples: list[TrajectorySample] = Field(min_length=1)
     force_model: ForceModelConfig
     backend: str = Field(min_length=1)
+    events: list[TrajectoryEvent] = Field(default_factory=list)
+    maneuvers: list[Maneuver] = Field(default_factory=list)
+    covariance_history: list[CovarianceSample] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")

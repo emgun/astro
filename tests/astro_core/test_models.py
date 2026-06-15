@@ -9,11 +9,13 @@ from pydantic import ValidationError
 from astro_core.models import (
     Body,
     CartesianState,
+    CovarianceSample,
     EstimateResult,
     ForceModelConfig,
     ForceModelName,
     Frame,
     GroundStation,
+    Maneuver,
     MeasurementConfig,
     MeasurementNoise,
     MeasurementRecord,
@@ -25,6 +27,7 @@ from astro_core.models import (
     Spacecraft,
     TimeScale,
     Trajectory,
+    TrajectoryEvent,
     TrajectorySample,
 )
 
@@ -327,6 +330,62 @@ def test_trajectory_rejects_descending_epochs() -> None:
                 make_trajectory_sample(earlier_epoch),
             ]
         )
+
+
+def test_trajectory_defaults_operational_product_fields() -> None:
+    trajectory = make_trajectory([make_trajectory_sample(datetime(2026, 1, 1, tzinfo=UTC))])
+
+    assert trajectory.events == []
+    assert trajectory.maneuvers == []
+    assert trajectory.covariance_history == []
+
+
+def test_trajectory_accepts_events_maneuvers_and_covariance_history() -> None:
+    epoch = datetime(2026, 1, 1, tzinfo=UTC)
+    event = TrajectoryEvent(
+        event_type="eclipse_entry",
+        epoch=epoch,
+        description="Entered eclipse.",
+        metadata={"source": "test"},
+    )
+    maneuver = Maneuver(
+        name="trim-burn",
+        epoch=epoch,
+        frame=Frame.EME2000,
+        delta_v_km_s=(0.0, 0.001, 0.0),
+        duration_s=0.0,
+    )
+    covariance = CovarianceSample(epoch=epoch, covariance=make_covariance())
+
+    trajectory = Trajectory(
+        scenario_id="leo-demo",
+        samples=[make_trajectory_sample(epoch)],
+        force_model=ForceModelConfig(gravity=ForceModelName.TWO_BODY),
+        backend="test",
+        events=[event],
+        maneuvers=[maneuver],
+        covariance_history=[covariance],
+    )
+
+    assert trajectory.events == [event]
+    assert trajectory.maneuvers == [maneuver]
+    assert trajectory.covariance_history == [covariance]
+
+
+def test_maneuver_and_covariance_validation() -> None:
+    epoch = datetime(2026, 1, 1, tzinfo=UTC)
+
+    with pytest.raises(ValidationError, match="greater than or equal"):
+        Maneuver(
+            name="bad-burn",
+            epoch=epoch,
+            frame=Frame.EME2000,
+            delta_v_km_s=(0.0, 0.001, 0.0),
+            duration_s=-1.0,
+        )
+
+    with pytest.raises(ValidationError, match="6x6"):
+        CovarianceSample(epoch=epoch, covariance=[[1.0]])
 
 
 @pytest.mark.parametrize("field_name", ["mass_kg", "area_m2"])
