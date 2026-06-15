@@ -113,7 +113,7 @@ research = [
 - Modify: `README.md`
 - Modify: this plan.
 
-- [ ] Run:
+- [x] Run:
 
 ```bash
 python -m pytest -q
@@ -123,8 +123,8 @@ astro tudat-smoke
 astro jax-smoke
 ```
 
-- [ ] Mark completed checklist items.
-- [ ] Commit with `git commit -m "docs: update research backend roadmap"`.
+- [x] Mark completed checklist items.
+- [x] Commit with `git commit -m "docs: update research backend roadmap"`.
 
 ## Self-Review
 

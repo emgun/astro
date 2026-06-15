@@ -55,6 +55,19 @@ loads the optional runtime and preserves the `LaunchTrajectory` product boundary
 simulation still requires backend-specific rocket/motor configuration beyond the aggregate local
 launch schema.
 
+Optional research backend smoke checks:
+
+```bash
+python -m pip install -e '.[research]'
+astro tudat-smoke
+astro jax-smoke
+```
+
+Tudat and JAX are optional research/cross-check boundaries. TudatPy is not currently assumed to be
+available from PyPI on every platform, so its smoke command reports installation state without
+promising a pip-only install path. JAX research propagation returns suite `MonteCarloResult` products
+and remains separate from operational Orekit semantics.
+
 ## Commands
 
 ```bash
@@ -65,6 +78,8 @@ astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke
 astro dymos-smoke
+astro tudat-smoke
+astro jax-smoke
 astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
 astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output pitch_launch.json
 astro sweep-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-index 3 --pitch-deg-values 10,20,30 --output pitch_sweep.json
@@ -83,6 +98,7 @@ astro estimate examples/scenarios/leo_two_body.yaml --backend local --output est
 astro estimate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_estimate.json
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend local --output estimate.json
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend orekit --output orekit_estimate.json
+astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output research_propagation.json
 astro orekit-smoke
 ```
 
@@ -152,6 +168,11 @@ can be forced with `--format csv` / `--format tdm`.
 `astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
 The example files under `examples/measurements/` are generated from `leo_two_station_od.yaml` and
 cover all three ingest/export formats.
+
+`astro research-propagate` is the research backend entry point for seeded propagation ensembles.
+With `--backend local`, it runs the deterministic Monte Carlo workflow. With `--backend jax`, it
+loads the optional JAX runtime and requires a validated JAX research runner rather than replacing the
+operational propagation backends.
 
 CSV inputs use one row per measurement with these required columns:
 
