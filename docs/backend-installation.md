@@ -20,9 +20,11 @@ python -m pip install -e '.[orekit]'
 astro orekit-smoke
 ```
 
-The Orekit adapter uses `orekit-jpype`. A working Java runtime and Orekit data context are also
-required for live propagation. If the wrapper, JVM, or data setup is unavailable, `astro orekit-smoke`
-and `astro propagate --backend orekit` fail with structured diagnostics.
+The Orekit adapter uses `orekit-jpype`. The legacy JCC wrapper still exists, but `orekit-jpype` is
+the pip-friendly wrapper recommended for new projects by current Orekit Python wrapper guidance.
+A working Java runtime and Orekit data context are also required for live propagation. If the
+wrapper, JVM, or data setup is unavailable, `astro orekit-smoke` and `astro propagate --backend
+orekit` fail with structured diagnostics.
 
 ## Launch Backends
 
