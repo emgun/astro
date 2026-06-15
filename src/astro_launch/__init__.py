@@ -13,6 +13,8 @@ from astro_launch.models import (
     LaunchPitchTuningPoint,
     LaunchPitchTuningResult,
     LaunchPropagationConfig,
+    LaunchReportInsertionMetrics,
+    LaunchReportShortArcMetrics,
     LaunchScenario,
     LaunchSite,
     LaunchStage,
@@ -21,7 +23,9 @@ from astro_launch.models import (
     LaunchVehicle,
     PitchProgramPoint,
     TargetOrbit,
+    TunedLaunchReport,
 )
+from astro_launch.reporting import generate_tuned_launch_report
 from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
 
 __all__ = [
@@ -36,6 +40,8 @@ __all__ = [
     "LaunchPitchTuningPoint",
     "LaunchPitchTuningResult",
     "LaunchPropagationConfig",
+    "LaunchReportInsertionMetrics",
+    "LaunchReportShortArcMetrics",
     "LaunchScenario",
     "LaunchSite",
     "LaunchStage",
@@ -44,6 +50,8 @@ __all__ = [
     "LaunchVehicle",
     "PitchProgramPoint",
     "TargetOrbit",
+    "TunedLaunchReport",
+    "generate_tuned_launch_report",
     "launch_trajectory_to_orbit_scenario",
     "load_launch_scenario",
     "load_launch_trajectory",

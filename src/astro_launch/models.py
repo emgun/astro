@@ -14,7 +14,9 @@ from astro_core.models import (
     Frame,
     OrbitRepresentation,
     OrbitState,
+    Scenario,
     TimeScale,
+    Trajectory,
     Vector3,
     _datetime_input_must_be_datetime_or_string,
     _datetime_must_be_aware,
@@ -521,3 +523,75 @@ class LaunchPitchTuningResult(AstroModel):
     @classmethod
     def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
         return _numeric_scalar_input_must_be_number(value, "Launch pitch tuning scalar")
+
+
+class LaunchReportInsertionMetrics(AstroModel):
+    target_altitude_km: FiniteFloat = Field(gt=0.0)
+    target_circular_velocity_km_s: FiniteFloat = Field(gt=0.0)
+    altitude_km: FiniteFloat
+    velocity_km_s: FiniteFloat
+    radial_velocity_km_s: FiniteFloat
+    horizontal_velocity_km_s: FiniteFloat
+    altitude_miss_km: FiniteFloat
+    velocity_miss_km_s: FiniteFloat
+
+    @field_validator(
+        "target_altitude_km",
+        "target_circular_velocity_km_s",
+        "altitude_km",
+        "velocity_km_s",
+        "radial_velocity_km_s",
+        "horizontal_velocity_km_s",
+        "altitude_miss_km",
+        "velocity_miss_km_s",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch report scalar")
+
+
+class LaunchReportShortArcMetrics(AstroModel):
+    duration_s: FiniteFloat = Field(gt=0.0)
+    step_s: FiniteFloat = Field(gt=0.0)
+    sample_count: int = Field(ge=1)
+    target_altitude_km: FiniteFloat = Field(gt=0.0)
+    target_circular_velocity_km_s: FiniteFloat = Field(gt=0.0)
+    initial_altitude_km: FiniteFloat
+    final_altitude_km: FiniteFloat
+    min_altitude_km: FiniteFloat
+    max_altitude_km: FiniteFloat
+    final_velocity_km_s: FiniteFloat
+    final_altitude_miss_km: FiniteFloat
+    final_velocity_miss_km_s: FiniteFloat
+    altitudes_km: list[FiniteFloat] = Field(min_length=1)
+
+    @field_validator(
+        "duration_s",
+        "step_s",
+        "target_altitude_km",
+        "target_circular_velocity_km_s",
+        "initial_altitude_km",
+        "final_altitude_km",
+        "min_altitude_km",
+        "max_altitude_km",
+        "final_velocity_km_s",
+        "final_altitude_miss_km",
+        "final_velocity_miss_km_s",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch report scalar")
+
+
+class TunedLaunchReport(AstroModel):
+    scenario_id: str = Field(min_length=1)
+    tuning_result: LaunchPitchTuningResult
+    launch_trajectory: LaunchTrajectory
+    orbit_scenario: Scenario
+    orbit_trajectory: Trajectory
+    insertion_metrics: LaunchReportInsertionMetrics
+    short_arc_metrics: LaunchReportShortArcMetrics
+    backend: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)

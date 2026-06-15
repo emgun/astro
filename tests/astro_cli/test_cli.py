@@ -395,6 +395,87 @@ def test_tune_launch_pitch_command_reports_tuned_scenario_write_error(
     assert str(tuned_scenario_output) in result.stderr
 
 
+def test_report_tuned_launch_command_writes_json(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "report.json"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "report-tuned-launch",
+            str(scenario_path),
+            "--point-indices",
+            "2,3",
+            "--initial-span-deg",
+            "10",
+            "--iterations",
+            "2",
+            "--orbit-duration-s",
+            "600",
+            "--orbit-step-s",
+            "60",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote tuned launch report" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "pitch-program-two-stage"
+    assert payload["tuning_result"]["point_indices"] == [2, 3]
+    assert payload["launch_trajectory"]["metadata"]["guidance_mode"] == "pitch_program"
+    assert payload["orbit_scenario"]["metadata"]["workflow"] == "launch_orbit_handoff"
+    assert len(payload["orbit_trajectory"]["samples"]) == 11
+    assert payload["short_arc_metrics"]["sample_count"] == 11
+    assert payload["insertion_metrics"]["altitude_miss_km"] == payload["launch_trajectory"][
+        "target_miss"
+    ]["altitude_miss_km"]
+
+
+def test_report_tuned_launch_command_reports_invalid_point_indices(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "report-tuned-launch",
+            str(scenario_path),
+            "--point-indices",
+            "2,bad",
+            "--output",
+            str(tmp_path / "report.json"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "point-indices must be two comma-separated integers" in result.stderr
+
+
+def test_report_tuned_launch_command_reports_output_write_error(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "missing" / "report.json"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "report-tuned-launch",
+            str(scenario_path),
+            "--point-indices",
+            "2,3",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "could not write tuned launch report" in result.stderr
+    assert str(output) in result.stderr
+
+
 def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:
     output = tmp_path / "measurements.json"
 

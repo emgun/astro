@@ -20,6 +20,7 @@ from astro_launch.handoff import launch_trajectory_to_orbit_scenario
 from astro_launch.io import load_launch_scenario, load_launch_trajectory
 from astro_launch.local import propagate_launch_local
 from astro_launch.models import LaunchScenario, LaunchTrajectory
+from astro_launch.reporting import generate_tuned_launch_report
 from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import (
@@ -391,6 +392,66 @@ def tune_launch_pitch(
             "tuned launch scenario",
         )
         typer.echo(f"wrote tuned launch scenario: {tuned_scenario_output}")
+
+
+@app.command("report-tuned-launch")
+def report_tuned_launch(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    point_indices: Annotated[
+        str,
+        typer.Option(
+            "--point-indices",
+            help="Two comma-separated pitch-program point indices.",
+        ),
+    ] = "2,3",
+    initial_span_deg: Annotated[float, typer.Option()] = 10.0,
+    iterations: Annotated[int, typer.Option()] = 2,
+    refinement_factor: Annotated[float, typer.Option()] = 0.5,
+    altitude_weight: Annotated[float, typer.Option()] = 1.0,
+    velocity_weight: Annotated[float, typer.Option()] = 1.0,
+    orbit_duration_s: Annotated[float, typer.Option()] = 600.0,
+    orbit_step_s: Annotated[float, typer.Option()] = 60.0,
+    spacecraft_name: Annotated[str, typer.Option()] = "launch-payload",
+    spacecraft_mass_kg: Annotated[float | None, typer.Option()] = None,
+    area_m2: Annotated[float, typer.Option()] = 2.5,
+    drag_coefficient: Annotated[float, typer.Option()] = 2.2,
+    reflectivity_coefficient: Annotated[float, typer.Option()] = 1.3,
+    gravity: Annotated[str, typer.Option()] = "two_body",
+) -> None:
+    """Run tune, launch, orbit handoff, and short-arc propagation in one report."""
+    scenario = _load_launch_scenario_or_exit(scenario_path)
+    parsed_point_indices = _parse_point_indices_or_exit(point_indices)
+    try:
+        force_model = ForceModelName(gravity)
+    except ValueError as exc:
+        typer.echo(f"unsupported report gravity: {gravity}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    try:
+        report = generate_tuned_launch_report(
+            scenario,
+            point_indices=parsed_point_indices,
+            initial_span_deg=initial_span_deg,
+            iterations=iterations,
+            refinement_factor=refinement_factor,
+            altitude_weight=altitude_weight,
+            velocity_weight=velocity_weight,
+            orbit_duration_s=orbit_duration_s,
+            orbit_step_s=orbit_step_s,
+            spacecraft_name=spacecraft_name,
+            spacecraft_mass_kg=spacecraft_mass_kg,
+            area_m2=area_m2,
+            drag_coefficient=drag_coefficient,
+            reflectivity_coefficient=reflectivity_coefficient,
+            gravity=force_model,
+        )
+    except ValueError as exc:
+        typer.echo(f"could not create tuned launch report: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, report.model_dump_json(indent=2), "tuned launch report")
+    typer.echo(f"wrote tuned launch report: {output}")
 
 
 @app.command()
