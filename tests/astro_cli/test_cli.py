@@ -2,13 +2,52 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from astro_backends.orekit import OrekitSmokeResult
 from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError
+from astro_core.io import load_scenario
+from astro_core.models import CartesianState, Scenario
+from astro_dynamics.local import propagate_local
+from astro_od.measurements import generate_synthetic_measurements
 
 runner = CliRunner(mix_stderr=False)
+
+
+def _observable_scenario() -> Scenario:
+    return load_scenario(Path("examples/scenarios/leo_two_station_od.yaml"))
+
+
+def _perturbed_scenario(scenario: Scenario) -> Scenario:
+    perturbed_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": CartesianState(
+                position_km=(7001.0, -0.8, 0.6),
+                velocity_km_s=(0.0005, 7.499, 1.0008),
+            )
+        }
+    )
+    return scenario.model_copy(update={"initial_state": perturbed_state})
+
+
+def _write_scenario(path: Path, scenario: Scenario) -> None:
+    payload = scenario.model_dump(mode="json")
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _write_measurements(path: Path, scenario: Scenario) -> None:
+    measurements = generate_synthetic_measurements(scenario, propagate_local(scenario))
+    path.write_text(
+        json.dumps(
+            {
+                "scenario_id": scenario.scenario_id,
+                "measurements": [record.model_dump(mode="json") for record in measurements],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_validate_command_accepts_example_scenario() -> None:
@@ -92,6 +131,37 @@ def test_estimate_command_writes_json(tmp_path: Path) -> None:
     assert payload["metadata"]["initial_guess_position_delta_km"] == [1.0, -0.8, 0.6]
     assert payload["metadata"]["initial_guess_velocity_delta_km_s"] == [0.0005, -0.001, 0.0008]
     assert payload["metadata"]["measurement_count"] == 44
+
+
+def test_estimate_measurements_command_writes_json(tmp_path: Path) -> None:
+    truth_scenario = _observable_scenario()
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+    scenario_path = tmp_path / "estimate_scenario.yaml"
+    measurements_path = tmp_path / "measurements.json"
+    output = tmp_path / "estimate.json"
+    _write_scenario(scenario_path, estimate_scenario)
+    _write_measurements(measurements_path, truth_scenario)
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate-measurements",
+            str(scenario_path),
+            str(measurements_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["converged"] is True
+    assert payload["rms"] < 3.0
+    assert payload["metadata"]["workflow"] == "local_measurement_file"
+    assert payload["metadata"]["source_scenario_id"] == "leo-two-station-od"
+    assert payload["metadata"]["measurement_file"] == str(measurements_path)
+    assert payload["metadata"]["measurement_count"] == 44
+    assert "demo_added_ground_stations" not in payload["metadata"]
 
 
 def test_propagate_command_reports_invalid_scenario(tmp_path: Path) -> None:
@@ -230,6 +300,53 @@ def test_estimate_command_reports_numerical_convergence_error(
 
     assert result.exit_code == 2
     assert "forced OD failure" in result.stderr
+
+
+def test_estimate_measurements_command_reports_invalid_measurement_file(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "scenario.yaml"
+    measurements_path = tmp_path / "measurements.json"
+    output = tmp_path / "estimate.json"
+    _write_scenario(scenario_path, _observable_scenario())
+    measurements_path.write_text('{"scenario_id": "wrong", "measurements": []}', encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate-measurements",
+            str(scenario_path),
+            str(measurements_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "scenario_id" in result.stderr
+
+
+def test_estimate_measurements_command_reports_output_write_error(tmp_path: Path) -> None:
+    truth_scenario = _observable_scenario()
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+    scenario_path = tmp_path / "estimate_scenario.yaml"
+    measurements_path = tmp_path / "measurements.json"
+    output = tmp_path / "missing" / "estimate.json"
+    _write_scenario(scenario_path, estimate_scenario)
+    _write_measurements(measurements_path, truth_scenario)
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate-measurements",
+            str(scenario_path),
+            str(measurements_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "could not write estimate" in result.stderr
+    assert str(output) in result.stderr
 
 
 def test_orekit_smoke_command_reports_available_wrapper(

@@ -13,6 +13,7 @@ def test_packages_import() -> None:
 
     expected_core_exports = {
         "AstroError",
+        "InvalidMeasurementFileError",
         "InvalidScenarioError",
         "J2_EARTH",
         "MU_EARTH_KM3_S2",
@@ -33,6 +34,7 @@ def test_packages_import() -> None:
     expected_od_exports = {
         "estimate_initial_state",
         "generate_synthetic_measurements",
+        "load_measurements",
         "range_km",
         "range_rate_km_s",
     }
@@ -43,6 +45,7 @@ def test_packages_import() -> None:
     assert astro_core.J2_EARTH == 1.08262668e-3
     assert astro_core.SECONDS_PER_DAY == 86400.0
     assert issubclass(astro_core.InvalidScenarioError, astro_core.AstroError)
+    assert issubclass(astro_core.InvalidMeasurementFileError, astro_core.AstroError)
     assert issubclass(astro_core.UnsupportedBackendError, astro_core.AstroError)
     assert issubclass(astro_core.NumericalConvergenceError, astro_core.AstroError)
     assert set(astro_dynamics.__all__) == expected_dynamics_exports

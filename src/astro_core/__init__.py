@@ -1,6 +1,7 @@
 from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM, SECONDS_PER_DAY
 from astro_core.errors import (
     AstroError,
+    InvalidMeasurementFileError,
     InvalidScenarioError,
     NumericalConvergenceError,
     UnsupportedBackendError,
@@ -37,6 +38,7 @@ __all__ = [
     "ForceModelName",
     "Frame",
     "GroundStation",
+    "InvalidMeasurementFileError",
     "InvalidScenarioError",
     "J2_EARTH",
     "MeasurementConfig",

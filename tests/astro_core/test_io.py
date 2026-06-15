@@ -15,6 +15,15 @@ def test_load_example_scenario() -> None:
     assert scenario.propagation.sample_count == 11
 
 
+def test_load_two_station_od_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_station_od.yaml"))
+
+    assert scenario.scenario_id == "leo-two-station-od"
+    assert scenario.force_model.gravity is ForceModelName.TWO_BODY
+    assert scenario.propagation.sample_count == 11
+    assert len(scenario.ground_stations) == 2
+
+
 def test_load_scenario_reports_yaml_parse_errors(tmp_path: Path) -> None:
     path = tmp_path / "bad.yaml"
     path.write_text("scenario_id: [broken", encoding="utf-8")

@@ -7,11 +7,16 @@ from typing import Annotated
 import typer
 
 from astro_backends.orekit import run_orekit_smoke
-from astro_core.errors import InvalidScenarioError, NumericalConvergenceError
+from astro_core.errors import (
+    InvalidMeasurementFileError,
+    InvalidScenarioError,
+    NumericalConvergenceError,
+)
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, GroundStation, Scenario
 from astro_dynamics.local import propagate_local
 from astro_od.estimation import estimate_initial_state
+from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
 
 app = typer.Typer(help="Astro Suite flight dynamics workflows.")
@@ -122,6 +127,22 @@ def _with_estimation_demo_metadata(
     }
 
 
+def _with_measurement_file_metadata(
+    result_metadata: dict[str, object],
+    *,
+    scenario: Scenario,
+    measurement_file: Path,
+    measurement_count: int,
+) -> dict[str, object]:
+    return {
+        **result_metadata,
+        "workflow": "local_measurement_file",
+        "source_scenario_id": scenario.scenario_id,
+        "measurement_file": str(measurement_file),
+        "measurement_count": measurement_count,
+    }
+
+
 @app.command()
 def validate(scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)]) -> None:
     """Validate a scenario file."""
@@ -207,6 +228,38 @@ def estimate(
                 source_scenario=source_scenario,
                 truth_scenario=truth_scenario,
                 demo_added_ground_stations=added_station_names,
+                measurement_count=len(measurements),
+            )
+        }
+    )
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "estimate")
+    typer.echo(f"wrote estimate: {output}")
+
+
+@app.command("estimate-measurements")
+def estimate_measurements(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    measurements_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+) -> None:
+    """Run local batch OD from an explicit measurement file."""
+    scenario = _load_scenario_or_exit(scenario_path)
+    try:
+        measurements = load_measurements(
+            measurements_path,
+            expected_scenario_id=scenario.scenario_id,
+        )
+        result = estimate_initial_state(scenario, measurements)
+    except (InvalidMeasurementFileError, NumericalConvergenceError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    result = result.model_copy(
+        update={
+            "metadata": _with_measurement_file_metadata(
+                result.metadata,
+                scenario=scenario,
+                measurement_file=measurements_path,
                 measurement_count=len(measurements),
             )
         }
