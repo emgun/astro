@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 
 import numpy as np
@@ -5,7 +6,7 @@ import pytest
 
 from astro_core.constants import MU_EARTH_KM3_S2
 from astro_core.io import load_scenario
-from astro_core.models import ForceModelConfig, ForceModelName
+from astro_core.models import ForceModelConfig, ForceModelName, Maneuver, Scenario
 from astro_dynamics.local import (
     acceleration_km_s2,
     derivative,
@@ -87,6 +88,35 @@ def test_propagate_local_returns_expected_sample_count() -> None:
     assert trajectory.metadata["integrator"] == "rk4"
     assert trajectory.metadata["step_s"] == scenario.propagation.step_s
     assert trajectory.metadata["sample_step_s"] == scenario.propagation.step_s
+
+
+def test_propagate_local_applies_finite_burn_schedule() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    burn = Maneuver(
+        name="finite-trim",
+        epoch=scenario.initial_state.epoch + timedelta(seconds=60),
+        frame=scenario.initial_state.frame,
+        delta_v_km_s=(0.0, 0.06, 0.0),
+        duration_s=120.0,
+    )
+    payload = scenario.model_dump(mode="json") | {
+        "maneuvers": [burn.model_dump(mode="json")]
+    }
+    maneuvered_scenario = Scenario.model_validate(payload)
+
+    baseline = propagate_local(scenario)
+    trajectory = propagate_local(maneuvered_scenario)
+    baseline_final_velocity = np.array(baseline.samples[-1].state.velocity_km_s)
+    maneuvered_final_velocity = np.array(trajectory.samples[-1].state.velocity_km_s)
+
+    assert maneuvered_scenario.maneuvers == [burn]
+    assert trajectory.maneuvers == [burn]
+    assert maneuvered_final_velocity[1] - baseline_final_velocity[1] > 0.05
+    assert {event.event_type for event in trajectory.events} >= {
+        "maneuver_start",
+        "maneuver_end",
+    }
+    assert trajectory.metadata["finite_burn_count"] == 1
 
 
 def test_propagate_local_rejects_unsupported_local_force_model() -> None:

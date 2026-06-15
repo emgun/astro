@@ -10,8 +10,8 @@ The current implementation slice covers:
 
 - Pydantic scenario validation from YAML.
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
-- Flight-dynamics trajectory product fields for events, impulsive maneuvers, and covariance
-  history, plus CSV ephemeris export and seeded initial-state Monte Carlo propagation.
+- Flight-dynamics trajectory product fields for events, impulsive and finite-burn maneuvers, and
+  covariance history, plus CSV ephemeris export and seeded initial-state Monte Carlo propagation.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
@@ -74,6 +74,7 @@ and remains separate from operational Orekit semantics.
 ```bash
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
+astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output finite_burn_trajectory.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
@@ -116,6 +117,12 @@ epoch, position, and velocity samples. `astro monte-carlo` runs a seeded initial
 perturbing the scenario's Cartesian state and propagating each case through the selected backend.
 This is a repeatable product workflow for uncertainty screening; it is not yet production covariance
 propagation or conjunction analysis.
+
+Local orbital propagation accepts an optional `maneuvers` schedule on `Scenario`. Impulsive
+maneuvers apply their full `delta_v_km_s` at the maneuver epoch; finite burns apply the configured
+total delta-v as constant inertial acceleration over `duration_s` and record maneuver start/end
+events in the trajectory. This is a deterministic maneuver baseline, not a thrust-vector, mass-flow,
+or attitude-control model.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage

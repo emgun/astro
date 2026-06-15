@@ -29,7 +29,8 @@ Implemented and protected:
 - `astro_core` scenario, state, spacecraft, force model, ground station, measurement, trajectory, and estimate products.
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV ephemeris export,
-  and seeded initial-state Monte Carlo propagation.
+  local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
+  propagation.
 - `astro_od` synthetic range/range-rate/right-ascension/declination generation, measurement
   JSON/CSV ingest/export, TDM range/range-rate ingest/export, and local SciPy batch least-squares
   OD.
@@ -39,7 +40,8 @@ Implemented and protected:
 Still roadmap-level:
 
 - Orekit high-fidelity force models, Orekit measurement generation, and Orekit batch/sequential OD.
-- Production covariance propagation and finite-burn maneuver dynamics.
+- Production covariance propagation, thrust-vector finite-burn dynamics, and mass-flow maneuver
+  dynamics.
 - RocketPy launch simulation adapter.
 - Dymos/OpenMDAO ascent optimization adapter.
 - Tudat cross-check backend.
@@ -126,13 +128,16 @@ Primary files:
 
 ### Goal 3: Operational Flight Dynamics Products
 
-Status: implemented for product primitives, impulsive maneuvers, CSV ephemeris export, and seeded initial-state Monte Carlo. Finite burns and production covariance dynamics remain deferred.
+Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
+finite burns, CSV ephemeris export, and seeded initial-state Monte Carlo. Production covariance,
+thrust-vector, and mass-flow dynamics remain deferred.
 
 Definition of done:
 
 - Orbital `Trajectory` supports event and maneuver records without breaking launch products.
 - Ephemeris export supports JSON plus at least one standard interchange format selected for the suite's current maturity.
-- Maneuver products cover impulsive delta-v first, with finite burns deferred until the event/maneuver schema is stable.
+- Maneuver products cover impulsive delta-v and local finite burns with constant inertial
+  acceleration; higher-fidelity thrust-vector and mass-flow modeling remains deferred.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported even if only OD outputs populate them initially.
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import timedelta
 from math import ceil
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -11,8 +12,10 @@ from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
 from astro_core.models import (
     CartesianState,
     ForceModelName,
+    Maneuver,
     Scenario,
     Trajectory,
+    TrajectoryEvent,
     TrajectorySample,
     Vector3,
 )
@@ -20,6 +23,15 @@ from astro_core.models import (
 FloatArray = NDArray[np.float64]
 _SUPPORTED_LOCAL_FORCE_MODELS = {ForceModelName.TWO_BODY, ForceModelName.J2}
 _MAX_RK4_INTERNAL_STEP_S = 30.0
+_MANEUVER_TIME_TOLERANCE_S = 1.0e-9
+
+
+@dataclass(frozen=True)
+class _ScheduledManeuver:
+    index: int
+    maneuver: Maneuver
+    start_s: float
+    end_s: float
 
 
 def _validate_local_force_model(force_model: ForceModelName) -> ForceModelName:
@@ -105,11 +117,246 @@ def rk4_step(state: FloatArray, step_s: float, force_model: ForceModelName) -> F
     return next_state
 
 
+def _maneuver_offset_s(scenario: Scenario, maneuver: Maneuver) -> float:
+    return (maneuver.epoch - scenario.initial_state.epoch).total_seconds()
+
+
+def _scheduled_maneuvers(scenario: Scenario) -> list[_ScheduledManeuver]:
+    duration_s = scenario.propagation.duration_s
+    schedule: list[_ScheduledManeuver] = []
+
+    for index, maneuver in enumerate(sorted(scenario.maneuvers, key=lambda item: item.epoch)):
+        if maneuver.frame != scenario.initial_state.frame:
+            raise ValueError("Local maneuver propagation requires maneuvers in the scenario frame")
+
+        start_s = _maneuver_offset_s(scenario, maneuver)
+        end_s = start_s + maneuver.duration_s
+        if start_s < -_MANEUVER_TIME_TOLERANCE_S:
+            raise ValueError("Local maneuver propagation does not support pre-epoch maneuvers")
+        if start_s > duration_s + _MANEUVER_TIME_TOLERANCE_S:
+            raise ValueError(
+                "Local maneuver propagation does not support post-propagation maneuvers"
+            )
+        if end_s > duration_s + _MANEUVER_TIME_TOLERANCE_S:
+            raise ValueError("Local finite-burn maneuvers must end within the propagation window")
+
+        schedule.append(
+            _ScheduledManeuver(
+                index=index,
+                maneuver=maneuver,
+                start_s=max(0.0, start_s),
+                end_s=min(duration_s, end_s),
+            )
+        )
+
+    return schedule
+
+
+def _finite_burn_acceleration_km_s2(
+    schedule: list[_ScheduledManeuver],
+    elapsed_s: float,
+) -> FloatArray:
+    acceleration = np.zeros(3, dtype=np.float64)
+    for scheduled in schedule:
+        maneuver = scheduled.maneuver
+        if maneuver.duration_s <= 0.0:
+            continue
+        if (
+            scheduled.start_s - _MANEUVER_TIME_TOLERANCE_S
+            <= elapsed_s
+            < scheduled.end_s - _MANEUVER_TIME_TOLERANCE_S
+        ):
+            acceleration = acceleration + (
+                np.array(maneuver.delta_v_km_s, dtype=np.float64) / float(maneuver.duration_s)
+            )
+    return cast(FloatArray, acceleration)
+
+
+def _derivative_with_maneuvers(
+    state: FloatArray,
+    force_model: ForceModelName,
+    schedule: list[_ScheduledManeuver],
+    elapsed_s: float,
+) -> FloatArray:
+    position = state[:3]
+    velocity = state[3:]
+    total_acceleration = acceleration_km_s2(
+        position,
+        force_model,
+    ) + _finite_burn_acceleration_km_s2(
+        schedule, elapsed_s
+    )
+    return cast(FloatArray, np.concatenate([velocity, total_acceleration]))
+
+
+def _rk4_step_once_with_maneuvers(
+    state: FloatArray,
+    step_s: float,
+    force_model: ForceModelName,
+    schedule: list[_ScheduledManeuver],
+    elapsed_s: float,
+) -> FloatArray:
+    k1 = _derivative_with_maneuvers(state, force_model, schedule, elapsed_s)
+    k2 = _derivative_with_maneuvers(
+        state + 0.5 * step_s * k1,
+        force_model,
+        schedule,
+        elapsed_s + 0.5 * step_s,
+    )
+    k3 = _derivative_with_maneuvers(
+        state + 0.5 * step_s * k2,
+        force_model,
+        schedule,
+        elapsed_s + 0.5 * step_s,
+    )
+    k4 = _derivative_with_maneuvers(
+        state + step_s * k3,
+        force_model,
+        schedule,
+        elapsed_s + step_s,
+    )
+    return cast(FloatArray, state + (step_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4))
+
+
+def _next_maneuver_boundary_s(
+    schedule: list[_ScheduledManeuver],
+    elapsed_s: float,
+    target_s: float,
+) -> float | None:
+    boundaries: list[float] = []
+    for scheduled in schedule:
+        boundaries.append(scheduled.start_s)
+        if scheduled.maneuver.duration_s > 0.0:
+            boundaries.append(scheduled.end_s)
+
+    candidates = [
+        boundary
+        for boundary in boundaries
+        if elapsed_s + _MANEUVER_TIME_TOLERANCE_S < boundary < target_s - _MANEUVER_TIME_TOLERANCE_S
+    ]
+    return min(candidates) if candidates else None
+
+
+def _apply_impulses_at_elapsed_s(
+    state: FloatArray,
+    schedule: list[_ScheduledManeuver],
+    elapsed_s: float,
+    applied_impulses: set[int],
+) -> FloatArray:
+    next_state = state
+    for scheduled in schedule:
+        if scheduled.maneuver.duration_s > 0.0 or scheduled.index in applied_impulses:
+            continue
+        if abs(scheduled.start_s - elapsed_s) <= _MANEUVER_TIME_TOLERANCE_S:
+            next_state = next_state.copy()
+            next_state[3:] = next_state[3:] + np.array(
+                scheduled.maneuver.delta_v_km_s,
+                dtype=np.float64,
+            )
+            applied_impulses.add(scheduled.index)
+    return next_state
+
+
+def _advance_with_maneuvers(
+    state: FloatArray,
+    *,
+    start_s: float,
+    target_s: float,
+    force_model: ForceModelName,
+    schedule: list[_ScheduledManeuver],
+    applied_impulses: set[int],
+) -> FloatArray:
+    elapsed_s = start_s
+    next_state = _apply_impulses_at_elapsed_s(state, schedule, elapsed_s, applied_impulses)
+
+    while elapsed_s < target_s - _MANEUVER_TIME_TOLERANCE_S:
+        step_target_s = min(elapsed_s + _MAX_RK4_INTERNAL_STEP_S, target_s)
+        boundary_s = _next_maneuver_boundary_s(schedule, elapsed_s, step_target_s)
+        if boundary_s is not None:
+            step_target_s = boundary_s
+
+        step_s = step_target_s - elapsed_s
+        next_state = _rk4_step_once_with_maneuvers(
+            next_state,
+            step_s,
+            force_model,
+            schedule,
+            elapsed_s,
+        )
+        elapsed_s = step_target_s
+        next_state = _apply_impulses_at_elapsed_s(
+            next_state,
+            schedule,
+            elapsed_s,
+            applied_impulses,
+        )
+
+    return next_state
+
+
+def _maneuver_events(
+    schedule: list[_ScheduledManeuver],
+    scenario: Scenario,
+) -> list[TrajectoryEvent]:
+    events: list[TrajectoryEvent] = []
+    for scheduled in schedule:
+        maneuver = scheduled.maneuver
+        metadata: dict[str, Any] = {
+            "maneuver": maneuver.name,
+            "delta_v_km_s": maneuver.delta_v_km_s,
+            "duration_s": maneuver.duration_s,
+        }
+        if maneuver.duration_s == 0.0:
+            events.append(
+                TrajectoryEvent(
+                    event_type="maneuver_impulse",
+                    epoch=maneuver.epoch,
+                    description=f"Applied impulsive maneuver {maneuver.name}.",
+                    metadata=metadata,
+                )
+            )
+            continue
+
+        events.append(
+            TrajectoryEvent(
+                event_type="maneuver_start",
+                epoch=maneuver.epoch,
+                description=f"Started finite-burn maneuver {maneuver.name}.",
+                metadata=metadata,
+            )
+        )
+        events.append(
+            TrajectoryEvent(
+                event_type="maneuver_end",
+                epoch=scenario.initial_state.epoch + timedelta(seconds=scheduled.end_s),
+                description=f"Completed finite-burn maneuver {maneuver.name}.",
+                metadata=metadata,
+            )
+        )
+    return events
+
+
+def _maneuver_metadata(schedule: list[_ScheduledManeuver]) -> dict[str, Any]:
+    if not schedule:
+        return {}
+
+    finite_burn_count = sum(1 for scheduled in schedule if scheduled.maneuver.duration_s > 0.0)
+    impulse_count = len(schedule) - finite_burn_count
+    return {
+        "maneuver_model": "constant_inertial_acceleration",
+        "finite_burn_count": finite_burn_count,
+        "impulsive_maneuver_count": impulse_count,
+    }
+
+
 def propagate_local(scenario: Scenario) -> Trajectory:
     force_model = _validate_local_force_model(scenario.force_model.gravity)
     internal_substeps_per_sample, internal_step_s = _internal_step_schedule(
         scenario.propagation.step_s
     )
+    maneuver_schedule = _scheduled_maneuvers(scenario)
+    maneuver_events = _maneuver_events(maneuver_schedule, scenario)
+    applied_impulses: set[int] = set()
 
     initial = scenario.initial_state.cartesian
     state = cast(FloatArray, np.concatenate([initial.position_array(), initial.velocity_array()]))
@@ -129,19 +376,33 @@ def propagate_local(scenario: Scenario) -> Trajectory:
             )
         )
         if step_index < scenario.propagation.sample_count - 1:
-            state = rk4_step(state, scenario.propagation.step_s, force_model)
+            if maneuver_schedule:
+                state = _advance_with_maneuvers(
+                    state,
+                    start_s=step_index * scenario.propagation.step_s,
+                    target_s=(step_index + 1) * scenario.propagation.step_s,
+                    force_model=force_model,
+                    schedule=maneuver_schedule,
+                    applied_impulses=applied_impulses,
+                )
+            else:
+                state = rk4_step(state, scenario.propagation.step_s, force_model)
+
+    metadata = {
+        "integrator": "rk4",
+        "step_s": scenario.propagation.step_s,
+        "sample_step_s": scenario.propagation.step_s,
+        "internal_max_step_s": _MAX_RK4_INTERNAL_STEP_S,
+        "internal_substeps_per_sample": internal_substeps_per_sample,
+        "internal_step_s": internal_step_s,
+    } | _maneuver_metadata(maneuver_schedule)
 
     return Trajectory(
         scenario_id=scenario.scenario_id,
         samples=samples,
         force_model=scenario.force_model,
         backend="local",
-        metadata={
-            "integrator": "rk4",
-            "step_s": scenario.propagation.step_s,
-            "sample_step_s": scenario.propagation.step_s,
-            "internal_max_step_s": _MAX_RK4_INTERNAL_STEP_S,
-            "internal_substeps_per_sample": internal_substeps_per_sample,
-            "internal_step_s": internal_step_s,
-        },
+        events=maneuver_events,
+        maneuvers=scenario.maneuvers,
+        metadata=metadata,
     )

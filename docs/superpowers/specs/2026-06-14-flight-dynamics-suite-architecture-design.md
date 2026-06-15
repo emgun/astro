@@ -434,6 +434,7 @@ The suite should track tolerances explicitly. When tolerance changes are needed,
 - Synthetic range/range-rate and inertial right-ascension/declination measurements.
 - Batch least-squares OD recovery.
 - Ephemeris output.
+- Local maneuver schedule propagation for impulsive and finite-burn baselines.
 - Deterministic examples.
 
 ### Milestone 3: Launch/Ascent Module

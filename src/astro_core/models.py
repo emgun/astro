@@ -484,6 +484,7 @@ class Scenario(AstroModel):
     initial_state: OrbitState
     force_model: ForceModelConfig
     propagation: PropagationConfig
+    maneuvers: list[Maneuver] = Field(default_factory=list)
     ground_stations: list[GroundStation] = Field(default_factory=list)
     measurements: MeasurementConfig = Field(default_factory=MeasurementConfig)
     metadata: dict[str, Any] = Field(default_factory=dict)
