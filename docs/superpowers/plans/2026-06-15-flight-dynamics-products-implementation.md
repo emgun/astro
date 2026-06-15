@@ -35,10 +35,10 @@ Out of scope:
 - Modify: `src/astro_core/models.py`
 - Test: `tests/astro_core/test_models.py`
 
-- [ ] Add tests for trajectory events, maneuvers, covariance samples, and default backward compatibility.
-- [ ] Implement the models and validation.
-- [ ] Run `python -m pytest tests/astro_core/test_models.py -v`.
-- [ ] Commit with `git commit -m "feat: add flight dynamics trajectory product fields"`.
+- [x] Add tests for trajectory events, maneuvers, covariance samples, and default backward compatibility.
+- [x] Implement the models and validation.
+- [x] Run `python -m pytest tests/astro_core/test_models.py -v`.
+- [x] Commit with `git commit -m "feat: add flight dynamics trajectory product fields"`.
 
 ## Task 2: Maneuver And Ephemeris Helpers
 
@@ -51,11 +51,11 @@ Out of scope:
 - Test: `tests/astro_dynamics/test_ephemeris.py`
 - Test: `tests/test_imports.py`
 
-- [ ] Add tests for impulsive delta-v application and CSV ephemeris export.
-- [ ] Implement helpers.
-- [ ] Export public functions.
-- [ ] Run focused tests.
-- [ ] Commit with `git commit -m "feat: add maneuver and ephemeris helpers"`.
+- [x] Add tests for impulsive delta-v application and CSV ephemeris export.
+- [x] Implement helpers.
+- [x] Export public functions.
+- [x] Run focused tests.
+- [x] Commit with `git commit -m "feat: add maneuver and ephemeris helpers"`.
 
 ## Task 3: Monte Carlo Propagation
 
@@ -66,10 +66,10 @@ Out of scope:
 - Test: `tests/astro_dynamics/test_monte_carlo.py`
 - Test: `tests/test_imports.py`
 
-- [ ] Add deterministic seeded Monte Carlo tests.
-- [ ] Implement perturbation and ensemble result models.
-- [ ] Run focused tests.
-- [ ] Commit with `git commit -m "feat: add seeded propagation monte carlo"`.
+- [x] Add deterministic seeded Monte Carlo tests.
+- [x] Implement perturbation and ensemble result models.
+- [x] Run focused tests.
+- [x] Commit with `git commit -m "feat: add seeded propagation monte carlo"`.
 
 ## Task 4: CLI And Documentation
 
@@ -80,10 +80,10 @@ Out of scope:
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-06-15-roadmap-goals-implementation-plan.md`
 
-- [ ] Add `export-trajectory` CLI command for CSV ephemeris export.
-- [ ] Add `monte-carlo` CLI command for seeded initial-state ensembles.
-- [ ] Document commands and mark Goal 3 implemented.
-- [ ] Run:
+- [x] Add `export-trajectory` CLI command for CSV ephemeris export.
+- [x] Add `monte-carlo` CLI command for seeded initial-state ensembles.
+- [x] Document commands and mark Goal 3 implemented.
+- [x] Run:
 
 ```bash
 python -m pytest -q
@@ -94,7 +94,7 @@ astro export-trajectory /tmp/astro-trajectory.json --format csv --output /tmp/as
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output /tmp/astro-monte-carlo.json
 ```
 
-- [ ] Commit with `git commit -m "feat: add flight dynamics product cli"`.
+- [x] Commit with `git commit -m "feat: add flight dynamics product cli"`.
 
 ## Self-Review
 
@@ -110,4 +110,3 @@ Placeholder scan:
 Type consistency:
 
 - `Trajectory` remains the common product; new fields are optional with default empty lists.
-

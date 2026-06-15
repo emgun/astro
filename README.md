@@ -10,6 +10,8 @@ The current implementation slice covers:
 
 - Pydantic scenario validation from YAML.
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
+- Flight-dynamics trajectory product fields for events, impulsive maneuvers, and covariance
+  history, plus CSV ephemeris export and seeded initial-state Monte Carlo propagation.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
@@ -46,6 +48,8 @@ If `orekit-jpype` is not installed, `astro orekit-smoke` exits nonzero with stru
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
+astro export-trajectory trajectory.json --format csv --output trajectory.csv
+astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
 astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output pitch_launch.json
 astro sweep-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-index 3 --pitch-deg-values 10,20,30 --output pitch_sweep.json
@@ -72,6 +76,12 @@ initial state as an estimate seed, and records that provenance in the output met
 option selects the propagation backend used for synthetic truth generation and residual propagation.
 With `--backend orekit`, the suite estimator uses Orekit-backed propagation when the optional Orekit
 runtime is installed; it is not yet Orekit's native `BatchLSEstimator`.
+
+`astro export-trajectory` converts suite trajectory JSON into a CSV ephemeris table containing
+epoch, position, and velocity samples. `astro monte-carlo` runs a seeded initial-state ensemble by
+perturbing the scenario's Cartesian state and propagating each case through the selected backend.
+This is a repeatable product workflow for uncertainty screening; it is not yet production covariance
+propagation or conjunction analysis.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage

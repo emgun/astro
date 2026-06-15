@@ -27,6 +27,7 @@ def test_packages_import() -> None:
         "Scenario",
         "TrajectoryEvent",
         "UnsupportedBackendError",
+        "load_trajectory",
     }
     expected_dynamics_exports = {
         "MonteCarloCase",

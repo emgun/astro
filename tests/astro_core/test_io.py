@@ -3,8 +3,9 @@ from pathlib import Path
 import pytest
 
 from astro_core.errors import InvalidScenarioError
-from astro_core.io import load_scenario
+from astro_core.io import load_scenario, load_trajectory
 from astro_core.models import ForceModelName
+from astro_dynamics.local import propagate_local
 
 
 def test_load_example_scenario() -> None:
@@ -22,6 +23,18 @@ def test_load_two_station_od_example_scenario() -> None:
     assert scenario.force_model.gravity is ForceModelName.TWO_BODY
     assert scenario.propagation.sample_count == 11
     assert len(scenario.ground_stations) == 2
+
+
+def test_load_trajectory_reads_json_product(tmp_path: Path) -> None:
+    trajectory = propagate_local(load_scenario(Path("examples/scenarios/leo_two_body.yaml")))
+    path = tmp_path / "trajectory.json"
+    path.write_text(trajectory.model_dump_json(), encoding="utf-8")
+
+    loaded = load_trajectory(path)
+
+    assert loaded.scenario_id == "leo-two-body"
+    assert loaded.backend == "local"
+    assert len(loaded.samples) == 11
 
 
 def test_load_scenario_reports_yaml_parse_errors(tmp_path: Path) -> None:

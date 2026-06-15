@@ -28,18 +28,16 @@ Implemented and protected:
 - Core package scaffold, CLI entrypoint, strict typing, linting, and tests.
 - `astro_core` scenario, state, spacecraft, force model, ground station, measurement, trajectory, and estimate products.
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
+- `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV ephemeris export,
+  and seeded initial-state Monte Carlo propagation.
 - `astro_od` synthetic range/range-rate generation, measurement JSON/CSV/TDM ingest/export, and local SciPy batch least-squares OD.
 - `astro_launch` local vertical and pitch-program ascent baselines, launch-to-orbit handoff, pitch sweep, two-knot tuning, tuned launch reports, batch ranking, and report comparison.
-- `astro_backends.orekit` optional `orekit_jpype` smoke gate for wrapper import, JVM init, EME2000 frame, and UTC time scale.
+- `astro_backends.orekit` optional `orekit_jpype` smoke gate and two-body Orekit propagation adapter.
 
 Still roadmap-level:
 
-- `astro propagate --backend orekit`.
-- Orekit data loading validation and simple Orekit propagation through the wrapper.
 - Orekit high-fidelity force models, Orekit measurement generation, and Orekit batch/sequential OD.
-- Maneuver and event models for orbital flight dynamics.
-- Ephemeris export beyond current JSON trajectory products.
-- Monte Carlo and covariance-history workflows.
+- Production covariance propagation and finite-burn maneuver dynamics.
 - RocketPy launch simulation adapter.
 - Dymos/OpenMDAO ascent optimization adapter.
 - Tudat cross-check backend.
@@ -122,7 +120,7 @@ Primary files:
 
 ### Goal 3: Operational Flight Dynamics Products
 
-Status: can begin after Goal 1, before or alongside Goal 2.
+Status: implemented for product primitives, impulsive maneuvers, CSV ephemeris export, and seeded initial-state Monte Carlo. Finite burns and production covariance dynamics remain deferred.
 
 Definition of done:
 
@@ -135,13 +133,11 @@ Definition of done:
 Primary files:
 
 - Modify `src/astro_core/models.py`
-- Create `src/astro_dynamics/events.py`
 - Create `src/astro_dynamics/maneuvers.py`
 - Create `src/astro_dynamics/ephemeris.py`
 - Create `src/astro_dynamics/monte_carlo.py`
 - Modify `src/astro_cli/main.py`
 - Test `tests/astro_core/test_models.py`
-- Test `tests/astro_dynamics/test_events.py`
 - Test `tests/astro_dynamics/test_maneuvers.py`
 - Test `tests/astro_dynamics/test_ephemeris.py`
 - Test `tests/astro_dynamics/test_monte_carlo.py`

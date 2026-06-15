@@ -58,6 +58,11 @@ def _write_launch_trajectory(path: Path) -> None:
     path.write_text(trajectory.model_dump_json(), encoding="utf-8")
 
 
+def _write_orbit_trajectory(path: Path) -> None:
+    trajectory = propagate_local(load_scenario(Path("examples/scenarios/leo_two_body.yaml")))
+    path.write_text(trajectory.model_dump_json(), encoding="utf-8")
+
+
 def _write_tuned_launch_report(path: Path, *, iterations: int) -> None:
     report = generate_tuned_launch_report(
         make_pitch_program_launch_scenario(),
@@ -179,6 +184,65 @@ def test_propagate_command_writes_json(tmp_path: Path) -> None:
     assert payload["scenario_id"] == "leo-two-body"
     assert payload["backend"] == "local"
     assert len(payload["samples"]) == 11
+
+
+def test_export_trajectory_command_writes_csv(tmp_path: Path) -> None:
+    trajectory_path = tmp_path / "trajectory.json"
+    output = tmp_path / "trajectory.csv"
+    _write_orbit_trajectory(trajectory_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "export-trajectory",
+            str(trajectory_path),
+            "--format",
+            "csv",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote trajectory" in result.stdout
+    rows = list(csv.DictReader(output.read_text(encoding="utf-8").splitlines()))
+    assert len(rows) == 11
+    assert rows[0]["scenario_id"] == "leo-two-body"
+    assert rows[0]["backend"] == "local"
+    assert rows[0]["x_km"] == "7000.0"
+
+
+def test_monte_carlo_command_writes_json(tmp_path: Path) -> None:
+    output = tmp_path / "monte_carlo.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "monte-carlo",
+            "examples/scenarios/leo_two_body.yaml",
+            "--cases",
+            "4",
+            "--position-sigma-km",
+            "0.01",
+            "--velocity-sigma-km-s",
+            "0.000001",
+            "--seed",
+            "7",
+            "--backend",
+            "local",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote monte carlo" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "leo-two-body"
+    assert payload["backend"] == "local"
+    assert payload["seed"] == 7
+    assert len(payload["cases"]) == 4
+    assert {case["trajectory"]["backend"] for case in payload["cases"]} == {"local"}
 
 
 def test_launch_command_writes_json(tmp_path: Path) -> None:
@@ -963,10 +1027,11 @@ def test_propagate_command_reports_invalid_scenario(tmp_path: Path) -> None:
 def test_propagate_command_reports_unavailable_orekit_backend(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fail_orekit(_scenario: Scenario) -> object:
+    def fail_backend(_scenario: Scenario, backend: str) -> object:
+        assert backend == "orekit"
         raise UnsupportedBackendError("Orekit backend unavailable: install astro-suite[orekit]")
 
-    monkeypatch.setattr("astro_cli.main.propagate_orekit", fail_orekit)
+    monkeypatch.setattr("astro_cli.main.propagate_with_backend", fail_backend)
 
     result = runner.invoke(
         app,
@@ -988,11 +1053,12 @@ def test_propagate_command_writes_orekit_json(
 ) -> None:
     output = tmp_path / "orekit.json"
 
-    def fake_orekit(scenario: Scenario) -> object:
+    def fake_backend(scenario: Scenario, backend: str) -> object:
+        assert backend == "orekit"
         trajectory = propagate_local(scenario)
         return trajectory.model_copy(update={"backend": "orekit"})
 
-    monkeypatch.setattr("astro_cli.main.propagate_orekit", fake_orekit)
+    monkeypatch.setattr("astro_cli.main.propagate_with_backend", fake_backend)
 
     result = runner.invoke(
         app,

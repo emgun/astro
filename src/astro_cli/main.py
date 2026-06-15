@@ -7,17 +7,18 @@ from typing import Annotated
 import typer
 import yaml
 
-from astro_backends.orekit import propagate_orekit, run_orekit_smoke
+from astro_backends.orekit import run_orekit_smoke
 from astro_core.errors import (
     InvalidMeasurementFileError,
     InvalidScenarioError,
     NumericalConvergenceError,
     UnsupportedBackendError,
 )
-from astro_core.io import load_scenario
-from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario
+from astro_core.io import load_scenario, load_trajectory
+from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario, Trajectory
 from astro_dynamics.backends import propagate_with_backend
-from astro_dynamics.local import propagate_local
+from astro_dynamics.ephemeris import dump_trajectory_ephemeris_csv
+from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
 from astro_launch.handoff import launch_trajectory_to_orbit_scenario
 from astro_launch.io import load_launch_scenario, load_launch_trajectory, load_tuned_launch_report
 from astro_launch.local import propagate_launch_local
@@ -52,6 +53,14 @@ DEMO_GROUND_STATION_CANDIDATES: tuple[tuple[str, tuple[float, float, float]], ..
 def _load_scenario_or_exit(scenario_path: Path) -> Scenario:
     try:
         return load_scenario(scenario_path)
+    except InvalidScenarioError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+
+def _load_trajectory_or_exit(trajectory_path: Path) -> Trajectory:
+    try:
+        return load_trajectory(trajectory_path)
     except InvalidScenarioError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
@@ -260,17 +269,11 @@ def propagate(
 ) -> None:
     """Propagate a scenario and write a trajectory product."""
     scenario = _load_scenario_or_exit(scenario_path)
-    if backend == "local":
-        trajectory = propagate_local(scenario)
-    elif backend == "orekit":
-        try:
-            trajectory = propagate_orekit(scenario)
-        except UnsupportedBackendError as exc:
-            typer.echo(str(exc), err=True)
-            raise typer.Exit(code=2) from exc
-    else:
-        typer.echo(f"unsupported propagation backend: {backend}", err=True)
-        raise typer.Exit(code=2)
+    try:
+        trajectory = propagate_with_backend(scenario, backend)
+    except UnsupportedBackendError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
 
     payload = trajectory.model_dump_json(indent=2)
     if output is None:
@@ -278,6 +281,55 @@ def propagate(
     else:
         _write_text_or_exit(output, payload, "trajectory")
         typer.echo(f"wrote trajectory: {output}")
+
+
+@app.command("export-trajectory")
+def export_trajectory(
+    trajectory_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    trajectory_format: Annotated[
+        str,
+        typer.Option("--format", help="Output trajectory format: csv."),
+    ] = "csv",
+) -> None:
+    """Export a trajectory product to an ephemeris table."""
+    trajectory = _load_trajectory_or_exit(trajectory_path)
+    if trajectory_format != "csv":
+        typer.echo(f"unsupported trajectory export format: {trajectory_format}", err=True)
+        raise typer.Exit(code=2)
+
+    payload = dump_trajectory_ephemeris_csv(trajectory)
+    _write_text_or_exit(output, payload, "trajectory")
+    typer.echo(f"wrote trajectory: {output}")
+
+
+@app.command("monte-carlo")
+def monte_carlo(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    cases: Annotated[int, typer.Option()] = 16,
+    position_sigma_km: Annotated[float, typer.Option()] = 0.0,
+    velocity_sigma_km_s: Annotated[float, typer.Option()] = 0.0,
+    seed: Annotated[int, typer.Option()] = 42,
+    backend: Annotated[str, typer.Option()] = "local",
+) -> None:
+    """Run a seeded initial-state propagation ensemble."""
+    scenario = _load_scenario_or_exit(scenario_path)
+    try:
+        result = run_initial_state_monte_carlo(
+            scenario,
+            cases=cases,
+            position_sigma_km=position_sigma_km,
+            velocity_sigma_km_s=velocity_sigma_km_s,
+            seed=seed,
+            backend=backend,
+        )
+    except (ValueError, UnsupportedBackendError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "monte carlo")
+    typer.echo(f"wrote monte carlo: {output}")
 
 
 @app.command()
