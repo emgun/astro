@@ -18,6 +18,7 @@ from astro_launch.io import load_launch_scenario
 from astro_launch.local import propagate_launch_local
 from astro_launch.models import LaunchScenario, LaunchTrajectory
 from astro_launch.reporting import generate_tuned_launch_report
+from astro_launch.targeting import tune_pitch_program
 from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
 from tests.astro_launch.helpers import make_launch_scenario, make_pitch_program_launch_scenario
@@ -506,6 +507,73 @@ def test_tune_launch_pitch_command_reports_tuned_scenario_write_error(
     assert result.exit_code == 2
     assert "could not write tuned launch scenario" in result.stderr
     assert str(tuned_scenario_output) in result.stderr
+
+
+def test_optimize_launch_command_writes_local_json(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "optimization.json"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "optimize-launch",
+            str(scenario_path),
+            "--backend",
+            "local",
+            "--point-indices",
+            "2,3",
+            "--iterations",
+            "1",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote launch optimization" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "pitch-program-two-stage"
+    assert payload["backend"] == "local"
+    assert payload["point_indices"] == [2, 3]
+    assert len(payload["iterations"]) == 1
+
+
+def test_optimize_launch_command_accepts_dymos_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "optimization.json"
+    seen_scenarios: list[str] = []
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    def fake_dymos(scenario: LaunchScenario) -> object:
+        seen_scenarios.append(scenario.scenario_id)
+        return tune_pitch_program(
+            scenario,
+            point_indices=(2, 3),
+            iterations=1,
+        ).model_copy(update={"backend": "dymos"})
+
+    monkeypatch.setattr("astro_cli.main.optimize_launch_dymos", fake_dymos)
+
+    result = runner.invoke(
+        app,
+        [
+            "optimize-launch",
+            str(scenario_path),
+            "--backend",
+            "dymos",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen_scenarios == ["pitch-program-two-stage"]
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["backend"] == "dymos"
 
 
 def test_report_tuned_launch_command_writes_json(tmp_path: Path) -> None:

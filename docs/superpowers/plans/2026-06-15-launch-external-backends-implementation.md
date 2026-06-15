@@ -131,13 +131,13 @@ def propagate_launch_with_backend(scenario: LaunchScenario, backend: str) -> Lau
 - Test: `tests/astro_cli/test_cli.py`
 - Modify: `README.md`
 
-- [ ] Add tests for `optimize_launch_dymos` missing-runtime diagnostics.
-- [ ] Add CLI test for `astro optimize-launch --backend local` using current pitch tuning.
-- [ ] Add CLI test for `astro optimize-launch --backend dymos` dispatch by monkeypatching the Dymos optimizer.
-- [ ] Implement local optimizer command using `tune_pitch_program`.
-- [ ] Implement Dymos adapter boundary that records runtime availability and raises explicit configuration requirements until a Dymos phase model exists.
-- [ ] Run focused Dymos and CLI tests.
-- [ ] Commit with `git commit -m "feat: add launch optimization command boundary"`.
+- [x] Add tests for `optimize_launch_dymos` missing-runtime diagnostics.
+- [x] Add CLI test for `astro optimize-launch --backend local` using current pitch tuning.
+- [x] Add CLI test for `astro optimize-launch --backend dymos` dispatch by monkeypatching the Dymos optimizer.
+- [x] Implement local optimizer command using `tune_pitch_program`.
+- [x] Implement Dymos adapter boundary that records runtime availability and raises explicit configuration requirements until a Dymos phase model exists.
+- [x] Run focused Dymos and CLI tests.
+- [x] Commit with `git commit -m "feat: add launch optimization command boundary"`.
 
 ## Task 5: Verification And Roadmap Update
 

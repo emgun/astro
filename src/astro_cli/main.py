@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 import yaml
 
-from astro_backends.dymos import run_dymos_smoke
+from astro_backends.dymos import optimize_launch_dymos, run_dymos_smoke
 from astro_backends.orekit import run_orekit_smoke
 from astro_backends.rocketpy import run_rocketpy_smoke
 from astro_core.errors import (
@@ -504,6 +504,49 @@ def tune_launch_pitch(
             "tuned launch scenario",
         )
         typer.echo(f"wrote tuned launch scenario: {tuned_scenario_output}")
+
+
+@app.command("optimize-launch")
+def optimize_launch(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    backend: Annotated[str, typer.Option()] = "local",
+    point_indices: Annotated[
+        str,
+        typer.Option(
+            "--point-indices",
+            help="Two comma-separated pitch-program point indices for local optimization.",
+        ),
+    ] = "2,3",
+    initial_span_deg: Annotated[float, typer.Option()] = 10.0,
+    iterations: Annotated[int, typer.Option()] = 2,
+    refinement_factor: Annotated[float, typer.Option()] = 0.5,
+    altitude_weight: Annotated[float, typer.Option()] = 1.0,
+    velocity_weight: Annotated[float, typer.Option()] = 1.0,
+) -> None:
+    """Run a launch optimization workflow and write an optimization product."""
+    scenario = _load_launch_scenario_or_exit(scenario_path)
+    try:
+        if backend == "local":
+            result = tune_pitch_program(
+                scenario,
+                point_indices=_parse_point_indices_or_exit(point_indices),
+                initial_span_deg=initial_span_deg,
+                iterations=iterations,
+                refinement_factor=refinement_factor,
+                altitude_weight=altitude_weight,
+                velocity_weight=velocity_weight,
+            )
+        elif backend == "dymos":
+            result = optimize_launch_dymos(scenario)
+        else:
+            raise UnsupportedBackendError(f"unsupported launch optimization backend: {backend}")
+    except (ValueError, UnsupportedBackendError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "launch optimization")
+    typer.echo(f"wrote launch optimization: {output}")
 
 
 @app.command("report-tuned-launch")

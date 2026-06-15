@@ -69,6 +69,7 @@ astro launch examples/launch/vertical_two_stage.yaml --backend local --output la
 astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output pitch_launch.json
 astro sweep-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-index 3 --pitch-deg-values 10,20,30 --output pitch_sweep.json
 astro tune-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --initial-span-deg 10 --iterations 2 --output pitch_tuning.json --tuned-scenario-output tuned_pitch_program.yaml
+astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend local --point-indices 2,3 --iterations 2 --output launch_optimization.json
 astro report-tuned-launch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --initial-span-deg 10 --iterations 2 --orbit-duration-s 600 --orbit-step-s 60 --output tuned_launch_report.json
 astro batch-report-tuned-launch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --iterations-values 1,2,3 --initial-span-deg 10 --orbit-duration-s 600 --orbit-step-s 60 --output tuned_launch_batch.json
 astro compare-tuned-launch-reports tuned_launch_report_baseline.json tuned_launch_report_candidate.json --output tuned_launch_comparison.json
@@ -114,6 +115,11 @@ OpenMDAO, or RocketPy-backed targeting.
 knots on a deterministic 3x3 grid, shrinks the search span each iteration, writes a JSON trace of
 every evaluated candidate, and can write the best tuned `LaunchScenario` back to YAML. This is still
 a coarse-to-fine targeting analysis tool, not a production optimizer.
+
+`astro optimize-launch` is the neutral launch optimization entry point. With `--backend local`, it
+uses the current pitch-program tuner and writes the same `LaunchPitchTuningResult` product. With
+`--backend dymos`, it loads the optional Dymos/OpenMDAO runtime and requires a validated Dymos phase
+runner; the current suite does not fake an optimal-control solve from the local aggregate schema.
 
 `astro report-tuned-launch` runs the current local end-to-end launch analysis: tune two pitch knots,
 propagate the tuned ascent, hand off insertion to an orbit scenario, propagate a short orbital arc,

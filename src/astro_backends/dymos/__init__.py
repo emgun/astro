@@ -1,3 +1,4 @@
+from astro_backends.dymos.optimization import optimize_launch_dymos
 from astro_backends.dymos.runtime import (
     DymosRuntime,
     DymosRuntimeUnavailable,
@@ -10,5 +11,6 @@ __all__ = [
     "DymosRuntimeUnavailable",
     "DymosSmokeResult",
     "load_dymos_runtime",
+    "optimize_launch_dymos",
     "run_dymos_smoke",
 ]
