@@ -42,6 +42,19 @@ astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output o
 
 If `orekit-jpype` is not installed, `astro orekit-smoke` exits nonzero with structured JSON explaining that the optional wrapper is unavailable. `astro propagate --backend orekit` currently supports phase-1 two-body propagation through Orekit's Keplerian propagator; J2, drag, SRP, and `orekit_high_fidelity` force models are part of the next Orekit force-model phase.
 
+Optional launch backend smoke checks:
+
+```bash
+python -m pip install -e '.[launch,optimization]'
+astro rocketpy-smoke
+astro dymos-smoke
+```
+
+RocketPy and Dymos/OpenMDAO are behind explicit adapter gates. The current `rocketpy` launch path
+loads the optional runtime and preserves the `LaunchTrajectory` product boundary, but live RocketPy
+simulation still requires backend-specific rocket/motor configuration beyond the aggregate local
+launch schema.
+
 ## Commands
 
 ```bash
@@ -50,6 +63,8 @@ astro propagate examples/scenarios/leo_two_body.yaml --backend local --output tr
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
+astro rocketpy-smoke
+astro dymos-smoke
 astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
 astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output pitch_launch.json
 astro sweep-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-index 3 --pitch-deg-values 10,20,30 --output pitch_sweep.json

@@ -113,13 +113,13 @@ def propagate_launch_with_backend(scenario: LaunchScenario, backend: str) -> Lau
 - Modify: `README.md`
 - Modify: `docs/superpowers/plans/2026-06-15-roadmap-goals-implementation-plan.md`
 
-- [ ] Add tests showing missing RocketPy raises `UnsupportedBackendError` with `install astro-suite[launch]`.
-- [ ] Add tests with a fake runtime and fake `flight_runner` that returns a `LaunchTrajectory` with `backend == "rocketpy"`.
-- [ ] Implement `propagate_launch_rocketpy(scenario, runtime_loader=load_rocketpy_runtime, flight_runner=None)`.
-- [ ] If no `flight_runner` is supplied, raise an explicit error that RocketPy live simulation requires backend-specific rocket/motor configuration not present in the current aggregate `LaunchScenario`.
-- [ ] Document that Goal 4's first RocketPy slice is a product-preserving adapter boundary, not a complete motor geometry authoring layer.
-- [ ] Run focused RocketPy adapter tests.
-- [ ] Commit with `git commit -m "feat: add rocketpy launch adapter boundary"`.
+- [x] Add tests showing missing RocketPy raises `UnsupportedBackendError` with `install astro-suite[launch]`.
+- [x] Add tests with a fake runtime and fake `flight_runner` that returns a `LaunchTrajectory` with `backend == "rocketpy"`.
+- [x] Implement `propagate_launch_rocketpy(scenario, runtime_loader=load_rocketpy_runtime, flight_runner=None)`.
+- [x] If no `flight_runner` is supplied, raise an explicit error that RocketPy live simulation requires backend-specific rocket/motor configuration not present in the current aggregate `LaunchScenario`.
+- [x] Document that Goal 4's first RocketPy slice is a product-preserving adapter boundary, not a complete motor geometry authoring layer.
+- [x] Run focused RocketPy adapter tests.
+- [x] Commit with `git commit -m "feat: add rocketpy launch adapter boundary"`.
 
 ## Task 4: Dymos Optimization Command Boundary
 
