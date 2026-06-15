@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
+from math import ceil
 from typing import cast
 
 import numpy as np
@@ -18,6 +19,7 @@ from astro_core.models import (
 
 FloatArray = NDArray[np.float64]
 _SUPPORTED_LOCAL_FORCE_MODELS = {ForceModelName.TWO_BODY, ForceModelName.J2}
+_MAX_RK4_INTERNAL_STEP_S = 30.0
 
 
 def _validate_local_force_model(force_model: ForceModelName) -> ForceModelName:
@@ -78,13 +80,24 @@ def derivative(state: FloatArray, force_model: ForceModelName) -> FloatArray:
     return cast(FloatArray, np.concatenate([velocity, acceleration_km_s2(position, force_model)]))
 
 
-def rk4_step(state: FloatArray, step_s: float, force_model: ForceModelName) -> FloatArray:
-    force_model = _validate_local_force_model(force_model)
+def _rk4_step_once(state: FloatArray, step_s: float, force_model: ForceModelName) -> FloatArray:
     k1 = derivative(state, force_model)
     k2 = derivative(state + 0.5 * step_s * k1, force_model)
     k3 = derivative(state + 0.5 * step_s * k2, force_model)
     k4 = derivative(state + step_s * k3, force_model)
     return cast(FloatArray, state + (step_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4))
+
+
+def rk4_step(state: FloatArray, step_s: float, force_model: ForceModelName) -> FloatArray:
+    force_model = _validate_local_force_model(force_model)
+    substep_count = max(1, ceil(abs(step_s) / _MAX_RK4_INTERNAL_STEP_S))
+    substep_s = step_s / substep_count
+    next_state = state
+
+    for _ in range(substep_count):
+        next_state = _rk4_step_once(next_state, substep_s, force_model)
+
+    return next_state
 
 
 def propagate_local(scenario: Scenario) -> Trajectory:
