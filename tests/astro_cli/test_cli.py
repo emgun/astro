@@ -533,6 +533,63 @@ def test_compare_tuned_launch_reports_command_writes_json(tmp_path: Path) -> Non
     ]
 
 
+def test_batch_report_tuned_launch_command_writes_ranked_json(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "batch.json"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "batch-report-tuned-launch",
+            str(scenario_path),
+            "--point-indices",
+            "2,3",
+            "--iterations-values",
+            "1,2",
+            "--initial-span-deg",
+            "10",
+            "--orbit-duration-s",
+            "600",
+            "--orbit-step-s",
+            "60",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote tuned launch report batch" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "pitch-program-two-stage"
+    assert payload["point_indices"] == [2, 3]
+    assert [case["rank"] for case in payload["cases"]] == [1, 2]
+    assert {case["iterations"] for case in payload["cases"]} == {1, 2}
+    assert payload["best_case"] == payload["cases"][0]
+
+
+def test_batch_report_tuned_launch_command_reports_invalid_iterations_values(
+    tmp_path: Path,
+) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "batch-report-tuned-launch",
+            str(scenario_path),
+            "--iterations-values",
+            "1,bad",
+            "--output",
+            str(tmp_path / "batch.json"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "iterations-values must be comma-separated positive integers" in result.stderr
+
+
 def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:
     output = tmp_path / "measurements.json"
 

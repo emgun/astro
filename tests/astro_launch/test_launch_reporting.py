@@ -1,6 +1,10 @@
 import pytest
 
-from astro_launch.reporting import compare_tuned_launch_reports, generate_tuned_launch_report
+from astro_launch.reporting import (
+    compare_tuned_launch_reports,
+    generate_tuned_launch_report,
+    generate_tuned_launch_report_batch,
+)
 from tests.astro_launch.helpers import make_launch_scenario, make_pitch_program_launch_scenario
 
 
@@ -130,6 +134,37 @@ def test_compare_tuned_launch_reports_summarizes_pass_and_metric_deltas() -> Non
         abs(baseline.insertion_metrics.altitude_miss_km)
         - abs(candidate.insertion_metrics.altitude_miss_km)
     )
+
+
+def test_generate_tuned_launch_report_batch_ranks_iteration_values() -> None:
+    scenario = make_pitch_program_launch_scenario()
+
+    batch = generate_tuned_launch_report_batch(
+        scenario,
+        point_indices=(2, 3),
+        iterations_values=(1, 2),
+        initial_span_deg=10.0,
+        orbit_duration_s=600.0,
+        orbit_step_s=60.0,
+    )
+
+    assert batch.scenario_id == scenario.scenario_id
+    assert batch.point_indices == [2, 3]
+    assert {case.iterations for case in batch.cases} == {1, 2}
+    assert [case.rank for case in batch.cases] == [1, 2]
+    assert batch.best_case == batch.cases[0]
+    assert batch.best_case.normalized_score == min(
+        case.normalized_score for case in batch.cases
+    )
+    for case in batch.cases:
+        checks = [
+            *case.report.insertion_assessment.checks,
+            *case.report.short_arc_assessment.checks,
+        ]
+        assert case.normalized_score == pytest.approx(
+            sum(abs(check.value) / check.tolerance for check in checks)
+        )
+        assert case.label == f"iterations={case.iterations}"
 
 
 def test_generate_tuned_launch_report_requires_pitch_program_guidance() -> None:

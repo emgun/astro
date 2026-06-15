@@ -17,6 +17,8 @@ from astro_launch.models import (
     LaunchScenario,
     LaunchTrajectory,
     TunedLaunchReport,
+    TunedLaunchReportBatch,
+    TunedLaunchReportBatchCase,
     TunedLaunchReportComparison,
 )
 from astro_launch.targeting import tune_pitch_program
@@ -228,6 +230,106 @@ def compare_tuned_launch_reports(
             "workflow": "tuned_launch_report_comparison",
             "baseline_backend": baseline.backend,
             "candidate_backend": candidate.backend,
+        },
+    )
+
+
+def _normalized_assessment_score(assessment: LaunchReportAssessment) -> float:
+    return sum(abs(check.value) / check.tolerance for check in assessment.checks)
+
+
+def _validate_iterations_values(iterations_values: Sequence[int]) -> list[int]:
+    parsed_values = list(iterations_values)
+    if not parsed_values:
+        raise ValueError("iterations_values must contain at least one value")
+    if any(iterations <= 0 for iterations in parsed_values):
+        raise ValueError("iterations_values must contain positive integers")
+    if len(set(parsed_values)) != len(parsed_values):
+        raise ValueError("iterations_values must not contain duplicates")
+    return parsed_values
+
+
+def generate_tuned_launch_report_batch(
+    scenario: LaunchScenario,
+    *,
+    point_indices: Sequence[int],
+    iterations_values: Sequence[int],
+    initial_span_deg: float = 10.0,
+    refinement_factor: float = 0.5,
+    altitude_weight: float = 1.0,
+    velocity_weight: float = 1.0,
+    orbit_duration_s: float = 600.0,
+    orbit_step_s: float = 60.0,
+    spacecraft_name: str = "launch-payload",
+    spacecraft_mass_kg: float | None = None,
+    area_m2: float = 2.5,
+    drag_coefficient: float = 2.2,
+    reflectivity_coefficient: float = 1.3,
+    gravity: ForceModelName = ForceModelName.TWO_BODY,
+) -> TunedLaunchReportBatch:
+    """Generate and rank tuned launch reports for a small iteration-count batch."""
+    parsed_iterations_values = _validate_iterations_values(iterations_values)
+    unranked_cases: list[tuple[int, int, TunedLaunchReport, float, float, float]] = []
+    for case_index, iterations in enumerate(parsed_iterations_values):
+        report = generate_tuned_launch_report(
+            scenario,
+            point_indices=point_indices,
+            initial_span_deg=initial_span_deg,
+            iterations=iterations,
+            refinement_factor=refinement_factor,
+            altitude_weight=altitude_weight,
+            velocity_weight=velocity_weight,
+            orbit_duration_s=orbit_duration_s,
+            orbit_step_s=orbit_step_s,
+            spacecraft_name=spacecraft_name,
+            spacecraft_mass_kg=spacecraft_mass_kg,
+            area_m2=area_m2,
+            drag_coefficient=drag_coefficient,
+            reflectivity_coefficient=reflectivity_coefficient,
+            gravity=gravity,
+        )
+        insertion_score = _normalized_assessment_score(report.insertion_assessment)
+        short_arc_score = _normalized_assessment_score(report.short_arc_assessment)
+        normalized_score = insertion_score + short_arc_score
+        unranked_cases.append(
+            (case_index, iterations, report, insertion_score, short_arc_score, normalized_score)
+        )
+
+    cases = [
+        TunedLaunchReportBatchCase(
+            case_index=case_index,
+            rank=rank,
+            label=f"iterations={iterations}",
+            iterations=iterations,
+            initial_span_deg=initial_span_deg,
+            normalized_score=normalized_score,
+            insertion_normalized_score=insertion_score,
+            short_arc_normalized_score=short_arc_score,
+            passed=report.passed,
+            report=report,
+        )
+        for rank, (
+            case_index,
+            iterations,
+            report,
+            insertion_score,
+            short_arc_score,
+            normalized_score,
+        ) in enumerate(
+            sorted(unranked_cases, key=lambda item: (item[5], item[0])),
+            start=1,
+        )
+    ]
+    return TunedLaunchReportBatch(
+        scenario_id=scenario.scenario_id,
+        point_indices=list(point_indices),
+        cases=cases,
+        best_case=cases[0],
+        backend="local",
+        metadata={
+            "workflow": "tuned_launch_report_batch",
+            "ranking": "sum_abs_assessment_value_over_tolerance",
+            "batch_axis": "iterations_values",
         },
     )
 

@@ -27,9 +27,15 @@ from astro_launch.models import (
     PitchProgramPoint,
     TargetOrbit,
     TunedLaunchReport,
+    TunedLaunchReportBatch,
+    TunedLaunchReportBatchCase,
     TunedLaunchReportComparison,
 )
-from astro_launch.reporting import compare_tuned_launch_reports, generate_tuned_launch_report
+from astro_launch.reporting import (
+    compare_tuned_launch_reports,
+    generate_tuned_launch_report,
+    generate_tuned_launch_report_batch,
+)
 from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
 
 __all__ = [
@@ -58,9 +64,12 @@ __all__ = [
     "PitchProgramPoint",
     "TargetOrbit",
     "TunedLaunchReport",
+    "TunedLaunchReportBatch",
+    "TunedLaunchReportBatchCase",
     "TunedLaunchReportComparison",
     "compare_tuned_launch_reports",
     "generate_tuned_launch_report",
+    "generate_tuned_launch_report_batch",
     "launch_trajectory_to_orbit_scenario",
     "load_launch_scenario",
     "load_launch_trajectory",

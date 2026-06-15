@@ -624,6 +624,39 @@ class TunedLaunchReport(AstroModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class TunedLaunchReportBatchCase(AstroModel):
+    case_index: int = Field(ge=0)
+    rank: int = Field(ge=1)
+    label: str = Field(min_length=1)
+    iterations: int = Field(ge=1)
+    initial_span_deg: FiniteFloat = Field(gt=0.0)
+    normalized_score: FiniteFloat = Field(ge=0.0)
+    insertion_normalized_score: FiniteFloat = Field(ge=0.0)
+    short_arc_normalized_score: FiniteFloat = Field(ge=0.0)
+    passed: bool
+    report: TunedLaunchReport
+
+    @field_validator(
+        "initial_span_deg",
+        "normalized_score",
+        "insertion_normalized_score",
+        "short_arc_normalized_score",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch report batch scalar")
+
+
+class TunedLaunchReportBatch(AstroModel):
+    scenario_id: str = Field(min_length=1)
+    point_indices: list[int] = Field(min_length=2, max_length=2)
+    cases: list[TunedLaunchReportBatchCase] = Field(min_length=1)
+    best_case: TunedLaunchReportBatchCase
+    backend: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class LaunchReportMetricDelta(AstroModel):
     name: str = Field(min_length=1)
     baseline_value: FiniteFloat
