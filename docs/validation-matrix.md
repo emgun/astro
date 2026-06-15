@@ -16,6 +16,7 @@ adapters.
 | Scenario validation | `astro validate examples/scenarios/leo_two_body.yaml` | Valid scenario message for `leo-two-body`. |
 | Local propagation | `astro propagate examples/scenarios/leo_two_body.yaml --backend local --output /tmp/astro-local-trajectory.json` | Writes a `Trajectory` with `backend = "local"` and 11 samples. |
 | Local finite burn | `astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output /tmp/astro-finite-burn.json` | Writes maneuver start/end events and finite-burn provenance metadata. |
+| Local covariance | `astro propagate examples/scenarios/leo_covariance.yaml --backend local --output /tmp/astro-covariance.json` | Writes covariance history samples using finite-difference state transition. |
 | Ephemeris export | `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv` | Writes CSV samples with epoch, position, and velocity. |
 | Local OD ingest | `astro estimate-measurements examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --output /tmp/astro-local-estimate.json` | Writes `EstimateResult` from explicit measurements. |
 | Optical measurement synthesis | `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json` | Writes right-ascension and declination records in degrees. |
@@ -40,6 +41,7 @@ adapters.
 | Local two-body determinism | Unit tests compare sample count and deterministic products. |
 | Orekit two-body vs local | `orekit_live` test compares final LEO state with `abs(position) <= 1 km` and `abs(velocity) <= 1e-3 km/s` when `ASTRO_RUN_OREKIT_LIVE=1`. |
 | Local finite burns | Tests compare finite-burn propagation against the no-maneuver local baseline and verify maneuver events/provenance. |
+| Local covariance propagation | Tests verify covariance history length, epoch alignment, symmetry, and finite-difference provenance metadata. |
 | Launch handoff | Tests confirm `LaunchTrajectory.insertion_state` converts into a normal orbital `Scenario` and propagates locally. |
 | OD explicit measurements | Tests validate JSON, CSV, TDM range/range-rate ingest/export, inertial angle generation, and local least-squares convergence. |
 | Research Monte Carlo | Tests confirm seeded repeatability, local Monte Carlo provenance, and built-in JAX two-body runner parity against the local reference for zero dispersion. |

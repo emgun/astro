@@ -11,7 +11,8 @@ The current implementation slice covers:
 - Pydantic scenario validation from YAML.
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
 - Flight-dynamics trajectory product fields for events, impulsive and finite-burn maneuvers, and
-  covariance history, plus CSV ephemeris export and seeded initial-state Monte Carlo propagation.
+  covariance history, plus local finite-difference covariance propagation, CSV ephemeris export, and
+  seeded initial-state Monte Carlo propagation.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
@@ -75,6 +76,7 @@ and remains separate from operational Orekit semantics.
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
 astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output finite_burn_trajectory.json
+astro propagate examples/scenarios/leo_covariance.yaml --backend local --output covariance_trajectory.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
@@ -123,6 +125,11 @@ maneuvers apply their full `delta_v_km_s` at the maneuver epoch; finite burns ap
 total delta-v as constant inertial acceleration over `duration_s` and record maneuver start/end
 events in the trajectory. This is a deterministic maneuver baseline, not a thrust-vector, mass-flow,
 or attitude-control model.
+
+Local propagation also accepts an optional `initial_covariance` 6x6 matrix. When present, the local
+backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference state
+transition with no process noise. This is useful for product wiring and first-order sensitivity
+screening; high-fidelity covariance dynamics remain a backend validation task.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage

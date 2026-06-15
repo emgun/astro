@@ -485,6 +485,28 @@ class Scenario(AstroModel):
     force_model: ForceModelConfig
     propagation: PropagationConfig
     maneuvers: list[Maneuver] = Field(default_factory=list)
+    initial_covariance: list[list[FiniteFloat]] | None = None
     ground_stations: list[GroundStation] = Field(default_factory=list)
     measurements: MeasurementConfig = Field(default_factory=MeasurementConfig)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("initial_covariance", mode="before")
+    @classmethod
+    def initial_covariance_inputs_must_be_numeric(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        return _numeric_matrix_input_must_be_numbers(value, "Scenario initial_covariance")
+
+    @field_validator("initial_covariance")
+    @classmethod
+    def initial_covariance_must_be_6x6_and_finite(
+        cls,
+        value: list[list[float]] | None,
+    ) -> list[list[float]] | None:
+        if value is None:
+            return None
+        if len(value) != 6 or any(len(row) != 6 for row in value):
+            raise ValueError("Scenario initial_covariance must be 6x6")
+        if any(not isfinite(component) for row in value for component in row):
+            raise ValueError("Scenario initial_covariance values must be finite")
+        return value

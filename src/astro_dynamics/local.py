@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from math import ceil
 from typing import Any, cast
 
@@ -11,6 +12,7 @@ from numpy.typing import NDArray
 from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
 from astro_core.models import (
     CartesianState,
+    CovarianceSample,
     ForceModelName,
     Maneuver,
     Scenario,
@@ -24,6 +26,8 @@ FloatArray = NDArray[np.float64]
 _SUPPORTED_LOCAL_FORCE_MODELS = {ForceModelName.TWO_BODY, ForceModelName.J2}
 _MAX_RK4_INTERNAL_STEP_S = 30.0
 _MANEUVER_TIME_TOLERANCE_S = 1.0e-9
+_COVARIANCE_FD_REL_STEP = 1.0e-6
+_COVARIANCE_FD_ABS_STEP = 1.0e-8
 
 
 @dataclass(frozen=True)
@@ -349,6 +353,48 @@ def _maneuver_metadata(schedule: list[_ScheduledManeuver]) -> dict[str, Any]:
     }
 
 
+def _initial_covariance_matrix(scenario: Scenario) -> FloatArray | None:
+    if scenario.initial_covariance is None:
+        return None
+    return cast(FloatArray, np.array(scenario.initial_covariance, dtype=np.float64))
+
+
+def _covariance_sample(epoch: datetime, covariance: FloatArray) -> CovarianceSample:
+    return CovarianceSample(
+        epoch=epoch,
+        covariance=[[float(component) for component in row] for row in covariance],
+    )
+
+
+def _finite_difference_state_transition(
+    state: FloatArray,
+    advance_state: Callable[[FloatArray], FloatArray],
+) -> FloatArray:
+    transition = np.zeros((6, 6), dtype=np.float64)
+    for column in range(6):
+        step = max(abs(float(state[column])) * _COVARIANCE_FD_REL_STEP, _COVARIANCE_FD_ABS_STEP)
+        perturbation = np.zeros(6, dtype=np.float64)
+        perturbation[column] = step
+        plus = advance_state(state + perturbation)
+        minus = advance_state(state - perturbation)
+        transition[:, column] = (plus - minus) / (2.0 * step)
+    return cast(FloatArray, transition)
+
+
+def _propagate_covariance(covariance: FloatArray, transition: FloatArray) -> FloatArray:
+    propagated = transition @ covariance @ transition.T
+    return cast(FloatArray, 0.5 * (propagated + propagated.T))
+
+
+def _covariance_metadata(covariance: FloatArray | None) -> dict[str, Any]:
+    if covariance is None:
+        return {}
+    return {
+        "covariance_model": "finite_difference_state_transition",
+        "covariance_process_noise": "none",
+    }
+
+
 def propagate_local(scenario: Scenario) -> Trajectory:
     force_model = _validate_local_force_model(scenario.force_model.gravity)
     internal_substeps_per_sample, internal_step_s = _internal_step_schedule(
@@ -357,6 +403,8 @@ def propagate_local(scenario: Scenario) -> Trajectory:
     maneuver_schedule = _scheduled_maneuvers(scenario)
     maneuver_events = _maneuver_events(maneuver_schedule, scenario)
     applied_impulses: set[int] = set()
+    covariance_matrix = _initial_covariance_matrix(scenario)
+    covariance_history: list[CovarianceSample] = []
 
     initial = scenario.initial_state.cartesian
     state = cast(FloatArray, np.concatenate([initial.position_array(), initial.velocity_array()]))
@@ -375,18 +423,56 @@ def propagate_local(scenario: Scenario) -> Trajectory:
                 ),
             )
         )
+        if covariance_matrix is not None:
+            covariance_history.append(_covariance_sample(epoch, covariance_matrix))
+
         if step_index < scenario.propagation.sample_count - 1:
+            transition: FloatArray | None = None
+            step_start_s = step_index * scenario.propagation.step_s
+            step_target_s = (step_index + 1) * scenario.propagation.step_s
             if maneuver_schedule:
+                if covariance_matrix is not None:
+                    def advance_trial_with_maneuvers(
+                        trial_state: FloatArray,
+                        *,
+                        step_start_s: float = step_start_s,
+                        step_target_s: float = step_target_s,
+                    ) -> FloatArray:
+                        return _advance_with_maneuvers(
+                            trial_state,
+                            start_s=step_start_s,
+                            target_s=step_target_s,
+                            force_model=force_model,
+                            schedule=maneuver_schedule,
+                            applied_impulses=set(applied_impulses),
+                        )
+
+                    transition = _finite_difference_state_transition(
+                        state,
+                        advance_trial_with_maneuvers,
+                    )
                 state = _advance_with_maneuvers(
                     state,
-                    start_s=step_index * scenario.propagation.step_s,
-                    target_s=(step_index + 1) * scenario.propagation.step_s,
+                    start_s=step_start_s,
+                    target_s=step_target_s,
                     force_model=force_model,
                     schedule=maneuver_schedule,
                     applied_impulses=applied_impulses,
                 )
             else:
+                if covariance_matrix is not None:
+                    transition = _finite_difference_state_transition(
+                        state,
+                        lambda trial_state: rk4_step(
+                            trial_state,
+                            scenario.propagation.step_s,
+                            force_model,
+                        ),
+                    )
                 state = rk4_step(state, scenario.propagation.step_s, force_model)
+
+            if covariance_matrix is not None and transition is not None:
+                covariance_matrix = _propagate_covariance(covariance_matrix, transition)
 
     metadata = {
         "integrator": "rk4",
@@ -395,7 +481,7 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         "internal_max_step_s": _MAX_RK4_INTERNAL_STEP_S,
         "internal_substeps_per_sample": internal_substeps_per_sample,
         "internal_step_s": internal_step_s,
-    } | _maneuver_metadata(maneuver_schedule)
+    } | _maneuver_metadata(maneuver_schedule) | _covariance_metadata(covariance_matrix)
 
     return Trajectory(
         scenario_id=scenario.scenario_id,
@@ -404,5 +490,6 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         backend="local",
         events=maneuver_events,
         maneuvers=scenario.maneuvers,
+        covariance_history=covariance_history,
         metadata=metadata,
     )

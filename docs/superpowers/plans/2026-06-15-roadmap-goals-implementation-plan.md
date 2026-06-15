@@ -30,7 +30,7 @@ Implemented and protected:
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV ephemeris export,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
-  propagation.
+  propagation, plus finite-difference local covariance propagation.
 - `astro_od` synthetic range/range-rate/right-ascension/declination generation, measurement
   JSON/CSV ingest/export, TDM range/range-rate ingest/export, and local SciPy batch least-squares
   OD.
@@ -40,8 +40,8 @@ Implemented and protected:
 Still roadmap-level:
 
 - Orekit high-fidelity force models, Orekit measurement generation, and Orekit batch/sequential OD.
-- Production covariance propagation, thrust-vector finite-burn dynamics, and mass-flow maneuver
-  dynamics.
+- High-fidelity covariance propagation with validated state transition matrices/process noise,
+  thrust-vector finite-burn dynamics, and mass-flow maneuver dynamics.
 - RocketPy launch simulation adapter.
 - Dymos/OpenMDAO ascent optimization adapter.
 - Tudat cross-check backend.
@@ -129,8 +129,9 @@ Primary files:
 ### Goal 3: Operational Flight Dynamics Products
 
 Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
-finite burns, CSV ephemeris export, and seeded initial-state Monte Carlo. Production covariance,
-thrust-vector, and mass-flow dynamics remain deferred.
+finite burns, finite-difference local covariance propagation, CSV ephemeris export, and seeded
+initial-state Monte Carlo. Validated high-fidelity covariance, thrust-vector, and mass-flow dynamics
+remain deferred.
 
 Definition of done:
 
@@ -139,7 +140,8 @@ Definition of done:
 - Maneuver products cover impulsive delta-v and local finite burns with constant inertial
   acceleration; higher-fidelity thrust-vector and mass-flow modeling remains deferred.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
-- Covariance-history products are schema-supported even if only OD outputs populate them initially.
+- Covariance-history products are schema-supported and local propagation can populate them from a
+  scenario initial covariance using finite-difference state transitions.
 
 Primary files:
 

@@ -119,6 +119,28 @@ def test_propagate_local_applies_finite_burn_schedule() -> None:
     assert trajectory.metadata["finite_burn_count"] == 1
 
 
+def test_propagate_local_generates_covariance_history_from_initial_covariance() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    initial_covariance = [
+        [1.0 if row == column else 0.0 for column in range(6)] for row in range(6)
+    ]
+    covariance_scenario = Scenario.model_validate(
+        scenario.model_dump(mode="json") | {"initial_covariance": initial_covariance}
+    )
+
+    trajectory = propagate_local(covariance_scenario)
+
+    assert len(trajectory.covariance_history) == covariance_scenario.propagation.sample_count
+    assert trajectory.covariance_history[0].epoch == covariance_scenario.initial_state.epoch
+    assert trajectory.covariance_history[0].covariance == initial_covariance
+    assert trajectory.covariance_history[-1].epoch == trajectory.samples[-1].epoch
+    final_covariance = np.array(trajectory.covariance_history[-1].covariance)
+    assert final_covariance.shape == (6, 6)
+    np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-10)
+    assert not np.allclose(final_covariance, np.array(initial_covariance))
+    assert trajectory.metadata["covariance_model"] == "finite_difference_state_transition"
+
+
 def test_propagate_local_rejects_unsupported_local_force_model() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     unsupported_scenario = scenario.model_copy(

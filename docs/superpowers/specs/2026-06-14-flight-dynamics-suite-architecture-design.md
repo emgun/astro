@@ -435,6 +435,7 @@ The suite should track tolerances explicitly. When tolerance changes are needed,
 - Batch least-squares OD recovery.
 - Ephemeris output.
 - Local maneuver schedule propagation for impulsive and finite-burn baselines.
+- Local finite-difference covariance-history propagation.
 - Deterministic examples.
 
 ### Milestone 3: Launch/Ascent Module
