@@ -3,14 +3,16 @@ from __future__ import annotations
 import csv
 import json
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from io import StringIO
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import ValidationError
 
 from astro_core.errors import InvalidMeasurementFileError
-from astro_core.models import MeasurementRecord
+from astro_core.models import MeasurementRecord, MeasurementType
 
 DEFAULT_TDM_RANGE_SIGMA_KM = 0.01
 DEFAULT_TDM_RANGE_RATE_SIGMA_KM_S = 1.0e-5
@@ -37,6 +39,12 @@ SUPPORTED_TDM_DATA_KEYWORDS = frozenset(
 )
 
 
+@dataclass(frozen=True)
+class MeasurementProduct:
+    scenario_id: str
+    measurements: list[MeasurementRecord]
+
+
 def load_measurements(
     path: Path | str,
     *,
@@ -59,6 +67,108 @@ def load_measurements(
         measurement_path,
         expected_scenario_id=expected_scenario_id,
     )
+
+
+def load_measurement_product(
+    path: Path | str,
+    *,
+    expected_scenario_id: str | None = None,
+) -> MeasurementProduct:
+    return _load_json_measurement_product(
+        Path(path),
+        expected_scenario_id=expected_scenario_id,
+    )
+
+
+def dump_measurements_json(scenario_id: str, measurements: list[MeasurementRecord]) -> str:
+    return json.dumps(
+        {
+            "scenario_id": scenario_id,
+            "measurements": [record.model_dump(mode="json") for record in measurements],
+        },
+        indent=2,
+    )
+
+
+def dump_measurements_csv(scenario_id: str, measurements: list[MeasurementRecord]) -> str:
+    fieldnames = [
+        "scenario_id",
+        "measurement_type",
+        "epoch",
+        "observer",
+        "observed_object",
+        "value",
+        "sigma",
+        "units",
+        "metadata_json",
+    ]
+    output = StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\n")
+    writer.writeheader()
+    for record in measurements:
+        payload = record.model_dump(mode="json")
+        writer.writerow(
+            {
+                "scenario_id": scenario_id,
+                "measurement_type": payload["measurement_type"],
+                "epoch": payload["epoch"],
+                "observer": payload["observer"],
+                "observed_object": payload["observed_object"],
+                "value": payload["value"],
+                "sigma": payload["sigma"],
+                "units": payload["units"],
+                "metadata_json": json.dumps(payload["metadata"], sort_keys=True),
+            }
+        )
+    return output.getvalue().rstrip("\r\n")
+
+
+def dump_measurements_tdm(
+    scenario_id: str,
+    measurements: list[MeasurementRecord],
+    *,
+    originator: str = "ASTRO_SUITE",
+) -> str:
+    if not measurements:
+        raise InvalidMeasurementFileError("At least one measurement is required for TDM export")
+
+    lines = [
+        "CCSDS_TDM_VERS = 2.0",
+        f"CREATION_DATE = {_format_tdm_epoch(measurements[0].epoch)}",
+        f"ORIGINATOR = {originator}",
+    ]
+    for (observer, observed_object), segment_records in _measurement_segments(measurements).items():
+        lines.extend(
+            [
+                "META_START",
+                f"SCENARIO_ID = {scenario_id}",
+                "TIME_SYSTEM = UTC",
+                "MODE = SEQUENTIAL",
+                f"PARTICIPANT_1 = {observer}",
+                f"PARTICIPANT_2 = {observed_object}",
+                "PATH = 1,2,1",
+                "RANGE_UNITS = km",
+            ]
+        )
+        range_sigma = _common_sigma(segment_records, MeasurementType.RANGE)
+        if range_sigma is not None:
+            lines.append(f"RANGE_SIGMA_KM = {_format_float(range_sigma)}")
+        range_rate_sigma = _common_sigma(segment_records, MeasurementType.RANGE_RATE)
+        if range_rate_sigma is not None:
+            lines.append(f"RANGE_RATE_SIGMA_KM_S = {_format_float(range_rate_sigma)}")
+
+        lines.extend(["META_STOP", "DATA_START"])
+        for record in segment_records:
+            keyword = (
+                "RANGE"
+                if record.measurement_type is MeasurementType.RANGE
+                else "DOPPLER_INSTANTANEOUS"
+            )
+            epoch = _format_tdm_epoch(record.epoch)
+            value = _format_float(record.value)
+            lines.append(f"{keyword} = {epoch} {value}")
+        lines.append("DATA_STOP")
+    return "\n".join(lines)
 
 
 def resolve_measurement_format(
@@ -100,6 +210,17 @@ def _load_json_measurements(
     *,
     expected_scenario_id: str | None,
 ) -> list[MeasurementRecord]:
+    return _load_json_measurement_product(
+        measurement_path,
+        expected_scenario_id=expected_scenario_id,
+    ).measurements
+
+
+def _load_json_measurement_product(
+    measurement_path: Path,
+    *,
+    expected_scenario_id: str | None,
+) -> MeasurementProduct:
     try:
         raw: Any = json.loads(measurement_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError) as exc:
@@ -134,11 +255,13 @@ def _load_json_measurements(
         )
 
     try:
-        return [MeasurementRecord.model_validate(record) for record in measurements]
+        records = [MeasurementRecord.model_validate(record) for record in measurements]
     except ValidationError as exc:
         raise InvalidMeasurementFileError(
             f"Measurement file {measurement_path} is invalid: {exc}"
         ) from exc
+
+    return MeasurementProduct(scenario_id=scenario_id, measurements=records)
 
 
 def _load_csv_measurements(
@@ -274,6 +397,40 @@ def _csv_metadata(
             "metadata_json must contain a JSON object"
         )
     return metadata
+
+
+def _measurement_segments(
+    measurements: list[MeasurementRecord],
+) -> dict[tuple[str, str], list[MeasurementRecord]]:
+    segments: dict[tuple[str, str], list[MeasurementRecord]] = {}
+    for record in measurements:
+        key = (record.observer, record.observed_object)
+        segments.setdefault(key, []).append(record)
+    return segments
+
+
+def _common_sigma(
+    measurements: list[MeasurementRecord],
+    measurement_type: MeasurementType,
+) -> float | None:
+    sigmas = {
+        record.sigma
+        for record in measurements
+        if record.measurement_type is measurement_type
+    }
+    if not sigmas:
+        return None
+    if len(sigmas) == 1:
+        return next(iter(sigmas))
+    return None
+
+
+def _format_tdm_epoch(epoch: datetime) -> str:
+    return epoch.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _format_float(value: float) -> str:
+    return str(value)
 
 
 def _load_tdm_measurements(

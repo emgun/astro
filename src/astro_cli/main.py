@@ -16,7 +16,14 @@ from astro_core.io import load_scenario
 from astro_core.models import CartesianState, GroundStation, Scenario
 from astro_dynamics.local import propagate_local
 from astro_od.estimation import estimate_initial_state
-from astro_od.io import load_measurements, resolve_measurement_format
+from astro_od.io import (
+    dump_measurements_csv,
+    dump_measurements_json,
+    dump_measurements_tdm,
+    load_measurement_product,
+    load_measurements,
+    resolve_measurement_format,
+)
 from astro_od.measurements import generate_synthetic_measurements
 
 app = typer.Typer(help="Astro Suite flight dynamics workflows.")
@@ -205,6 +212,33 @@ def synth_measurements(
     typer.echo(f"wrote measurements: {output}")
 
 
+@app.command("export-measurements")
+def export_measurements(
+    measurements_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    measurement_format: Annotated[
+        str,
+        typer.Option("--format", help="Output measurement format: auto, json, csv, or tdm."),
+    ] = "auto",
+) -> None:
+    """Export suite JSON measurements to JSON, CSV, or TDM."""
+    try:
+        product = load_measurement_product(measurements_path)
+        resolved_measurement_format = resolve_measurement_format(output, measurement_format)
+        if resolved_measurement_format == "csv":
+            payload = dump_measurements_csv(product.scenario_id, product.measurements)
+        elif resolved_measurement_format == "tdm":
+            payload = dump_measurements_tdm(product.scenario_id, product.measurements)
+        else:
+            payload = dump_measurements_json(product.scenario_id, product.measurements)
+    except InvalidMeasurementFileError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, payload, "measurements")
+    typer.echo(f"wrote measurements: {output}")
+
+
 @app.command()
 def estimate(
     scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
@@ -245,7 +279,7 @@ def estimate_measurements(
     output: Annotated[Path, typer.Option()],
     measurement_format: Annotated[
         str,
-        typer.Option("--format", help="Measurement file format: auto, json, or csv."),
+        typer.Option("--format", help="Measurement file format: auto, json, csv, or tdm."),
     ] = "auto",
 ) -> None:
     """Run local batch OD from an explicit measurement file."""

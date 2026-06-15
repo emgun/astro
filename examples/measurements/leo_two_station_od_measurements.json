@@ -1,0 +1,533 @@
+{
+  "scenario_id": "leo-two-station-od",
+  "measurements": [
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:00:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 621.8667471707975,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 621.8636999999999
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:00:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": -1.0399841062404956e-05,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 0.0
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:00:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 9469.992861489955,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 9469.985356977997
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:00:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -5.051320712276602,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -5.051330117923766
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:01:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 757.9624653086602,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 757.9819756605467
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:01:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 4.128398237845294,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 4.128411259640363
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:01:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 9162.17387893365,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 9162.172600529619
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:01:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -5.208111168015444,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -5.20810800558952
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:02:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 1066.3980928822125,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 1066.3982608937874
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:02:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 5.856365129857245,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 5.856373660296521
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:02:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 8845.14220775933,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 8845.133413779582
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:02:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -5.35882721387546,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -5.358834991794814
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:03:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 1439.559515544996,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 1439.5588552380204
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:03:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 6.484401901670477,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 6.4843906292584075
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:03:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 8519.243336002482,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 8519.238660909059
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:03:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -5.503257427974309,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -5.50324883504968
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:04:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 1837.376326264391,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 1837.3726387565503
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:04:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 6.740297726309718,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 6.740307315135726
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:04:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 8184.884119110569,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 8184.875334607556
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:04:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -5.6410737471137695,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -5.64107324785466
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:05:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 2245.5484460050366,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 2245.550294628672
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:05:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 6.8498431581591035,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 6.849849967454547
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:05:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 7842.459808430816,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 7842.44758301743
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:05:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -5.7720129436087335,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -5.7720113983139125
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:06:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 2657.9896126092463,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 2657.9938958874677
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:06:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 6.890026467344592,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 6.890029988680097
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:06:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 7492.383522909762,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 7492.3781998179065
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:06:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -5.895733159479382,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -5.895736813920025
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:07:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 3071.5946139465173,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 3071.5904866204014
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:07:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 6.891547832938521,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 6.89154352472849
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:07:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 7135.132182425833,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 7135.110765949824
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:07:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -6.01188458237965,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -6.011880518229486
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:08:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 3484.4840159518794,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 3484.48913837917
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:08:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 6.86833993973223,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 6.868348077459512
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:08:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 6771.118878792739,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 6771.112718998514
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:08:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -6.120001312974341,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -6.120012602697268
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:09:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 3895.4399019365233,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 3895.4410414111
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:09:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 6.827485488335401,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 6.82749388990017
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:09:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 6400.871517498263,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 6400.879762310419
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:09:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -6.2196089051558445,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -6.219615411083723
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:10:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 4303.521240297217,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 4303.513807755506
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:10:00Z",
+      "observer": "equator-x-eci",
+      "observed_object": "demo-sat",
+      "value": 6.772865800724345,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": 6.772860369181662
+      }
+    },
+    {
+      "measurement_type": "range",
+      "epoch": "2026-01-01T00:10:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": 6024.93558705407,
+      "sigma": 0.01,
+      "units": "km",
+      "metadata": {
+        "truth": 6024.942242151144
+      }
+    },
+    {
+      "measurement_type": "range_rate",
+      "epoch": "2026-01-01T00:10:00Z",
+      "observer": "equator-y-eci",
+      "observed_object": "demo-sat",
+      "value": -6.310041480648642,
+      "sigma": 1e-05,
+      "units": "km/s",
+      "metadata": {
+        "truth": -6.310043802261872
+      }
+    }
+  ]
+}

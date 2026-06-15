@@ -12,6 +12,7 @@ from astro_core.errors import NumericalConvergenceError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
+from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
 
 runner = CliRunner(mix_stderr=False)
@@ -291,6 +292,122 @@ def test_estimate_measurements_command_accepts_tdm(tmp_path: Path) -> None:
     assert payload["metadata"]["workflow"] == "local_measurement_file"
     assert payload["metadata"]["measurement_format"] == "tdm"
     assert payload["metadata"]["measurement_count"] == 44
+
+
+def test_export_measurements_command_writes_csv(tmp_path: Path) -> None:
+    scenario = _observable_scenario()
+    input_path = tmp_path / "measurements.json"
+    output_path = tmp_path / "measurements.csv"
+    _write_measurements(input_path, scenario)
+
+    result = runner.invoke(
+        app,
+        [
+            "export-measurements",
+            str(input_path),
+            "--format",
+            "csv",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote measurements" in result.stdout
+    assert load_measurements(output_path, expected_scenario_id=scenario.scenario_id) == (
+        load_measurements(input_path, expected_scenario_id=scenario.scenario_id)
+    )
+
+
+def test_export_measurements_command_writes_tdm(tmp_path: Path) -> None:
+    scenario = _observable_scenario()
+    input_path = tmp_path / "measurements.json"
+    output_path = tmp_path / "measurements.tdm"
+    _write_measurements(input_path, scenario)
+
+    result = runner.invoke(
+        app,
+        [
+            "export-measurements",
+            str(input_path),
+            "--format",
+            "tdm",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    loaded = load_measurements(output_path, expected_scenario_id=scenario.scenario_id)
+    expected = load_measurements(input_path, expected_scenario_id=scenario.scenario_id)
+    assert len(loaded) == len(expected)
+    assert sorted(
+        [
+            (
+                record.measurement_type,
+                record.epoch,
+                record.observer,
+                record.observed_object,
+                record.value,
+                record.sigma,
+                record.units,
+            )
+            for record in loaded
+        ]
+    ) == sorted(
+        [
+            (
+                record.measurement_type,
+                record.epoch,
+                record.observer,
+                record.observed_object,
+                record.value,
+                record.sigma,
+                record.units,
+            )
+            for record in expected
+        ]
+    )
+
+
+def test_export_measurements_command_reports_invalid_format(tmp_path: Path) -> None:
+    input_path = tmp_path / "measurements.json"
+    _write_measurements(input_path, _observable_scenario())
+
+    result = runner.invoke(
+        app,
+        [
+            "export-measurements",
+            str(input_path),
+            "--format",
+            "unsupported",
+            "--output",
+            str(tmp_path / "measurements.out"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Unsupported measurement format" in result.stderr
+
+
+def test_export_measurements_command_reports_output_write_error(tmp_path: Path) -> None:
+    input_path = tmp_path / "measurements.json"
+    _write_measurements(input_path, _observable_scenario())
+
+    result = runner.invoke(
+        app,
+        [
+            "export-measurements",
+            str(input_path),
+            "--format",
+            "csv",
+            "--output",
+            str(tmp_path / "missing" / "measurements.csv"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "could not write measurements" in result.stderr
 
 
 def test_propagate_command_reports_invalid_scenario(tmp_path: Path) -> None:

@@ -11,7 +11,7 @@ The current implementation slice covers:
 - Synthetic range and range-rate measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, synthetic measurements, synthetic OD, and
-  measurement-file OD ingest.
+  measurement-file OD ingest/export.
 - Optional Orekit Python-wrapper smoke checks through `orekit_jpype`.
 
 Launch/ascent is included in the design specs and will be implemented after the shared scenario, trajectory, and backend adapter spine is stable.
@@ -37,6 +37,8 @@ If `orekit-jpype` is not installed, `astro orekit-smoke` exits nonzero with stru
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --output measurements.json
+astro export-measurements measurements.json --format csv --output measurements.csv
+astro export-measurements measurements.json --format tdm --output measurements.tdm
 astro estimate examples/scenarios/leo_two_body.yaml --output estimate.json
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --output estimate.json
 astro orekit-smoke
@@ -51,6 +53,10 @@ CSV, or CCSDS Tracking Data Message (TDM) measurement file, then estimates from 
 caller-provided station geometry and measurement records without adding demo geometry. JSON inputs
 match the output of `astro synth-measurements`; CSV and TDM inputs are auto-detected by `.csv` and
 `.tdm` extensions or can be forced with `--format csv` / `--format tdm`.
+
+`astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
+The example files under `examples/measurements/` are generated from `leo_two_station_od.yaml` and
+cover all three ingest/export formats.
 
 CSV inputs use one row per measurement with these required columns:
 
