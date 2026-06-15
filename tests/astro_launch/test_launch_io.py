@@ -5,6 +5,7 @@ import yaml
 
 from astro_core.errors import InvalidScenarioError
 from astro_launch.io import load_launch_scenario
+from astro_launch.local import propagate_launch_local
 from tests.astro_launch.helpers import make_launch_scenario
 
 
@@ -28,6 +29,20 @@ def test_load_example_launch_scenario() -> None:
     assert scenario.scenario_id == "vertical-two-stage"
     assert scenario.vehicle.stages[1].name == "stage-2"
     assert scenario.target_orbit.altitude_km == 160.0
+
+
+def test_load_launch_trajectory_reads_json_product(tmp_path: Path) -> None:
+    from astro_launch.io import load_launch_trajectory
+
+    trajectory = propagate_launch_local(make_launch_scenario())
+    path = tmp_path / "launch.json"
+    path.write_text(trajectory.model_dump_json(), encoding="utf-8")
+
+    loaded = load_launch_trajectory(path)
+
+    assert loaded.scenario_id == trajectory.scenario_id
+    assert len(loaded.samples) == len(trajectory.samples)
+    assert loaded.insertion_state == trajectory.insertion_state
 
 
 def test_load_launch_scenario_reports_yaml_parse_errors(tmp_path: Path) -> None:

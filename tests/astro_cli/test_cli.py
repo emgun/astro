@@ -12,6 +12,7 @@ from astro_core.errors import NumericalConvergenceError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
+from astro_launch.local import propagate_launch_local
 from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
 from tests.astro_launch.helpers import make_launch_scenario
@@ -43,6 +44,11 @@ def _write_scenario(path: Path, scenario: Scenario) -> None:
 def _write_launch_scenario(path: Path) -> None:
     payload = make_launch_scenario().model_dump(mode="json")
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _write_launch_trajectory(path: Path) -> None:
+    trajectory = propagate_launch_local(make_launch_scenario())
+    path.write_text(trajectory.model_dump_json(), encoding="utf-8")
 
 
 def _write_measurements(path: Path, scenario: Scenario) -> None:
@@ -182,6 +188,39 @@ def test_launch_command_writes_json(tmp_path: Path) -> None:
     assert payload["events"][-1]["event_type"] == "insertion"
     assert payload["insertion_state"]["central_body"] == "earth"
     assert payload["metadata"]["model"] == "vertical_1d"
+
+
+def test_handoff_launch_command_writes_orbit_scenario(tmp_path: Path) -> None:
+    launch_output = tmp_path / "launch.json"
+    orbit_scenario_path = tmp_path / "insertion.yaml"
+    _write_launch_trajectory(launch_output)
+
+    result = runner.invoke(
+        app,
+        [
+            "handoff-launch",
+            str(launch_output),
+            "--output",
+            str(orbit_scenario_path),
+            "--duration-s",
+            "600",
+            "--step-s",
+            "60",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote orbit scenario" in result.stdout
+    scenario = load_scenario(orbit_scenario_path)
+    propagated = propagate_local(scenario)
+    launch_payload = json.loads(launch_output.read_text(encoding="utf-8"))
+    assert scenario.scenario_id == "vertical-two-stage-insertion"
+    assert scenario.initial_state.model_dump(mode="json") == launch_payload["insertion_state"]
+    assert scenario.spacecraft.mass_kg == launch_payload["samples"][-1]["mass_kg"]
+    assert scenario.propagation.duration_s == 600.0
+    assert scenario.propagation.step_s == 60.0
+    assert scenario.metadata["workflow"] == "launch_orbit_handoff"
+    assert len(propagated.samples) == 11
 
 
 def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:
@@ -490,6 +529,26 @@ def test_launch_command_reports_unsupported_backend(tmp_path: Path) -> None:
     assert "unsupported launch backend: rocketpy" in result.stderr
 
 
+def test_handoff_launch_command_reports_unsupported_gravity(tmp_path: Path) -> None:
+    launch_output = tmp_path / "launch.json"
+    _write_launch_trajectory(launch_output)
+
+    result = runner.invoke(
+        app,
+        [
+            "handoff-launch",
+            str(launch_output),
+            "--output",
+            str(tmp_path / "insertion.yaml"),
+            "--gravity",
+            "unsupported",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "unsupported handoff gravity: unsupported" in result.stderr
+
+
 def test_propagate_command_reports_output_write_error(tmp_path: Path) -> None:
     output = tmp_path / "missing" / "trajectory.json"
 
@@ -525,6 +584,26 @@ def test_launch_command_reports_output_write_error(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "could not write launch trajectory" in result.stderr
+    assert str(output) in result.stderr
+
+
+def test_handoff_launch_command_reports_output_write_error(tmp_path: Path) -> None:
+    launch_output = tmp_path / "launch.json"
+    output = tmp_path / "missing" / "insertion.yaml"
+    _write_launch_trajectory(launch_output)
+
+    result = runner.invoke(
+        app,
+        [
+            "handoff-launch",
+            str(launch_output),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "could not write orbit scenario" in result.stderr
     assert str(output) in result.stderr
 
 

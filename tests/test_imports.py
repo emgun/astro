@@ -52,7 +52,9 @@ def test_packages_import() -> None:
         "LaunchTrajectorySample",
         "LaunchVehicle",
         "TargetOrbit",
+        "launch_trajectory_to_orbit_scenario",
         "load_launch_scenario",
+        "load_launch_trajectory",
         "propagate_launch_local",
     }
 

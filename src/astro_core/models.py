@@ -395,3 +395,4 @@ class Scenario(AstroModel):
     propagation: PropagationConfig
     ground_stations: list[GroundStation] = Field(default_factory=list)
     measurements: MeasurementConfig = Field(default_factory=MeasurementConfig)
+    metadata: dict[str, Any] = Field(default_factory=dict)

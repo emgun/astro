@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+import yaml
 
 from astro_backends.orekit import run_orekit_smoke
 from astro_core.errors import (
@@ -13,11 +14,12 @@ from astro_core.errors import (
     NumericalConvergenceError,
 )
 from astro_core.io import load_scenario
-from astro_core.models import CartesianState, GroundStation, Scenario
+from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario
 from astro_dynamics.local import propagate_local
-from astro_launch.io import load_launch_scenario
+from astro_launch.handoff import launch_trajectory_to_orbit_scenario
+from astro_launch.io import load_launch_scenario, load_launch_trajectory
 from astro_launch.local import propagate_launch_local
-from astro_launch.models import LaunchScenario
+from astro_launch.models import LaunchScenario, LaunchTrajectory
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import (
     dump_measurements_csv,
@@ -50,6 +52,14 @@ def _load_scenario_or_exit(scenario_path: Path) -> Scenario:
 def _load_launch_scenario_or_exit(scenario_path: Path) -> LaunchScenario:
     try:
         return load_launch_scenario(scenario_path)
+    except InvalidScenarioError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+
+def _load_launch_trajectory_or_exit(trajectory_path: Path) -> LaunchTrajectory:
+    try:
+        return load_launch_trajectory(trajectory_path)
     except InvalidScenarioError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
@@ -221,6 +231,52 @@ def launch(
     else:
         _write_text_or_exit(output, payload, "launch trajectory")
         typer.echo(f"wrote launch trajectory: {output}")
+
+
+@app.command("handoff-launch")
+def handoff_launch(
+    launch_trajectory_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    duration_s: Annotated[float, typer.Option()] = 600.0,
+    step_s: Annotated[float, typer.Option()] = 60.0,
+    spacecraft_name: Annotated[str, typer.Option()] = "launch-payload",
+    spacecraft_mass_kg: Annotated[float | None, typer.Option()] = None,
+    area_m2: Annotated[float, typer.Option()] = 2.5,
+    drag_coefficient: Annotated[float, typer.Option()] = 2.2,
+    reflectivity_coefficient: Annotated[float, typer.Option()] = 1.3,
+    gravity: Annotated[str, typer.Option()] = "two_body",
+    scenario_id: Annotated[str | None, typer.Option()] = None,
+    description: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """Convert a launch trajectory product into an orbital propagation scenario."""
+    trajectory = _load_launch_trajectory_or_exit(launch_trajectory_path)
+    try:
+        force_model = ForceModelName(gravity)
+    except ValueError as exc:
+        typer.echo(f"unsupported handoff gravity: {gravity}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    try:
+        scenario = launch_trajectory_to_orbit_scenario(
+            trajectory,
+            duration_s=duration_s,
+            step_s=step_s,
+            spacecraft_name=spacecraft_name,
+            spacecraft_mass_kg=spacecraft_mass_kg,
+            area_m2=area_m2,
+            drag_coefficient=drag_coefficient,
+            reflectivity_coefficient=reflectivity_coefficient,
+            gravity=force_model,
+            scenario_id=scenario_id,
+            description=description,
+        )
+    except ValueError as exc:
+        typer.echo(f"could not create orbit scenario: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    payload = yaml.safe_dump(scenario.model_dump(mode="json"), sort_keys=False)
+    _write_text_or_exit(output, payload.rstrip("\n"), "orbit scenario")
+    typer.echo(f"wrote orbit scenario: {output}")
 
 
 @app.command()

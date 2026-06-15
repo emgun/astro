@@ -11,11 +11,11 @@ The current implementation slice covers:
 - Pydantic scenario validation from YAML.
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
 - Local launch/ascent reference propagation with staged mass depletion, drag, events, and
-  insertion-state handoff.
+  launch-to-orbit insertion handoff.
 - Synthetic range and range-rate measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
-- CLI workflows for validation, propagation, synthetic measurements, synthetic OD, and
-  measurement-file OD ingest/export.
+- CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
+  measurements, synthetic OD, and measurement-file OD ingest/export.
 - Optional Orekit Python-wrapper smoke checks through `orekit_jpype`.
 
 Launch/ascent currently uses a deliberately simple local vertical-ascent baseline. RocketPy and
@@ -42,6 +42,8 @@ If `orekit-jpype` is not installed, `astro orekit-smoke` exits nonzero with stru
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
 astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
+astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
+astro propagate insertion.yaml --backend local --output insertion_trajectory.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --output measurements.json
 astro export-measurements measurements.json --format csv --output measurements.csv
 astro export-measurements measurements.json --format tdm --output measurements.tdm
@@ -59,6 +61,11 @@ vertical-ascent baseline, and writes a launch trajectory product with samples, s
 dynamic pressure, acceleration, target miss metrics, and an `insertion_state` compatible with the
 shared `OrbitState` product. This local backend is a deterministic data-flow baseline, not a
 production launch simulator.
+
+`astro handoff-launch` converts a launch trajectory product into a normal orbital propagation
+scenario initialized from `LaunchTrajectory.insertion_state`. The generated YAML is intentionally
+plain `Scenario` input, so the next step is the existing `astro propagate` command rather than a
+special launch-aware propagation path.
 
 `astro estimate-measurements` is the explicit ingest workflow. It loads a scenario plus a JSON,
 CSV, or CCSDS Tracking Data Message (TDM) measurement file, then estimates from the
