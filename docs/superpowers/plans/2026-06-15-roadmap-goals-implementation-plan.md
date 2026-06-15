@@ -67,7 +67,7 @@ astro report-tuned-launch examples/launch/pitch_program_two_stage.yaml --point-i
 
 ### Goal 1: Operational Orekit Propagation Backend
 
-Status: next executable roadmap slice.
+Status: implemented.
 
 Plan: `docs/superpowers/plans/2026-06-15-orekit-operational-propagation-implementation.md`
 
@@ -90,7 +90,14 @@ Tradeoff:
 
 ### Goal 2: Orekit Force Models, Measurements, and Batch OD
 
-Status: blocked on Goal 1.
+Status: first backend-aware measurement and OD slice implemented; native Orekit estimator and numerical high-fidelity force models still require live Java/Orekit validation.
+
+Implemented slice:
+
+- `astro synth-measurements --backend orekit` routes truth propagation through the Orekit adapter.
+- `astro estimate --backend orekit` and `astro estimate-measurements --backend orekit` run the suite's SciPy least-squares estimator with Orekit-backed residual propagation.
+- OD metadata records the selected propagation backend.
+- Missing Java/`orekit-jpype` still produces actionable `UnsupportedBackendError` diagnostics.
 
 Definition of done:
 
@@ -297,4 +304,3 @@ Placeholder scan:
 Type consistency:
 
 - All goals keep `Scenario`, `OrbitState`, `Trajectory`, `EstimateResult`, `LaunchScenario`, and `LaunchTrajectory` as the public product boundary.
-

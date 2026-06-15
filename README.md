@@ -55,17 +55,23 @@ astro batch-report-tuned-launch examples/launch/pitch_program_two_stage.yaml --p
 astro compare-tuned-launch-reports tuned_launch_report_baseline.json tuned_launch_report_candidate.json --output tuned_launch_comparison.json
 astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
 astro propagate insertion.yaml --backend local --output insertion_trajectory.json
-astro synth-measurements examples/scenarios/leo_two_station_od.yaml --output measurements.json
+astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output measurements.json
+astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend orekit --output orekit_measurements.json
 astro export-measurements measurements.json --format csv --output measurements.csv
 astro export-measurements measurements.json --format tdm --output measurements.tdm
-astro estimate examples/scenarios/leo_two_body.yaml --output estimate.json
-astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --output estimate.json
+astro estimate examples/scenarios/leo_two_body.yaml --backend local --output estimate.json
+astro estimate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_estimate.json
+astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend local --output estimate.json
+astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend orekit --output orekit_estimate.json
 astro orekit-smoke
 ```
 
 `astro estimate` is an MVP synthetic demonstration workflow. It keeps the source scenario unchanged,
 adds in-memory demo geometry for observability, generates synthetic measurements, perturbs the
-initial state as an estimate seed, and records that provenance in the output metadata.
+initial state as an estimate seed, and records that provenance in the output metadata. The `--backend`
+option selects the propagation backend used for synthetic truth generation and residual propagation.
+With `--backend orekit`, the suite estimator uses Orekit-backed propagation when the optional Orekit
+runtime is installed; it is not yet Orekit's native `BatchLSEstimator`.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage
@@ -105,11 +111,12 @@ scenario initialized from `LaunchTrajectory.insertion_state`. The generated YAML
 plain `Scenario` input, so the next step is the existing `astro propagate` command rather than a
 special launch-aware propagation path.
 
-`astro estimate-measurements` is the explicit ingest workflow. It loads a scenario plus a JSON,
-CSV, or CCSDS Tracking Data Message (TDM) measurement file, then estimates from the
-caller-provided station geometry and measurement records without adding demo geometry. JSON inputs
-match the output of `astro synth-measurements`; CSV and TDM inputs are auto-detected by `.csv` and
-`.tdm` extensions or can be forced with `--format csv` / `--format tdm`.
+`astro synth-measurements` and `astro estimate-measurements` both accept `--backend local` or
+`--backend orekit`. The explicit ingest workflow loads a scenario plus a JSON, CSV, or CCSDS
+Tracking Data Message (TDM) measurement file, then estimates from the caller-provided station
+geometry and measurement records without adding demo geometry. JSON inputs match the output of
+`astro synth-measurements`; CSV and TDM inputs are auto-detected by `.csv` and `.tdm` extensions or
+can be forced with `--format csv` / `--format tdm`.
 
 `astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
 The example files under `examples/measurements/` are generated from `leo_two_station_od.yaml` and
