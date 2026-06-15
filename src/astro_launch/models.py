@@ -126,8 +126,35 @@ class AtmosphereConfig(AstroModel):
         return _numeric_scalar_input_must_be_number(value, "Atmosphere scalar")
 
 
+class PitchProgramPoint(AstroModel):
+    time_s: FiniteFloat = Field(ge=0.0)
+    pitch_deg: FiniteFloat = Field(ge=0.0, le=90.0)
+
+    @field_validator("time_s", "pitch_deg", mode="before")
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Pitch program scalar")
+
+
 class GuidanceConfig(AstroModel):
-    mode: Literal["vertical"] = "vertical"
+    mode: Literal["vertical", "pitch_program"] = "vertical"
+    pitch_program: list[PitchProgramPoint] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_pitch_program(self) -> GuidanceConfig:
+        if self.mode != "pitch_program":
+            return self
+        if len(self.pitch_program) < 2:
+            raise ValueError("pitch_program guidance requires at least two pitch_program points")
+        if self.pitch_program[0].time_s != 0.0:
+            raise ValueError("first pitch_program point must start at t=0")
+        times_s = [point.time_s for point in self.pitch_program]
+        if not all(
+            previous_time < next_time
+            for previous_time, next_time in zip(times_s, times_s[1:], strict=False)
+        ):
+            raise ValueError("pitch_program time_s values must be strictly increasing")
+        return self
 
 
 class TargetOrbit(AstroModel):
@@ -199,7 +226,26 @@ class LaunchScenario(AstroModel):
         altitude_km: float,
         velocity_km_s: float,
     ) -> OrbitState:
-        if not isfinite(altitude_km) or not isfinite(velocity_km_s):
+        return self.insertion_state_from_local_state(
+            epoch=epoch,
+            altitude_km=altitude_km,
+            radial_velocity_km_s=velocity_km_s,
+            horizontal_velocity_km_s=0.0,
+        )
+
+    def insertion_state_from_local_state(
+        self,
+        *,
+        epoch: datetime,
+        altitude_km: float,
+        radial_velocity_km_s: float,
+        horizontal_velocity_km_s: float,
+    ) -> OrbitState:
+        if (
+            not isfinite(altitude_km)
+            or not isfinite(radial_velocity_km_s)
+            or not isfinite(horizontal_velocity_km_s)
+        ):
             raise ValueError("Launch insertion altitude and velocity must be finite")
 
         lat_rad = radians(self.launch_site.latitude_deg)
@@ -209,6 +255,7 @@ class LaunchScenario(AstroModel):
             cos(lat_rad) * sin(lon_rad),
             sin(lat_rad),
         )
+        east_unit = (-sin(lon_rad), cos(lon_rad), 0.0)
         radius_km = R_EARTH_KM + altitude_km
         position_km: Vector3 = (
             radius_km * radial_unit[0],
@@ -216,9 +263,9 @@ class LaunchScenario(AstroModel):
             radius_km * radial_unit[2],
         )
         velocity_vector_km_s: Vector3 = (
-            velocity_km_s * radial_unit[0],
-            velocity_km_s * radial_unit[1],
-            velocity_km_s * radial_unit[2],
+            radial_velocity_km_s * radial_unit[0] + horizontal_velocity_km_s * east_unit[0],
+            radial_velocity_km_s * radial_unit[1] + horizontal_velocity_km_s * east_unit[1],
+            radial_velocity_km_s * radial_unit[2] + horizontal_velocity_km_s * east_unit[2],
         )
         return OrbitState(
             epoch=epoch,
@@ -262,10 +309,13 @@ class LaunchTrajectorySample(AstroModel):
     altitude_km: FiniteFloat
     downrange_km: FiniteFloat = 0.0
     velocity_km_s: FiniteFloat
+    radial_velocity_km_s: FiniteFloat = 0.0
+    horizontal_velocity_km_s: FiniteFloat = 0.0
     mass_kg: FiniteFloat = Field(gt=0.0)
     stage_name: str = Field(min_length=1)
     dynamic_pressure_pa: FiniteFloat = Field(ge=0.0)
     acceleration_m_s2: FiniteFloat
+    flight_path_angle_deg: FiniteFloat = 90.0
     state: CartesianState | None = None
 
     @field_validator("epoch", mode="before")
@@ -283,9 +333,12 @@ class LaunchTrajectorySample(AstroModel):
         "altitude_km",
         "downrange_km",
         "velocity_km_s",
+        "radial_velocity_km_s",
+        "horizontal_velocity_km_s",
         "mass_kg",
         "dynamic_pressure_pa",
         "acceleration_m_s2",
+        "flight_path_angle_deg",
         mode="before",
     )
     @classmethod

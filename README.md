@@ -10,8 +10,8 @@ The current implementation slice covers:
 
 - Pydantic scenario validation from YAML.
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
-- Local launch/ascent reference propagation with staged mass depletion, drag, events, and
-  launch-to-orbit insertion handoff.
+- Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
+  depletion, drag, events, and launch-to-orbit insertion handoff.
 - Synthetic range and range-rate measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
@@ -42,6 +42,7 @@ If `orekit-jpype` is not installed, `astro orekit-smoke` exits nonzero with stru
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
 astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
+astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output pitch_launch.json
 astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
 astro propagate insertion.yaml --backend local --output insertion_trajectory.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --output measurements.json
@@ -57,10 +58,10 @@ adds in-memory demo geometry for observability, generates synthetic measurements
 initial state as an estimate seed, and records that provenance in the output metadata.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
-vertical-ascent baseline, and writes a launch trajectory product with samples, stage events,
-dynamic pressure, acceleration, target miss metrics, and an `insertion_state` compatible with the
-shared `OrbitState` product. This local backend is a deterministic data-flow baseline, not a
-production launch simulator.
+vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage
+events, dynamic pressure, acceleration, downrange, target miss metrics, and an `insertion_state`
+compatible with the shared `OrbitState` product. This local backend is a deterministic data-flow
+baseline, not a production launch simulator.
 
 `astro handoff-launch` converts a launch trajectory product into a normal orbital propagation
 scenario initialized from `LaunchTrajectory.insertion_state`. The generated YAML is intentionally

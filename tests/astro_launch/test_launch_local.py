@@ -1,7 +1,7 @@
 from astro_core.constants import R_EARTH_KM
 from astro_launch.local import propagate_launch_local
 from astro_launch.models import AtmosphereConfig
-from tests.astro_launch.helpers import make_launch_scenario
+from tests.astro_launch.helpers import make_launch_scenario, make_pitch_program_launch_scenario
 
 
 def test_propagate_launch_local_returns_events_samples_and_insertion_state() -> None:
@@ -21,6 +21,8 @@ def test_propagate_launch_local_returns_events_samples_and_insertion_state() -> 
     assert trajectory.insertion_state.cartesian.position_km[0] > R_EARTH_KM
     assert trajectory.target_miss["altitude_miss_km"] != 0.0
     assert "velocity_miss_km_s" in trajectory.target_miss
+    assert all(sample.downrange_km == 0.0 for sample in trajectory.samples)
+    assert all(sample.horizontal_velocity_km_s == 0.0 for sample in trajectory.samples)
 
 
 def test_propagate_launch_local_sequences_stage_events() -> None:
@@ -64,3 +66,18 @@ def test_propagate_launch_local_none_atmosphere_has_zero_dynamic_pressure() -> N
     trajectory = propagate_launch_local(scenario)
 
     assert all(sample.dynamic_pressure_pa == 0.0 for sample in trajectory.samples)
+
+
+def test_propagate_launch_local_pitch_program_builds_downrange_and_horizontal_velocity() -> None:
+    trajectory = propagate_launch_local(make_pitch_program_launch_scenario())
+    final_sample = trajectory.samples[-1]
+
+    assert trajectory.metadata["model"] == "pitch_program_2d"
+    assert trajectory.metadata["guidance_mode"] == "pitch_program"
+    assert final_sample.downrange_km > 0.0
+    assert final_sample.horizontal_velocity_km_s > 0.0
+    assert final_sample.radial_velocity_km_s > 0.0
+    assert final_sample.flight_path_angle_deg < 90.0
+    assert final_sample.state is not None
+    assert final_sample.state.velocity_km_s[1] > 0.0
+    assert trajectory.insertion_state.cartesian == final_sample.state

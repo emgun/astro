@@ -31,6 +31,20 @@ def test_load_example_launch_scenario() -> None:
     assert scenario.target_orbit.altitude_km == 160.0
 
 
+def test_load_pitch_program_launch_scenario() -> None:
+    scenario = load_launch_scenario(Path("examples/launch/pitch_program_two_stage.yaml"))
+
+    assert scenario.scenario_id == "pitch-program-two-stage"
+    assert scenario.guidance.mode == "pitch_program"
+    assert [point.pitch_deg for point in scenario.guidance.pitch_program] == [
+        90.0,
+        75.0,
+        45.0,
+        20.0,
+        5.0,
+    ]
+
+
 def test_load_launch_trajectory_reads_json_product(tmp_path: Path) -> None:
     from astro_launch.io import load_launch_trajectory
 

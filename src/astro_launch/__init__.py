@@ -13,6 +13,7 @@ from astro_launch.models import (
     LaunchTrajectory,
     LaunchTrajectorySample,
     LaunchVehicle,
+    PitchProgramPoint,
     TargetOrbit,
 )
 
@@ -28,6 +29,7 @@ __all__ = [
     "LaunchTrajectory",
     "LaunchTrajectorySample",
     "LaunchVehicle",
+    "PitchProgramPoint",
     "TargetOrbit",
     "launch_trajectory_to_orbit_scenario",
     "load_launch_scenario",

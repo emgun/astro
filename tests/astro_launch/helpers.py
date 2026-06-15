@@ -10,6 +10,7 @@ from astro_launch.models import (
     LaunchSite,
     LaunchStage,
     LaunchVehicle,
+    PitchProgramPoint,
     TargetOrbit,
 )
 
@@ -65,3 +66,22 @@ def make_launch_scenario(**overrides: object) -> LaunchScenario:
     }
     payload.update(overrides)
     return LaunchScenario(**payload)
+
+
+def make_pitch_program_launch_scenario(**overrides: object) -> LaunchScenario:
+    payload = {
+        "scenario_id": "pitch-program-two-stage",
+        "description": "Deterministic pitch-program launch model test case.",
+        "guidance": GuidanceConfig(
+            mode="pitch_program",
+            pitch_program=[
+                PitchProgramPoint(time_s=0.0, pitch_deg=90.0),
+                PitchProgramPoint(time_s=30.0, pitch_deg=75.0),
+                PitchProgramPoint(time_s=70.0, pitch_deg=45.0),
+                PitchProgramPoint(time_s=110.0, pitch_deg=20.0),
+                PitchProgramPoint(time_s=140.0, pitch_deg=5.0),
+            ],
+        ),
+    }
+    payload.update(overrides)
+    return make_launch_scenario(**payload)

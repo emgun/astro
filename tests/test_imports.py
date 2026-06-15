@@ -51,6 +51,7 @@ def test_packages_import() -> None:
         "LaunchTrajectory",
         "LaunchTrajectorySample",
         "LaunchVehicle",
+        "PitchProgramPoint",
         "TargetOrbit",
         "launch_trajectory_to_orbit_scenario",
         "load_launch_scenario",

@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 from astro_core.models import Body, Frame, TimeScale
 from astro_launch.models import (
+    GuidanceConfig,
     LaunchEngine,
     LaunchEvent,
     LaunchPropagationConfig,
@@ -12,6 +13,7 @@ from astro_launch.models import (
     LaunchStage,
     LaunchTrajectory,
     LaunchTrajectorySample,
+    PitchProgramPoint,
 )
 from tests.astro_launch.helpers import make_launch_scenario
 
@@ -39,6 +41,41 @@ def test_launch_scenario_accepts_two_stage_vertical_case() -> None:
     assert scenario.propagation.sample_count == 15
     assert scenario.frame is Frame.EME2000
     assert scenario.time_scale is TimeScale.UTC
+
+
+def test_pitch_program_guidance_requires_ordered_pitch_knots() -> None:
+    guidance = GuidanceConfig(
+        mode="pitch_program",
+        pitch_program=[
+            PitchProgramPoint(time_s=0.0, pitch_deg=90.0),
+            PitchProgramPoint(time_s=40.0, pitch_deg=45.0),
+            PitchProgramPoint(time_s=120.0, pitch_deg=5.0),
+        ],
+    )
+
+    assert guidance.mode == "pitch_program"
+    assert guidance.pitch_program[-1].pitch_deg == 5.0
+
+    with pytest.raises(ValidationError, match="requires at least two pitch_program points"):
+        GuidanceConfig(mode="pitch_program")
+
+    with pytest.raises(ValidationError, match="time_s values must be strictly increasing"):
+        GuidanceConfig(
+            mode="pitch_program",
+            pitch_program=[
+                PitchProgramPoint(time_s=0.0, pitch_deg=90.0),
+                PitchProgramPoint(time_s=0.0, pitch_deg=45.0),
+            ],
+        )
+
+    with pytest.raises(ValidationError, match="first pitch_program point must start at t=0"):
+        GuidanceConfig(
+            mode="pitch_program",
+            pitch_program=[
+                PitchProgramPoint(time_s=5.0, pitch_deg=90.0),
+                PitchProgramPoint(time_s=40.0, pitch_deg=45.0),
+            ],
+        )
 
 
 def test_launch_stage_requires_propellant_to_cover_burn_duration() -> None:
@@ -115,3 +152,19 @@ def test_insertion_state_from_vertical_state_returns_cartesian_orbit_state() -> 
     assert insertion_state.epoch == epoch
     assert insertion_state.cartesian.position_km[0] > 6378.0
     assert insertion_state.cartesian.velocity_km_s == (1.0, 0.0, 0.0)
+
+
+def test_insertion_state_from_local_state_maps_horizontal_velocity_east() -> None:
+    epoch = datetime(2026, 1, 1, tzinfo=UTC)
+    scenario: LaunchScenario = make_launch_scenario()
+
+    insertion_state = scenario.insertion_state_from_local_state(
+        epoch=epoch,
+        altitude_km=10.0,
+        radial_velocity_km_s=1.0,
+        horizontal_velocity_km_s=2.0,
+    )
+
+    assert insertion_state.epoch == epoch
+    assert insertion_state.cartesian.position_km[0] > 6378.0
+    assert insertion_state.cartesian.velocity_km_s == (1.0, 2.0, 0.0)
