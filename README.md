@@ -19,12 +19,13 @@ The current implementation slice covers:
 - Synthetic range and range-rate measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
-  measurements, synthetic OD, and measurement-file OD ingest/export.
-- Optional Orekit Python-wrapper smoke checks through `orekit_jpype`.
+  measurements, synthetic OD, measurement-file OD ingest/export, and research propagation.
+- Optional backend smoke gates and product boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy,
+  and JAX.
 
 Launch/ascent currently uses deliberately simple local vertical and pitch-program baselines.
-RocketPy and Dymos/OpenMDAO remain future backend adapters once the launch product contracts are
-stable.
+RocketPy and Dymos/OpenMDAO are recognized adapter boundaries, but live external-engine workflows
+still require backend-specific configuration beyond the aggregate local launch schema.
 
 ## Setup
 
