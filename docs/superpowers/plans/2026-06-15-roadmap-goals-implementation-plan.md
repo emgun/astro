@@ -39,15 +39,15 @@ Implemented and protected:
 
 Still roadmap-level:
 
-- Orekit high-fidelity force models, Orekit measurement generation, and Orekit batch/sequential OD.
+- Live Orekit high-fidelity force models and native Orekit batch/sequential OD.
 - High-fidelity covariance propagation with validated state transition matrices/process noise,
   thrust-vector finite-burn dynamics, and mass-flow maneuver dynamics.
-- RocketPy launch simulation adapter.
-- Dymos/OpenMDAO ascent optimization adapter.
-- Tudat cross-check backend.
+- Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
+- Live Dymos/OpenMDAO ascent phase transcription and optimization.
+- Live Tudat cross-check environment/body construction.
 - Earth-fixed/geodetic/EOP-aware pointing, richer radiometric families, and operational CCSDS
   support beyond current TDM range/range-rate MVP.
-- Nyx evaluation and JAX differentiable research backend.
+- Richer JAX force models, sensitivities, and differentiable OD workflows.
 
 ## Goal Ledger
 
