@@ -30,7 +30,9 @@ def test_packages_import() -> None:
     }
     expected_dynamics_exports = {
         "acceleration_km_s2",
+        "apply_impulsive_maneuver",
         "derivative",
+        "dump_trajectory_ephemeris_csv",
         "j2_acceleration_km_s2",
         "propagate_local",
         "propagate_with_backend",
