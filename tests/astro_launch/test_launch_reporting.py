@@ -39,6 +39,49 @@ def test_generate_tuned_launch_report_runs_tune_launch_handoff_and_orbit_arc() -
     assert report.short_arc_metrics.final_altitude_miss_km == pytest.approx(
         report.short_arc_metrics.final_altitude_km - scenario.target_orbit.altitude_km
     )
+    assert report.passed is False
+    assert report.insertion_assessment.passed is False
+    assert report.short_arc_assessment.passed is False
+    assert [check.name for check in report.insertion_assessment.checks] == [
+        "insertion_altitude_miss",
+        "insertion_velocity_miss",
+    ]
+    assert [check.name for check in report.short_arc_assessment.checks] == [
+        "short_arc_final_altitude_miss",
+        "short_arc_final_velocity_miss",
+    ]
+    assert report.insertion_assessment.checks[0].tolerance == pytest.approx(
+        scenario.target_orbit.altitude_tolerance_km
+    )
+    assert report.insertion_assessment.checks[1].tolerance == pytest.approx(
+        scenario.target_orbit.velocity_tolerance_km_s
+    )
+
+
+def test_generate_tuned_launch_report_passes_with_loose_target_tolerances() -> None:
+    scenario = make_pitch_program_launch_scenario()
+    loose_target = scenario.target_orbit.model_copy(
+        update={
+            "altitude_tolerance_km": 5000.0,
+            "velocity_tolerance_km_s": 20.0,
+        }
+    )
+    loose_scenario = scenario.model_copy(update={"target_orbit": loose_target})
+
+    report = generate_tuned_launch_report(
+        loose_scenario,
+        point_indices=(2, 3),
+        initial_span_deg=10.0,
+        iterations=2,
+        orbit_duration_s=600.0,
+        orbit_step_s=60.0,
+    )
+
+    assert report.passed is True
+    assert report.insertion_assessment.passed is True
+    assert report.short_arc_assessment.passed is True
+    assert all(check.passed for check in report.insertion_assessment.checks)
+    assert all(check.passed for check in report.short_arc_assessment.checks)
 
 
 def test_generate_tuned_launch_report_requires_pitch_program_guidance() -> None:

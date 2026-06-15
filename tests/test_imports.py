@@ -51,6 +51,8 @@ def test_packages_import() -> None:
         "LaunchPitchTuningPoint",
         "LaunchPitchTuningResult",
         "LaunchPropagationConfig",
+        "LaunchReportAssessment",
+        "LaunchReportCheck",
         "LaunchReportInsertionMetrics",
         "LaunchReportShortArcMetrics",
         "LaunchScenario",

@@ -9,6 +9,8 @@ from astro_dynamics.local import propagate_local
 from astro_launch.handoff import launch_trajectory_to_orbit_scenario
 from astro_launch.local import propagate_launch_local
 from astro_launch.models import (
+    LaunchReportAssessment,
+    LaunchReportCheck,
     LaunchReportInsertionMetrics,
     LaunchReportShortArcMetrics,
     LaunchScenario,
@@ -88,6 +90,73 @@ def _short_arc_metrics(
     )
 
 
+def _check_against_tolerance(
+    *,
+    name: str,
+    value: float,
+    tolerance: float,
+    units: str,
+) -> LaunchReportCheck:
+    return LaunchReportCheck(
+        name=name,
+        value=value,
+        tolerance=tolerance,
+        passed=abs(value) <= tolerance,
+        units=units,
+    )
+
+
+def _assessment(checks: list[LaunchReportCheck]) -> LaunchReportAssessment:
+    return LaunchReportAssessment(
+        passed=all(check.passed for check in checks),
+        checks=checks,
+    )
+
+
+def _insertion_assessment(
+    scenario: LaunchScenario,
+    metrics: LaunchReportInsertionMetrics,
+) -> LaunchReportAssessment:
+    return _assessment(
+        [
+            _check_against_tolerance(
+                name="insertion_altitude_miss",
+                value=metrics.altitude_miss_km,
+                tolerance=scenario.target_orbit.altitude_tolerance_km,
+                units="km",
+            ),
+            _check_against_tolerance(
+                name="insertion_velocity_miss",
+                value=metrics.velocity_miss_km_s,
+                tolerance=scenario.target_orbit.velocity_tolerance_km_s,
+                units="km/s",
+            ),
+        ]
+    )
+
+
+def _short_arc_assessment(
+    scenario: LaunchScenario,
+    metrics: LaunchReportShortArcMetrics,
+) -> LaunchReportAssessment:
+    return _assessment(
+        [
+            _check_against_tolerance(
+                name="short_arc_final_altitude_miss",
+                value=metrics.final_altitude_miss_km,
+                tolerance=scenario.target_orbit.altitude_tolerance_km,
+                units="km",
+            ),
+            _check_against_tolerance(
+                name="short_arc_final_velocity_miss",
+                value=metrics.final_velocity_miss_km_s,
+                tolerance=scenario.target_orbit.velocity_tolerance_km_s,
+                units="km/s",
+            ),
+        ]
+    )
+
+
 def generate_tuned_launch_report(
     scenario: LaunchScenario,
     *,
@@ -129,6 +198,21 @@ def generate_tuned_launch_report(
         gravity=gravity,
     )
     orbit_trajectory = propagate_local(orbit_scenario)
+    insertion_metrics = _insertion_metrics(tuning_result.tuned_scenario, launch_trajectory)
+    short_arc_metrics = _short_arc_metrics(
+        tuning_result.tuned_scenario,
+        orbit_trajectory,
+        duration_s=orbit_duration_s,
+        step_s=orbit_step_s,
+    )
+    insertion_assessment = _insertion_assessment(
+        tuning_result.tuned_scenario,
+        insertion_metrics,
+    )
+    short_arc_assessment = _short_arc_assessment(
+        tuning_result.tuned_scenario,
+        short_arc_metrics,
+    )
 
     return TunedLaunchReport(
         scenario_id=scenario.scenario_id,
@@ -136,13 +220,11 @@ def generate_tuned_launch_report(
         launch_trajectory=launch_trajectory,
         orbit_scenario=orbit_scenario,
         orbit_trajectory=orbit_trajectory,
-        insertion_metrics=_insertion_metrics(tuning_result.tuned_scenario, launch_trajectory),
-        short_arc_metrics=_short_arc_metrics(
-            tuning_result.tuned_scenario,
-            orbit_trajectory,
-            duration_s=orbit_duration_s,
-            step_s=orbit_step_s,
-        ),
+        insertion_metrics=insertion_metrics,
+        short_arc_metrics=short_arc_metrics,
+        insertion_assessment=insertion_assessment,
+        short_arc_assessment=short_arc_assessment,
+        passed=insertion_assessment.passed and short_arc_assessment.passed,
         backend="local",
         metadata={
             "workflow": "tuned_launch_report",

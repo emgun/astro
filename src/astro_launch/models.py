@@ -585,6 +585,30 @@ class LaunchReportShortArcMetrics(AstroModel):
         return _numeric_scalar_input_must_be_number(value, "Launch report scalar")
 
 
+class LaunchReportCheck(AstroModel):
+    name: str = Field(min_length=1)
+    value: FiniteFloat
+    tolerance: FiniteFloat = Field(ge=0.0)
+    passed: bool
+    units: str = Field(min_length=1)
+
+    @field_validator("value", "tolerance", mode="before")
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch report check scalar")
+
+
+class LaunchReportAssessment(AstroModel):
+    passed: bool
+    checks: list[LaunchReportCheck] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def passed_must_match_checks(self) -> LaunchReportAssessment:
+        if self.passed != all(check.passed for check in self.checks):
+            raise ValueError("Launch report assessment passed must match check results")
+        return self
+
+
 class TunedLaunchReport(AstroModel):
     scenario_id: str = Field(min_length=1)
     tuning_result: LaunchPitchTuningResult
@@ -593,5 +617,8 @@ class TunedLaunchReport(AstroModel):
     orbit_trajectory: Trajectory
     insertion_metrics: LaunchReportInsertionMetrics
     short_arc_metrics: LaunchReportShortArcMetrics
+    insertion_assessment: LaunchReportAssessment
+    short_arc_assessment: LaunchReportAssessment
+    passed: bool
     backend: str = Field(min_length=1)
     metadata: dict[str, Any] = Field(default_factory=dict)

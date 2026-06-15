@@ -83,6 +83,8 @@ a coarse-to-fine targeting analysis tool, not a production optimizer.
 `astro report-tuned-launch` runs the current local end-to-end launch analysis: tune two pitch knots,
 propagate the tuned ascent, hand off insertion to an orbit scenario, propagate a short orbital arc,
 and write one JSON product with the component products plus insertion and short-arc target metrics.
+The report also includes pass/fail assessment gates using the target orbit's configured altitude
+and velocity tolerances, with named checks for insertion and short-arc misses.
 It is a deterministic report over local baselines, not a substitute for high-fidelity ascent design.
 
 `astro handoff-launch` converts a launch trajectory product into a normal orbital propagation

@@ -432,6 +432,17 @@ def test_report_tuned_launch_command_writes_json(tmp_path: Path) -> None:
     assert payload["insertion_metrics"]["altitude_miss_km"] == payload["launch_trajectory"][
         "target_miss"
     ]["altitude_miss_km"]
+    assert payload["passed"] is False
+    assert payload["insertion_assessment"]["passed"] is False
+    assert payload["short_arc_assessment"]["passed"] is False
+    assert [check["name"] for check in payload["insertion_assessment"]["checks"]] == [
+        "insertion_altitude_miss",
+        "insertion_velocity_miss",
+    ]
+    assert [check["name"] for check in payload["short_arc_assessment"]["checks"]] == [
+        "short_arc_final_altitude_miss",
+        "short_arc_final_velocity_miss",
+    ]
 
 
 def test_report_tuned_launch_command_reports_invalid_point_indices(tmp_path: Path) -> None:
