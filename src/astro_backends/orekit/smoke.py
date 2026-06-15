@@ -49,6 +49,15 @@ def _not_installed_result(wrapper_version: str | None = None) -> OrekitSmokeResu
     )
 
 
+def _import_failed_result(wrapper_version: str, exc: ImportError) -> OrekitSmokeResult:
+    return OrekitSmokeResult(
+        available=False,
+        wrapper=WRAPPER,
+        version=wrapper_version,
+        message=f"Orekit JPype wrapper import failed: {exc}",
+    )
+
+
 def run_orekit_smoke(
     *,
     strict: bool = False,
@@ -57,14 +66,19 @@ def run_orekit_smoke(
     if force_unavailable:
         return _not_installed_result()
 
-    wrapper_version: str | None = None
     try:
         wrapper_version = version(DISTRIBUTION)
-        orekit = cast(_OrekitModule, import_module(WRAPPER))
-    except (ImportError, PackageNotFoundError):
+    except PackageNotFoundError:
         if strict:
             raise
-        return _not_installed_result(wrapper_version)
+        return _not_installed_result()
+
+    try:
+        orekit = cast(_OrekitModule, import_module(WRAPPER))
+    except ImportError as exc:
+        if strict:
+            raise
+        return _import_failed_result(wrapper_version, exc)
 
     try:
         orekit.initVM()
