@@ -7,11 +7,12 @@ from typing import Annotated
 import typer
 import yaml
 
-from astro_backends.orekit import run_orekit_smoke
+from astro_backends.orekit import propagate_orekit, run_orekit_smoke
 from astro_core.errors import (
     InvalidMeasurementFileError,
     InvalidScenarioError,
     NumericalConvergenceError,
+    UnsupportedBackendError,
 )
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario
@@ -258,11 +259,18 @@ def propagate(
 ) -> None:
     """Propagate a scenario and write a trajectory product."""
     scenario = _load_scenario_or_exit(scenario_path)
-    if backend != "local":
+    if backend == "local":
+        trajectory = propagate_local(scenario)
+    elif backend == "orekit":
+        try:
+            trajectory = propagate_orekit(scenario)
+        except UnsupportedBackendError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(code=2) from exc
+    else:
         typer.echo(f"unsupported propagation backend: {backend}", err=True)
         raise typer.Exit(code=2)
 
-    trajectory = propagate_local(scenario)
     payload = trajectory.model_dump_json(indent=2)
     if output is None:
         typer.echo(payload)

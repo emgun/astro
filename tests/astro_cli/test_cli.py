@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 
 from astro_backends.orekit import OrekitSmokeResult
 from astro_cli.main import app
-from astro_core.errors import NumericalConvergenceError
+from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
@@ -860,7 +860,14 @@ def test_propagate_command_reports_invalid_scenario(tmp_path: Path) -> None:
     assert "is invalid" in result.stderr
 
 
-def test_propagate_command_reports_unsupported_backend() -> None:
+def test_propagate_command_reports_unavailable_orekit_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_orekit(_scenario: Scenario) -> object:
+        raise UnsupportedBackendError("Orekit backend unavailable: install astro-suite[orekit]")
+
+    monkeypatch.setattr("astro_cli.main.propagate_orekit", fail_orekit)
+
     result = runner.invoke(
         app,
         [
@@ -872,7 +879,36 @@ def test_propagate_command_reports_unsupported_backend() -> None:
     )
 
     assert result.exit_code == 2
-    assert "unsupported propagation backend: orekit" in result.stderr
+    assert "Orekit backend unavailable" in result.stderr
+
+
+def test_propagate_command_writes_orekit_json(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "orekit.json"
+
+    def fake_orekit(scenario: Scenario) -> object:
+        trajectory = propagate_local(scenario)
+        return trajectory.model_copy(update={"backend": "orekit"})
+
+    monkeypatch.setattr("astro_cli.main.propagate_orekit", fake_orekit)
+
+    result = runner.invoke(
+        app,
+        [
+            "propagate",
+            "examples/scenarios/leo_two_body.yaml",
+            "--backend",
+            "orekit",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["backend"] == "orekit"
 
 
 def test_launch_command_reports_unsupported_backend(tmp_path: Path) -> None:
