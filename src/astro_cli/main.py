@@ -58,31 +58,30 @@ def _offset_cartesian_state(
     )
 
 
-def _with_estimation_demo_geometry(scenario: Scenario) -> tuple[Scenario, list[str]]:
+def _with_estimation_demo_geometry(scenario: Scenario) -> tuple[Scenario, list[GroundStation]]:
     if len(scenario.ground_stations) >= 2:
         return scenario, []
 
     stations = list(scenario.ground_stations)
     station_names = {station.name for station in stations}
-    added_station_names: list[str] = []
+    added_stations: list[GroundStation] = []
 
     for station_name, station_position in DEMO_GROUND_STATION_CANDIDATES:
         if len(stations) >= 2:
             break
         if station_name in station_names:
             continue
-        stations.append(
-            GroundStation(
-                name=station_name,
-                position_eci_km=station_position,
-                frame=scenario.initial_state.frame,
-                elevation_mask_deg=0.0,
-            )
+        station = GroundStation(
+            name=station_name,
+            position_eci_km=station_position,
+            frame=scenario.initial_state.frame,
+            elevation_mask_deg=0.0,
         )
+        stations.append(station)
         station_names.add(station_name)
-        added_station_names.append(station_name)
+        added_stations.append(station)
 
-    return scenario.model_copy(update={"ground_stations": stations}), added_station_names
+    return scenario.model_copy(update={"ground_stations": stations}), added_stations
 
 
 def _with_estimation_demo_initial_guess(scenario: Scenario) -> Scenario:
@@ -102,16 +101,20 @@ def _with_estimation_demo_metadata(
     *,
     source_scenario: Scenario,
     truth_scenario: Scenario,
-    demo_added_ground_stations: list[str],
+    demo_added_ground_stations: list[GroundStation],
     measurement_count: int,
 ) -> dict[str, object]:
+    added_station_payloads = [
+        station.model_dump(mode="json") for station in demo_added_ground_stations
+    ]
     return {
         **result_metadata,
         "workflow": "local_synthetic_demo",
         "source_scenario_id": source_scenario.scenario_id,
         "source_ground_station_count": len(source_scenario.ground_stations),
         "truth_ground_station_count": len(truth_scenario.ground_stations),
-        "demo_added_ground_stations": demo_added_ground_stations,
+        "demo_added_ground_stations": [station.name for station in demo_added_ground_stations],
+        "demo_added_ground_station_geometry": added_station_payloads,
         "initial_guess_position_delta_km": list(INITIAL_GUESS_POSITION_DELTA_KM),
         "initial_guess_velocity_delta_km_s": list(INITIAL_GUESS_VELOCITY_DELTA_KM_S),
         "measurement_count": measurement_count,

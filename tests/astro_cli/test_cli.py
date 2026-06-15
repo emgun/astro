@@ -80,6 +80,14 @@ def test_estimate_command_writes_json(tmp_path: Path) -> None:
     assert payload["metadata"]["source_ground_station_count"] == 1
     assert payload["metadata"]["truth_ground_station_count"] == 2
     assert payload["metadata"]["demo_added_ground_stations"] == ["demo-y-axis-eci"]
+    assert payload["metadata"]["demo_added_ground_station_geometry"] == [
+        {
+            "name": "demo-y-axis-eci",
+            "position_eci_km": [0.0, 6378.1363, 0.0],
+            "frame": "EME2000",
+            "elevation_mask_deg": 0.0,
+        }
+    ]
     assert payload["metadata"]["initial_guess_position_delta_km"] == [1.0, -0.8, 0.6]
     assert payload["metadata"]["initial_guess_velocity_delta_km_s"] == [0.0005, -0.001, 0.0008]
     assert payload["metadata"]["measurement_count"] == 44
@@ -175,6 +183,24 @@ def test_synth_measurements_command_reports_invalid_scenario(tmp_path: Path) -> 
             str(scenario),
             "--output",
             str(tmp_path / "measurements.json"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "is invalid" in result.stderr
+
+
+def test_estimate_command_reports_invalid_scenario(tmp_path: Path) -> None:
+    scenario = tmp_path / "invalid.yaml"
+    scenario.write_text("scenario_id: missing-required-fields\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate",
+            str(scenario),
+            "--output",
+            str(tmp_path / "estimate.json"),
         ],
     )
 
