@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from astro_core.errors import UnsupportedBackendError
@@ -35,7 +35,7 @@ def validate_orekit_state_support(state: OrbitState) -> None:
 
 
 def absolute_date_from_datetime(runtime: Any, epoch: datetime) -> Any:
-    utc_epoch = epoch.astimezone(timezone.utc)
+    utc_epoch = epoch.astimezone(UTC)
     seconds_with_fraction = utc_epoch.second + utc_epoch.microsecond / 1_000_000.0
     utc = runtime.time_scales_factory.getUTC()
     return runtime.absolute_date(

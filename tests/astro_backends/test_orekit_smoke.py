@@ -3,7 +3,6 @@ from types import ModuleType
 
 import pytest
 
-from astro_backends.orekit import smoke
 from astro_backends.orekit import runtime
 from astro_backends.orekit.smoke import OrekitSmokeResult, run_orekit_smoke
 

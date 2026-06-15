@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -20,7 +20,7 @@ def test_orekit_unit_conversions_are_reversible() -> None:
 
 
 def test_orekit_epoch_requires_utc() -> None:
-    epoch = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+    epoch = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
 
     assert epoch.isoformat() == "2026-01-01T00:00:00+00:00"
 
@@ -106,7 +106,7 @@ class _FakeAbsoluteDate:
             minute,
             whole_seconds,
             microsecond,
-            tzinfo=timezone.utc,
+            tzinfo=UTC,
         )
 
 
