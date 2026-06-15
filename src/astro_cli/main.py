@@ -21,9 +21,9 @@ from astro_core.models import CartesianState, ForceModelName, GroundStation, Sce
 from astro_dynamics.backends import propagate_with_backend
 from astro_dynamics.ephemeris import dump_trajectory_ephemeris_csv
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
+from astro_launch.backends import propagate_launch_with_backend
 from astro_launch.handoff import launch_trajectory_to_orbit_scenario
 from astro_launch.io import load_launch_scenario, load_launch_trajectory, load_tuned_launch_report
-from astro_launch.local import propagate_launch_local
 from astro_launch.models import LaunchScenario, LaunchTrajectory, TunedLaunchReport
 from astro_launch.reporting import (
     compare_tuned_launch_reports,
@@ -362,11 +362,12 @@ def launch(
 ) -> None:
     """Run a launch/ascent scenario and write a launch trajectory product."""
     scenario = _load_launch_scenario_or_exit(scenario_path)
-    if backend != "local":
-        typer.echo(f"unsupported launch backend: {backend}", err=True)
-        raise typer.Exit(code=2)
+    try:
+        trajectory = propagate_launch_with_backend(scenario, backend)
+    except UnsupportedBackendError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
 
-    trajectory = propagate_launch_local(scenario)
     payload = trajectory.model_dump_json(indent=2)
     if output is None:
         typer.echo(payload)

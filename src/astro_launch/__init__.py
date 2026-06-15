@@ -1,3 +1,4 @@
+from astro_launch.backends import propagate_launch_with_backend
 from astro_launch.handoff import launch_trajectory_to_orbit_scenario
 from astro_launch.io import load_launch_scenario, load_launch_trajectory, load_tuned_launch_report
 from astro_launch.local import propagate_launch_local
@@ -74,6 +75,7 @@ __all__ = [
     "load_launch_scenario",
     "load_launch_trajectory",
     "load_tuned_launch_report",
+    "propagate_launch_with_backend",
     "propagate_launch_local",
     "sweep_pitch_program",
     "tune_pitch_program",

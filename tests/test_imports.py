@@ -86,6 +86,7 @@ def test_packages_import() -> None:
         "load_launch_scenario",
         "load_launch_trajectory",
         "load_tuned_launch_report",
+        "propagate_launch_with_backend",
         "propagate_launch_local",
         "sweep_pitch_program",
         "tune_pitch_program",

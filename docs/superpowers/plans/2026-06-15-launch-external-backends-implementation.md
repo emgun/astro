@@ -88,8 +88,8 @@ optimization = [
 - Test: `tests/astro_cli/test_cli.py`
 - Test: `tests/test_imports.py`
 
-- [ ] Add failing tests for `propagate_launch_with_backend(scenario, "local")`, unsupported backend errors, and CLI `launch --backend rocketpy` dispatch.
-- [ ] Implement:
+- [x] Add failing tests for `propagate_launch_with_backend(scenario, "local")`, unsupported backend errors, and CLI `launch --backend rocketpy` dispatch.
+- [x] Implement:
 
 ```python
 def propagate_launch_with_backend(scenario: LaunchScenario, backend: str) -> LaunchTrajectory:
@@ -100,9 +100,9 @@ def propagate_launch_with_backend(scenario: LaunchScenario, backend: str) -> Lau
     raise UnsupportedBackendError(f"unsupported launch backend: {backend}")
 ```
 
-- [ ] Update `astro launch` to call the dispatcher and catch `UnsupportedBackendError`.
-- [ ] Run focused launch backend and CLI tests.
-- [ ] Commit with `git commit -m "feat: dispatch launch propagation backends"`.
+- [x] Update `astro launch` to call the dispatcher and catch `UnsupportedBackendError`.
+- [x] Run focused launch backend and CLI tests.
+- [x] Commit with `git commit -m "feat: dispatch launch propagation backends"`.
 
 ## Task 3: RocketPy Product Adapter Boundary
 

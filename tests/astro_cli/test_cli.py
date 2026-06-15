@@ -16,6 +16,7 @@ from astro_core.models import CartesianState, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
 from astro_launch.io import load_launch_scenario
 from astro_launch.local import propagate_launch_local
+from astro_launch.models import LaunchScenario, LaunchTrajectory
 from astro_launch.reporting import generate_tuned_launch_report
 from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
@@ -273,6 +274,39 @@ def test_launch_command_writes_json(tmp_path: Path) -> None:
     assert payload["events"][-1]["event_type"] == "insertion"
     assert payload["insertion_state"]["central_body"] == "earth"
     assert payload["metadata"]["model"] == "vertical_1d"
+
+
+def test_launch_command_accepts_rocketpy_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    scenario_path = tmp_path / "launch.yaml"
+    output = tmp_path / "rocketpy-launch.json"
+    seen_backends: list[str] = []
+    _write_launch_scenario(scenario_path)
+
+    def fake_backend(scenario: LaunchScenario, backend: str) -> LaunchTrajectory:
+        seen_backends.append(backend)
+        return propagate_launch_local(scenario).model_copy(update={"backend": backend})
+
+    monkeypatch.setattr("astro_cli.main.propagate_launch_with_backend", fake_backend)
+
+    result = runner.invoke(
+        app,
+        [
+            "launch",
+            str(scenario_path),
+            "--backend",
+            "rocketpy",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen_backends == ["rocketpy"]
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["backend"] == "rocketpy"
 
 
 def test_handoff_launch_command_writes_orbit_scenario(tmp_path: Path) -> None:
