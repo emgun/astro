@@ -1183,6 +1183,37 @@ def test_propagate_command_writes_orekit_json(
     assert payload["backend"] == "orekit"
 
 
+def test_propagate_command_accepts_tudat_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "tudat.json"
+    seen_backends: list[str] = []
+
+    def fake_backend(scenario: Scenario, backend: str) -> object:
+        seen_backends.append(backend)
+        return propagate_local(scenario).model_copy(update={"backend": backend})
+
+    monkeypatch.setattr("astro_cli.main.propagate_with_backend", fake_backend)
+
+    result = runner.invoke(
+        app,
+        [
+            "propagate",
+            "examples/scenarios/leo_two_body.yaml",
+            "--backend",
+            "tudat",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen_backends == ["tudat"]
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["backend"] == "tudat"
+
+
 def test_launch_command_reports_unsupported_backend(tmp_path: Path) -> None:
     scenario_path = tmp_path / "launch.yaml"
     output = tmp_path / "launch.json"

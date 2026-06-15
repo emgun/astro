@@ -1,3 +1,4 @@
+from astro_backends.tudat.propagation import propagate_tudat
 from astro_backends.tudat.runtime import (
     TudatRuntime,
     TudatRuntimeUnavailable,
@@ -10,5 +11,6 @@ __all__ = [
     "TudatRuntimeUnavailable",
     "TudatSmokeResult",
     "load_tudat_runtime",
+    "propagate_tudat",
     "run_tudat_smoke",
 ]

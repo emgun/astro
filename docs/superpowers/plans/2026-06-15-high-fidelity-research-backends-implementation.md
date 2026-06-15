@@ -72,12 +72,12 @@ research = [
 - Test: `tests/astro_dynamics/test_backends.py`
 - Test: `tests/astro_cli/test_cli.py`
 
-- [ ] Add tests showing missing Tudat raises `UnsupportedBackendError`.
-- [ ] Add tests with a fake `tudat_runner` returning a suite `Trajectory`.
-- [ ] Add `propagate_tudat(scenario, runtime_loader=load_tudat_runtime, tudat_runner=None)`.
-- [ ] Update propagation dispatcher to recognize `backend == "tudat"`.
-- [ ] Run focused propagation tests.
-- [ ] Commit with `git commit -m "feat: add tudat propagation boundary"`.
+- [x] Add tests showing missing Tudat raises `UnsupportedBackendError`.
+- [x] Add tests with a fake `tudat_runner` returning a suite `Trajectory`.
+- [x] Add `propagate_tudat(scenario, runtime_loader=load_tudat_runtime, tudat_runner=None)`.
+- [x] Update propagation dispatcher to recognize `backend == "tudat"`.
+- [x] Run focused propagation tests.
+- [x] Commit with `git commit -m "feat: add tudat propagation boundary"`.
 
 ## Task 3: JAX Research Propagation Boundary
 
