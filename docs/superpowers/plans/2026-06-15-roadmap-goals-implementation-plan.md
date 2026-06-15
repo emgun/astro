@@ -144,13 +144,20 @@ Primary files:
 
 ### Goal 4: Launch External Backends and Optimization
 
-Status: local launch baseline is implemented; external adapters remain.
+Status: first external-backend boundary implemented. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, a RocketPy product adapter boundary, and a neutral `optimize-launch` command are implemented. Full live RocketPy motor/rocket geometry mapping and Dymos phase transcription remain gated on richer backend-specific configuration.
+
+Implemented slice:
+
+- `astro rocketpy-smoke` and `astro dymos-smoke` return structured availability diagnostics.
+- `astro launch --backend rocketpy` routes through a recognized RocketPy adapter boundary and fails clearly when dependencies or backend-specific configuration are unavailable.
+- `astro optimize-launch --backend local` runs the existing pitch-program tuner through a neutral optimization entry point.
+- `astro optimize-launch --backend dymos` routes through a Dymos/OpenMDAO adapter boundary and fails clearly until a validated Dymos phase runner is provided.
 
 Definition of done:
 
-- `astro launch --backend rocketpy` runs a direct simulation adapter when `astro[launch]` is installed.
+- `astro launch --backend rocketpy` runs a direct simulation adapter when `astro[launch]` is installed and the scenario supplies RocketPy-specific vehicle/motor configuration.
 - RocketPy adapter returns the existing `LaunchTrajectory` schema, not RocketPy-native objects.
-- `astro optimize-launch --backend dymos` solves a small ascent optimization example.
+- `astro optimize-launch --backend dymos` solves a small ascent optimization example once a validated Dymos phase model is added.
 - Dymos/OpenMDAO adapter reports path constraints, optimizer status, convergence diagnostics, and target insertion residuals.
 - Launch validation includes deterministic direct-simulation cases and one small optimization case.
 - Launch-to-orbit handoff still produces a normal orbital `Scenario`.

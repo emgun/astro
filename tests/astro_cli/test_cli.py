@@ -1192,14 +1192,14 @@ def test_launch_command_reports_unsupported_backend(tmp_path: Path) -> None:
             "launch",
             str(scenario_path),
             "--backend",
-            "rocketpy",
+            "missing",
             "--output",
             str(output),
         ],
     )
 
     assert result.exit_code == 2
-    assert "unsupported launch backend: rocketpy" in result.stderr
+    assert "unsupported launch backend: missing" in result.stderr
 
 
 def test_handoff_launch_command_reports_unsupported_gravity(tmp_path: Path) -> None:

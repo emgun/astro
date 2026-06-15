@@ -84,7 +84,7 @@ optimization = [
 - Create: `src/astro_launch/backends.py`
 - Modify: `src/astro_launch/__init__.py`
 - Modify: `src/astro_cli/main.py`
-- Test: `tests/astro_launch/test_backends.py`
+- Test: `tests/astro_launch/test_launch_backends.py`
 - Test: `tests/astro_cli/test_cli.py`
 - Test: `tests/test_imports.py`
 
@@ -147,7 +147,7 @@ def propagate_launch_with_backend(scenario: LaunchScenario, backend: str) -> Lau
 - Modify: `docs/superpowers/plans/2026-06-15-roadmap-goals-implementation-plan.md`
 - Modify: this plan.
 
-- [ ] Run:
+- [x] Run:
 
 ```bash
 python -m pytest -q
@@ -159,8 +159,8 @@ astro launch examples/launch/pitch_program_two_stage.yaml --backend local --outp
 astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend local --point-indices 2,3 --iterations 1 --output /tmp/astro-optimized-launch.json
 ```
 
-- [ ] Mark completed checklist items.
-- [ ] Commit with `git commit -m "docs: update launch external backend roadmap"`.
+- [x] Mark completed checklist items.
+- [x] Commit with `git commit -m "docs: update launch external backend roadmap"`.
 
 ## Self-Review
 
