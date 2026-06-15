@@ -8,8 +8,10 @@ import typer
 import yaml
 
 from astro_backends.dymos import optimize_launch_dymos, run_dymos_smoke
+from astro_backends.jax import run_jax_smoke
 from astro_backends.orekit import run_orekit_smoke
 from astro_backends.rocketpy import run_rocketpy_smoke
+from astro_backends.tudat import run_tudat_smoke
 from astro_core.errors import (
     InvalidMeasurementFileError,
     InvalidScenarioError,
@@ -277,6 +279,26 @@ def rocketpy_smoke() -> None:
 def dymos_smoke() -> None:
     """Run the optional Dymos/OpenMDAO package smoke gate."""
     result = run_dymos_smoke()
+
+    typer.echo(json.dumps(result.to_dict(), indent=2))
+    if not result.available:
+        raise typer.Exit(code=1)
+
+
+@app.command("tudat-smoke")
+def tudat_smoke() -> None:
+    """Run the optional TudatPy package smoke gate."""
+    result = run_tudat_smoke()
+
+    typer.echo(json.dumps(result.to_dict(), indent=2))
+    if not result.available:
+        raise typer.Exit(code=1)
+
+
+@app.command("jax-smoke")
+def jax_smoke() -> None:
+    """Run the optional JAX/JAXLIB package smoke gate."""
+    result = run_jax_smoke()
 
     typer.echo(json.dumps(result.to_dict(), indent=2))
     if not result.available:

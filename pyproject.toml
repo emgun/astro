@@ -34,6 +34,10 @@ optimization = [
   "dymos>=1.15,<2",
   "openmdao>=3.44,<4",
 ]
+research = [
+  "jax>=0.4.38,<1",
+  "jaxlib>=0.4.38,<1",
+]
 
 [project.scripts]
 astro = "astro_cli.main:app"

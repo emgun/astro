@@ -7,8 +7,10 @@ import yaml
 from typer.testing import CliRunner
 
 from astro_backends.dymos import DymosSmokeResult
+from astro_backends.jax import JaxSmokeResult
 from astro_backends.orekit import OrekitSmokeResult
 from astro_backends.rocketpy import RocketPySmokeResult
+from astro_backends.tudat import TudatSmokeResult
 from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
@@ -1544,6 +1546,80 @@ def test_dymos_smoke_command_exits_nonzero_when_package_unavailable(
     monkeypatch.setattr("astro_cli.main.run_dymos_smoke", lambda: smoke_result)
 
     result = runner.invoke(app, ["dymos-smoke"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
+
+
+def test_tudat_smoke_command_reports_available_package(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = TudatSmokeResult(
+        available=True,
+        package="tudatpy",
+        version="1.0.0",
+        message="Tudat available.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_tudat_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["tudat-smoke"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
+
+
+def test_tudat_smoke_command_exits_nonzero_when_package_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = TudatSmokeResult(
+        available=False,
+        package="tudatpy",
+        version=None,
+        message="Tudat unavailable.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_tudat_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["tudat-smoke"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
+
+
+def test_jax_smoke_command_reports_available_package(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = JaxSmokeResult(
+        available=True,
+        package="jax",
+        version="0.10.1",
+        jaxlib_version="0.10.1",
+        message="JAX available.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_jax_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["jax-smoke"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload == smoke_result.to_dict()
+
+
+def test_jax_smoke_command_exits_nonzero_when_package_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    smoke_result = JaxSmokeResult(
+        available=False,
+        package="jax",
+        version=None,
+        jaxlib_version=None,
+        message="JAX unavailable.",
+    )
+    monkeypatch.setattr("astro_cli.main.run_jax_smoke", lambda: smoke_result)
+
+    result = runner.invoke(app, ["jax-smoke"])
 
     assert result.exit_code == 1
     payload = json.loads(result.stdout)
