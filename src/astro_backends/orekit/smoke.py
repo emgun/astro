@@ -1,32 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from importlib import import_module
-from importlib.metadata import PackageNotFoundError, version
-from typing import Protocol, cast
+from importlib.metadata import PackageNotFoundError
+from typing import cast
 
-WRAPPER = "orekit_jpype"
-DISTRIBUTION = "orekit-jpype"
-
-
-class _OrekitModule(Protocol):
-    def initVM(self) -> object: ...
-
-
-class _FramesFactory(Protocol):
-    def getEME2000(self) -> object: ...
-
-
-class _TimeScalesFactory(Protocol):
-    def getUTC(self) -> object: ...
-
-
-class _FramesModule(Protocol):
-    FramesFactory: _FramesFactory
-
-
-class _TimeModule(Protocol):
-    TimeScalesFactory: _TimeScalesFactory
+from astro_backends.orekit.runtime import (
+    WRAPPER,
+    OrekitRuntimeUnavailable,
+    load_orekit_runtime,
+)
 
 
 @dataclass(frozen=True)
@@ -67,38 +49,42 @@ def run_orekit_smoke(
         return _not_installed_result()
 
     try:
-        wrapper_version = version(DISTRIBUTION)
+        runtime = load_orekit_runtime(strict=strict)
     except PackageNotFoundError:
         if strict:
             raise
         return _not_installed_result()
-
-    try:
-        orekit = cast(_OrekitModule, import_module(WRAPPER))
     except ImportError as exc:
         if strict:
             raise
-        return _import_failed_result(wrapper_version, exc)
+        return _import_failed_result("unknown", exc)
+    except OrekitRuntimeUnavailable as exc:
+        message = str(exc)
+        if "not installed" in message:
+            return _not_installed_result(exc.wrapper_version)
+        return OrekitSmokeResult(
+            available=False,
+            wrapper=WRAPPER,
+            version=exc.wrapper_version,
+            message=message,
+        )
 
     try:
-        orekit.initVM()
-        frames_module = cast(_FramesModule, import_module("org.orekit.frames"))
-        time_module = cast(_TimeModule, import_module("org.orekit.time"))
-        frames_module.FramesFactory.getEME2000()
-        time_module.TimeScalesFactory.getUTC()
+        runtime.frames_factory.getEME2000()
+        runtime.time_scales_factory.getUTC()
     except Exception as exc:
         if strict:
             raise
         return OrekitSmokeResult(
             available=False,
             wrapper=WRAPPER,
-            version=wrapper_version,
+            version=runtime.wrapper_version,
             message=f"Orekit JPype VM/frame/time smoke failure: {exc}",
         )
 
     return OrekitSmokeResult(
         available=True,
         wrapper=WRAPPER,
-        version=wrapper_version,
+        version=runtime.wrapper_version,
         message="Orekit JPype VM, EME2000 frame, and UTC time scale are available.",
     )
