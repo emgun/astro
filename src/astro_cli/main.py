@@ -15,6 +15,13 @@ from astro_od.measurements import generate_synthetic_measurements
 
 app = typer.Typer(help="Astro Suite flight dynamics workflows.")
 
+INITIAL_GUESS_POSITION_DELTA_KM = (1.0, -0.8, 0.6)
+INITIAL_GUESS_VELOCITY_DELTA_KM_S = (0.0005, -0.001, 0.0008)
+DEMO_GROUND_STATION_CANDIDATES: tuple[tuple[str, tuple[float, float, float]], ...] = (
+    ("demo-y-axis-eci", (0.0, 6378.1363, 0.0)),
+    ("demo-x-axis-eci", (6378.1363, 0.0, 0.0)),
+)
+
 
 def _load_scenario_or_exit(scenario_path: Path) -> Scenario:
     try:
@@ -51,47 +58,64 @@ def _offset_cartesian_state(
     )
 
 
-def _with_estimation_demo_geometry(scenario: Scenario) -> Scenario:
+def _with_estimation_demo_geometry(scenario: Scenario) -> tuple[Scenario, list[str]]:
     if len(scenario.ground_stations) >= 2:
-        return scenario
+        return scenario, []
 
     stations = list(scenario.ground_stations)
     station_names = {station.name for station in stations}
+    added_station_names: list[str] = []
 
-    if not stations and "equator-eci" not in station_names:
+    for station_name, station_position in DEMO_GROUND_STATION_CANDIDATES:
+        if len(stations) >= 2:
+            break
+        if station_name in station_names:
+            continue
         stations.append(
             GroundStation(
-                name="equator-eci",
-                position_eci_km=(6378.1363, 0.0, 0.0),
+                name=station_name,
+                position_eci_km=station_position,
                 frame=scenario.initial_state.frame,
                 elevation_mask_deg=0.0,
             )
         )
-        station_names.add("equator-eci")
+        station_names.add(station_name)
+        added_station_names.append(station_name)
 
-    if "north-eci" not in station_names:
-        stations.append(
-            GroundStation(
-                name="north-eci",
-                position_eci_km=(0.0, 6378.1363, 0.0),
-                frame=scenario.initial_state.frame,
-                elevation_mask_deg=0.0,
-            )
-        )
-
-    return scenario.model_copy(update={"ground_stations": stations})
+    return scenario.model_copy(update={"ground_stations": stations}), added_station_names
 
 
 def _with_estimation_demo_initial_guess(scenario: Scenario) -> Scenario:
     perturbed_cartesian = _offset_cartesian_state(
         scenario.initial_state.cartesian,
-        position_delta_km=(1.0, -0.8, 0.6),
-        velocity_delta_km_s=(0.0005, -0.001, 0.0008),
+        position_delta_km=INITIAL_GUESS_POSITION_DELTA_KM,
+        velocity_delta_km_s=INITIAL_GUESS_VELOCITY_DELTA_KM_S,
     )
     perturbed_initial_state = scenario.initial_state.model_copy(
         update={"cartesian": perturbed_cartesian}
     )
     return scenario.model_copy(update={"initial_state": perturbed_initial_state})
+
+
+def _with_estimation_demo_metadata(
+    result_metadata: dict[str, object],
+    *,
+    source_scenario: Scenario,
+    truth_scenario: Scenario,
+    demo_added_ground_stations: list[str],
+    measurement_count: int,
+) -> dict[str, object]:
+    return {
+        **result_metadata,
+        "workflow": "local_synthetic_demo",
+        "source_scenario_id": source_scenario.scenario_id,
+        "source_ground_station_count": len(source_scenario.ground_stations),
+        "truth_ground_station_count": len(truth_scenario.ground_stations),
+        "demo_added_ground_stations": demo_added_ground_stations,
+        "initial_guess_position_delta_km": list(INITIAL_GUESS_POSITION_DELTA_KM),
+        "initial_guess_velocity_delta_km_s": list(INITIAL_GUESS_VELOCITY_DELTA_KM_S),
+        "measurement_count": measurement_count,
+    }
 
 
 @app.command()
@@ -151,7 +175,7 @@ def estimate(
 ) -> None:
     """Run a local synthetic orbit-determination workflow."""
     source_scenario = _load_scenario_or_exit(scenario_path)
-    truth_scenario = _with_estimation_demo_geometry(source_scenario)
+    truth_scenario, added_station_names = _with_estimation_demo_geometry(source_scenario)
     truth_trajectory = propagate_local(truth_scenario)
     measurements = generate_synthetic_measurements(truth_scenario, truth_trajectory)
     estimate_scenario = _with_estimation_demo_initial_guess(truth_scenario)
@@ -162,5 +186,16 @@ def estimate(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
 
+    result = result.model_copy(
+        update={
+            "metadata": _with_estimation_demo_metadata(
+                result.metadata,
+                source_scenario=source_scenario,
+                truth_scenario=truth_scenario,
+                demo_added_ground_stations=added_station_names,
+                measurement_count=len(measurements),
+            )
+        }
+    )
     _write_text_or_exit(output, result.model_dump_json(indent=2), "estimate")
     typer.echo(f"wrote estimate: {output}")
