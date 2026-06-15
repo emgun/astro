@@ -44,6 +44,9 @@ packages = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+  "orekit_live: requires orekit-jpype, Java, and Orekit runtime support",
+]
 
 [tool.ruff]
 line-length = 100

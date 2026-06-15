@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from astro_backends.orekit.propagation import propagate_orekit
 from astro_backends.orekit.runtime import OrekitRuntime
 from astro_core.errors import UnsupportedBackendError
 from astro_core.io import load_scenario
+from astro_dynamics.local import propagate_local
 
 
 def test_orekit_unit_conversions_are_reversible() -> None:
@@ -51,6 +53,24 @@ def test_propagate_orekit_returns_suite_trajectory_with_fake_runtime() -> None:
     final_state = trajectory.samples[-1].state
     assert final_state.position_km == pytest.approx((7000.0, 4500.0, 600.0))
     assert final_state.velocity_km_s == pytest.approx((0.0, 7.5, 1.0))
+
+
+@pytest.mark.orekit_live
+def test_live_orekit_two_body_matches_local_reference() -> None:
+    if os.environ.get("ASTRO_RUN_OREKIT_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_OREKIT_LIVE=1 to run live Orekit propagation")
+    pytest.importorskip("orekit_jpype")
+
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    orekit_trajectory = propagate_orekit(scenario)
+    local_trajectory = propagate_local(scenario)
+
+    assert orekit_trajectory.backend == "orekit"
+    assert len(orekit_trajectory.samples) == len(local_trajectory.samples)
+    final_orekit = orekit_trajectory.samples[-1].state
+    final_local = local_trajectory.samples[-1].state
+    assert final_orekit.position_km == pytest.approx(final_local.position_km, abs=1.0)
+    assert final_orekit.velocity_km_s == pytest.approx(final_local.velocity_km_s, abs=1.0e-3)
 
 
 class _FakeFramesFactory:

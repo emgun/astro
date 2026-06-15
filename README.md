@@ -30,20 +30,22 @@ stable.
 python -m pip install -e '.[dev]'
 ```
 
-Optional Orekit wrapper smoke support:
+Optional Orekit wrapper smoke and phase-1 propagation support:
 
 ```bash
 python -m pip install -e '.[orekit]'
 astro orekit-smoke
+astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
 ```
 
-If `orekit-jpype` is not installed, `astro orekit-smoke` exits nonzero with structured JSON explaining that the optional wrapper is unavailable.
+If `orekit-jpype` is not installed, `astro orekit-smoke` exits nonzero with structured JSON explaining that the optional wrapper is unavailable. `astro propagate --backend orekit` currently supports phase-1 two-body propagation through Orekit's Keplerian propagator; J2, drag, SRP, and `orekit_high_fidelity` force models are part of the next Orekit force-model phase.
 
 ## Commands
 
 ```bash
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
+astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
 astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
 astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output pitch_launch.json
 astro sweep-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-index 3 --pitch-deg-values 10,20,30 --output pitch_sweep.json
