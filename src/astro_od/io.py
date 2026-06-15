@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import json
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -10,6 +11,9 @@ from pydantic import ValidationError
 
 from astro_core.errors import InvalidMeasurementFileError
 from astro_core.models import MeasurementRecord
+
+DEFAULT_TDM_RANGE_SIGMA_KM = 0.01
+DEFAULT_TDM_RANGE_RATE_SIGMA_KM_S = 1.0e-5
 
 CSV_REQUIRED_COLUMNS = frozenset(
     {
@@ -24,6 +28,14 @@ CSV_REQUIRED_COLUMNS = frozenset(
     }
 )
 
+SUPPORTED_TDM_DATA_KEYWORDS = frozenset(
+    {
+        "RANGE",
+        "DOPPLER_INSTANTANEOUS",
+        "DOPPLER_INTEGRATED",
+    }
+)
+
 
 def load_measurements(
     path: Path | str,
@@ -33,6 +45,11 @@ def load_measurements(
 ) -> list[MeasurementRecord]:
     measurement_path = Path(path)
     resolved_format = resolve_measurement_format(measurement_path, measurement_format)
+    if resolved_format == "tdm":
+        return _load_tdm_measurements(
+            measurement_path,
+            expected_scenario_id=expected_scenario_id,
+        )
     if resolved_format == "csv":
         return _load_csv_measurements(
             measurement_path,
@@ -47,7 +64,7 @@ def load_measurements(
 def resolve_measurement_format(
     path: Path | str,
     measurement_format: str = "auto",
-) -> Literal["json", "csv"]:
+) -> Literal["json", "csv", "tdm"]:
     measurement_path = Path(path)
     normalized_format = measurement_format.lower()
 
@@ -55,11 +72,13 @@ def resolve_measurement_format(
         return "json"
     if normalized_format == "csv":
         return "csv"
+    if normalized_format == "tdm":
+        return "tdm"
 
     if normalized_format != "auto":
         raise InvalidMeasurementFileError(
             f"Unsupported measurement format {measurement_format!r}. "
-            "Supported formats are auto, json, and csv."
+            "Supported formats are auto, json, csv, and tdm."
         )
 
     suffix = measurement_path.suffix.lower()
@@ -67,10 +86,12 @@ def resolve_measurement_format(
         return "json"
     if suffix == ".csv":
         return "csv"
+    if suffix == ".tdm":
+        return "tdm"
 
     raise InvalidMeasurementFileError(
         f"Unsupported measurement format for {measurement_path}: "
-        "could not infer from file extension; use json or csv."
+        "could not infer from file extension; use json, csv, or tdm."
     )
 
 
@@ -253,3 +274,341 @@ def _csv_metadata(
             "metadata_json must contain a JSON object"
         )
     return metadata
+
+
+def _load_tdm_measurements(
+    measurement_path: Path,
+    *,
+    expected_scenario_id: str | None,
+) -> list[MeasurementRecord]:
+    try:
+        lines = measurement_path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as exc:
+        raise InvalidMeasurementFileError(
+            f"Could not read measurement file {measurement_path}: {exc}"
+        ) from exc
+
+    header: dict[str, str] = {}
+    pending_metadata: dict[str, str] | None = None
+    segment_metadata: dict[str, str] | None = None
+    active_metadata: dict[str, str] | None = None
+    section = "header"
+    records: list[MeasurementRecord] = []
+
+    for line_number, raw_line in enumerate(lines, start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        key, value = _tdm_key_value(measurement_path, line_number, line)
+        if key == "COMMENT":
+            continue
+        if key == "META_START":
+            pending_metadata = {}
+            section = "metadata"
+            continue
+        if key == "META_STOP":
+            if pending_metadata is None:
+                raise InvalidMeasurementFileError(
+                    f"TDM file {measurement_path} line {line_number} has META_STOP "
+                    "without META_START"
+                )
+            segment_metadata = pending_metadata
+            pending_metadata = None
+            section = "header"
+            continue
+        if key == "DATA_START":
+            if segment_metadata is None:
+                raise InvalidMeasurementFileError(
+                    f"TDM file {measurement_path} line {line_number} has DATA_START "
+                    "without preceding metadata"
+                )
+            active_metadata = segment_metadata
+            section = "data"
+            continue
+        if key == "DATA_STOP":
+            active_metadata = None
+            segment_metadata = None
+            section = "header"
+            continue
+
+        if section == "metadata":
+            if pending_metadata is None:
+                raise InvalidMeasurementFileError(
+                    f"TDM file {measurement_path} line {line_number} has metadata "
+                    "outside META_START/META_STOP"
+                )
+            pending_metadata[key] = value
+            continue
+
+        if section == "data":
+            if active_metadata is None:
+                raise InvalidMeasurementFileError(
+                    f"TDM file {measurement_path} line {line_number} has data "
+                    "outside DATA_START/DATA_STOP"
+                )
+            record = _tdm_record_from_data_line(
+                measurement_path,
+                line_number=line_number,
+                keyword=key,
+                raw_value=value,
+                metadata=active_metadata,
+                header=header,
+                expected_scenario_id=expected_scenario_id,
+            )
+            if record is not None:
+                records.append(record)
+            continue
+
+        header[key] = value
+
+    if pending_metadata is not None:
+        raise InvalidMeasurementFileError(f"TDM file {measurement_path} ended inside META block")
+    if active_metadata is not None:
+        raise InvalidMeasurementFileError(f"TDM file {measurement_path} ended inside DATA block")
+    if not records:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} contains no supported RANGE or Doppler measurements"
+        )
+    return records
+
+
+def _tdm_key_value(
+    measurement_path: Path,
+    line_number: int,
+    line: str,
+) -> tuple[str, str]:
+    if "=" in line:
+        raw_key, raw_value = line.split("=", maxsplit=1)
+        key = raw_key.strip().upper()
+        value = raw_value.strip()
+    else:
+        key = line.strip().upper()
+        value = ""
+
+    if not key:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} has an empty keyword"
+        )
+    return key, value
+
+
+def _tdm_record_from_data_line(
+    measurement_path: Path,
+    *,
+    line_number: int,
+    keyword: str,
+    raw_value: str,
+    metadata: dict[str, str],
+    header: dict[str, str],
+    expected_scenario_id: str | None,
+) -> MeasurementRecord | None:
+    if keyword not in SUPPORTED_TDM_DATA_KEYWORDS:
+        return None
+
+    scenario_id = metadata.get("SCENARIO_ID")
+    if (
+        expected_scenario_id is not None
+        and scenario_id is not None
+        and scenario_id != expected_scenario_id
+    ):
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} scenario_id {scenario_id!r} "
+            f"does not match expected scenario_id {expected_scenario_id!r}"
+        )
+
+    epoch_text, value_text = _tdm_observable_fields(measurement_path, line_number, raw_value)
+    time_system = _required_tdm_metadata(measurement_path, line_number, metadata, "TIME_SYSTEM")
+    epoch = _tdm_epoch(measurement_path, line_number, epoch_text, time_system)
+    observer, observed_object = _tdm_observer_and_object(measurement_path, line_number, metadata)
+
+    try:
+        value = float(value_text)
+    except ValueError as exc:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} has non-numeric value "
+            f"{value_text!r}"
+        ) from exc
+
+    if keyword == "RANGE":
+        range_units = metadata.get("RANGE_UNITS", "km")
+        if range_units.lower() != "km":
+            raise InvalidMeasurementFileError(
+                f"TDM file {measurement_path} line {line_number} uses unsupported "
+                f"RANGE_UNITS {range_units!r}; only km is supported"
+            )
+        measurement_type = "range"
+        units = "km"
+        sigma = _tdm_sigma(
+            measurement_path,
+            line_number=line_number,
+            metadata=metadata,
+            key="RANGE_SIGMA_KM",
+            default=DEFAULT_TDM_RANGE_SIGMA_KM,
+        )
+    else:
+        measurement_type = "range_rate"
+        units = "km/s"
+        sigma = _tdm_sigma(
+            measurement_path,
+            line_number=line_number,
+            metadata=metadata,
+            key="RANGE_RATE_SIGMA_KM_S",
+            default=DEFAULT_TDM_RANGE_RATE_SIGMA_KM_S,
+        )
+
+    try:
+        return MeasurementRecord.model_validate(
+            {
+                "measurement_type": measurement_type,
+                "epoch": epoch,
+                "observer": observer,
+                "observed_object": observed_object,
+                "value": value,
+                "sigma": sigma,
+                "units": units,
+                "metadata": {
+                    "source_format": "ccsds_tdm_kvn",
+                    "tdm_keyword": keyword,
+                    "tdm_time_system": time_system,
+                    "tdm_mode": metadata.get("MODE"),
+                    "tdm_path": metadata.get("PATH"),
+                    "tdm_originator": header.get("ORIGINATOR"),
+                },
+            }
+        )
+    except ValidationError as exc:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} is invalid: {exc}"
+        ) from exc
+
+
+def _tdm_observable_fields(
+    measurement_path: Path,
+    line_number: int,
+    raw_value: str,
+) -> tuple[str, str]:
+    fields = raw_value.split()
+    if len(fields) < 2:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} must contain epoch and value"
+        )
+    return fields[0], fields[1]
+
+
+def _required_tdm_metadata(
+    measurement_path: Path,
+    line_number: int,
+    metadata: dict[str, str],
+    key: str,
+) -> str:
+    value = metadata.get(key)
+    if value is None or value.strip() == "":
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} is missing {key} metadata"
+        )
+    return value.strip()
+
+
+def _tdm_epoch(
+    measurement_path: Path,
+    line_number: int,
+    epoch_text: str,
+    time_system: str,
+) -> datetime:
+    if time_system.upper() != "UTC":
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} uses unsupported "
+            f"TIME_SYSTEM {time_system!r}; only UTC is supported"
+        )
+
+    normalized_epoch = epoch_text[:-1] + "+00:00" if epoch_text.endswith("Z") else epoch_text
+    try:
+        epoch = datetime.fromisoformat(normalized_epoch)
+    except ValueError:
+        epoch = _tdm_ordinal_epoch(measurement_path, line_number, epoch_text)
+
+    if epoch.tzinfo is None or epoch.utcoffset() is None:
+        epoch = epoch.replace(tzinfo=UTC)
+    return epoch
+
+
+def _tdm_ordinal_epoch(
+    measurement_path: Path,
+    line_number: int,
+    epoch_text: str,
+) -> datetime:
+    for epoch_format in ("%Y-%jT%H:%M:%S.%f", "%Y-%jT%H:%M:%S"):
+        try:
+            return datetime.strptime(epoch_text, epoch_format).replace(tzinfo=UTC)
+        except ValueError:
+            continue
+
+    raise InvalidMeasurementFileError(
+        f"TDM file {measurement_path} line {line_number} has invalid UTC epoch "
+        f"{epoch_text!r}"
+    )
+
+
+def _tdm_observer_and_object(
+    measurement_path: Path,
+    line_number: int,
+    metadata: dict[str, str],
+) -> tuple[str, str]:
+    participants = _tdm_participants(metadata)
+    path = _tdm_path(metadata.get("PATH"))
+
+    if path and len(path) >= 2:
+        observer_index = path[0]
+        observed_index = path[1]
+    else:
+        observer_index = 1
+        observed_index = 2
+
+    try:
+        return participants[observer_index], participants[observed_index]
+    except KeyError as exc:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} is missing PARTICIPANT "
+            f"metadata for PATH-derived participant {exc.args[0]}"
+        ) from exc
+
+
+def _tdm_participants(metadata: dict[str, str]) -> dict[int, str]:
+    participants: dict[int, str] = {}
+    for key, value in metadata.items():
+        if not key.startswith("PARTICIPANT_"):
+            continue
+        try:
+            participant_index = int(key.removeprefix("PARTICIPANT_"))
+        except ValueError:
+            continue
+        participants[participant_index] = value
+    return participants
+
+
+def _tdm_path(path: str | None) -> list[int]:
+    if path is None:
+        return []
+    cleaned_path = path.replace("{", " ").replace("}", " ").replace(",", " ")
+    return [int(component) for component in cleaned_path.split()]
+
+
+def _tdm_sigma(
+    measurement_path: Path,
+    *,
+    line_number: int,
+    metadata: dict[str, str],
+    key: str,
+    default: float,
+) -> float:
+    raw_sigma = metadata.get(key)
+    if raw_sigma is None:
+        return default
+    try:
+        return float(raw_sigma)
+    except ValueError as exc:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} has non-numeric "
+            f"{key} value {raw_sigma!r}"
+        ) from exc

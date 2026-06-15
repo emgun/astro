@@ -6,7 +6,7 @@ import pytest
 
 from astro_core.errors import InvalidMeasurementFileError
 from astro_core.io import load_scenario
-from astro_core.models import Frame, GroundStation, MeasurementRecord, Scenario
+from astro_core.models import Frame, GroundStation, MeasurementRecord, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
 from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
@@ -83,6 +83,125 @@ def test_load_measurements_reads_csv_records(tmp_path: Path) -> None:
     loaded = load_measurements(path, expected_scenario_id=scenario.scenario_id)
 
     assert loaded == measurements
+
+
+def test_load_measurements_reads_tdm_range_and_doppler_records(tmp_path: Path) -> None:
+    path = tmp_path / "measurements.tdm"
+    path.write_text(
+        "\n".join(
+            [
+                "CCSDS_TDM_VERS = 2.0",
+                "CREATION_DATE = 2026-01-01T00:00:00Z",
+                "ORIGINATOR = ASTRO_SUITE_TEST",
+                "META_START",
+                "SCENARIO_ID = leo-two-body",
+                "TIME_SYSTEM = UTC",
+                "MODE = SEQUENTIAL",
+                "PARTICIPANT_1 = measurement-file-y-axis-eci",
+                "PARTICIPANT_2 = demo-sat",
+                "PATH = 1,2,1",
+                "RANGE_UNITS = km",
+                "META_STOP",
+                "DATA_START",
+                "RANGE = 2026-001T00:00:00 621.8637",
+                "DOPPLER_INSTANTANEOUS = 2026-01-01T00:00:00 -6.507594",
+                "DATA_STOP",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_measurements(path, expected_scenario_id="leo-two-body")
+
+    assert [record.measurement_type for record in loaded] == [
+        MeasurementType.RANGE,
+        MeasurementType.RANGE_RATE,
+    ]
+    assert [record.observer for record in loaded] == [
+        "measurement-file-y-axis-eci",
+        "measurement-file-y-axis-eci",
+    ]
+    assert [record.observed_object for record in loaded] == ["demo-sat", "demo-sat"]
+    assert loaded[0].epoch.isoformat() == "2026-01-01T00:00:00+00:00"
+    assert loaded[0].value == 621.8637
+    assert loaded[0].sigma == 0.01
+    assert loaded[0].units == "km"
+    assert loaded[0].metadata["tdm_keyword"] == "RANGE"
+    assert loaded[1].value == -6.507594
+    assert loaded[1].sigma == 1.0e-5
+    assert loaded[1].units == "km/s"
+    assert loaded[1].metadata["tdm_keyword"] == "DOPPLER_INSTANTANEOUS"
+
+
+def test_load_measurements_rejects_tdm_scenario_mismatch(tmp_path: Path) -> None:
+    path = tmp_path / "measurements.tdm"
+    path.write_text(
+        "\n".join(
+            [
+                "CCSDS_TDM_VERS = 2.0",
+                "META_START",
+                "SCENARIO_ID = wrong",
+                "TIME_SYSTEM = UTC",
+                "PARTICIPANT_1 = equator-eci",
+                "PARTICIPANT_2 = demo-sat",
+                "PATH = 1,2,1",
+                "META_STOP",
+                "DATA_START",
+                "RANGE = 2026-01-01T00:00:00 7000.0",
+                "DATA_STOP",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(InvalidMeasurementFileError, match="scenario_id"):
+        load_measurements(path, expected_scenario_id="leo-two-body")
+
+
+def test_load_measurements_rejects_tdm_non_km_range_units(tmp_path: Path) -> None:
+    path = tmp_path / "measurements.tdm"
+    path.write_text(
+        "\n".join(
+            [
+                "CCSDS_TDM_VERS = 2.0",
+                "META_START",
+                "TIME_SYSTEM = UTC",
+                "PARTICIPANT_1 = equator-eci",
+                "PARTICIPANT_2 = demo-sat",
+                "PATH = 1,2,1",
+                "RANGE_UNITS = RU",
+                "META_STOP",
+                "DATA_START",
+                "RANGE = 2026-01-01T00:00:00 7000.0",
+                "DATA_STOP",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(InvalidMeasurementFileError, match="RANGE_UNITS"):
+        load_measurements(path)
+
+
+def test_load_measurements_rejects_tdm_missing_participants(tmp_path: Path) -> None:
+    path = tmp_path / "measurements.tdm"
+    path.write_text(
+        "\n".join(
+            [
+                "CCSDS_TDM_VERS = 2.0",
+                "META_START",
+                "TIME_SYSTEM = UTC",
+                "META_STOP",
+                "DATA_START",
+                "RANGE = 2026-01-01T00:00:00 7000.0",
+                "DATA_STOP",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(InvalidMeasurementFileError, match="PARTICIPANT"):
+        load_measurements(path)
 
 
 def test_load_measurements_rejects_csv_scenario_mismatch(tmp_path: Path) -> None:

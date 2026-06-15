@@ -10,7 +10,7 @@ from astro_backends.orekit import OrekitSmokeResult
 from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError
 from astro_core.io import load_scenario
-from astro_core.models import CartesianState, Scenario
+from astro_core.models import CartesianState, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
 from astro_od.measurements import generate_synthetic_measurements
 
@@ -81,6 +81,43 @@ def _write_measurements_csv(path: Path, scenario: Scenario) -> None:
                     if fieldname != "scenario_id"
                 }
             )
+
+
+def _write_measurements_tdm(path: Path, scenario: Scenario) -> None:
+    measurements = generate_synthetic_measurements(scenario, propagate_local(scenario))
+    station_index = {station.name: station for station in scenario.ground_stations}
+    lines = [
+        "CCSDS_TDM_VERS = 2.0",
+        "CREATION_DATE = 2026-01-01T00:00:00Z",
+        "ORIGINATOR = ASTRO_SUITE_TEST",
+    ]
+    for station in scenario.ground_stations:
+        lines.extend(
+            [
+                "META_START",
+                f"SCENARIO_ID = {scenario.scenario_id}",
+                "TIME_SYSTEM = UTC",
+                "MODE = SEQUENTIAL",
+                f"PARTICIPANT_1 = {station.name}",
+                f"PARTICIPANT_2 = {scenario.spacecraft.name}",
+                "PATH = 1,2,1",
+                "RANGE_UNITS = km",
+                "META_STOP",
+                "DATA_START",
+            ]
+        )
+        for record in measurements:
+            if record.observer != station.name:
+                continue
+            assert record.observer in station_index
+            tdm_keyword = (
+                "RANGE"
+                if record.measurement_type is MeasurementType.RANGE
+                else "DOPPLER_INSTANTANEOUS"
+            )
+            lines.append(f"{tdm_keyword} = {record.epoch.isoformat()} {record.value}")
+        lines.append("DATA_STOP")
+    path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def test_validate_command_accepts_example_scenario() -> None:
@@ -225,6 +262,34 @@ def test_estimate_measurements_command_accepts_csv(tmp_path: Path) -> None:
     assert payload["converged"] is True
     assert payload["metadata"]["workflow"] == "local_measurement_file"
     assert payload["metadata"]["measurement_format"] == "csv"
+    assert payload["metadata"]["measurement_count"] == 44
+
+
+def test_estimate_measurements_command_accepts_tdm(tmp_path: Path) -> None:
+    truth_scenario = _observable_scenario()
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+    scenario_path = tmp_path / "estimate_scenario.yaml"
+    measurements_path = tmp_path / "measurements.tdm"
+    output = tmp_path / "estimate.json"
+    _write_scenario(scenario_path, estimate_scenario)
+    _write_measurements_tdm(measurements_path, truth_scenario)
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate-measurements",
+            str(scenario_path),
+            str(measurements_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["converged"] is True
+    assert payload["metadata"]["workflow"] == "local_measurement_file"
+    assert payload["metadata"]["measurement_format"] == "tdm"
     assert payload["metadata"]["measurement_count"] == 44
 
 
