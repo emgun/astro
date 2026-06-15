@@ -102,9 +102,9 @@ research = [
 - Create: `docs/research/nyx-evaluation.md`
 - Modify: `docs/superpowers/plans/2026-06-15-roadmap-goals-implementation-plan.md`
 
-- [ ] Document what Nyx/ANISE would need to prove before becoming a production adapter.
-- [ ] Record the current decision as `defer adapter; keep evaluation-only`.
-- [ ] Commit with `git commit -m "docs: add nyx evaluation gate"`.
+- [x] Document what Nyx/ANISE would need to prove before becoming a production adapter.
+- [x] Record the current decision as `defer adapter; keep evaluation-only`.
+- [x] Commit with `git commit -m "docs: add nyx evaluation gate"`.
 
 ## Task 5: Verification
 
