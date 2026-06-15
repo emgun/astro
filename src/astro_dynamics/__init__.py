@@ -1,3 +1,4 @@
+from astro_dynamics.backends import propagate_with_backend
 from astro_dynamics.local import (
     acceleration_km_s2,
     derivative,
@@ -12,6 +13,7 @@ __all__ = [
     "derivative",
     "j2_acceleration_km_s2",
     "propagate_local",
+    "propagate_with_backend",
     "rk4_step",
     "two_body_acceleration_km_s2",
 ]

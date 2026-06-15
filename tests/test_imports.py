@@ -30,6 +30,7 @@ def test_packages_import() -> None:
         "derivative",
         "j2_acceleration_km_s2",
         "propagate_local",
+        "propagate_with_backend",
         "rk4_step",
         "two_body_acceleration_km_s2",
     }
