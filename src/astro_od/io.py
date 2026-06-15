@@ -16,6 +16,12 @@ from astro_core.models import MeasurementRecord, MeasurementType
 
 DEFAULT_TDM_RANGE_SIGMA_KM = 0.01
 DEFAULT_TDM_RANGE_RATE_SIGMA_KM_S = 1.0e-5
+TDM_EXPORT_MEASUREMENT_TYPES = frozenset(
+    {
+        MeasurementType.RANGE,
+        MeasurementType.RANGE_RATE,
+    }
+)
 
 CSV_REQUIRED_COLUMNS = frozenset(
     {
@@ -131,6 +137,19 @@ def dump_measurements_tdm(
 ) -> str:
     if not measurements:
         raise InvalidMeasurementFileError("At least one measurement is required for TDM export")
+    unsupported_types = {
+        record.measurement_type
+        for record in measurements
+        if record.measurement_type not in TDM_EXPORT_MEASUREMENT_TYPES
+    }
+    if unsupported_types:
+        unsupported_text = ", ".join(
+            sorted(str(measurement_type) for measurement_type in unsupported_types)
+        )
+        raise InvalidMeasurementFileError(
+            "TDM export supports only range and range_rate measurements; "
+            f"unsupported measurement types: {unsupported_text}"
+        )
 
     lines = [
         "CCSDS_TDM_VERS = 2.0",

@@ -8,7 +8,7 @@ from numpy.typing import ArrayLike, NDArray
 from astro_core.models import MeasurementRecord, MeasurementType, Scenario, Trajectory
 
 FloatArray = NDArray[np.float64]
-MeasurementUnits = Literal["km", "km/s"]
+MeasurementUnits = Literal["km", "km/s", "deg"]
 
 
 def _as_float_array(values: ArrayLike) -> FloatArray:
@@ -40,6 +40,29 @@ def range_rate_km_s(
 
     line_of_sight = relative_position / distance
     return float(np.dot(spacecraft_velocity, line_of_sight))
+
+
+def _relative_line_of_sight(
+    spacecraft_position_km: ArrayLike,
+    station_position_km: ArrayLike,
+) -> FloatArray:
+    spacecraft_position = _as_float_array(spacecraft_position_km)
+    station_position = _as_float_array(station_position_km)
+    relative_position = spacecraft_position - station_position
+    distance = float(np.linalg.norm(relative_position))
+    if distance == 0.0:
+        raise ValueError("Cannot compute line-of-sight angles for zero range")
+    return cast(FloatArray, relative_position / distance)
+
+
+def right_ascension_deg(spacecraft_position_km: ArrayLike, station_position_km: ArrayLike) -> float:
+    line_of_sight = _relative_line_of_sight(spacecraft_position_km, station_position_km)
+    return float(np.degrees(np.arctan2(line_of_sight[1], line_of_sight[0])) % 360.0)
+
+
+def declination_deg(spacecraft_position_km: ArrayLike, station_position_km: ArrayLike) -> float:
+    line_of_sight = _relative_line_of_sight(spacecraft_position_km, station_position_km)
+    return float(np.degrees(np.arcsin(np.clip(line_of_sight[2], -1.0, 1.0))))
 
 
 def _is_on_cadence(elapsed_s: float, cadence_s: float) -> bool:
@@ -114,5 +137,17 @@ def _measurement_geometry(
             ),
             scenario.measurements.noise.range_rate_sigma_km_s,
             "km/s",
+        )
+    if measurement_type is MeasurementType.RIGHT_ASCENSION:
+        return (
+            right_ascension_deg(spacecraft_position_km, station_position_km),
+            scenario.measurements.noise.angle_sigma_deg,
+            "deg",
+        )
+    if measurement_type is MeasurementType.DECLINATION:
+        return (
+            declination_deg(spacecraft_position_km, station_position_km),
+            scenario.measurements.noise.angle_sigma_deg,
+            "deg",
         )
     raise ValueError(f"Unsupported measurement type: {measurement_type}")

@@ -30,7 +30,9 @@ Implemented and protected:
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV ephemeris export,
   and seeded initial-state Monte Carlo propagation.
-- `astro_od` synthetic range/range-rate generation, measurement JSON/CSV/TDM ingest/export, and local SciPy batch least-squares OD.
+- `astro_od` synthetic range/range-rate/right-ascension/declination generation, measurement
+  JSON/CSV ingest/export, TDM range/range-rate ingest/export, and local SciPy batch least-squares
+  OD.
 - `astro_launch` local vertical and pitch-program ascent baselines, launch-to-orbit handoff, pitch sweep, two-knot tuning, tuned launch reports, batch ranking, and report comparison.
 - `astro_backends.orekit` optional `orekit_jpype` smoke gate and two-body Orekit propagation adapter.
 
@@ -41,7 +43,8 @@ Still roadmap-level:
 - RocketPy launch simulation adapter.
 - Dymos/OpenMDAO ascent optimization adapter.
 - Tudat cross-check backend.
-- Optical/angles, richer radiometric families, and operational CCSDS support beyond current TDM MVP.
+- Topocentric optical angles, richer radiometric families, and operational CCSDS support beyond
+  current TDM range/range-rate MVP.
 - Nyx evaluation and JAX differentiable research backend.
 
 ## Goal Ledger
@@ -94,6 +97,8 @@ Implemented slice:
 
 - `astro synth-measurements --backend orekit` routes truth propagation through the Orekit adapter.
 - `astro estimate --backend orekit` and `astro estimate-measurements --backend orekit` run the suite's SciPy least-squares estimator with Orekit-backed residual propagation.
+- The shared measurement surface supports range, range-rate, inertial right ascension, and
+  declination records; right-ascension residuals wrap across 0/360 degrees.
 - OD metadata records the selected propagation backend.
 - Missing Java/`orekit-jpype` still produces actionable `UnsupportedBackendError` diagnostics.
 
@@ -101,7 +106,8 @@ Definition of done:
 
 - `orekit_high_fidelity` force model maps to an Orekit-backed numerical propagator.
 - Orekit propagation supports configured gravity/drag/SRP feature flags with explicit unsupported-feature errors.
-- Measurement models can predict range and range-rate through the same measurement product surface.
+- Measurement models can predict range, range-rate, inertial right ascension, and declination
+  through the same measurement product surface.
 - `astro estimate --backend orekit` or `astro estimate-measurements --backend orekit` returns `EstimateResult`.
 - OD result metadata records Orekit version, wrapper, data source, estimator configuration, residual statistics, and convergence diagnostics.
 - Cross-check tests compare local two-body OD and Orekit two-body OD on the controlled two-station scenario.

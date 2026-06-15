@@ -44,11 +44,13 @@ def test_packages_import() -> None:
         "two_body_acceleration_km_s2",
     }
     expected_od_exports = {
+        "declination_deg",
         "estimate_initial_state",
         "generate_synthetic_measurements",
         "load_measurements",
         "range_km",
         "range_rate_km_s",
+        "right_ascension_deg",
     }
     expected_launch_exports = {
         "AtmosphereConfig",

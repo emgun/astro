@@ -8,9 +8,18 @@ import pytest
 import astro_od.estimation as estimation
 from astro_core.errors import NumericalConvergenceError
 from astro_core.io import load_scenario
-from astro_core.models import CartesianState, Frame, GroundStation, MeasurementType, Scenario
+from astro_core.models import (
+    CartesianState,
+    Frame,
+    GroundStation,
+    MeasurementRecord,
+    MeasurementType,
+    Scenario,
+    Trajectory,
+    TrajectorySample,
+)
 from astro_dynamics.local import propagate_local
-from astro_od.estimation import estimate_initial_state
+from astro_od.estimation import estimate_initial_state, residual_vector
 from astro_od.measurements import generate_synthetic_measurements
 
 
@@ -35,6 +44,20 @@ def _perturbed_scenario(scenario: Scenario) -> Scenario:
         }
     )
     return scenario.model_copy(update={"initial_state": perturbed_state})
+
+
+def _single_sample_propagator(scenario: Scenario) -> Trajectory:
+    return Trajectory(
+        scenario_id=scenario.scenario_id,
+        samples=[
+            TrajectorySample(
+                epoch=scenario.initial_state.epoch,
+                state=scenario.initial_state.cartesian,
+            )
+        ],
+        force_model=scenario.force_model,
+        backend="test",
+    )
 
 
 def test_batch_od_recovers_synthetic_initial_state() -> None:
@@ -70,6 +93,25 @@ def test_batch_od_recovers_synthetic_initial_state() -> None:
     assert result.metadata["jacobian_rank"] == 6
     assert len(result.metadata["singular_values"]) == 6
     assert result.metadata["condition_number"] > 0.0
+
+
+def test_residual_vector_wraps_right_ascension_across_zero_degrees() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    state = scenario.initial_state.cartesian
+    state_vector = np.concatenate([state.position_array(), state.velocity_array()])
+    measurement = MeasurementRecord(
+        measurement_type=MeasurementType.RIGHT_ASCENSION,
+        epoch=scenario.initial_state.epoch,
+        observer="equator-eci",
+        observed_object=scenario.spacecraft.name,
+        value=359.9,
+        sigma=0.1,
+        units="deg",
+    )
+
+    residuals = residual_vector(state_vector, scenario, [measurement], _single_sample_propagator)
+
+    assert residuals.tolist() == pytest.approx([1.0])
 
 
 def test_estimate_initial_state_requires_measurements() -> None:

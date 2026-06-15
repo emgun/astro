@@ -18,7 +18,7 @@ from astro_core.models import (
     Trajectory,
 )
 from astro_dynamics.backends import propagate_with_backend
-from astro_od.measurements import range_km, range_rate_km_s
+from astro_od.measurements import declination_deg, range_km, range_rate_km_s, right_ascension_deg
 
 FloatArray = NDArray[np.float64]
 Propagator = Callable[[Scenario], Trajectory]
@@ -112,7 +112,21 @@ def _predicted_measurement(
         return range_km(spacecraft_position, station_position)
     if measurement.measurement_type is MeasurementType.RANGE_RATE:
         return range_rate_km_s(spacecraft_position, spacecraft_velocity, station_position)
+    if measurement.measurement_type is MeasurementType.RIGHT_ASCENSION:
+        return right_ascension_deg(spacecraft_position, station_position)
+    if measurement.measurement_type is MeasurementType.DECLINATION:
+        return declination_deg(spacecraft_position, station_position)
     raise NumericalConvergenceError(f"Unsupported measurement type: {measurement.measurement_type}")
+
+
+def _angle_delta_deg(predicted_deg: float, observed_deg: float) -> float:
+    return ((predicted_deg - observed_deg + 180.0) % 360.0) - 180.0
+
+
+def _measurement_residual(predicted: float, measurement: MeasurementRecord) -> float:
+    if measurement.measurement_type is MeasurementType.RIGHT_ASCENSION:
+        return _angle_delta_deg(predicted, measurement.value) / measurement.sigma
+    return (predicted - measurement.value) / measurement.sigma
 
 
 def residual_vector(
@@ -126,8 +140,10 @@ def residual_vector(
     trajectory_index = {sample.epoch: sample.state for sample in trajectory.samples}
 
     residuals = [
-        (_predicted_measurement(trial_scenario, measurement, trajectory_index) - measurement.value)
-        / measurement.sigma
+        _measurement_residual(
+            _predicted_measurement(trial_scenario, measurement, trajectory_index),
+            measurement,
+        )
         for measurement in measurements
     ]
     return np.array(residuals, dtype=np.float64)

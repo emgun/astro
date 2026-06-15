@@ -17,6 +17,7 @@ adapters.
 | Local propagation | `astro propagate examples/scenarios/leo_two_body.yaml --backend local --output /tmp/astro-local-trajectory.json` | Writes a `Trajectory` with `backend = "local"` and 11 samples. |
 | Ephemeris export | `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv` | Writes CSV samples with epoch, position, and velocity. |
 | Local OD ingest | `astro estimate-measurements examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --output /tmp/astro-local-estimate.json` | Writes `EstimateResult` from explicit measurements. |
+| Optical measurement synthesis | `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json` | Writes right-ascension and declination records in degrees. |
 | Local launch report | `astro report-tuned-launch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --iterations 2 --orbit-duration-s 600 --orbit-step-s 60 --output /tmp/astro-launch-report.json` | Writes tuned launch report with insertion and short-arc assessments. |
 | Local research propagation | `astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 2 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output /tmp/astro-research.json` | Writes `MonteCarloResult` with deterministic seeded cases. |
 
@@ -38,7 +39,7 @@ adapters.
 | Local two-body determinism | Unit tests compare sample count and deterministic products. |
 | Orekit two-body vs local | `orekit_live` test compares final LEO state with `abs(position) <= 1 km` and `abs(velocity) <= 1e-3 km/s` when `ASTRO_RUN_OREKIT_LIVE=1`. |
 | Launch handoff | Tests confirm `LaunchTrajectory.insertion_state` converts into a normal orbital `Scenario` and propagates locally. |
-| OD explicit measurements | Tests validate JSON, CSV, and TDM ingest/export plus local least-squares convergence. |
+| OD explicit measurements | Tests validate JSON, CSV, TDM range/range-rate ingest/export, inertial angle generation, and local least-squares convergence. |
 | Research Monte Carlo | Tests confirm seeded repeatability, local Monte Carlo provenance, and built-in JAX two-body runner parity against the local reference for zero dispersion. |
 
 ## Backend Boundary Rule

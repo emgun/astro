@@ -101,6 +101,8 @@ class ForceModelName(StrEnum):
 class MeasurementType(StrEnum):
     RANGE = "range"
     RANGE_RATE = "range_rate"
+    RIGHT_ASCENSION = "right_ascension"
+    DECLINATION = "declination"
 
 
 class CartesianState(AstroModel):
@@ -219,9 +221,10 @@ class GroundStation(AstroModel):
 class MeasurementNoise(AstroModel):
     range_sigma_km: FiniteFloat = Field(gt=0.0, default=0.01)
     range_rate_sigma_km_s: FiniteFloat = Field(gt=0.0, default=1.0e-5)
+    angle_sigma_deg: FiniteFloat = Field(gt=0.0, default=0.001)
     seed: int = 42
 
-    @field_validator("range_sigma_km", "range_rate_sigma_km_s", mode="before")
+    @field_validator("range_sigma_km", "range_rate_sigma_km_s", "angle_sigma_deg", mode="before")
     @classmethod
     def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
         return _numeric_scalar_input_must_be_number(value, "Measurement noise scalar")
@@ -253,7 +256,7 @@ class MeasurementRecord(AstroModel):
     observed_object: str
     value: FiniteFloat
     sigma: FiniteFloat = Field(gt=0.0)
-    units: Literal["km", "km/s"]
+    units: Literal["km", "km/s", "deg"]
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("epoch", mode="before")
@@ -283,6 +286,8 @@ class MeasurementRecord(AstroModel):
         expected_units = {
             MeasurementType.RANGE: "km",
             MeasurementType.RANGE_RATE: "km/s",
+            MeasurementType.RIGHT_ASCENSION: "deg",
+            MeasurementType.DECLINATION: "deg",
         }
         if self.units != expected_units[self.measurement_type]:
             expected_unit = expected_units[self.measurement_type]

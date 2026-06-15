@@ -431,7 +431,7 @@ The suite should track tolerances explicitly. When tolerance changes are needed,
 
 - Orekit adapter boundary.
 - LEO/MEO/GEO propagation workflows.
-- Synthetic range/range-rate measurements.
+- Synthetic range/range-rate and inertial right-ascension/declination measurements.
 - Batch least-squares OD recovery.
 - Ephemeris output.
 - Deterministic examples.

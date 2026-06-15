@@ -8,7 +8,7 @@ from astro_core.errors import InvalidMeasurementFileError
 from astro_core.io import load_scenario
 from astro_core.models import Frame, GroundStation, MeasurementRecord, MeasurementType, Scenario
 from astro_dynamics.local import propagate_local
-from astro_od.io import load_measurements
+from astro_od.io import dump_measurements_tdm, load_measurements
 from astro_od.measurements import generate_synthetic_measurements
 
 
@@ -202,6 +202,22 @@ def test_load_measurements_rejects_tdm_missing_participants(tmp_path: Path) -> N
 
     with pytest.raises(InvalidMeasurementFileError, match="PARTICIPANT"):
         load_measurements(path)
+
+
+def test_dump_measurements_tdm_rejects_angle_measurements() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    record = MeasurementRecord(
+        measurement_type=MeasurementType.RIGHT_ASCENSION,
+        epoch=scenario.initial_state.epoch,
+        observer="equator-eci",
+        observed_object=scenario.spacecraft.name,
+        value=0.0,
+        sigma=0.001,
+        units="deg",
+    )
+
+    with pytest.raises(InvalidMeasurementFileError, match="TDM export supports only"):
+        dump_measurements_tdm(scenario.scenario_id, [record])
 
 
 def test_load_measurements_rejects_csv_scenario_mismatch(tmp_path: Path) -> None:
