@@ -15,7 +15,7 @@ from astro_dynamics.local import propagate_local
 from astro_launch.local import propagate_launch_local
 from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
-from tests.astro_launch.helpers import make_launch_scenario
+from tests.astro_launch.helpers import make_launch_scenario, make_pitch_program_launch_scenario
 
 runner = CliRunner(mix_stderr=False)
 
@@ -43,6 +43,11 @@ def _write_scenario(path: Path, scenario: Scenario) -> None:
 
 def _write_launch_scenario(path: Path) -> None:
     payload = make_launch_scenario().model_dump(mode="json")
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _write_pitch_program_launch_scenario(path: Path) -> None:
+    payload = make_pitch_program_launch_scenario().model_dump(mode="json")
     path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
 
 
@@ -221,6 +226,83 @@ def test_handoff_launch_command_writes_orbit_scenario(tmp_path: Path) -> None:
     assert scenario.propagation.step_s == 60.0
     assert scenario.metadata["workflow"] == "launch_orbit_handoff"
     assert len(propagated.samples) == 11
+
+
+def test_sweep_launch_pitch_command_writes_json(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "sweep.json"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "sweep-launch-pitch",
+            str(scenario_path),
+            "--point-index",
+            "3",
+            "--pitch-deg-values",
+            "10,20,30",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote launch pitch sweep" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "pitch-program-two-stage"
+    assert payload["point_index"] == 3
+    assert payload["point_time_s"] == 110.0
+    assert payload["baseline_pitch_deg"] == 20.0
+    assert [case["pitch_deg"] for case in payload["cases"]] == [10.0, 20.0, 30.0]
+    assert payload["best_case"]["pitch_deg"] in [10.0, 20.0, 30.0]
+    assert payload["best_case"]["score"] == min(case["score"] for case in payload["cases"])
+
+
+def test_sweep_launch_pitch_command_reports_invalid_pitch_values(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "sweep-launch-pitch",
+            str(scenario_path),
+            "--point-index",
+            "3",
+            "--pitch-deg-values",
+            "10,bad,30",
+            "--output",
+            str(tmp_path / "sweep.json"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "pitch-deg-values must be comma-separated numbers" in result.stderr
+
+
+def test_sweep_launch_pitch_command_reports_output_write_error(tmp_path: Path) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "missing" / "sweep.json"
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "sweep-launch-pitch",
+            str(scenario_path),
+            "--point-index",
+            "3",
+            "--pitch-deg-values",
+            "10,20,30",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "could not write launch pitch sweep" in result.stderr
+    assert str(output) in result.stderr
 
 
 def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:

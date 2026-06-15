@@ -12,14 +12,16 @@ The current implementation slice covers:
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
+- Launch pitch-program sweep targeting over repeated local ascent propagations.
 - Synthetic range and range-rate measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
   measurements, synthetic OD, and measurement-file OD ingest/export.
 - Optional Orekit Python-wrapper smoke checks through `orekit_jpype`.
 
-Launch/ascent currently uses a deliberately simple local vertical-ascent baseline. RocketPy and
-Dymos/OpenMDAO remain future backend adapters once the launch product contracts are stable.
+Launch/ascent currently uses deliberately simple local vertical and pitch-program baselines.
+RocketPy and Dymos/OpenMDAO remain future backend adapters once the launch product contracts are
+stable.
 
 ## Setup
 
@@ -43,6 +45,7 @@ astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
 astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
 astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output pitch_launch.json
+astro sweep-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-index 3 --pitch-deg-values 10,20,30 --output pitch_sweep.json
 astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
 astro propagate insertion.yaml --backend local --output insertion_trajectory.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --output measurements.json
@@ -62,6 +65,12 @@ vertical or pitch-program baseline, and writes a launch trajectory product with 
 events, dynamic pressure, acceleration, downrange, target miss metrics, and an `insertion_state`
 compatible with the shared `OrbitState` product. This local backend is a deterministic data-flow
 baseline, not a production launch simulator.
+
+`astro sweep-launch-pitch` is the first launch targeting workflow. It varies one pitch-program knot,
+runs the local launch propagator for each candidate pitch angle, and writes a JSON product with
+altitude miss, velocity miss, weighted score, final downrange, and the best case. It is a transparent
+grid sweep rather than an optimizer; that keeps the target-miss contract clear before adding Dymos,
+OpenMDAO, or RocketPy-backed targeting.
 
 `astro handoff-launch` converts a launch trajectory product into a normal orbital propagation
 scenario initialized from `LaunchTrajectory.insertion_state`. The generated YAML is intentionally

@@ -20,6 +20,7 @@ from astro_launch.handoff import launch_trajectory_to_orbit_scenario
 from astro_launch.io import load_launch_scenario, load_launch_trajectory
 from astro_launch.local import propagate_launch_local
 from astro_launch.models import LaunchScenario, LaunchTrajectory
+from astro_launch.targeting import sweep_pitch_program
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import (
     dump_measurements_csv,
@@ -70,6 +71,18 @@ def _write_text_or_exit(output: Path, payload: str, product_name: str) -> None:
         output.write_text(payload + "\n", encoding="utf-8")
     except OSError as exc:
         typer.echo(f"could not write {product_name} {output}: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+
+def _parse_pitch_deg_values_or_exit(pitch_deg_values: str) -> list[float]:
+    raw_values = [raw_value.strip() for raw_value in pitch_deg_values.split(",")]
+    if not pitch_deg_values.strip() or any(raw_value == "" for raw_value in raw_values):
+        typer.echo("pitch-deg-values must be comma-separated numbers", err=True)
+        raise typer.Exit(code=2)
+    try:
+        return [float(raw_value) for raw_value in raw_values]
+    except ValueError as exc:
+        typer.echo("pitch-deg-values must be comma-separated numbers", err=True)
         raise typer.Exit(code=2) from exc
 
 
@@ -277,6 +290,40 @@ def handoff_launch(
     payload = yaml.safe_dump(scenario.model_dump(mode="json"), sort_keys=False)
     _write_text_or_exit(output, payload.rstrip("\n"), "orbit scenario")
     typer.echo(f"wrote orbit scenario: {output}")
+
+
+@app.command("sweep-launch-pitch")
+def sweep_launch_pitch(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    point_index: Annotated[int, typer.Option()] = 1,
+    pitch_deg_values: Annotated[
+        str,
+        typer.Option(
+            "--pitch-deg-values",
+            help="Comma-separated candidate pitch angles in degrees.",
+        ),
+    ] = "10,20,30",
+    altitude_weight: Annotated[float, typer.Option()] = 1.0,
+    velocity_weight: Annotated[float, typer.Option()] = 1.0,
+) -> None:
+    """Sweep one launch pitch-program knot and write a targeting product."""
+    scenario = _load_launch_scenario_or_exit(scenario_path)
+    pitch_values = _parse_pitch_deg_values_or_exit(pitch_deg_values)
+    try:
+        result = sweep_pitch_program(
+            scenario,
+            point_index=point_index,
+            pitch_values_deg=pitch_values,
+            altitude_weight=altitude_weight,
+            velocity_weight=velocity_weight,
+        )
+    except ValueError as exc:
+        typer.echo(f"could not sweep launch pitch: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "launch pitch sweep")
+    typer.echo(f"wrote launch pitch sweep: {output}")
 
 
 @app.command()

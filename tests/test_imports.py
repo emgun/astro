@@ -44,6 +44,8 @@ def test_packages_import() -> None:
         "GuidanceConfig",
         "LaunchEngine",
         "LaunchEvent",
+        "LaunchPitchSweepCase",
+        "LaunchPitchSweepResult",
         "LaunchPropagationConfig",
         "LaunchScenario",
         "LaunchSite",
@@ -57,6 +59,7 @@ def test_packages_import() -> None:
         "load_launch_scenario",
         "load_launch_trajectory",
         "propagate_launch_local",
+        "sweep_pitch_program",
     }
 
     assert expected_core_exports <= set(astro_core.__all__)

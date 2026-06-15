@@ -384,3 +384,56 @@ class LaunchTrajectory(AstroModel):
             raise ValueError("Launch event times must be monotonic")
 
         return self
+
+
+class LaunchPitchSweepCase(AstroModel):
+    pitch_deg: FiniteFloat = Field(ge=0.0, le=90.0)
+    score: FiniteFloat = Field(ge=0.0)
+    altitude_miss_km: FiniteFloat
+    velocity_miss_km_s: FiniteFloat
+    final_altitude_km: FiniteFloat
+    final_velocity_km_s: FiniteFloat
+    final_radial_velocity_km_s: FiniteFloat
+    final_horizontal_velocity_km_s: FiniteFloat
+    final_downrange_km: FiniteFloat
+    target_miss: dict[str, FiniteFloat]
+
+    @field_validator(
+        "pitch_deg",
+        "score",
+        "altitude_miss_km",
+        "velocity_miss_km_s",
+        "final_altitude_km",
+        "final_velocity_km_s",
+        "final_radial_velocity_km_s",
+        "final_horizontal_velocity_km_s",
+        "final_downrange_km",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch pitch sweep scalar")
+
+
+class LaunchPitchSweepResult(AstroModel):
+    scenario_id: str = Field(min_length=1)
+    point_index: int = Field(ge=0)
+    point_time_s: FiniteFloat = Field(ge=0.0)
+    baseline_pitch_deg: FiniteFloat = Field(ge=0.0, le=90.0)
+    altitude_weight: FiniteFloat = Field(ge=0.0)
+    velocity_weight: FiniteFloat = Field(ge=0.0)
+    cases: list[LaunchPitchSweepCase] = Field(min_length=1)
+    best_case: LaunchPitchSweepCase
+    backend: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator(
+        "point_time_s",
+        "baseline_pitch_deg",
+        "altitude_weight",
+        "velocity_weight",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Launch pitch sweep scalar")
