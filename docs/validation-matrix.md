@@ -15,6 +15,7 @@ adapters.
 | Types | `python -m mypy` | Strict type checking passes. |
 | Scenario validation | `astro validate examples/scenarios/leo_two_body.yaml` | Valid scenario message for `leo-two-body`. |
 | Local propagation | `astro propagate examples/scenarios/leo_two_body.yaml --backend local --output /tmp/astro-local-trajectory.json` | Writes a `Trajectory` with `backend = "local"` and 11 samples. |
+| Local MEO/GEO propagation | `astro propagate examples/scenarios/meo_two_body.yaml --backend local --output /tmp/astro-meo.json` and `astro propagate examples/scenarios/geo_two_body.yaml --backend local --output /tmp/astro-geo.json` | Writes medium-Earth and geosynchronous-radius two-body trajectories. |
 | Local finite burn | `astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output /tmp/astro-finite-burn.json` | Writes maneuver start/end events and finite-burn provenance metadata. |
 | Local covariance | `astro propagate examples/scenarios/leo_covariance.yaml --backend local --output /tmp/astro-covariance.json` | Writes covariance history samples using finite-difference state transition. |
 | Ephemeris export | `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv` | Writes CSV samples with epoch, position, and velocity. |
@@ -39,6 +40,7 @@ adapters.
 | Comparison | Current Gate |
 | --- | --- |
 | Local two-body determinism | Unit tests compare sample count and deterministic products. |
+| MEO/GEO examples | Tests validate and propagate the medium-Earth and geosynchronous-radius scenarios. |
 | Orekit two-body vs local | `orekit_live` test compares final LEO state with `abs(position) <= 1 km` and `abs(velocity) <= 1e-3 km/s` when `ASTRO_RUN_OREKIT_LIVE=1`. |
 | Local finite burns | Tests compare finite-burn propagation against the no-maneuver local baseline and verify maneuver events/provenance. |
 | Local covariance propagation | Tests verify covariance history length, epoch alignment, symmetry, and finite-difference provenance metadata. |

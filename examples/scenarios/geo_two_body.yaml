@@ -1,0 +1,22 @@
+scenario_id: geo-two-body
+description: Deterministic geosynchronous-radius two-body propagation example.
+spacecraft:
+  name: geo-demo-sat
+  mass_kg: 1800.0
+  area_m2: 18.0
+  drag_coefficient: 2.2
+  reflectivity_coefficient: 1.3
+initial_state:
+  epoch: "2026-01-01T00:00:00+00:00"
+  time_scale: UTC
+  frame: EME2000
+  central_body: earth
+  representation: cartesian
+  cartesian:
+    position_km: [42164.0, 0.0, 0.0]
+    velocity_km_s: [0.0, 3.074666, 0.0]
+force_model:
+  gravity: two_body
+propagation:
+  duration_s: 3600.0
+  step_s: 600.0

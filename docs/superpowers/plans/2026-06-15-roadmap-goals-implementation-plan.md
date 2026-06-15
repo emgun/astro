@@ -238,7 +238,7 @@ Tradeoff:
 ### Goal 6: Release Packaging, Documentation, and Validation Matrix
 
 Status: implemented for the current roadmap pass. README, backend installation guide, validation
-matrix, release checklist, and optional smoke-gate semantics are documented.
+matrix, release checklist, LEO/MEO/GEO examples, and optional smoke-gate semantics are documented.
 
 Definition of done:
 

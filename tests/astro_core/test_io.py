@@ -25,6 +25,32 @@ def test_load_two_station_od_example_scenario() -> None:
     assert len(scenario.ground_stations) == 2
 
 
+@pytest.mark.parametrize(
+    ("scenario_path", "scenario_id", "minimum_radius_km"),
+    [
+        ("examples/scenarios/meo_two_body.yaml", "meo-two-body", 20000.0),
+        ("examples/scenarios/geo_two_body.yaml", "geo-two-body", 40000.0),
+    ],
+)
+def test_load_medium_and_geosynchronous_examples(
+    scenario_path: str,
+    scenario_id: str,
+    minimum_radius_km: float,
+) -> None:
+    scenario = load_scenario(Path(scenario_path))
+
+    trajectory = propagate_local(scenario)
+
+    assert scenario.scenario_id == scenario_id
+    assert scenario.force_model.gravity is ForceModelName.TWO_BODY
+    assert scenario.propagation.sample_count == 7
+    minimum_sample_radius_km = min(
+        sample.state.position_array().dot(sample.state.position_array()) ** 0.5
+        for sample in trajectory.samples
+    )
+    assert minimum_sample_radius_km > minimum_radius_km
+
+
 def test_load_trajectory_reads_json_product(tmp_path: Path) -> None:
     trajectory = propagate_local(load_scenario(Path("examples/scenarios/leo_two_body.yaml")))
     path = tmp_path / "trajectory.json"

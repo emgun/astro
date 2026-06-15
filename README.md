@@ -75,6 +75,8 @@ and remains separate from operational Orekit semantics.
 ```bash
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
+astro propagate examples/scenarios/meo_two_body.yaml --backend local --output meo_trajectory.json
+astro propagate examples/scenarios/geo_two_body.yaml --backend local --output geo_trajectory.json
 astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output finite_burn_trajectory.json
 astro propagate examples/scenarios/leo_covariance.yaml --backend local --output covariance_trajectory.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
