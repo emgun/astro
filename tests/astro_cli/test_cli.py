@@ -609,6 +609,37 @@ def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:
     assert len(payload["measurements"]) == 22
 
 
+def test_synth_measurements_command_accepts_orekit_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "measurements.json"
+    seen_backends: list[str] = []
+
+    def fake_backend_propagation(scenario: Scenario, backend: str) -> object:
+        seen_backends.append(backend)
+        return propagate_local(scenario)
+
+    monkeypatch.setattr("astro_cli.main.propagate_with_backend", fake_backend_propagation)
+
+    result = runner.invoke(
+        app,
+        [
+            "synth-measurements",
+            "examples/scenarios/leo_two_body.yaml",
+            "--backend",
+            "orekit",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen_backends == ["orekit"]
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert len(payload["measurements"]) == 22
+
+
 def test_estimate_command_writes_json(tmp_path: Path) -> None:
     output = tmp_path / "estimate.json"
 
@@ -644,6 +675,38 @@ def test_estimate_command_writes_json(tmp_path: Path) -> None:
     assert payload["metadata"]["measurement_count"] == 44
 
 
+def test_estimate_command_accepts_orekit_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "estimate.json"
+    seen_backends: list[str] = []
+
+    def fake_backend_propagation(scenario: Scenario, backend: str) -> object:
+        seen_backends.append(backend)
+        return propagate_local(scenario)
+
+    monkeypatch.setattr("astro_od.estimation.propagate_with_backend", fake_backend_propagation)
+    monkeypatch.setattr("astro_cli.main.propagate_with_backend", fake_backend_propagation)
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate",
+            "examples/scenarios/leo_two_body.yaml",
+            "--backend",
+            "orekit",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["metadata"]["propagation_backend"] == "orekit"
+    assert set(seen_backends) == {"orekit"}
+
+
 def test_estimate_measurements_command_writes_json(tmp_path: Path) -> None:
     truth_scenario = _observable_scenario()
     estimate_scenario = _perturbed_scenario(truth_scenario)
@@ -674,6 +737,43 @@ def test_estimate_measurements_command_writes_json(tmp_path: Path) -> None:
     assert payload["metadata"]["measurement_format"] == "json"
     assert payload["metadata"]["measurement_count"] == 44
     assert "demo_added_ground_stations" not in payload["metadata"]
+
+
+def test_estimate_measurements_command_accepts_orekit_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    truth_scenario = _observable_scenario()
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+    scenario_path = tmp_path / "estimate_scenario.yaml"
+    measurements_path = tmp_path / "measurements.json"
+    output = tmp_path / "estimate.json"
+    _write_scenario(scenario_path, estimate_scenario)
+    _write_measurements(measurements_path, truth_scenario)
+
+    def fake_backend_propagation(scenario: Scenario, backend: str) -> object:
+        trajectory = propagate_local(scenario)
+        return trajectory.model_copy(update={"backend": backend})
+
+    monkeypatch.setattr("astro_od.estimation.propagate_with_backend", fake_backend_propagation)
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate-measurements",
+            str(scenario_path),
+            str(measurements_path),
+            "--backend",
+            "orekit",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["metadata"]["propagation_backend"] == "orekit"
+    assert payload["metadata"]["workflow"] == "local_measurement_file"
 
 
 def test_estimate_measurements_command_accepts_csv(tmp_path: Path) -> None:

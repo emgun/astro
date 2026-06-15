@@ -16,6 +16,7 @@ from astro_core.errors import (
 )
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario
+from astro_dynamics.backends import propagate_with_backend
 from astro_dynamics.local import propagate_local
 from astro_launch.handoff import launch_trajectory_to_orbit_scenario
 from astro_launch.io import load_launch_scenario, load_launch_trajectory, load_tuned_launch_report
@@ -580,10 +581,15 @@ def compare_tuned_launch_report_products(
 def synth_measurements(
     scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
     output: Annotated[Path, typer.Option()],
+    backend: Annotated[str, typer.Option()] = "local",
 ) -> None:
-    """Generate synthetic measurements for a locally propagated scenario."""
+    """Generate synthetic measurements for a propagated scenario."""
     scenario = _load_scenario_or_exit(scenario_path)
-    trajectory = propagate_local(scenario)
+    try:
+        trajectory = propagate_with_backend(scenario, backend)
+    except UnsupportedBackendError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
     measurements = generate_synthetic_measurements(scenario, trajectory)
     payload = json.dumps(
         {
@@ -628,17 +634,22 @@ def export_measurements(
 def estimate(
     scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
     output: Annotated[Path, typer.Option()],
+    backend: Annotated[str, typer.Option()] = "local",
 ) -> None:
-    """Run a local synthetic orbit-determination workflow."""
+    """Run a synthetic orbit-determination workflow."""
     source_scenario = _load_scenario_or_exit(scenario_path)
     truth_scenario, added_station_names = _with_estimation_demo_geometry(source_scenario)
-    truth_trajectory = propagate_local(truth_scenario)
+    try:
+        truth_trajectory = propagate_with_backend(truth_scenario, backend)
+    except UnsupportedBackendError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
     measurements = generate_synthetic_measurements(truth_scenario, truth_trajectory)
     estimate_scenario = _with_estimation_demo_initial_guess(truth_scenario)
 
     try:
-        result = estimate_initial_state(estimate_scenario, measurements)
-    except NumericalConvergenceError as exc:
+        result = estimate_initial_state(estimate_scenario, measurements, backend=backend)
+    except (NumericalConvergenceError, UnsupportedBackendError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
 
@@ -666,8 +677,9 @@ def estimate_measurements(
         str,
         typer.Option("--format", help="Measurement file format: auto, json, csv, or tdm."),
     ] = "auto",
+    backend: Annotated[str, typer.Option()] = "local",
 ) -> None:
-    """Run local batch OD from an explicit measurement file."""
+    """Run batch OD from an explicit measurement file."""
     scenario = _load_scenario_or_exit(scenario_path)
     try:
         resolved_measurement_format = resolve_measurement_format(
@@ -679,8 +691,8 @@ def estimate_measurements(
             expected_scenario_id=scenario.scenario_id,
             measurement_format=resolved_measurement_format,
         )
-        result = estimate_initial_state(scenario, measurements)
-    except (InvalidMeasurementFileError, NumericalConvergenceError) as exc:
+        result = estimate_initial_state(scenario, measurements, backend=backend)
+    except (InvalidMeasurementFileError, NumericalConvergenceError, UnsupportedBackendError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
 
