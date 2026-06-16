@@ -65,3 +65,12 @@ def test_optimize_launch_dymos_returns_suite_product_with_fake_runner() -> None:
     assert result.metadata["source_backend"] == "local"
     assert result.metadata["dymos_version"] == "1.15.1"
     assert result.metadata["openmdao_version"] == "3.44.0"
+    assert result.metadata["optimizer_status"] == "completed"
+    assert result.metadata["converged"] is True
+    assert result.metadata["iteration_count"] == len(result.iterations)
+    assert result.metadata["candidate_count"] == result.metadata["source_candidate_count"]
+    assert result.metadata["best_score"] == result.best_case.score
+    assert result.metadata["target_insertion_residuals"] == result.best_case.target_miss
+    assert result.metadata["path_constraints"] == {
+        "pitch_deg": {"lower": 0.0, "upper": 90.0},
+    }

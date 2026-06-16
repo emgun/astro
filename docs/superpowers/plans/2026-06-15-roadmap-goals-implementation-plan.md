@@ -184,7 +184,7 @@ Primary files:
 
 ### Goal 4: Launch External Backends and Optimization
 
-Status: first external-backend boundary implemented. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, a RocketPy product adapter boundary, and a neutral `optimize-launch` command are implemented. Full live RocketPy motor/rocket geometry mapping and Dymos phase transcription remain gated on richer backend-specific configuration.
+Status: first external-backend boundary implemented. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, a RocketPy product adapter boundary, a neutral `optimize-launch` command, and Dymos adapter optimization diagnostics are implemented. Full live RocketPy motor/rocket geometry mapping and Dymos phase transcription remain gated on richer backend-specific configuration.
 
 Implemented slice:
 
@@ -192,6 +192,9 @@ Implemented slice:
 - `astro launch --backend rocketpy` routes through a recognized RocketPy adapter boundary and fails clearly when dependencies or backend-specific configuration are unavailable.
 - `astro optimize-launch --backend local` runs the existing pitch-program tuner through a neutral optimization entry point.
 - `astro optimize-launch --backend dymos` routes through a Dymos/OpenMDAO adapter boundary and fails clearly until a validated Dymos phase runner is provided.
+- Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
+  iteration count, candidate count, path-constraint summary, best score, target insertion
+  residuals, Dymos version, and OpenMDAO version.
 
 Definition of done:
 
