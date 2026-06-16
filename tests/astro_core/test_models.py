@@ -68,6 +68,28 @@ def make_trajectory(samples: list[TrajectorySample]) -> Trajectory:
     )
 
 
+def test_force_model_config_defaults_optional_high_fidelity_flags_to_false() -> None:
+    force_model = ForceModelConfig(gravity=ForceModelName.TWO_BODY)
+
+    assert force_model.atmospheric_drag is False
+    assert force_model.solar_radiation_pressure is False
+    assert force_model.third_body_gravity is False
+
+
+def test_force_model_config_accepts_optional_high_fidelity_flags() -> None:
+    force_model = ForceModelConfig(
+        gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+        atmospheric_drag=True,
+        solar_radiation_pressure=True,
+        third_body_gravity=True,
+    )
+
+    assert force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+    assert force_model.atmospheric_drag is True
+    assert force_model.solar_radiation_pressure is True
+    assert force_model.third_body_gravity is True
+
+
 def make_measurement_record(**overrides: object) -> MeasurementRecord:
     payload = {
         "measurement_type": MeasurementType.RANGE,

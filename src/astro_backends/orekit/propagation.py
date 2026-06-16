@@ -29,6 +29,11 @@ MU_EARTH_M3_S2 = MU_EARTH_KM3_S2 * 1.0e9
 R_EARTH_M = R_EARTH_KM * 1.0e3
 J2_POSITION_TOLERANCE_M = 0.001
 NUMERICAL_MIN_STEP_S = 0.001
+_SUPPORTED_OREKIT_GRAVITY_MODELS = {
+    ForceModelName.TWO_BODY,
+    ForceModelName.J2,
+    ForceModelName.OREKIT_HIGH_FIDELITY,
+}
 
 
 @dataclass(frozen=True)
@@ -39,10 +44,15 @@ class _OrekitPropagatorConfig:
 
 def _validate_orekit_scenario(scenario: Scenario) -> None:
     validate_orekit_state_support(scenario.initial_state)
-    if scenario.force_model.gravity not in {ForceModelName.TWO_BODY, ForceModelName.J2}:
+    enabled_flags = scenario.force_model.enabled_high_fidelity_flags()
+    if enabled_flags:
         raise UnsupportedBackendError(
-            "Orekit propagation supports two_body and j2 gravity; "
-            "orekit_high_fidelity requires the drag/SRP/third-body force-model phase"
+            "Orekit propagation does not yet support high-fidelity force model flags: "
+            f"{', '.join(enabled_flags)}"
+        )
+    if scenario.force_model.gravity not in _SUPPORTED_OREKIT_GRAVITY_MODELS:
+        raise UnsupportedBackendError(
+            "Orekit propagation supports two_body, j2, and orekit_high_fidelity gravity"
         )
 
 
@@ -130,6 +140,14 @@ def _build_j2_numerical_propagator(
             "integrator_max_step_s": max_step_s,
             "integrator_initial_step_s": initial_step_s,
             "integrator_position_tolerance_m": J2_POSITION_TOLERANCE_M,
+            **(
+                {
+                    "gravity_model": "orekit_high_fidelity",
+                    "unsupported_force_model_flags": [],
+                }
+                if scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+                else {}
+            ),
         },
     )
 

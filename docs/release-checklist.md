@@ -31,6 +31,7 @@ Run when the matching runtime is expected to be present:
 - [ ] `astro orekit-smoke`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_two_body_matches_local_reference -v`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_j2_matches_local_reference_scale -v`
+- [ ] `astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend orekit --output /tmp/astro-orekit-high-fidelity.json`
 - [ ] `astro rocketpy-smoke`
 - [ ] `astro dymos-smoke`
 - [ ] `astro tudat-smoke`

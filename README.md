@@ -48,9 +48,11 @@ astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output o
 If `orekit-jpype`, Java, or Orekit data are not configured, `astro orekit-smoke` exits nonzero with
 structured JSON explaining the missing piece. The runtime checks `ASTRO_OREKIT_DATA_PATH`,
 `OREKIT_DATA_PATH`, then `~/.orekit/orekit-data.zip` for Orekit data. `astro propagate --backend
-orekit` currently supports two-body propagation through Orekit's Keplerian propagator and J2 through
-Orekit's numerical propagator with `J2OnlyPerturbation`. Drag, SRP, third-body, and
-`orekit_high_fidelity` force models remain part of the next Orekit force-model phase.
+orekit` currently supports two-body propagation through Orekit's Keplerian propagator, J2 through
+Orekit's numerical propagator with `J2OnlyPerturbation`, and `orekit_high_fidelity` as the numerical
+propagation expansion path. Scenario force-model flags for atmospheric drag, solar radiation
+pressure, and third-body gravity are accepted by the schema but currently produce explicit
+unsupported-feature diagnostics until those Orekit force models are implemented.
 
 Optional launch backend smoke checks:
 
@@ -90,6 +92,7 @@ astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output
 astro propagate examples/scenarios/leo_covariance.yaml --backend local --output covariance_trajectory.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
 astro propagate examples/scenarios/leo_j2.yaml --backend orekit --output orekit_j2_trajectory.json
+astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend orekit --output orekit_high_fidelity_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke

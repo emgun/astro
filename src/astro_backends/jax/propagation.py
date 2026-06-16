@@ -74,6 +74,12 @@ def _rk4_step(jnp: Any, state: Any, step_s: float) -> Any:
 
 
 def _validate_jax_force_model(scenario: Scenario) -> None:
+    enabled_flags = scenario.force_model.enabled_high_fidelity_flags()
+    if enabled_flags:
+        raise UnsupportedBackendError(
+            "JAX research propagation does not support high-fidelity force model flags: "
+            f"{', '.join(enabled_flags)}"
+        )
     if scenario.force_model.gravity is not ForceModelName.TWO_BODY:
         raise UnsupportedBackendError(
             "JAX research propagation currently supports only two_body force models"

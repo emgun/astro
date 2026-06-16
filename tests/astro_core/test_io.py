@@ -36,6 +36,14 @@ def test_load_j2_example_scenario() -> None:
     assert len(trajectory.samples) == 11
 
 
+def test_load_orekit_high_fidelity_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_orekit_high_fidelity.yaml"))
+
+    assert scenario.scenario_id == "leo-orekit-high-fidelity"
+    assert scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+    assert scenario.force_model.enabled_high_fidelity_flags() == ()
+
+
 @pytest.mark.parametrize(
     ("scenario_path", "scenario_id", "minimum_radius_km"),
     [

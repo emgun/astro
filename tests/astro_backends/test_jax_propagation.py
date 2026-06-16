@@ -77,6 +77,27 @@ def test_research_propagate_jax_rejects_unsupported_force_model() -> None:
         )
 
 
+def test_research_propagate_jax_rejects_high_fidelity_flags() -> None:
+    scenario = load_scenario("examples/scenarios/leo_two_body.yaml").model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.TWO_BODY,
+                solar_radiation_pressure=True,
+            )
+        }
+    )
+
+    with pytest.raises(UnsupportedBackendError, match="solar_radiation_pressure"):
+        research_propagate_jax(
+            scenario,
+            cases=1,
+            position_sigma_km=0.0,
+            velocity_sigma_km_s=0.0,
+            seed=7,
+            runtime_loader=_fake_runtime,
+        )
+
+
 def test_research_propagate_jax_returns_monte_carlo_product_with_fake_runner() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml")
     seen_runtime: list[JaxRuntime] = []

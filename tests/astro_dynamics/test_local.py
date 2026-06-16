@@ -153,6 +153,21 @@ def test_propagate_local_rejects_unsupported_local_force_model() -> None:
         propagate_local(unsupported_scenario)
 
 
+def test_propagate_local_rejects_unsupported_high_fidelity_flags() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    unsupported_scenario = scenario.model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.TWO_BODY,
+                atmospheric_drag=True,
+            ),
+        }
+    )
+
+    with pytest.raises(ValueError, match="atmospheric_drag"):
+        propagate_local(unsupported_scenario)
+
+
 def test_j2_and_two_body_propagations_diverge() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     j2_scenario = scenario.model_copy(

@@ -170,6 +170,19 @@ class Spacecraft(AstroModel):
 
 class ForceModelConfig(AstroModel):
     gravity: ForceModelName
+    atmospheric_drag: bool = False
+    solar_radiation_pressure: bool = False
+    third_body_gravity: bool = False
+
+    def enabled_high_fidelity_flags(self) -> tuple[str, ...]:
+        flags: list[str] = []
+        if self.atmospheric_drag:
+            flags.append("atmospheric_drag")
+        if self.solar_radiation_pressure:
+            flags.append("solar_radiation_pressure")
+        if self.third_body_gravity:
+            flags.append("third_body_gravity")
+        return tuple(flags)
 
 
 class PropagationConfig(AstroModel):

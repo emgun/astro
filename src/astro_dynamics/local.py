@@ -13,6 +13,7 @@ from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
 from astro_core.models import (
     CartesianState,
     CovarianceSample,
+    ForceModelConfig,
     ForceModelName,
     Maneuver,
     Scenario,
@@ -44,6 +45,16 @@ def _validate_local_force_model(force_model: ForceModelName) -> ForceModelName:
     if force_model not in _SUPPORTED_LOCAL_FORCE_MODELS:
         raise ValueError("Local backend supports only two_body and j2 force models")
     return force_model
+
+
+def _validate_local_force_config(force_model: ForceModelConfig) -> ForceModelName:
+    enabled_flags = force_model.enabled_high_fidelity_flags()
+    if enabled_flags:
+        raise ValueError(
+            "Local backend does not support high-fidelity force model flags: "
+            f"{', '.join(enabled_flags)}"
+        )
+    return _validate_local_force_model(force_model.gravity)
 
 
 def _radius_metrics(position_km: FloatArray) -> tuple[float, float]:
@@ -396,7 +407,7 @@ def _covariance_metadata(covariance: FloatArray | None) -> dict[str, Any]:
 
 
 def propagate_local(scenario: Scenario) -> Trajectory:
-    force_model = _validate_local_force_model(scenario.force_model.gravity)
+    force_model = _validate_local_force_config(scenario.force_model)
     internal_substeps_per_sample, internal_step_s = _internal_step_schedule(
         scenario.propagation.step_s
     )

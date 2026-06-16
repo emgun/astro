@@ -90,6 +90,50 @@ def test_propagate_orekit_j2_uses_numerical_force_model_with_fake_runtime() -> N
     assert final_state.velocity_km_s == pytest.approx((0.0, 7.5, 1.0))
 
 
+def test_propagate_orekit_high_fidelity_uses_numerical_force_model_with_fake_runtime() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+            )
+        }
+    )
+
+    trajectory = propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.backend == "orekit"
+    assert trajectory.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+    assert trajectory.metadata["propagator"] == "NumericalPropagator"
+    assert trajectory.metadata["force_models"] == ["J2OnlyPerturbation"]
+    assert trajectory.metadata["gravity_model"] == "orekit_high_fidelity"
+    assert trajectory.metadata["unsupported_force_model_flags"] == []
+
+
+@pytest.mark.parametrize(
+    "force_model_update",
+    [
+        {"atmospheric_drag": True},
+        {"solar_radiation_pressure": True},
+        {"third_body_gravity": True},
+    ],
+)
+def test_propagate_orekit_reports_unsupported_high_fidelity_flags(
+    force_model_update: dict[str, bool],
+) -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+                **force_model_update,
+            )
+        }
+    )
+    flag_name = next(iter(force_model_update))
+
+    with pytest.raises(UnsupportedBackendError, match=flag_name):
+        propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+
 @pytest.mark.orekit_live
 def test_live_orekit_two_body_matches_local_reference() -> None:
     if os.environ.get("ASTRO_RUN_OREKIT_LIVE") != "1":
