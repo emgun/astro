@@ -34,7 +34,7 @@ still require backend-specific configuration beyond the aggregate local launch s
 python -m pip install -e '.[dev]'
 ```
 
-Optional Orekit wrapper smoke and phase-1 propagation support:
+Optional Orekit wrapper smoke and propagation support:
 
 ```bash
 python -m pip install -e '.[orekit]'
@@ -48,8 +48,9 @@ astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output o
 If `orekit-jpype`, Java, or Orekit data are not configured, `astro orekit-smoke` exits nonzero with
 structured JSON explaining the missing piece. The runtime checks `ASTRO_OREKIT_DATA_PATH`,
 `OREKIT_DATA_PATH`, then `~/.orekit/orekit-data.zip` for Orekit data. `astro propagate --backend
-orekit` currently supports phase-1 two-body propagation through Orekit's Keplerian propagator; J2,
-drag, SRP, and `orekit_high_fidelity` force models are part of the next Orekit force-model phase.
+orekit` currently supports two-body propagation through Orekit's Keplerian propagator and J2 through
+Orekit's numerical propagator with `J2OnlyPerturbation`. Drag, SRP, third-body, and
+`orekit_high_fidelity` force models remain part of the next Orekit force-model phase.
 
 Optional launch backend smoke checks:
 
@@ -84,9 +85,11 @@ astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
 astro propagate examples/scenarios/meo_two_body.yaml --backend local --output meo_trajectory.json
 astro propagate examples/scenarios/geo_two_body.yaml --backend local --output geo_trajectory.json
+astro propagate examples/scenarios/leo_j2.yaml --backend local --output j2_trajectory.json
 astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output finite_burn_trajectory.json
 astro propagate examples/scenarios/leo_covariance.yaml --backend local --output covariance_trajectory.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
+astro propagate examples/scenarios/leo_j2.yaml --backend orekit --output orekit_j2_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke

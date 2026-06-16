@@ -25,6 +25,51 @@ class FakePyHelpers:
         cls.loaded_from_pip_library.append(from_pip_library)
 
 
+def _fake_runtime_modules(
+    *,
+    frames_factory: object,
+    time_scales_factory: object = object(),
+) -> dict[str, object]:
+    frames_module = ModuleType("org.orekit.frames")
+    frames_module.FramesFactory = frames_factory
+    time_module = ModuleType("org.orekit.time")
+    time_module.TimeScalesFactory = time_scales_factory
+    time_module.AbsoluteDate = object()
+    geometry_module = ModuleType("org.hipparchus.geometry.euclidean.threed")
+    geometry_module.Vector3D = object()
+    utils_module = ModuleType("org.orekit.utils")
+    utils_module.PVCoordinates = object()
+    utils_module.IERSConventions = object()
+    orbits_module = ModuleType("org.orekit.orbits")
+    orbits_module.CartesianOrbit = object()
+    orbits_module.OrbitType = object()
+    orbits_module.PositionAngleType = object()
+    propagation_module = ModuleType("org.orekit.propagation")
+    propagation_module.SpacecraftState = object()
+    analytical_module = ModuleType("org.orekit.propagation.analytical")
+    analytical_module.KeplerianPropagator = object()
+    numerical_module = ModuleType("org.orekit.propagation.numerical")
+    numerical_module.NumericalPropagator = object()
+    gravity_module = ModuleType("org.orekit.forces.gravity")
+    gravity_module.J2OnlyPerturbation = object()
+    ode_module = ModuleType("org.hipparchus.ode.nonstiff")
+    ode_module.DormandPrince853Integrator = object()
+    return {
+        "orekit_jpype": FakeOrekit(),
+        "orekit_jpype.pyhelpers": FakePyHelpers,
+        "org.orekit.frames": frames_module,
+        "org.orekit.time": time_module,
+        "org.hipparchus.geometry.euclidean.threed": geometry_module,
+        "org.orekit.utils": utils_module,
+        "org.orekit.orbits": orbits_module,
+        "org.orekit.propagation": propagation_module,
+        "org.orekit.propagation.analytical": analytical_module,
+        "org.orekit.propagation.numerical": numerical_module,
+        "org.orekit.forces.gravity": gravity_module,
+        "org.hipparchus.ode.nonstiff": ode_module,
+    }
+
+
 def test_run_orekit_smoke_reports_forced_unavailable_without_importing_wrapper() -> None:
     result = run_orekit_smoke(strict=False, force_unavailable=True)
 
@@ -101,35 +146,14 @@ def test_run_orekit_smoke_reports_vm_frame_time_failure_with_version(
         def getUTC() -> object:
             return object()
 
-    frames_module = ModuleType("org.orekit.frames")
-    frames_module.FramesFactory = FailingFramesFactory
-    time_module = ModuleType("org.orekit.time")
-    time_module.TimeScalesFactory = FakeTimeScalesFactory
-    time_module.AbsoluteDate = object()
-
-    geometry_module = ModuleType("org.hipparchus.geometry.euclidean.threed")
-    geometry_module.Vector3D = object()
-    utils_module = ModuleType("org.orekit.utils")
-    utils_module.PVCoordinates = object()
-    orbits_module = ModuleType("org.orekit.orbits")
-    orbits_module.CartesianOrbit = object()
-    propagation_module = ModuleType("org.orekit.propagation.analytical")
-    propagation_module.KeplerianPropagator = object()
-
     def fake_version(_distribution_name: str) -> str:
         return OREKIT_VERSION
 
     def fake_import(module_name: str) -> object:
-        modules: dict[str, object] = {
-            "orekit_jpype": FakeOrekit(),
-            "orekit_jpype.pyhelpers": FakePyHelpers,
-            "org.orekit.frames": frames_module,
-            "org.orekit.time": time_module,
-            "org.hipparchus.geometry.euclidean.threed": geometry_module,
-            "org.orekit.utils": utils_module,
-            "org.orekit.orbits": orbits_module,
-            "org.orekit.propagation.analytical": propagation_module,
-        }
+        modules = _fake_runtime_modules(
+            frames_factory=FailingFramesFactory,
+            time_scales_factory=FakeTimeScalesFactory,
+        )
         return modules[module_name]
 
     monkeypatch.setenv("ASTRO_OREKIT_DATA_PATH", str(data_path))
@@ -153,34 +177,11 @@ def test_load_orekit_runtime_sets_up_data_from_env_path(
     data_path.write_bytes(b"placeholder")
     FakePyHelpers.loaded_filenames = []
     FakePyHelpers.loaded_from_pip_library = []
-    frames_module = ModuleType("org.orekit.frames")
-    frames_module.FramesFactory = object()
-    time_module = ModuleType("org.orekit.time")
-    time_module.TimeScalesFactory = object()
-    time_module.AbsoluteDate = object()
-    geometry_module = ModuleType("org.hipparchus.geometry.euclidean.threed")
-    geometry_module.Vector3D = object()
-    utils_module = ModuleType("org.orekit.utils")
-    utils_module.PVCoordinates = object()
-    orbits_module = ModuleType("org.orekit.orbits")
-    orbits_module.CartesianOrbit = object()
-    propagation_module = ModuleType("org.orekit.propagation.analytical")
-    propagation_module.KeplerianPropagator = object()
-
     def fake_version(_distribution_name: str) -> str:
         return OREKIT_VERSION
 
     def fake_import(module_name: str) -> object:
-        modules: dict[str, object] = {
-            "orekit_jpype": FakeOrekit(),
-            "orekit_jpype.pyhelpers": FakePyHelpers,
-            "org.orekit.frames": frames_module,
-            "org.orekit.time": time_module,
-            "org.hipparchus.geometry.euclidean.threed": geometry_module,
-            "org.orekit.utils": utils_module,
-            "org.orekit.orbits": orbits_module,
-            "org.orekit.propagation.analytical": propagation_module,
-        }
+        modules = _fake_runtime_modules(frames_factory=object())
         return modules[module_name]
 
     monkeypatch.setenv("ASTRO_OREKIT_DATA_PATH", str(data_path))

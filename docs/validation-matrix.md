@@ -10,7 +10,7 @@ adapters.
 
 | Area | Command | Expected Result |
 | --- | --- | --- |
-| Test suite | `python -m pytest -q` | All non-live tests pass; Orekit live test remains skipped unless explicitly enabled. |
+| Test suite | `python -m pytest -q` | All non-live tests pass; Orekit live tests remain skipped unless explicitly enabled. |
 | Lint | `python -m ruff check .` | No lint findings. |
 | Types | `python -m mypy` | Strict type checking passes. |
 | Scenario validation | `astro validate examples/scenarios/leo_two_body.yaml` | Valid scenario message for `leo-two-body`. |
@@ -29,7 +29,7 @@ adapters.
 | Backend | Command | Available Behavior | Unavailable Behavior |
 | --- | --- | --- | --- |
 | Orekit | `astro orekit-smoke` | Exits 0 with wrapper/JVM/frame/time availability. | Exits 1 with structured JSON explaining missing `orekit-jpype`, Java, or data-context failure. |
-| Orekit propagation | `astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output /tmp/astro-orekit-trajectory.json` | Writes suite `Trajectory` with `backend = "orekit"`. | Exits 2 with `UnsupportedBackendError` diagnostics. |
+| Orekit propagation | `astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output /tmp/astro-orekit-trajectory.json` and `astro propagate examples/scenarios/leo_j2.yaml --backend orekit --output /tmp/astro-orekit-j2.json` | Writes suite `Trajectory` with `backend = "orekit"` for two-body and J2 scenarios. | Exits 2 with `UnsupportedBackendError` diagnostics. |
 | RocketPy | `astro rocketpy-smoke` | Exits 0 when RocketPy imports and required classes exist. | Exits 1 with structured JSON explaining missing package/import failure. |
 | Dymos/OpenMDAO | `astro dymos-smoke` | Exits 0 when Dymos and OpenMDAO APIs import. | Exits 1 with structured JSON explaining missing package/import failure. |
 | TudatPy | `astro tudat-smoke` | Exits 0 when TudatPy imports. | Exits 1 with structured JSON; install path is platform-specific and not assumed to be pip-only. |
@@ -42,6 +42,7 @@ adapters.
 | Local two-body determinism | Unit tests compare sample count and deterministic products. |
 | MEO/GEO examples | Tests validate and propagate the medium-Earth and geosynchronous-radius scenarios. |
 | Orekit two-body vs local | `orekit_live` test compares final LEO state with `abs(position) <= 1 km` and `abs(velocity) <= 1e-3 km/s` when `ASTRO_RUN_OREKIT_LIVE=1`. |
+| Orekit J2 vs local | `orekit_live` test compares final LEO J2 state with `norm(position delta) < 0.05 km` and `norm(velocity delta) < 1e-4 km/s` when `ASTRO_RUN_OREKIT_LIVE=1`. |
 | Local finite burns | Tests compare finite-burn propagation against the no-maneuver local baseline and verify maneuver events/provenance. |
 | Local covariance propagation | Tests verify covariance history length, epoch alignment, symmetry, and finite-difference provenance metadata. |
 | Launch handoff | Tests confirm `LaunchTrajectory.insertion_state` converts into a normal orbital `Scenario` and propagates locally. |

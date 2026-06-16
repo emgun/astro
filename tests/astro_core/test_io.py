@@ -25,6 +25,17 @@ def test_load_two_station_od_example_scenario() -> None:
     assert len(scenario.ground_stations) == 2
 
 
+def test_load_j2_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_j2.yaml"))
+
+    trajectory = propagate_local(scenario)
+
+    assert scenario.scenario_id == "leo-j2"
+    assert scenario.force_model.gravity is ForceModelName.J2
+    assert trajectory.backend == "local"
+    assert len(trajectory.samples) == 11
+
+
 @pytest.mark.parametrize(
     ("scenario_path", "scenario_id", "minimum_radius_km"),
     [

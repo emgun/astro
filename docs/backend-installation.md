@@ -37,6 +37,11 @@ export ASTRO_OREKIT_DATA_PATH="$HOME/.orekit/orekit-data.zip"
 `ASTRO_OREKIT_DATA_PATH` may point to an Orekit data zip or directory. If it is not set, the suite
 also checks `OREKIT_DATA_PATH`, then `~/.orekit/orekit-data.zip`.
 
+The Orekit propagation adapter currently supports suite `two_body` scenarios through
+`KeplerianPropagator` and suite `j2` scenarios through `NumericalPropagator` plus
+`J2OnlyPerturbation`. Higher-fidelity drag, SRP, third-body, and native Orekit OD workflows remain
+separate roadmap items.
+
 ## Launch Backends
 
 ```bash

@@ -35,11 +35,12 @@ Implemented and protected:
   measurement JSON/CSV ingest/export, TDM range/range-rate ingest/export, and local SciPy batch
   least-squares OD.
 - `astro_launch` local vertical and pitch-program ascent baselines, launch-to-orbit handoff, pitch sweep, two-knot tuning, tuned launch reports, batch ranking, and report comparison.
-- `astro_backends.orekit` optional `orekit_jpype` smoke gate and two-body Orekit propagation adapter.
+- `astro_backends.orekit` optional `orekit_jpype` smoke gate, two-body Orekit propagation adapter,
+  and J2 numerical propagation through `J2OnlyPerturbation`.
 
 Still roadmap-level:
 
-- Live Orekit high-fidelity force models and native Orekit batch/sequential OD.
+- Orekit drag/SRP/third-body high-fidelity force models and native Orekit batch/sequential OD.
 - High-fidelity covariance propagation with validated state transition matrices/process noise,
   thrust-vector finite-burn dynamics, and mass-flow maneuver dynamics.
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
@@ -93,10 +94,15 @@ Tradeoff:
 
 ### Goal 2: Orekit Force Models, Measurements, and Batch OD
 
-Status: first backend-aware measurement and OD slice implemented; native Orekit estimator and numerical high-fidelity force models still require live Java/Orekit validation.
+Status: backend-aware measurement/OD slice and Orekit J2 numerical propagation are implemented;
+native Orekit estimator plus drag/SRP/third-body high-fidelity force models remain.
 
 Implemented slice:
 
+- `propagate_orekit` supports suite `j2` scenarios through Orekit `NumericalPropagator`,
+  Dormand-Prince 8(5,3) integration, and `J2OnlyPerturbation`.
+- `examples/scenarios/leo_j2.yaml` gives local and Orekit CLI workflows a checked-in J2 case.
+- Optional live tests compare Orekit J2 against the local J2 reference scale on the LEO case.
 - `astro synth-measurements --backend orekit` routes truth propagation through the Orekit adapter.
 - `astro estimate --backend orekit` and `astro estimate-measurements --backend orekit` run the suite's SciPy least-squares estimator with Orekit-backed residual propagation.
 - The shared measurement surface supports range, range-rate, inertial right ascension, and
@@ -108,7 +114,7 @@ Implemented slice:
 Definition of done:
 
 - `orekit_high_fidelity` force model maps to an Orekit-backed numerical propagator.
-- Orekit propagation supports configured gravity/drag/SRP feature flags with explicit unsupported-feature errors.
+- Orekit propagation supports configured drag/SRP feature flags with explicit unsupported-feature errors.
 - Measurement models can predict range, range-rate, inertial right ascension/declination, and
   local-horizon azimuth/elevation through the same measurement product surface.
 - `astro estimate --backend orekit` or `astro estimate-measurements --backend orekit` returns `EstimateResult`.

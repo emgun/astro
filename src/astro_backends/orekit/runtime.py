@@ -35,6 +35,13 @@ class OrekitRuntime:
     pv_coordinates: Any
     cartesian_orbit: Any
     keplerian_propagator: Any
+    spacecraft_state: Any
+    numerical_propagator: Any
+    dormand_prince_853_integrator: Any
+    j2_only_perturbation: Any
+    orbit_type: Any
+    position_angle_type: Any
+    iers_conventions: Any
 
 
 def _runtime_unavailable(
@@ -103,7 +110,11 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         geometry_module = import_module("org.hipparchus.geometry.euclidean.threed")
         utils_module = import_module("org.orekit.utils")
         orbits_module = import_module("org.orekit.orbits")
-        propagation_module = import_module("org.orekit.propagation.analytical")
+        propagation_module = import_module("org.orekit.propagation")
+        analytical_module = import_module("org.orekit.propagation.analytical")
+        numerical_module = import_module("org.orekit.propagation.numerical")
+        gravity_module = import_module("org.orekit.forces.gravity")
+        ode_module = import_module("org.hipparchus.ode.nonstiff")
     except Exception as exc:
         if strict:
             raise
@@ -122,5 +133,12 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         vector3d=geometry_module.Vector3D,
         pv_coordinates=utils_module.PVCoordinates,
         cartesian_orbit=orbits_module.CartesianOrbit,
-        keplerian_propagator=propagation_module.KeplerianPropagator,
+        keplerian_propagator=analytical_module.KeplerianPropagator,
+        spacecraft_state=propagation_module.SpacecraftState,
+        numerical_propagator=numerical_module.NumericalPropagator,
+        dormand_prince_853_integrator=ode_module.DormandPrince853Integrator,
+        j2_only_perturbation=gravity_module.J2OnlyPerturbation,
+        orbit_type=orbits_module.OrbitType,
+        position_angle_type=orbits_module.PositionAngleType,
+        iers_conventions=utils_module.IERSConventions,
     )

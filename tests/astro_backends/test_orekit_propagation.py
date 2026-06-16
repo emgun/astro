@@ -2,6 +2,7 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from astro_backends.orekit.conversion import km_s_to_m_s, km_to_m, m_s_to_km_s, m_to_km
@@ -9,6 +10,7 @@ from astro_backends.orekit.propagation import propagate_orekit
 from astro_backends.orekit.runtime import OrekitRuntime
 from astro_core.errors import UnsupportedBackendError
 from astro_core.io import load_scenario
+from astro_core.models import ForceModelConfig, ForceModelName
 from astro_dynamics.local import propagate_local
 
 
@@ -56,6 +58,38 @@ def test_propagate_orekit_returns_suite_trajectory_with_fake_runtime() -> None:
     assert final_state.velocity_km_s == pytest.approx((0.0, 7.5, 1.0))
 
 
+def test_propagate_orekit_j2_uses_numerical_force_model_with_fake_runtime() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
+        update={"force_model": ForceModelConfig(gravity=ForceModelName.J2)}
+    )
+
+    trajectory = propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.scenario_id == "leo-two-body"
+    assert trajectory.backend == "orekit"
+    assert len(trajectory.samples) == scenario.propagation.sample_count
+    assert trajectory.metadata == {
+        "wrapper": "orekit_jpype",
+        "wrapper_version": "13.1.0",
+        "data_path": "fake-orekit-data.zip",
+        "propagator": "NumericalPropagator",
+        "frame": "EME2000",
+        "j2_frame": "ITRF(IERS_2010, simple_eop=True)",
+        "force_models": ["J2OnlyPerturbation"],
+        "orbit_type": "CARTESIAN",
+        "position_angle_type": "TRUE",
+        "integrator": "DormandPrince853Integrator",
+        "integrator_min_step_s": 0.001,
+        "integrator_max_step_s": 60.0,
+        "integrator_initial_step_s": 60.0,
+        "integrator_position_tolerance_m": 0.001,
+        "units": "suite km/km_s converted to Orekit m/m_s",
+    }
+    final_state = trajectory.samples[-1].state
+    assert final_state.position_km == pytest.approx((7000.0, 4500.0, 600.0))
+    assert final_state.velocity_km_s == pytest.approx((0.0, 7.5, 1.0))
+
+
 @pytest.mark.orekit_live
 def test_live_orekit_two_body_matches_local_reference() -> None:
     if os.environ.get("ASTRO_RUN_OREKIT_LIVE") != "1":
@@ -74,10 +108,37 @@ def test_live_orekit_two_body_matches_local_reference() -> None:
     assert final_orekit.velocity_km_s == pytest.approx(final_local.velocity_km_s, abs=1.0e-3)
 
 
+@pytest.mark.orekit_live
+def test_live_orekit_j2_matches_local_reference_scale() -> None:
+    if os.environ.get("ASTRO_RUN_OREKIT_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_OREKIT_LIVE=1 to run live Orekit propagation")
+    pytest.importorskip("orekit_jpype")
+
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
+        update={"force_model": ForceModelConfig(gravity=ForceModelName.J2)}
+    )
+    orekit_trajectory = propagate_orekit(scenario)
+    local_trajectory = propagate_local(scenario)
+
+    assert orekit_trajectory.backend == "orekit"
+    assert orekit_trajectory.metadata["propagator"] == "NumericalPropagator"
+    assert orekit_trajectory.metadata["force_models"] == ["J2OnlyPerturbation"]
+    final_orekit = orekit_trajectory.samples[-1].state
+    final_local = local_trajectory.samples[-1].state
+    position_delta_km = final_orekit.position_array() - final_local.position_array()
+    velocity_delta_km_s = final_orekit.velocity_array() - final_local.velocity_array()
+    assert np.linalg.norm(position_delta_km) < 0.05
+    assert np.linalg.norm(velocity_delta_km_s) < 1.0e-4
+
+
 class _FakeFramesFactory:
     @staticmethod
     def getEME2000() -> str:
         return "EME2000"
+
+    @staticmethod
+    def getITRF(_conventions: str, _simple_eop: bool) -> str:
+        return "ITRF"
 
 
 class _FakeTimeScalesFactory:
@@ -155,10 +216,19 @@ class _FakeCartesianOrbit:
 
 class _FakeSpacecraftState:
     def __init__(self, pv_coordinates: _FakePVCoordinates) -> None:
-        self._pv_coordinates = pv_coordinates
+        self._orbit: _FakeCartesianOrbit | None = None
+        if isinstance(pv_coordinates, _FakeCartesianOrbit):
+            self._orbit = pv_coordinates
+            self._pv_coordinates = pv_coordinates.pv_coordinates
+        else:
+            self._pv_coordinates = pv_coordinates
 
     def getPVCoordinates(self, _frame: str) -> _FakePVCoordinates:
         return self._pv_coordinates
+
+    @property
+    def orbit(self) -> _FakeCartesianOrbit | None:
+        return self._orbit
 
 
 class _FakeKeplerianPropagator:
@@ -182,6 +252,78 @@ class _FakeKeplerianPropagator:
         )
 
 
+class _FakeDormandPrince853Integrator:
+    def __init__(
+        self,
+        min_step_s: float,
+        max_step_s: float,
+        absolute_tolerances: list[float],
+        relative_tolerances: list[float],
+    ) -> None:
+        self.min_step_s = min_step_s
+        self.max_step_s = max_step_s
+        self.absolute_tolerances = absolute_tolerances
+        self.relative_tolerances = relative_tolerances
+        self.initial_step_s: float | None = None
+
+    def setInitialStepSize(self, initial_step_s: float) -> None:
+        self.initial_step_s = initial_step_s
+
+
+class _FakeJ2OnlyPerturbation:
+    def __init__(self, mu: float, radius: float, j2: float, frame: str) -> None:
+        self.mu = mu
+        self.radius = radius
+        self.j2 = j2
+        self.frame = frame
+
+
+class _FakeNumericalPropagator(_FakeKeplerianPropagator):
+    def __init__(self, integrator: _FakeDormandPrince853Integrator) -> None:
+        self.integrator = integrator
+        self.orbit_type: str | None = None
+        self.position_angle_type: str | None = None
+        self.force_models: list[_FakeJ2OnlyPerturbation] = []
+        self._orbit: _FakeCartesianOrbit | None = None
+
+    @staticmethod
+    def tolerances(
+        _position_tolerance_m: float,
+        _orbit: _FakeCartesianOrbit,
+        _orbit_type: str,
+    ) -> list[list[float]]:
+        return [[1.0e-3] * 7, [1.0e-9] * 7]
+
+    def setOrbitType(self, orbit_type: str) -> None:
+        self.orbit_type = orbit_type
+
+    def setPositionAngleType(self, position_angle_type: str) -> None:
+        self.position_angle_type = position_angle_type
+
+    def setInitialState(self, initial_state: _FakeSpacecraftState) -> None:
+        self._orbit = initial_state.orbit
+
+    def addForceModel(self, force_model: _FakeJ2OnlyPerturbation) -> None:
+        self.force_models.append(force_model)
+
+    def propagate(self, target_date: _FakeAbsoluteDate) -> _FakeSpacecraftState:
+        if self._orbit is None:
+            raise AssertionError("initial state was not configured")
+        return _FakeKeplerianPropagator(self._orbit).propagate(target_date)
+
+
+class _FakeOrbitType:
+    CARTESIAN = "CARTESIAN"
+
+
+class _FakePositionAngleType:
+    TRUE = "TRUE"
+
+
+class _FakeIERSConventions:
+    IERS_2010 = "IERS_2010"
+
+
 def _fake_runtime() -> OrekitRuntime:
     return OrekitRuntime(
         wrapper="orekit_jpype",
@@ -194,4 +336,11 @@ def _fake_runtime() -> OrekitRuntime:
         pv_coordinates=_FakePVCoordinates,
         cartesian_orbit=_FakeCartesianOrbit,
         keplerian_propagator=_FakeKeplerianPropagator,
+        spacecraft_state=_FakeSpacecraftState,
+        numerical_propagator=_FakeNumericalPropagator,
+        dormand_prince_853_integrator=_FakeDormandPrince853Integrator,
+        j2_only_perturbation=_FakeJ2OnlyPerturbation,
+        orbit_type=_FakeOrbitType,
+        position_angle_type=_FakePositionAngleType,
+        iers_conventions=_FakeIERSConventions,
     )
