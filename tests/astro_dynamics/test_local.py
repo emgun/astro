@@ -119,6 +119,36 @@ def test_propagate_local_applies_finite_burn_schedule() -> None:
     assert trajectory.metadata["finite_burn_count"] == 1
 
 
+def test_propagate_local_applies_thrust_vector_mass_flow_burn() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    burn = Maneuver(
+        name="thrust-trim",
+        epoch=scenario.initial_state.epoch + timedelta(seconds=60),
+        frame=scenario.initial_state.frame,
+        delta_v_km_s=(0.0, 0.0, 0.0),
+        duration_s=120.0,
+        thrust_vector_n=(0.0, 0.25, 0.0),
+        specific_impulse_s=220.0,
+    )
+    maneuvered_scenario = scenario.model_copy(update={"maneuvers": [burn]})
+
+    baseline = propagate_local(scenario)
+    trajectory = propagate_local(maneuvered_scenario)
+    baseline_final_velocity = np.array(baseline.samples[-1].state.velocity_km_s)
+    maneuvered_final_velocity = np.array(trajectory.samples[-1].state.velocity_km_s)
+    masses = [sample.mass_kg for sample in trajectory.samples]
+
+    assert maneuvered_final_velocity[1] > baseline_final_velocity[1]
+    assert masses[0] == pytest.approx(scenario.spacecraft.mass_kg)
+    assert masses[-1] is not None
+    assert masses[-1] < scenario.spacecraft.mass_kg
+    assert masses == sorted(masses, reverse=True)
+    assert trajectory.metadata["maneuver_model"] == "thrust_vector_mass_flow"
+    assert trajectory.metadata["thrust_vector_burn_count"] == 1
+    assert trajectory.metadata["final_mass_kg"] == pytest.approx(masses[-1])
+    assert trajectory.events[0].metadata["thrust_vector_n"] == (0.0, 0.25, 0.0)
+
+
 def test_propagate_local_generates_covariance_history_from_initial_covariance() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     initial_covariance = [

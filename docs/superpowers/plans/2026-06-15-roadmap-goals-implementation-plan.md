@@ -41,8 +41,8 @@ Implemented and protected:
 Still roadmap-level:
 
 - Orekit drag/SRP/third-body force-model implementations and native Orekit batch/sequential OD.
-- High-fidelity covariance propagation with validated state transition matrices/process noise,
-  thrust-vector finite-burn dynamics, and mass-flow maneuver dynamics.
+- High-fidelity covariance propagation with validated state transition matrices/process noise and
+  attitude-coupled maneuver dynamics.
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
 - Live Tudat cross-check environment/body construction.
@@ -156,16 +156,16 @@ Primary files:
 ### Goal 3: Operational Flight Dynamics Products
 
 Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
-finite burns, finite-difference local covariance propagation, CSV ephemeris export, and seeded
-initial-state Monte Carlo. Validated high-fidelity covariance, thrust-vector, and mass-flow dynamics
-remain deferred.
+finite burns, local thrust-vector finite burns with mass depletion, finite-difference local
+covariance propagation, CSV ephemeris export, and seeded initial-state Monte Carlo. Validated
+high-fidelity covariance dynamics and attitude-coupled maneuver dynamics remain deferred.
 
 Definition of done:
 
 - Orbital `Trajectory` supports event and maneuver records without breaking launch products.
 - Ephemeris export supports JSON plus at least one standard interchange format selected for the suite's current maturity.
-- Maneuver products cover impulsive delta-v and local finite burns with constant inertial
-  acceleration; higher-fidelity thrust-vector and mass-flow modeling remains deferred.
+- Maneuver products cover impulsive delta-v, local finite burns with constant inertial
+  acceleration, and local thrust-vector finite burns with mass-flow depletion.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported and local propagation can populate them from a
   scenario initial covariance using finite-difference state transitions.

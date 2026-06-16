@@ -24,8 +24,10 @@ maneuvers:
   - name: finite-trim
     epoch: "2026-01-01T00:01:00+00:00"
     frame: EME2000
-    delta_v_km_s: [0.0, 0.06, 0.0]
+    delta_v_km_s: [0.0, 0.0, 0.0]
     duration_s: 120.0
+    thrust_vector_n: [0.0, 0.25, 0.0]
+    specific_impulse_s: 220.0
 ground_stations:
   - name: equator-eci
     position_eci_km: [6378.1363, 0.0, 0.0]

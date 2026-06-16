@@ -394,6 +394,30 @@ def test_trajectory_accepts_events_maneuvers_and_covariance_history() -> None:
     assert trajectory.covariance_history == [covariance]
 
 
+def test_trajectory_sample_accepts_optional_mass_history() -> None:
+    epoch = datetime(2026, 1, 1, tzinfo=UTC)
+    sample = make_trajectory_sample(epoch).model_copy(update={"mass_kg": 118.5})
+
+    assert sample.mass_kg == 118.5
+
+
+def test_maneuver_accepts_thrust_vector_mass_flow_fields() -> None:
+    epoch = datetime(2026, 1, 1, tzinfo=UTC)
+
+    maneuver = Maneuver(
+        name="low-thrust",
+        epoch=epoch,
+        frame=Frame.EME2000,
+        delta_v_km_s=(0.0, 0.0, 0.0),
+        duration_s=120.0,
+        thrust_vector_n=(0.0, 0.25, 0.0),
+        specific_impulse_s=220.0,
+    )
+
+    assert maneuver.thrust_vector_n == (0.0, 0.25, 0.0)
+    assert maneuver.specific_impulse_s == 220.0
+
+
 def test_maneuver_and_covariance_validation() -> None:
     epoch = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -404,6 +428,26 @@ def test_maneuver_and_covariance_validation() -> None:
             frame=Frame.EME2000,
             delta_v_km_s=(0.0, 0.001, 0.0),
             duration_s=-1.0,
+        )
+
+    with pytest.raises(ValidationError, match="thrust-vector maneuvers require duration_s > 0"):
+        Maneuver(
+            name="bad-thrust",
+            epoch=epoch,
+            frame=Frame.EME2000,
+            delta_v_km_s=(0.0, 0.0, 0.0),
+            thrust_vector_n=(0.0, 0.25, 0.0),
+            specific_impulse_s=220.0,
+        )
+
+    with pytest.raises(ValidationError, match="specific_impulse_s"):
+        Maneuver(
+            name="missing-isp",
+            epoch=epoch,
+            frame=Frame.EME2000,
+            delta_v_km_s=(0.0, 0.0, 0.0),
+            duration_s=120.0,
+            thrust_vector_n=(0.0, 0.25, 0.0),
         )
 
     with pytest.raises(ValidationError, match="6x6"):

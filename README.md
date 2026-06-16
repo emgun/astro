@@ -150,9 +150,10 @@ propagation or conjunction analysis.
 
 Local orbital propagation accepts an optional `maneuvers` schedule on `Scenario`. Impulsive
 maneuvers apply their full `delta_v_km_s` at the maneuver epoch; finite burns apply the configured
-total delta-v as constant inertial acceleration over `duration_s` and record maneuver start/end
-events in the trajectory. This is a deterministic maneuver baseline, not a thrust-vector, mass-flow,
-or attitude-control model.
+total delta-v as constant inertial acceleration over `duration_s`, or use optional
+`thrust_vector_n` plus `specific_impulse_s` to integrate thrust-vector acceleration with mass
+depletion. Trajectory samples include `mass_kg`, and maneuver start/end events preserve maneuver
+metadata. This remains an inertial thrust-vector baseline, not an attitude-control model.
 
 Local propagation also accepts an optional `initial_covariance` 6x6 matrix. When present, the local
 backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference state

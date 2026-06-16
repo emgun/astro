@@ -29,6 +29,7 @@ _MAX_RK4_INTERNAL_STEP_S = 30.0
 _MANEUVER_TIME_TOLERANCE_S = 1.0e-9
 _COVARIANCE_FD_REL_STEP = 1.0e-6
 _COVARIANCE_FD_ABS_STEP = 1.0e-8
+_STANDARD_GRAVITY_M_S2 = 9.80665
 
 
 @dataclass(frozen=True)
@@ -170,6 +171,7 @@ def _scheduled_maneuvers(scenario: Scenario) -> list[_ScheduledManeuver]:
 def _finite_burn_acceleration_km_s2(
     schedule: list[_ScheduledManeuver],
     elapsed_s: float,
+    mass_kg: float,
 ) -> FloatArray:
     acceleration = np.zeros(3, dtype=np.float64)
     for scheduled in schedule:
@@ -181,56 +183,100 @@ def _finite_burn_acceleration_km_s2(
             <= elapsed_s
             < scheduled.end_s - _MANEUVER_TIME_TOLERANCE_S
         ):
-            acceleration = acceleration + (
-                np.array(maneuver.delta_v_km_s, dtype=np.float64) / float(maneuver.duration_s)
-            )
+            if maneuver.thrust_vector_n is not None:
+                thrust_acceleration_m_s2 = (
+                    np.array(maneuver.thrust_vector_n, dtype=np.float64) / mass_kg
+                )
+                acceleration = acceleration + thrust_acceleration_m_s2 / 1000.0
+            else:
+                acceleration = acceleration + (
+                    np.array(maneuver.delta_v_km_s, dtype=np.float64)
+                    / float(maneuver.duration_s)
+                )
     return cast(FloatArray, acceleration)
 
 
+def _finite_burn_mass_flow_kg_s(
+    schedule: list[_ScheduledManeuver],
+    elapsed_s: float,
+) -> float:
+    mass_flow_kg_s = 0.0
+    for scheduled in schedule:
+        maneuver = scheduled.maneuver
+        if (
+            maneuver.duration_s <= 0.0
+            or maneuver.thrust_vector_n is None
+            or maneuver.specific_impulse_s is None
+        ):
+            continue
+        if (
+            scheduled.start_s - _MANEUVER_TIME_TOLERANCE_S
+            <= elapsed_s
+            < scheduled.end_s - _MANEUVER_TIME_TOLERANCE_S
+        ):
+            thrust_n = float(np.linalg.norm(np.array(maneuver.thrust_vector_n, dtype=np.float64)))
+            mass_flow_kg_s += thrust_n / (maneuver.specific_impulse_s * _STANDARD_GRAVITY_M_S2)
+    return mass_flow_kg_s
+
+
 def _derivative_with_maneuvers(
-    state: FloatArray,
+    state_with_mass: FloatArray,
     force_model: ForceModelName,
     schedule: list[_ScheduledManeuver],
     elapsed_s: float,
 ) -> FloatArray:
-    position = state[:3]
-    velocity = state[3:]
+    position = state_with_mass[:3]
+    velocity = state_with_mass[3:6]
+    mass_kg = max(float(state_with_mass[6]), 1.0e-9)
     total_acceleration = acceleration_km_s2(
         position,
         force_model,
     ) + _finite_burn_acceleration_km_s2(
-        schedule, elapsed_s
+        schedule,
+        elapsed_s,
+        mass_kg,
     )
-    return cast(FloatArray, np.concatenate([velocity, total_acceleration]))
+    return cast(
+        FloatArray,
+        np.concatenate(
+            [
+                velocity,
+                total_acceleration,
+                np.array([-_finite_burn_mass_flow_kg_s(schedule, elapsed_s)]),
+            ]
+        ),
+    )
 
 
 def _rk4_step_once_with_maneuvers(
-    state: FloatArray,
+    state_with_mass: FloatArray,
     step_s: float,
     force_model: ForceModelName,
     schedule: list[_ScheduledManeuver],
     elapsed_s: float,
 ) -> FloatArray:
-    k1 = _derivative_with_maneuvers(state, force_model, schedule, elapsed_s)
+    k1 = _derivative_with_maneuvers(state_with_mass, force_model, schedule, elapsed_s)
     k2 = _derivative_with_maneuvers(
-        state + 0.5 * step_s * k1,
+        state_with_mass + 0.5 * step_s * k1,
         force_model,
         schedule,
         elapsed_s + 0.5 * step_s,
     )
     k3 = _derivative_with_maneuvers(
-        state + 0.5 * step_s * k2,
+        state_with_mass + 0.5 * step_s * k2,
         force_model,
         schedule,
         elapsed_s + 0.5 * step_s,
     )
     k4 = _derivative_with_maneuvers(
-        state + step_s * k3,
+        state_with_mass + step_s * k3,
         force_model,
         schedule,
         elapsed_s + step_s,
     )
-    return cast(FloatArray, state + (step_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4))
+    next_state = state_with_mass + (step_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    next_state[6] = max(float(next_state[6]), 1.0e-9)
+    return cast(FloatArray, next_state)
 
 
 def _next_maneuver_boundary_s(
@@ -275,14 +321,19 @@ def _apply_impulses_at_elapsed_s(
 def _advance_with_maneuvers(
     state: FloatArray,
     *,
+    mass_kg: float,
     start_s: float,
     target_s: float,
     force_model: ForceModelName,
     schedule: list[_ScheduledManeuver],
     applied_impulses: set[int],
-) -> FloatArray:
+) -> tuple[FloatArray, float]:
     elapsed_s = start_s
     next_state = _apply_impulses_at_elapsed_s(state, schedule, elapsed_s, applied_impulses)
+    state_with_mass = cast(
+        FloatArray,
+        np.concatenate([next_state, np.array([mass_kg], dtype=np.float64)]),
+    )
 
     while elapsed_s < target_s - _MANEUVER_TIME_TOLERANCE_S:
         step_target_s = min(elapsed_s + _MAX_RK4_INTERNAL_STEP_S, target_s)
@@ -291,22 +342,24 @@ def _advance_with_maneuvers(
             step_target_s = boundary_s
 
         step_s = step_target_s - elapsed_s
-        next_state = _rk4_step_once_with_maneuvers(
-            next_state,
+        state_with_mass = _rk4_step_once_with_maneuvers(
+            state_with_mass,
             step_s,
             force_model,
             schedule,
             elapsed_s,
         )
         elapsed_s = step_target_s
+        next_state = state_with_mass[:6]
         next_state = _apply_impulses_at_elapsed_s(
             next_state,
             schedule,
             elapsed_s,
             applied_impulses,
         )
+        state_with_mass[:6] = next_state
 
-    return next_state
+    return cast(FloatArray, state_with_mass[:6].copy()), float(state_with_mass[6])
 
 
 def _maneuver_events(
@@ -321,6 +374,9 @@ def _maneuver_events(
             "delta_v_km_s": maneuver.delta_v_km_s,
             "duration_s": maneuver.duration_s,
         }
+        if maneuver.thrust_vector_n is not None:
+            metadata["thrust_vector_n"] = maneuver.thrust_vector_n
+            metadata["specific_impulse_s"] = maneuver.specific_impulse_s
         if maneuver.duration_s == 0.0:
             events.append(
                 TrajectoryEvent(
@@ -357,10 +413,19 @@ def _maneuver_metadata(schedule: list[_ScheduledManeuver]) -> dict[str, Any]:
 
     finite_burn_count = sum(1 for scheduled in schedule if scheduled.maneuver.duration_s > 0.0)
     impulse_count = len(schedule) - finite_burn_count
+    thrust_vector_burn_count = sum(
+        1 for scheduled in schedule if scheduled.maneuver.thrust_vector_n is not None
+    )
+    maneuver_model = (
+        "thrust_vector_mass_flow"
+        if thrust_vector_burn_count
+        else "constant_inertial_acceleration"
+    )
     return {
-        "maneuver_model": "constant_inertial_acceleration",
+        "maneuver_model": maneuver_model,
         "finite_burn_count": finite_burn_count,
         "impulsive_maneuver_count": impulse_count,
+        "thrust_vector_burn_count": thrust_vector_burn_count,
     }
 
 
@@ -419,6 +484,7 @@ def propagate_local(scenario: Scenario) -> Trajectory:
 
     initial = scenario.initial_state.cartesian
     state = cast(FloatArray, np.concatenate([initial.position_array(), initial.velocity_array()]))
+    mass_kg = float(scenario.spacecraft.mass_kg)
     samples: list[TrajectorySample] = []
 
     for step_index in range(scenario.propagation.sample_count):
@@ -432,6 +498,7 @@ def propagate_local(scenario: Scenario) -> Trajectory:
                     position_km=_vector3_from_array(state[:3]),
                     velocity_km_s=_vector3_from_array(state[3:]),
                 ),
+                mass_kg=mass_kg,
             )
         )
         if covariance_matrix is not None:
@@ -446,24 +513,27 @@ def propagate_local(scenario: Scenario) -> Trajectory:
                     def advance_trial_with_maneuvers(
                         trial_state: FloatArray,
                         *,
+                        mass_kg: float = mass_kg,
                         step_start_s: float = step_start_s,
                         step_target_s: float = step_target_s,
                     ) -> FloatArray:
                         return _advance_with_maneuvers(
                             trial_state,
+                            mass_kg=mass_kg,
                             start_s=step_start_s,
                             target_s=step_target_s,
                             force_model=force_model,
                             schedule=maneuver_schedule,
                             applied_impulses=set(applied_impulses),
-                        )
+                        )[0]
 
                     transition = _finite_difference_state_transition(
                         state,
                         advance_trial_with_maneuvers,
                     )
-                state = _advance_with_maneuvers(
+                state, mass_kg = _advance_with_maneuvers(
                     state,
+                    mass_kg=mass_kg,
                     start_s=step_start_s,
                     target_s=step_target_s,
                     force_model=force_model,
@@ -485,14 +555,27 @@ def propagate_local(scenario: Scenario) -> Trajectory:
             if covariance_matrix is not None and transition is not None:
                 covariance_matrix = _propagate_covariance(covariance_matrix, transition)
 
-    metadata = {
-        "integrator": "rk4",
-        "step_s": scenario.propagation.step_s,
-        "sample_step_s": scenario.propagation.step_s,
-        "internal_max_step_s": _MAX_RK4_INTERNAL_STEP_S,
-        "internal_substeps_per_sample": internal_substeps_per_sample,
-        "internal_step_s": internal_step_s,
-    } | _maneuver_metadata(maneuver_schedule) | _covariance_metadata(covariance_matrix)
+    mass_metadata = (
+        {
+            "initial_mass_kg": scenario.spacecraft.mass_kg,
+            "final_mass_kg": mass_kg,
+        }
+        if maneuver_schedule
+        else {}
+    )
+    metadata = (
+        {
+            "integrator": "rk4",
+            "step_s": scenario.propagation.step_s,
+            "sample_step_s": scenario.propagation.step_s,
+            "internal_max_step_s": _MAX_RK4_INTERNAL_STEP_S,
+            "internal_substeps_per_sample": internal_substeps_per_sample,
+            "internal_step_s": internal_step_s,
+        }
+        | mass_metadata
+        | _maneuver_metadata(maneuver_schedule)
+        | _covariance_metadata(covariance_matrix)
+    )
 
     return Trajectory(
         scenario_id=scenario.scenario_id,

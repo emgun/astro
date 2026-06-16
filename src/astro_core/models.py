@@ -335,6 +335,8 @@ class Maneuver(AstroModel):
     frame: Frame
     delta_v_km_s: Vector3
     duration_s: FiniteFloat = Field(ge=0.0, default=0.0)
+    thrust_vector_n: Vector3 | None = None
+    specific_impulse_s: FiniteFloat | None = Field(default=None, gt=0.0)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("epoch", mode="before")
@@ -347,22 +349,44 @@ class Maneuver(AstroModel):
     def epoch_must_be_aware(cls, value: datetime) -> datetime:
         return _datetime_must_be_aware(value, "Maneuver epoch")
 
-    @field_validator("delta_v_km_s", mode="before")
+    @field_validator("delta_v_km_s", "thrust_vector_n", mode="before")
     @classmethod
     def delta_v_input_must_be_numeric(cls, value: Any) -> Any:
+        if value is None:
+            return None
         return _numeric_sequence_input_must_be_numbers(value, "Maneuver delta-v")
 
-    @field_validator("delta_v_km_s")
+    @field_validator("delta_v_km_s", "thrust_vector_n")
     @classmethod
     def delta_v_must_be_finite(cls, value: Vector3) -> Vector3:
+        if value is None:
+            return value
         if not all(isfinite(component) for component in value):
             raise ValueError("Maneuver delta-v values must be finite")
         return value
 
-    @field_validator("duration_s", mode="before")
+    @field_validator("duration_s", "specific_impulse_s", mode="before")
     @classmethod
     def duration_input_must_be_numeric(cls, value: Any) -> Any:
+        if value is None:
+            return None
         return _numeric_scalar_input_must_be_number(value, "Maneuver duration")
+
+    @model_validator(mode="after")
+    def validate_thrust_vector_mass_flow(self) -> Maneuver:
+        has_thrust_vector = self.thrust_vector_n is not None
+        has_specific_impulse = self.specific_impulse_s is not None
+        if has_thrust_vector != has_specific_impulse:
+            raise ValueError(
+                "thrust-vector maneuvers require both thrust_vector_n and specific_impulse_s"
+            )
+        if not has_thrust_vector:
+            return self
+        if self.duration_s <= 0.0:
+            raise ValueError("thrust-vector maneuvers require duration_s > 0")
+        if self.thrust_vector_n == (0.0, 0.0, 0.0):
+            raise ValueError("thrust-vector maneuvers require nonzero thrust_vector_n")
+        return self
 
 
 class CovarianceSample(AstroModel):
@@ -398,6 +422,7 @@ class CovarianceSample(AstroModel):
 class TrajectorySample(AstroModel):
     epoch: datetime
     state: CartesianState
+    mass_kg: FiniteFloat | None = Field(default=None, gt=0.0)
 
     @field_validator("epoch", mode="before")
     @classmethod
@@ -408,6 +433,13 @@ class TrajectorySample(AstroModel):
     @classmethod
     def epoch_must_be_aware(cls, value: datetime) -> datetime:
         return _datetime_must_be_aware(value, "TrajectorySample epoch")
+
+    @field_validator("mass_kg", mode="before")
+    @classmethod
+    def mass_input_must_be_numeric(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        return _numeric_scalar_input_must_be_number(value, "TrajectorySample mass")
 
 
 class Trajectory(AstroModel):
