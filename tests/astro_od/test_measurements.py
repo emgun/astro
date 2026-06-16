@@ -6,7 +6,7 @@ import numpy as np
 
 import astro_od.measurements as od_measurements
 from astro_core.io import load_scenario
-from astro_core.models import MeasurementType
+from astro_core.models import Frame, GroundStation, MeasurementType
 from astro_dynamics.local import propagate_local
 from astro_od.measurements import (
     generate_synthetic_measurements,
@@ -132,6 +132,29 @@ def test_generate_synthetic_measurements_supports_topocentric_angles() -> None:
     assert all(
         record.sigma == angle_scenario.measurements.noise.angle_sigma_deg for record in records
     )
+
+
+def test_generate_synthetic_measurements_supports_geodetic_stations() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    geodetic_station = GroundStation(
+        name="equator-geodetic",
+        latitude_deg=0.0,
+        longitude_deg=0.0,
+        altitude_km=0.0,
+        frame=Frame.EME2000,
+        elevation_mask_deg=0.0,
+    )
+    geodetic_scenario = scenario.model_copy(update={"ground_stations": [geodetic_station]})
+    trajectory = propagate_local(geodetic_scenario)
+
+    records = generate_synthetic_measurements(geodetic_scenario, trajectory)
+
+    assert len(records) == 22
+    assert {record.observer for record in records} == {"equator-geodetic"}
+    assert {record.measurement_type for record in records} == {
+        MeasurementType.RANGE,
+        MeasurementType.RANGE_RATE,
+    }
 
 
 def test_generate_synthetic_measurements_uses_scenario_noise_seed() -> None:

@@ -26,7 +26,8 @@ The suite owns scenarios, validation, CLI/API workflows, product schemas, and pr
 Implemented and protected:
 
 - Core package scaffold, CLI entrypoint, strict typing, linting, and tests.
-- `astro_core` scenario, state, spacecraft, force model, ground station, measurement, trajectory, and estimate products.
+- `astro_core` scenario, state, spacecraft, force model, ECI and WGS-84 geodetic ground station,
+  measurement, trajectory, and estimate products.
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV ephemeris export,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
@@ -46,8 +47,8 @@ Still roadmap-level:
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
 - Live Tudat cross-check environment/body construction.
-- Earth-fixed/geodetic/EOP-aware pointing, richer radiometric families, and operational CCSDS
-  support beyond current KVN TDM measurement families.
+- EOP-aware ITRF-to-celestial pointing, richer radiometric families, and operational CCSDS support
+  beyond current KVN TDM measurement families.
 - Richer JAX force models, sensitivities, and differentiable OD workflows.
 
 ## Goal Ledger
@@ -130,6 +131,10 @@ Implemented slice:
 - The shared measurement surface supports range, range-rate, inertial right ascension, and
   declination plus local-horizon azimuth/elevation records; wrapped angle residuals handle 0/360
   degree crossings.
+- Ground stations support fixed `position_eci_km` definitions and WGS-84 geodetic
+  `latitude_deg`/`longitude_deg`/`altitude_km` definitions, with geodetic stations rotated into
+  inertial measurement geometry at each measurement epoch using a deterministic UTC sidereal-time
+  model.
 - OD metadata records the selected propagation backend, estimator settings, residual statistics,
   convergence diagnostics, validation trajectory backend, and Orekit wrapper/version/data/propagator
   provenance when Orekit propagation metadata is available.

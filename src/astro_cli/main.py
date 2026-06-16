@@ -213,7 +213,8 @@ def _with_estimation_demo_metadata(
     measurement_count: int,
 ) -> dict[str, object]:
     added_station_payloads = [
-        station.model_dump(mode="json") for station in demo_added_ground_stations
+        station.model_dump(mode="json", exclude_none=True)
+        for station in demo_added_ground_stations
     ]
     return {
         **result_metadata,

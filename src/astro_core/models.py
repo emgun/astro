@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from enum import StrEnum
 from fractions import Fraction
-from math import isfinite
+from math import cos, isfinite, radians, sin, sqrt
 from numbers import Number
 from typing import Any, Literal
 
@@ -13,6 +13,11 @@ from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, field_validator, model_validator
 
 Vector3 = tuple[float, float, float]
+WGS84_EQUATORIAL_RADIUS_KM = 6378.137
+WGS84_FLATTENING = 1.0 / 298.257223563
+SECONDS_PER_DAY = 86400.0
+UNIX_EPOCH_JULIAN_DATE = 2440587.5
+J2000_JULIAN_DATE = 2451545.0
 
 
 class AstroModel(BaseModel):
@@ -208,14 +213,26 @@ class PropagationConfig(AstroModel):
 
 class GroundStation(AstroModel):
     name: str = Field(min_length=1)
-    position_eci_km: Vector3
+    position_eci_km: Vector3 | None = None
+    latitude_deg: FiniteFloat | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude_deg: FiniteFloat | None = Field(default=None, ge=-360.0, le=360.0)
+    altitude_km: FiniteFloat | None = None
     frame: Frame
     elevation_mask_deg: FiniteFloat = Field(ge=-90.0, le=90.0)
 
     @field_validator("position_eci_km", mode="before")
     @classmethod
     def position_input_must_be_numeric(cls, value: Any) -> Any:
+        if value is None:
+            return None
         return _numeric_sequence_input_must_be_numbers(value, "Ground station position")
+
+    @field_validator("latitude_deg", "longitude_deg", "altitude_km", mode="before")
+    @classmethod
+    def geodetic_input_must_be_numeric(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        return _numeric_scalar_input_must_be_number(value, "Ground station geodetic coordinate")
 
     @field_validator("elevation_mask_deg", mode="before")
     @classmethod
@@ -224,13 +241,99 @@ class GroundStation(AstroModel):
 
     @field_validator("position_eci_km")
     @classmethod
-    def position_must_be_finite(cls, value: Vector3) -> Vector3:
+    def position_must_be_finite(cls, value: Vector3 | None) -> Vector3 | None:
+        if value is None:
+            return None
         if not all(isfinite(component) for component in value):
             raise ValueError("Ground station position values must be finite")
         return value
 
-    def position_array(self) -> NDArray[np.float64]:
-        return np.array(self.position_eci_km, dtype=np.float64)
+    @field_validator("latitude_deg", "longitude_deg", "altitude_km")
+    @classmethod
+    def geodetic_values_must_be_finite(cls, value: float | None) -> float | None:
+        if value is not None and not isfinite(value):
+            raise ValueError("Ground station geodetic coordinate values must be finite")
+        return value
+
+    @model_validator(mode="after")
+    def validate_position_definition(self) -> GroundStation:
+        has_eci_position = self.position_eci_km is not None
+        geodetic_values = (self.latitude_deg, self.longitude_deg, self.altitude_km)
+        has_any_geodetic = any(value is not None for value in geodetic_values)
+        has_all_geodetic = all(value is not None for value in geodetic_values)
+
+        if has_eci_position and has_any_geodetic:
+            raise ValueError(
+                "Ground station must define position_eci_km or geodetic fields, not both"
+            )
+        if not has_eci_position and not has_any_geodetic:
+            raise ValueError("Ground station must define position_eci_km or geodetic fields")
+        if has_any_geodetic and not has_all_geodetic:
+            raise ValueError(
+                "Ground station geodetic definition requires latitude_deg, longitude_deg, "
+                "and altitude_km"
+            )
+        return self
+
+    def position_array(self, epoch: datetime | None = None) -> NDArray[np.float64]:
+        if self.position_eci_km is not None:
+            return np.array(self.position_eci_km, dtype=np.float64)
+        if epoch is None:
+            raise ValueError("Ground station geodetic position requires an epoch")
+        return _ecef_to_eci(_geodetic_to_ecef(self), epoch)
+
+
+def _geodetic_to_ecef(station: GroundStation) -> NDArray[np.float64]:
+    if (
+        station.latitude_deg is None
+        or station.longitude_deg is None
+        or station.altitude_km is None
+    ):
+        raise ValueError("Ground station geodetic definition is incomplete")
+
+    latitude_rad = radians(station.latitude_deg)
+    longitude_rad = radians(station.longitude_deg)
+    eccentricity_squared = WGS84_FLATTENING * (2.0 - WGS84_FLATTENING)
+    sin_latitude = sin(latitude_rad)
+    prime_vertical_radius = WGS84_EQUATORIAL_RADIUS_KM / sqrt(
+        1.0 - eccentricity_squared * sin_latitude**2
+    )
+
+    radius_at_altitude = prime_vertical_radius + station.altitude_km
+    x_km = radius_at_altitude * cos(latitude_rad) * cos(longitude_rad)
+    y_km = radius_at_altitude * cos(latitude_rad) * sin(longitude_rad)
+    z_km = (
+        prime_vertical_radius * (1.0 - eccentricity_squared) + station.altitude_km
+    ) * sin_latitude
+    return np.array((x_km, y_km, z_km), dtype=np.float64)
+
+
+def _ecef_to_eci(position_ecef_km: NDArray[np.float64], epoch: datetime) -> NDArray[np.float64]:
+    earth_rotation_angle_rad = _greenwich_sidereal_angle_rad(epoch)
+    cos_angle = cos(earth_rotation_angle_rad)
+    sin_angle = sin(earth_rotation_angle_rad)
+    x_km, y_km, z_km = position_ecef_km
+    return np.array(
+        (
+            cos_angle * x_km - sin_angle * y_km,
+            sin_angle * x_km + cos_angle * y_km,
+            z_km,
+        ),
+        dtype=np.float64,
+    )
+
+
+def _greenwich_sidereal_angle_rad(epoch: datetime) -> float:
+    epoch_utc = epoch.astimezone(UTC)
+    julian_date = epoch_utc.timestamp() / SECONDS_PER_DAY + UNIX_EPOCH_JULIAN_DATE
+    centuries_since_j2000 = (julian_date - J2000_JULIAN_DATE) / 36525.0
+    sidereal_degrees = (
+        280.46061837
+        + 360.98564736629 * (julian_date - J2000_JULIAN_DATE)
+        + 0.000387933 * centuries_since_j2000**2
+        - centuries_since_j2000**3 / 38710000.0
+    )
+    return radians(sidereal_degrees % 360.0)
 
 
 class MeasurementNoise(AstroModel):

@@ -54,10 +54,14 @@ def scenario_with_state_vector(scenario: Scenario, state_vector: FloatArray) -> 
     return scenario.model_copy(update={"initial_state": initial_state})
 
 
-def _station_position_for_observer(scenario: Scenario, observer: str) -> FloatArray:
+def _station_position_for_observer(
+    scenario: Scenario,
+    observer: str,
+    epoch: datetime,
+) -> FloatArray:
     for station in scenario.ground_stations:
         if station.name == observer:
-            return station.position_array()
+            return station.position_array(epoch)
     raise NumericalConvergenceError(f"Measurement observer {observer!r} is not in the scenario")
 
 
@@ -119,7 +123,11 @@ def _predicted_measurement(
 
     spacecraft_position = sample_state.position_array()
     spacecraft_velocity = sample_state.velocity_array()
-    station_position = _station_position_for_observer(scenario, measurement.observer)
+    station_position = _station_position_for_observer(
+        scenario,
+        measurement.observer,
+        measurement.epoch,
+    )
 
     if measurement.measurement_type is MeasurementType.RANGE:
         return range_km(spacecraft_position, station_position)

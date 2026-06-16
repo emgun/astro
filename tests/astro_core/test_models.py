@@ -240,6 +240,51 @@ def test_ground_station_rejects_numpy_position_inputs() -> None:
         )
 
 
+def test_ground_station_accepts_geodetic_position_with_epoch() -> None:
+    station = GroundStation(
+        name="equator-geodetic",
+        latitude_deg=0.0,
+        longitude_deg=0.0,
+        altitude_km=0.0,
+        frame=Frame.EME2000,
+        elevation_mask_deg=0.0,
+    )
+
+    with pytest.raises(ValueError, match="epoch"):
+        station.position_array()
+
+    position = station.position_array(datetime(2026, 1, 1, tzinfo=UTC))
+
+    assert position.shape == (3,)
+    assert np.linalg.norm(position) == pytest.approx(6378.137)
+    assert position[2] == pytest.approx(0.0)
+
+
+def test_ground_station_rejects_missing_or_mixed_position_definitions() -> None:
+    with pytest.raises(ValidationError, match="position_eci_km or geodetic"):
+        GroundStation(name="station-a", frame=Frame.EME2000, elevation_mask_deg=0.0)
+
+    with pytest.raises(ValidationError, match="latitude_deg, longitude_deg, and altitude_km"):
+        GroundStation(
+            name="station-a",
+            latitude_deg=0.0,
+            longitude_deg=0.0,
+            frame=Frame.EME2000,
+            elevation_mask_deg=0.0,
+        )
+
+    with pytest.raises(ValidationError, match="not both"):
+        GroundStation(
+            name="station-a",
+            position_eci_km=(6378.1363, 0.0, 0.0),
+            latitude_deg=0.0,
+            longitude_deg=0.0,
+            altitude_km=0.0,
+            frame=Frame.EME2000,
+            elevation_mask_deg=0.0,
+        )
+
+
 def test_orbit_state_requires_finite_cartesian_values() -> None:
     with pytest.raises(ValidationError, match="finite"):
         CartesianState(position_km=(7000.0, float("nan"), 0.0), velocity_km_s=(0.0, 7.5, 0.0))

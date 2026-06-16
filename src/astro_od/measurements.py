@@ -123,7 +123,7 @@ def generate_synthetic_measurements(
         spacecraft_velocity = sample.state.velocity_array()
 
         for station in scenario.ground_stations:
-            station_position = station.position_array()
+            station_position = station.position_array(sample.epoch)
             for measurement_type in scenario.measurements.types:
                 truth, sigma, units = _measurement_geometry(
                     measurement_type,
