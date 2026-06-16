@@ -134,6 +134,7 @@ astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backen
 astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output topocentric_measurements.json
 astro synth-measurements examples/scenarios/leo_geodetic_topocentric.yaml --backend local --output geodetic_topocentric_measurements.json
 astro synth-measurements examples/scenarios/leo_geodetic_eop_topocentric.yaml --backend local --output geodetic_eop_topocentric_measurements.json
+astro synth-measurements examples/scenarios/leo_geodetic_eop_table_topocentric.yaml --backend local --output geodetic_eop_table_topocentric_measurements.json
 astro synth-measurements examples/scenarios/leo_doppler.yaml --backend local --output doppler_measurements.json
 astro export-measurements measurements.json --format csv --output measurements.csv
 astro export-measurements measurements.json --format tdm --output measurements.tdm
@@ -232,11 +233,13 @@ line-of-sight range rate into a received-frequency shift; this is a first one-wa
 not yet a two-way or three-way DSN observable. Angle records use degrees. Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
-epoch using a deterministic UTC sidereal-time model by default. Scenarios may also provide
-`earth_orientation` with `ut1_minus_utc_s`, `polar_motion_x_arcsec`, `polar_motion_y_arcsec`, and a
-`source` label; those values drive an approximate EOP-aware Earth-fixed to inertial correction for
-geodetic station pointing. This supports explicit fixed EOP values, but it is not a full IERS table
-interpolation or precession/nutation reduction. JSON inputs
+epoch using a deterministic UTC sidereal-time model by default. Scenarios may also provide fixed
+`earth_orientation` values with `ut1_minus_utc_s`, `polar_motion_x_arcsec`,
+`polar_motion_y_arcsec`, and a `source` label, or a `samples` table with timestamped values that
+are linearly interpolated per measurement epoch. These values drive an approximate EOP-aware
+Earth-fixed to inertial correction for geodetic station pointing. This supports explicit fixed EOP
+values and simple tabulated interpolation, but it is not a full IERS finals parser or
+precession/nutation reduction. JSON inputs
 match the output of `astro synth-measurements`; CSV and TDM inputs are auto-detected by `.csv` and
 `.tdm` extensions or can be forced with `--format csv` / `--format tdm`.
 

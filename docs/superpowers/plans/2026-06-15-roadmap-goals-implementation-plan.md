@@ -27,7 +27,8 @@ Implemented and protected:
 
 - Core package scaffold, CLI entrypoint, strict typing, linting, and tests.
 - `astro_core` scenario, state, spacecraft, force model, ECI and WGS-84 geodetic ground station,
-  fixed Earth-orientation correction, measurement, trajectory, and estimate products.
+  fixed and tabulated-interpolation Earth-orientation correction, measurement, trajectory, and
+  estimate products.
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV ephemeris export,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
@@ -48,8 +49,8 @@ Still roadmap-level:
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
 - Live Tudat cross-check environment/body construction.
-- Full IERS table interpolation/precession-nutation reductions, two-way/three-way radiometric
-  families, and operational CCSDS support beyond current KVN TDM measurement families.
+- Full IERS finals parsing/precession-nutation reductions, two-way/three-way radiometric families,
+  and operational CCSDS support beyond current KVN TDM measurement families.
 - Richer JAX force models, sensitivities, and differentiable OD workflows.
 
 ## Goal Ledger
@@ -149,7 +150,8 @@ Implemented slice:
 - Ground stations support fixed `position_eci_km` definitions and WGS-84 geodetic
   `latitude_deg`/`longitude_deg`/`altitude_km` definitions, with geodetic stations rotated into
   inertial measurement geometry at each measurement epoch using a deterministic UTC sidereal-time
-  model or scenario-provided fixed Earth-orientation corrections for UT1-UTC and polar motion.
+  model, scenario-provided fixed Earth-orientation corrections, or linearly interpolated tabulated
+  Earth-orientation samples for UT1-UTC and polar motion.
 - OD metadata records the selected propagation backend, estimator settings, residual statistics,
   convergence diagnostics, validation trajectory backend, and Orekit wrapper/version/data/propagator
   provenance when Orekit propagation metadata is available.

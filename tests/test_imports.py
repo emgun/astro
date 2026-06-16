@@ -17,6 +17,7 @@ def test_packages_import() -> None:
         "AstroError",
         "CovarianceSample",
         "EarthOrientationConfig",
+        "EarthOrientationSample",
         "InvalidMeasurementFileError",
         "InvalidScenarioError",
         "J2_EARTH",

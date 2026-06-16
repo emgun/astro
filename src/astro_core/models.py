@@ -212,13 +212,21 @@ class PropagationConfig(AstroModel):
         return self
 
 
-class EarthOrientationConfig(AstroModel):
-    """Small Earth-orientation correction set for suite geodetic station transforms."""
-
+class EarthOrientationSample(AstroModel):
+    epoch: datetime
     ut1_minus_utc_s: FiniteFloat = 0.0
     polar_motion_x_arcsec: FiniteFloat = 0.0
     polar_motion_y_arcsec: FiniteFloat = 0.0
-    source: str = "zero"
+
+    @field_validator("epoch", mode="before")
+    @classmethod
+    def epoch_input_must_be_datetime_or_string(cls, value: Any) -> Any:
+        return _datetime_input_must_be_datetime_or_string(value, "EarthOrientationSample epoch")
+
+    @field_validator("epoch")
+    @classmethod
+    def epoch_must_be_aware(cls, value: datetime) -> datetime:
+        return _datetime_must_be_aware(value, "EarthOrientationSample epoch")
 
     @field_validator(
         "ut1_minus_utc_s",
@@ -236,6 +244,95 @@ class EarthOrientationConfig(AstroModel):
         if not isfinite(value):
             raise ValueError("Earth orientation values must be finite")
         return value
+
+
+class EarthOrientationConfig(AstroModel):
+    """Small Earth-orientation correction set for suite geodetic station transforms."""
+
+    ut1_minus_utc_s: FiniteFloat = 0.0
+    polar_motion_x_arcsec: FiniteFloat = 0.0
+    polar_motion_y_arcsec: FiniteFloat = 0.0
+    source: str = "zero"
+    samples: tuple[EarthOrientationSample, ...] = ()
+
+    @field_validator(
+        "ut1_minus_utc_s",
+        "polar_motion_x_arcsec",
+        "polar_motion_y_arcsec",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Earth orientation scalar")
+
+    @field_validator("ut1_minus_utc_s", "polar_motion_x_arcsec", "polar_motion_y_arcsec")
+    @classmethod
+    def values_must_be_finite(cls, value: float) -> float:
+        if not isfinite(value):
+            raise ValueError("Earth orientation values must be finite")
+        return value
+
+    def at_epoch(self, epoch: datetime) -> EarthOrientationConfig:
+        if not self.samples:
+            return self
+
+        _datetime_must_be_aware(epoch, "Earth orientation interpolation epoch")
+        samples = tuple(sorted(self.samples, key=lambda sample: sample.epoch))
+        first = samples[0]
+        last = samples[-1]
+        if epoch < first.epoch or epoch > last.epoch:
+            raise ValueError(
+                "Earth orientation interpolation epoch is outside Earth orientation sample range"
+            )
+
+        for sample in samples:
+            if epoch == sample.epoch:
+                return self._from_sample(sample, source=f"{self.source}:sample")
+
+        for previous, following in zip(samples, samples[1:], strict=True):
+            if previous.epoch <= epoch <= following.epoch:
+                fraction = (epoch - previous.epoch).total_seconds() / (
+                    following.epoch - previous.epoch
+                ).total_seconds()
+                return EarthOrientationConfig(
+                    ut1_minus_utc_s=_linear_interpolate(
+                        previous.ut1_minus_utc_s,
+                        following.ut1_minus_utc_s,
+                        fraction,
+                    ),
+                    polar_motion_x_arcsec=_linear_interpolate(
+                        previous.polar_motion_x_arcsec,
+                        following.polar_motion_x_arcsec,
+                        fraction,
+                    ),
+                    polar_motion_y_arcsec=_linear_interpolate(
+                        previous.polar_motion_y_arcsec,
+                        following.polar_motion_y_arcsec,
+                        fraction,
+                    ),
+                    source=f"{self.source}:interpolated",
+                )
+
+        raise ValueError(
+            "Earth orientation interpolation epoch is outside Earth orientation sample range"
+        )
+
+    def _from_sample(
+        self,
+        sample: EarthOrientationSample,
+        *,
+        source: str,
+    ) -> EarthOrientationConfig:
+        return EarthOrientationConfig(
+            ut1_minus_utc_s=sample.ut1_minus_utc_s,
+            polar_motion_x_arcsec=sample.polar_motion_x_arcsec,
+            polar_motion_y_arcsec=sample.polar_motion_y_arcsec,
+            source=source,
+        )
+
+
+def _linear_interpolate(start: float, stop: float, fraction: float) -> float:
+    return float(start + (stop - start) * fraction)
 
 
 class GroundStation(AstroModel):
@@ -345,6 +442,7 @@ def _ecef_to_eci(
     earth_orientation: EarthOrientationConfig | None = None,
 ) -> NDArray[np.float64]:
     earth_orientation = earth_orientation or EarthOrientationConfig()
+    earth_orientation = earth_orientation.at_epoch(epoch)
     polar_corrected_km = _apply_polar_motion(position_ecef_km, earth_orientation)
     earth_rotation_angle_rad = _greenwich_sidereal_angle_rad(
         epoch,

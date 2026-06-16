@@ -11,6 +11,7 @@ from astro_core.models import (
     CartesianState,
     CovarianceSample,
     EarthOrientationConfig,
+    EarthOrientationSample,
     EstimateResult,
     ForceModelConfig,
     ForceModelName,
@@ -627,6 +628,58 @@ def test_measurement_config_accepts_doppler_frequency_and_noise() -> None:
 def test_measurement_config_requires_non_empty_types() -> None:
     with pytest.raises(ValidationError):
         MeasurementConfig(types=())
+
+
+def test_earth_orientation_config_interpolates_tabulated_samples() -> None:
+    first_epoch = datetime(2026, 1, 1, tzinfo=UTC)
+    second_epoch = datetime(2026, 1, 1, 0, 10, tzinfo=UTC)
+    midpoint = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+    earth_orientation = EarthOrientationConfig(
+        source="unit-test-eop-table",
+        samples=(
+            EarthOrientationSample(
+                epoch=first_epoch,
+                ut1_minus_utc_s=0.1,
+                polar_motion_x_arcsec=0.2,
+                polar_motion_y_arcsec=-0.4,
+            ),
+            EarthOrientationSample(
+                epoch=second_epoch,
+                ut1_minus_utc_s=0.3,
+                polar_motion_x_arcsec=0.6,
+                polar_motion_y_arcsec=0.0,
+            ),
+        ),
+    )
+
+    interpolated = earth_orientation.at_epoch(midpoint)
+
+    assert interpolated.ut1_minus_utc_s == pytest.approx(0.2)
+    assert interpolated.polar_motion_x_arcsec == pytest.approx(0.4)
+    assert interpolated.polar_motion_y_arcsec == pytest.approx(-0.2)
+    assert interpolated.source == "unit-test-eop-table:interpolated"
+
+
+def test_earth_orientation_config_rejects_extrapolated_epoch() -> None:
+    earth_orientation = EarthOrientationConfig(
+        samples=(
+            EarthOrientationSample(
+                epoch=datetime(2026, 1, 1, tzinfo=UTC),
+                ut1_minus_utc_s=0.1,
+                polar_motion_x_arcsec=0.2,
+                polar_motion_y_arcsec=-0.4,
+            ),
+            EarthOrientationSample(
+                epoch=datetime(2026, 1, 1, 0, 10, tzinfo=UTC),
+                ut1_minus_utc_s=0.3,
+                polar_motion_x_arcsec=0.6,
+                polar_motion_y_arcsec=0.0,
+            ),
+        )
+    )
+
+    with pytest.raises(ValueError, match="outside Earth orientation sample range"):
+        earth_orientation.at_epoch(datetime(2026, 1, 1, 0, 11, tzinfo=UTC))
 
 
 @pytest.mark.parametrize(

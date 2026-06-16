@@ -33,6 +33,14 @@ def test_load_geodetic_eop_example_scenario() -> None:
     assert scenario.earth_orientation.ut1_minus_utc_s == 0.12
 
 
+def test_load_geodetic_eop_table_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_geodetic_eop_table_topocentric.yaml"))
+
+    assert scenario.scenario_id == "leo-geodetic-eop-table-topocentric"
+    assert scenario.earth_orientation.source == "example-eop-table"
+    assert len(scenario.earth_orientation.samples) == 2
+
+
 def test_load_doppler_example_scenario() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_doppler.yaml"))
 
