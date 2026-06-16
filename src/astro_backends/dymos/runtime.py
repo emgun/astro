@@ -5,6 +5,10 @@ from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from astro_backends.import_timeout import (
+    DEFAULT_OPTIONAL_IMPORT_TIMEOUT_S,
+    import_optional_module,
+)
 from astro_core.errors import UnsupportedBackendError
 
 PACKAGE = "dymos"
@@ -66,17 +70,37 @@ def _load_versions(*, strict: bool) -> tuple[str, str]:
     return dymos_version, openmdao_version
 
 
-def load_dymos_runtime(*, strict: bool = False) -> DymosRuntime:
+def load_dymos_runtime(
+    *,
+    strict: bool = False,
+    import_timeout_s: float = DEFAULT_OPTIONAL_IMPORT_TIMEOUT_S,
+) -> DymosRuntime:
     dymos_version, openmdao_version = _load_versions(strict=strict)
 
     try:
-        dymos_module = import_module(PACKAGE)
-        openmdao_module = import_module(OPENMDAO_API_MODULE)
+        dymos_module = import_optional_module(
+            PACKAGE,
+            import_module,
+            timeout_s=import_timeout_s,
+        )
+        openmdao_module = import_optional_module(
+            OPENMDAO_API_MODULE,
+            import_module,
+            timeout_s=import_timeout_s,
+        )
     except ImportError as exc:
         if strict:
             raise
         raise _runtime_unavailable(
             f"Dymos/OpenMDAO import failed: {exc}",
+            dymos_version=dymos_version,
+            openmdao_version=openmdao_version,
+        ) from exc
+    except TimeoutError as exc:
+        if strict:
+            raise
+        raise _runtime_unavailable(
+            f"Dymos/OpenMDAO import timed out: {exc}",
             dymos_version=dymos_version,
             openmdao_version=openmdao_version,
         ) from exc

@@ -63,6 +63,9 @@ astro rocketpy-smoke
 astro dymos-smoke
 ```
 
+These extras are pinned to NumPy-1-compatible backend lines: RocketPy `>=1.11,<1.12`,
+Dymos `>=1.13.1,<1.14`, and OpenMDAO `>=3.41,<3.42`.
+
 RocketPy and Dymos/OpenMDAO are behind explicit adapter gates. The current `rocketpy` launch path
 loads the optional runtime and preserves the `LaunchTrajectory` product boundary, but live RocketPy
 simulation still requires backend-specific rocket/motor configuration beyond the aggregate local

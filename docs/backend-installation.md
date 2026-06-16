@@ -54,6 +54,11 @@ astro rocketpy-smoke
 astro dymos-smoke
 ```
 
+The launch and optimization extras are pinned to NumPy-1-compatible backend lines:
+RocketPy `>=1.11,<1.12`, Dymos `>=1.13.1,<1.14`, and OpenMDAO `>=3.41,<3.42`.
+Newer backend releases may require NumPy 2.x and can break the suite's currently validated
+SciPy/Matplotlib binary stack in shared Anaconda environments.
+
 RocketPy and Dymos/OpenMDAO are optional adapter boundaries. The current local launch schema is an
 aggregate point-mass model; live RocketPy simulation and Dymos optimization require backend-specific
 vehicle/motor or phase-model configuration before they should be promoted beyond the adapter gates.

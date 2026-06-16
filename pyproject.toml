@@ -11,7 +11,7 @@ requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Emery Gunselman" }]
 dependencies = [
-  "numpy>=1.26",
+  "numpy>=1.26,<2",
   "pydantic>=2.7",
   "PyYAML>=6.0",
   "scipy>=1.12",
@@ -28,11 +28,11 @@ orekit = [
   "orekit-jpype>=13.1",
 ]
 launch = [
-  "rocketpy>=1.12,<2",
+  "rocketpy>=1.11,<1.12",
 ]
 optimization = [
-  "dymos>=1.15,<2",
-  "openmdao>=3.44,<4",
+  "dymos>=1.13.1,<1.14",
+  "openmdao>=3.41,<3.42",
 ]
 research = [
   "jax>=0.4.38,<1",

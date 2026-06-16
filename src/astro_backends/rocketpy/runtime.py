@@ -5,6 +5,10 @@ from importlib import import_module
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from astro_backends.import_timeout import (
+    DEFAULT_OPTIONAL_IMPORT_TIMEOUT_S,
+    import_optional_module,
+)
 from astro_core.errors import UnsupportedBackendError
 
 PACKAGE = "rocketpy"
@@ -41,7 +45,11 @@ def _runtime_unavailable(
     )
 
 
-def load_rocketpy_runtime(*, strict: bool = False) -> RocketPyRuntime:
+def load_rocketpy_runtime(
+    *,
+    strict: bool = False,
+    import_timeout_s: float = DEFAULT_OPTIONAL_IMPORT_TIMEOUT_S,
+) -> RocketPyRuntime:
     try:
         package_version = version(DISTRIBUTION)
     except PackageNotFoundError as exc:
@@ -52,12 +60,23 @@ def load_rocketpy_runtime(*, strict: bool = False) -> RocketPyRuntime:
         ) from exc
 
     try:
-        rocketpy_module = import_module(PACKAGE)
+        rocketpy_module = import_optional_module(
+            PACKAGE,
+            import_module,
+            timeout_s=import_timeout_s,
+        )
     except ImportError as exc:
         if strict:
             raise
         raise _runtime_unavailable(
             f"RocketPy import failed: {exc}",
+            package_version=package_version,
+        ) from exc
+    except TimeoutError as exc:
+        if strict:
+            raise
+        raise _runtime_unavailable(
+            f"RocketPy import timed out: {exc}",
             package_version=package_version,
         ) from exc
 

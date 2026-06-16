@@ -38,6 +38,23 @@ def test_load_dymos_runtime_reports_import_failure(
         load_dymos_runtime()
 
 
+def test_load_dymos_runtime_reports_import_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "astro_backends.dymos.runtime.version",
+        lambda distribution: "1.13.1" if distribution == "dymos" else "3.41.0",
+    )
+
+    def timeout_import(_module_name: str) -> object:
+        raise TimeoutError("timed out importing optional backend module")
+
+    monkeypatch.setattr("astro_backends.dymos.runtime.import_module", timeout_import)
+
+    with pytest.raises(UnsupportedBackendError, match="import timed out"):
+        load_dymos_runtime()
+
+
 def test_load_dymos_runtime_returns_required_api(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

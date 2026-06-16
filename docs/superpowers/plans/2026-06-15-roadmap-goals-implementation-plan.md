@@ -184,11 +184,15 @@ Primary files:
 
 ### Goal 4: Launch External Backends and Optimization
 
-Status: first external-backend boundary implemented. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, a RocketPy product adapter boundary, a neutral `optimize-launch` command, and Dymos adapter optimization diagnostics are implemented. Full live RocketPy motor/rocket geometry mapping and Dymos phase transcription remain gated on richer backend-specific configuration.
+Status: first external-backend boundary implemented. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, a RocketPy product adapter boundary, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, and Dymos adapter optimization diagnostics are implemented. Full live RocketPy motor/rocket geometry mapping and Dymos phase transcription remain gated on richer backend-specific configuration.
 
 Implemented slice:
 
 - `astro rocketpy-smoke` and `astro dymos-smoke` return structured availability diagnostics.
+- `astro rocketpy-smoke` and `astro dymos-smoke` are live-verified with NumPy-1-compatible pins:
+  RocketPy `>=1.11,<1.12`, Dymos `>=1.13.1,<1.14`, and OpenMDAO `>=3.41,<3.42`.
+- Optional backend imports have timeout diagnostics so Matplotlib/OpenMDAO/RocketPy import-time
+  stalls report as backend-unavailable errors instead of hanging indefinitely.
 - `astro launch --backend rocketpy` routes through a recognized RocketPy adapter boundary and fails clearly when dependencies or backend-specific configuration are unavailable.
 - `astro optimize-launch --backend local` runs the existing pitch-program tuner through a neutral optimization entry point.
 - `astro optimize-launch --backend dymos` routes through a Dymos/OpenMDAO adapter boundary and fails clearly until a validated Dymos phase runner is provided.
