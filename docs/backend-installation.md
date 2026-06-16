@@ -40,9 +40,10 @@ also checks `OREKIT_DATA_PATH`, then `~/.orekit/orekit-data.zip`.
 The Orekit propagation adapter currently supports suite `two_body` scenarios through
 `KeplerianPropagator`, suite `j2` scenarios through `NumericalPropagator` plus
 `J2OnlyPerturbation`, and suite `orekit_high_fidelity` scenarios through the same numerical
-propagation expansion path. Force-model flags for atmospheric drag, solar radiation pressure, and
-third-body gravity are schema-supported but fail with explicit unsupported-feature diagnostics until
-those Orekit force models are implemented. Native Orekit OD remains a separate roadmap item.
+propagation expansion path. Atmospheric drag is implemented with Orekit `DragForce`,
+`SimpleExponentialAtmosphere`, and `IsotropicDrag`. Force-model flags for solar radiation pressure
+and third-body gravity are schema-supported but fail with explicit unsupported-feature diagnostics
+until those Orekit force models are implemented. Native Orekit OD remains a separate roadmap item.
 
 ## Launch Backends
 

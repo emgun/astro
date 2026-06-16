@@ -109,10 +109,31 @@ def test_propagate_orekit_high_fidelity_uses_numerical_force_model_with_fake_run
     assert trajectory.metadata["unsupported_force_model_flags"] == []
 
 
+def test_propagate_orekit_high_fidelity_drag_adds_drag_force_with_fake_runtime() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+                atmospheric_drag=True,
+            )
+        }
+    )
+
+    trajectory = propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.backend == "orekit"
+    assert trajectory.metadata["propagator"] == "NumericalPropagator"
+    assert trajectory.metadata["force_models"] == ["J2OnlyPerturbation", "DragForce"]
+    assert trajectory.metadata["atmosphere_model"] == "SimpleExponentialAtmosphere"
+    assert trajectory.metadata["drag_spacecraft_model"] == "IsotropicDrag"
+    assert trajectory.metadata["drag_area_m2"] == scenario.spacecraft.area_m2
+    assert trajectory.metadata["drag_coefficient"] == scenario.spacecraft.drag_coefficient
+    assert trajectory.metadata["unsupported_force_model_flags"] == []
+
+
 @pytest.mark.parametrize(
     "force_model_update",
     [
-        {"atmospheric_drag": True},
         {"solar_radiation_pressure": True},
         {"third_body_gravity": True},
     ],
@@ -322,12 +343,49 @@ class _FakeJ2OnlyPerturbation:
         self.frame = frame
 
 
+class _FakeOneAxisEllipsoid:
+    def __init__(self, radius: float, flattening: float, frame: str) -> None:
+        self.radius = radius
+        self.flattening = flattening
+        self.frame = frame
+
+
+class _FakeSimpleExponentialAtmosphere:
+    def __init__(
+        self,
+        shape: _FakeOneAxisEllipsoid,
+        reference_density: float,
+        reference_altitude: float,
+        scale_height: float,
+    ) -> None:
+        self.shape = shape
+        self.reference_density = reference_density
+        self.reference_altitude = reference_altitude
+        self.scale_height = scale_height
+
+
+class _FakeIsotropicDrag:
+    def __init__(self, cross_section: float, drag_coefficient: float) -> None:
+        self.cross_section = cross_section
+        self.drag_coefficient = drag_coefficient
+
+
+class _FakeDragForce:
+    def __init__(
+        self,
+        atmosphere: _FakeSimpleExponentialAtmosphere,
+        spacecraft: _FakeIsotropicDrag,
+    ) -> None:
+        self.atmosphere = atmosphere
+        self.spacecraft = spacecraft
+
+
 class _FakeNumericalPropagator(_FakeKeplerianPropagator):
     def __init__(self, integrator: _FakeDormandPrince853Integrator) -> None:
         self.integrator = integrator
         self.orbit_type: str | None = None
         self.position_angle_type: str | None = None
-        self.force_models: list[_FakeJ2OnlyPerturbation] = []
+        self.force_models: list[object] = []
         self._orbit: _FakeCartesianOrbit | None = None
 
     @staticmethod
@@ -347,7 +405,7 @@ class _FakeNumericalPropagator(_FakeKeplerianPropagator):
     def setInitialState(self, initial_state: _FakeSpacecraftState) -> None:
         self._orbit = initial_state.orbit
 
-    def addForceModel(self, force_model: _FakeJ2OnlyPerturbation) -> None:
+    def addForceModel(self, force_model: object) -> None:
         self.force_models.append(force_model)
 
     def propagate(self, target_date: _FakeAbsoluteDate) -> _FakeSpacecraftState:
@@ -368,6 +426,11 @@ class _FakeIERSConventions:
     IERS_2010 = "IERS_2010"
 
 
+class _FakeConstants:
+    WGS84_EARTH_EQUATORIAL_RADIUS = 6_378_137.0
+    WGS84_EARTH_FLATTENING = 1.0 / 298.257223563
+
+
 def _fake_runtime() -> OrekitRuntime:
     return OrekitRuntime(
         wrapper="orekit_jpype",
@@ -384,7 +447,12 @@ def _fake_runtime() -> OrekitRuntime:
         numerical_propagator=_FakeNumericalPropagator,
         dormand_prince_853_integrator=_FakeDormandPrince853Integrator,
         j2_only_perturbation=_FakeJ2OnlyPerturbation,
+        one_axis_ellipsoid=_FakeOneAxisEllipsoid,
+        simple_exponential_atmosphere=_FakeSimpleExponentialAtmosphere,
+        drag_force=_FakeDragForce,
+        isotropic_drag=_FakeIsotropicDrag,
         orbit_type=_FakeOrbitType,
         position_angle_type=_FakePositionAngleType,
         iers_conventions=_FakeIERSConventions,
+        constants=_FakeConstants,
     )

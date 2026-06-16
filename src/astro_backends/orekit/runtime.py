@@ -39,9 +39,14 @@ class OrekitRuntime:
     numerical_propagator: Any
     dormand_prince_853_integrator: Any
     j2_only_perturbation: Any
+    one_axis_ellipsoid: Any
+    simple_exponential_atmosphere: Any
+    drag_force: Any
+    isotropic_drag: Any
     orbit_type: Any
     position_angle_type: Any
     iers_conventions: Any
+    constants: Any
 
 
 def _runtime_unavailable(
@@ -114,6 +119,9 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         analytical_module = import_module("org.orekit.propagation.analytical")
         numerical_module = import_module("org.orekit.propagation.numerical")
         gravity_module = import_module("org.orekit.forces.gravity")
+        bodies_module = import_module("org.orekit.bodies")
+        atmosphere_module = import_module("org.orekit.models.earth.atmosphere")
+        drag_module = import_module("org.orekit.forces.drag")
         ode_module = import_module("org.hipparchus.ode.nonstiff")
     except Exception as exc:
         if strict:
@@ -138,7 +146,12 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         numerical_propagator=numerical_module.NumericalPropagator,
         dormand_prince_853_integrator=ode_module.DormandPrince853Integrator,
         j2_only_perturbation=gravity_module.J2OnlyPerturbation,
+        one_axis_ellipsoid=bodies_module.OneAxisEllipsoid,
+        simple_exponential_atmosphere=atmosphere_module.SimpleExponentialAtmosphere,
+        drag_force=drag_module.DragForce,
+        isotropic_drag=drag_module.IsotropicDrag,
         orbit_type=orbits_module.OrbitType,
         position_angle_type=orbits_module.PositionAngleType,
         iers_conventions=utils_module.IERSConventions,
+        constants=utils_module.Constants,
     )

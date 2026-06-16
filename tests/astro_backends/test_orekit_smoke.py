@@ -40,6 +40,7 @@ def _fake_runtime_modules(
     utils_module = ModuleType("org.orekit.utils")
     utils_module.PVCoordinates = object()
     utils_module.IERSConventions = object()
+    utils_module.Constants = object()
     orbits_module = ModuleType("org.orekit.orbits")
     orbits_module.CartesianOrbit = object()
     orbits_module.OrbitType = object()
@@ -52,6 +53,13 @@ def _fake_runtime_modules(
     numerical_module.NumericalPropagator = object()
     gravity_module = ModuleType("org.orekit.forces.gravity")
     gravity_module.J2OnlyPerturbation = object()
+    bodies_module = ModuleType("org.orekit.bodies")
+    bodies_module.OneAxisEllipsoid = object()
+    atmosphere_module = ModuleType("org.orekit.models.earth.atmosphere")
+    atmosphere_module.SimpleExponentialAtmosphere = object()
+    drag_module = ModuleType("org.orekit.forces.drag")
+    drag_module.DragForce = object()
+    drag_module.IsotropicDrag = object()
     ode_module = ModuleType("org.hipparchus.ode.nonstiff")
     ode_module.DormandPrince853Integrator = object()
     return {
@@ -66,6 +74,9 @@ def _fake_runtime_modules(
         "org.orekit.propagation.analytical": analytical_module,
         "org.orekit.propagation.numerical": numerical_module,
         "org.orekit.forces.gravity": gravity_module,
+        "org.orekit.bodies": bodies_module,
+        "org.orekit.models.earth.atmosphere": atmosphere_module,
+        "org.orekit.forces.drag": drag_module,
         "org.hipparchus.ode.nonstiff": ode_module,
     }
 

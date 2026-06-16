@@ -13,6 +13,10 @@ from astro_backends.orekit.conversion import (
     m_to_km,
     validate_orekit_state_support,
 )
+from astro_backends.orekit.force_models import (
+    build_atmospheric_drag_force_model,
+    build_earth_shape,
+)
 from astro_backends.orekit.runtime import OrekitRuntime, load_orekit_runtime
 from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
 from astro_core.errors import UnsupportedBackendError
@@ -44,11 +48,15 @@ class _OrekitPropagatorConfig:
 
 def _validate_orekit_scenario(scenario: Scenario) -> None:
     validate_orekit_state_support(scenario.initial_state)
-    enabled_flags = scenario.force_model.enabled_high_fidelity_flags()
-    if enabled_flags:
+    unsupported_flags = tuple(
+        flag
+        for flag in scenario.force_model.enabled_high_fidelity_flags()
+        if flag != "atmospheric_drag"
+    )
+    if unsupported_flags:
         raise UnsupportedBackendError(
             "Orekit propagation does not yet support high-fidelity force model flags: "
-            f"{', '.join(enabled_flags)}"
+            f"{', '.join(unsupported_flags)}"
         )
     if scenario.force_model.gravity not in _SUPPORTED_OREKIT_GRAVITY_MODELS:
         raise UnsupportedBackendError(
@@ -117,6 +125,9 @@ def _build_j2_numerical_propagator(
     propagator.setInitialState(runtime.spacecraft_state(orbit))
 
     j2_frame = runtime.frames_factory.getITRF(runtime.iers_conventions.IERS_2010, True)
+    earth_shape = build_earth_shape(runtime, j2_frame)
+    force_model_names = ["J2OnlyPerturbation"]
+    force_model_metadata: dict[str, object] = {}
     propagator.addForceModel(
         runtime.j2_only_perturbation(
             MU_EARTH_M3_S2,
@@ -125,6 +136,11 @@ def _build_j2_numerical_propagator(
             j2_frame,
         )
     )
+    if scenario.force_model.atmospheric_drag:
+        drag_force_model = build_atmospheric_drag_force_model(scenario, runtime, earth_shape)
+        propagator.addForceModel(drag_force_model.model)
+        force_model_names.append(drag_force_model.name)
+        force_model_metadata.update(drag_force_model.metadata)
 
     return _OrekitPropagatorConfig(
         propagator=propagator,
@@ -132,7 +148,7 @@ def _build_j2_numerical_propagator(
             "propagator": "NumericalPropagator",
             "frame": "EME2000",
             "j2_frame": "ITRF(IERS_2010, simple_eop=True)",
-            "force_models": ["J2OnlyPerturbation"],
+            "force_models": force_model_names,
             "orbit_type": "CARTESIAN",
             "position_angle_type": "TRUE",
             "integrator": "DormandPrince853Integrator",
@@ -140,6 +156,7 @@ def _build_j2_numerical_propagator(
             "integrator_max_step_s": max_step_s,
             "integrator_initial_step_s": initial_step_s,
             "integrator_position_tolerance_m": J2_POSITION_TOLERANCE_M,
+            **force_model_metadata,
             **(
                 {
                     "gravity_model": "orekit_high_fidelity",
