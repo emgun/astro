@@ -149,6 +149,33 @@ def test_propagate_local_applies_thrust_vector_mass_flow_burn() -> None:
     assert trajectory.events[0].metadata["thrust_vector_n"] == (0.0, 0.25, 0.0)
 
 
+def test_propagate_local_applies_velocity_aligned_thrust_vector_burn() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    burn = Maneuver(
+        name="velocity-aligned-trim",
+        epoch=scenario.initial_state.epoch + timedelta(seconds=60),
+        frame=scenario.initial_state.frame,
+        delta_v_km_s=(0.0, 0.0, 0.0),
+        duration_s=120.0,
+        thrust_vector_n=(0.0, 0.25, 0.0),
+        specific_impulse_s=220.0,
+        thrust_direction_mode="velocity_aligned",
+    )
+    maneuvered_scenario = scenario.model_copy(update={"maneuvers": [burn]})
+
+    baseline = propagate_local(scenario)
+    trajectory = propagate_local(maneuvered_scenario)
+    baseline_final_velocity = np.array(baseline.samples[-1].state.velocity_km_s)
+    maneuvered_final_velocity = np.array(trajectory.samples[-1].state.velocity_km_s)
+    velocity_delta = maneuvered_final_velocity - baseline_final_velocity
+
+    assert velocity_delta[1] > 0.0
+    assert velocity_delta[2] > 0.0
+    assert trajectory.metadata["attitude_coupled_burn_count"] == 1
+    assert trajectory.metadata["thrust_direction_modes"] == ["velocity_aligned"]
+    assert trajectory.events[0].metadata["thrust_direction_mode"] == "velocity_aligned"
+
+
 def test_propagate_local_generates_covariance_history_from_initial_covariance() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     initial_covariance = [

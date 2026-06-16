@@ -33,6 +33,13 @@ def test_load_geodetic_eop_example_scenario() -> None:
     assert scenario.earth_orientation.ut1_minus_utc_s == 0.12
 
 
+def test_load_velocity_aligned_burn_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_velocity_aligned_burn.yaml"))
+
+    assert scenario.scenario_id == "leo-velocity-aligned-burn"
+    assert scenario.maneuvers[0].thrust_direction_mode == "velocity_aligned"
+
+
 def test_load_j2_example_scenario() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_j2.yaml"))
 

@@ -172,6 +172,7 @@ def _finite_burn_acceleration_km_s2(
     schedule: list[_ScheduledManeuver],
     elapsed_s: float,
     mass_kg: float,
+    velocity_km_s: FloatArray,
 ) -> FloatArray:
     acceleration = np.zeros(3, dtype=np.float64)
     for scheduled in schedule:
@@ -184,9 +185,17 @@ def _finite_burn_acceleration_km_s2(
             < scheduled.end_s - _MANEUVER_TIME_TOLERANCE_S
         ):
             if maneuver.thrust_vector_n is not None:
-                thrust_acceleration_m_s2 = (
-                    np.array(maneuver.thrust_vector_n, dtype=np.float64) / mass_kg
-                )
+                thrust_vector_n = np.array(maneuver.thrust_vector_n, dtype=np.float64)
+                if maneuver.thrust_direction_mode == "velocity_aligned":
+                    velocity_norm = float(np.linalg.norm(velocity_km_s))
+                    if velocity_norm == 0.0:
+                        raise ValueError(
+                            "velocity-aligned thrust requires nonzero spacecraft velocity"
+                        )
+                    thrust_vector_n = (
+                        float(np.linalg.norm(thrust_vector_n)) * velocity_km_s / velocity_norm
+                    )
+                thrust_acceleration_m_s2 = thrust_vector_n / mass_kg
                 acceleration = acceleration + thrust_acceleration_m_s2 / 1000.0
             else:
                 acceleration = acceleration + (
@@ -235,6 +244,7 @@ def _derivative_with_maneuvers(
         schedule,
         elapsed_s,
         mass_kg,
+        velocity,
     )
     return cast(
         FloatArray,
@@ -377,6 +387,7 @@ def _maneuver_events(
         if maneuver.thrust_vector_n is not None:
             metadata["thrust_vector_n"] = maneuver.thrust_vector_n
             metadata["specific_impulse_s"] = maneuver.specific_impulse_s
+            metadata["thrust_direction_mode"] = maneuver.thrust_direction_mode
         if maneuver.duration_s == 0.0:
             events.append(
                 TrajectoryEvent(
@@ -416,16 +427,32 @@ def _maneuver_metadata(schedule: list[_ScheduledManeuver]) -> dict[str, Any]:
     thrust_vector_burn_count = sum(
         1 for scheduled in schedule if scheduled.maneuver.thrust_vector_n is not None
     )
-    maneuver_model = (
-        "thrust_vector_mass_flow"
-        if thrust_vector_burn_count
-        else "constant_inertial_acceleration"
+    attitude_coupled_burn_count = sum(
+        1
+        for scheduled in schedule
+        if scheduled.maneuver.thrust_vector_n is not None
+        and scheduled.maneuver.thrust_direction_mode != "inertial"
     )
+    thrust_direction_modes = sorted(
+        {
+            scheduled.maneuver.thrust_direction_mode
+            for scheduled in schedule
+            if scheduled.maneuver.thrust_vector_n is not None
+        }
+    )
+    if attitude_coupled_burn_count:
+        maneuver_model = "attitude_coupled_thrust_vector_mass_flow"
+    elif thrust_vector_burn_count:
+        maneuver_model = "thrust_vector_mass_flow"
+    else:
+        maneuver_model = "constant_inertial_acceleration"
     return {
         "maneuver_model": maneuver_model,
         "finite_burn_count": finite_burn_count,
         "impulsive_maneuver_count": impulse_count,
         "thrust_vector_burn_count": thrust_vector_burn_count,
+        "attitude_coupled_burn_count": attitude_coupled_burn_count,
+        "thrust_direction_modes": thrust_direction_modes,
     }
 
 

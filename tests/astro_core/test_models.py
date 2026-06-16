@@ -497,6 +497,22 @@ def test_maneuver_accepts_thrust_vector_mass_flow_fields() -> None:
 
     assert maneuver.thrust_vector_n == (0.0, 0.25, 0.0)
     assert maneuver.specific_impulse_s == 220.0
+    assert maneuver.thrust_direction_mode == "inertial"
+
+
+def test_maneuver_accepts_velocity_aligned_thrust_direction_mode() -> None:
+    maneuver = Maneuver(
+        name="velocity-aligned",
+        epoch=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
+        frame=Frame.EME2000,
+        delta_v_km_s=(0.0, 0.0, 0.0),
+        duration_s=120.0,
+        thrust_vector_n=(0.0, 0.25, 0.0),
+        specific_impulse_s=220.0,
+        thrust_direction_mode="velocity_aligned",
+    )
+
+    assert maneuver.thrust_direction_mode == "velocity_aligned"
 
 
 def test_maneuver_and_covariance_validation() -> None:

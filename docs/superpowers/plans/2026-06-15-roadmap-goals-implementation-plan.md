@@ -32,7 +32,7 @@ Implemented and protected:
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV ephemeris export,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
   propagation, plus finite-difference local covariance propagation with optional acceleration
-  process noise.
+  process noise and a velocity-aligned attitude-coupled thrust-vector burn mode.
 - `astro_od` synthetic range/range-rate/right-ascension/declination/azimuth/elevation generation,
   measurement JSON/CSV ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy
   batch least-squares OD.
@@ -44,7 +44,7 @@ Still roadmap-level:
 
 - Native Orekit batch/sequential OD execution and suite result mapping.
 - High-fidelity covariance propagation with validated state transition matrices/process noise and
-  attitude-coupled maneuver dynamics.
+  full attitude-control maneuver dynamics.
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
 - Live Tudat cross-check environment/body construction.
@@ -178,15 +178,17 @@ Primary files:
 Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
 finite burns, local thrust-vector finite burns with mass depletion, finite-difference local
 covariance propagation with optional white-acceleration process noise, CSV ephemeris export, and
-seeded initial-state Monte Carlo. Validated high-fidelity covariance dynamics and attitude-coupled
-maneuver dynamics remain deferred.
+seeded initial-state Monte Carlo. The first attitude-coupled finite-burn mode rotates thrust along
+the instantaneous velocity direction; validated high-fidelity covariance dynamics and full
+attitude-control maneuver dynamics remain deferred.
 
 Definition of done:
 
 - Orbital `Trajectory` supports event and maneuver records without breaking launch products.
 - Ephemeris export supports JSON plus at least one standard interchange format selected for the suite's current maturity.
 - Maneuver products cover impulsive delta-v, local finite burns with constant inertial
-  acceleration, and local thrust-vector finite burns with mass-flow depletion.
+  acceleration, local thrust-vector finite burns with mass-flow depletion, and velocity-aligned
+  thrust direction for the first attitude-coupled burn mode.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported and local propagation can populate them from a
   scenario initial covariance using finite-difference state transitions plus optional

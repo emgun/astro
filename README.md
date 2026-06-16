@@ -103,6 +103,7 @@ astro propagate examples/scenarios/meo_two_body.yaml --backend local --output me
 astro propagate examples/scenarios/geo_two_body.yaml --backend local --output geo_trajectory.json
 astro propagate examples/scenarios/leo_j2.yaml --backend local --output j2_trajectory.json
 astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output finite_burn_trajectory.json
+astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output velocity_aligned_burn_trajectory.json
 astro propagate examples/scenarios/leo_covariance.yaml --backend local --output covariance_trajectory.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
 astro propagate examples/scenarios/leo_j2.yaml --backend orekit --output orekit_j2_trajectory.json
@@ -164,7 +165,10 @@ maneuvers apply their full `delta_v_km_s` at the maneuver epoch; finite burns ap
 total delta-v as constant inertial acceleration over `duration_s`, or use optional
 `thrust_vector_n` plus `specific_impulse_s` to integrate thrust-vector acceleration with mass
 depletion. Trajectory samples include `mass_kg`, and maneuver start/end events preserve maneuver
-metadata. This remains an inertial thrust-vector baseline, not an attitude-control model.
+metadata. Thrust-vector finite burns default to inertial direction; setting
+`thrust_direction_mode` to `velocity_aligned` rotates the thrust magnitude along the instantaneous
+velocity direction as the first attitude-coupled burn mode. This is still a commanded-direction
+model, not a full attitude control simulation.
 
 Local propagation also accepts an optional `initial_covariance` 6x6 matrix. When present, the local
 backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference state
