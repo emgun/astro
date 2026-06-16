@@ -27,6 +27,7 @@ initial_covariance:
   - [0.0, 0.0, 0.0, 0.000001, 0.0, 0.0]
   - [0.0, 0.0, 0.0, 0.0, 0.000001, 0.0]
   - [0.0, 0.0, 0.0, 0.0, 0.0, 0.000001]
+covariance_process_noise_acceleration_km_s2: 0.000000001
 ground_stations:
   - name: equator-eci
     position_eci_km: [6378.1363, 0.0, 0.0]

@@ -31,7 +31,8 @@ Implemented and protected:
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV ephemeris export,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
-  propagation, plus finite-difference local covariance propagation.
+  propagation, plus finite-difference local covariance propagation with optional acceleration
+  process noise.
 - `astro_od` synthetic range/range-rate/right-ascension/declination/azimuth/elevation generation,
   measurement JSON/CSV ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy
   batch least-squares OD.
@@ -162,8 +163,9 @@ Primary files:
 
 Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
 finite burns, local thrust-vector finite burns with mass depletion, finite-difference local
-covariance propagation, CSV ephemeris export, and seeded initial-state Monte Carlo. Validated
-high-fidelity covariance dynamics and attitude-coupled maneuver dynamics remain deferred.
+covariance propagation with optional white-acceleration process noise, CSV ephemeris export, and
+seeded initial-state Monte Carlo. Validated high-fidelity covariance dynamics and attitude-coupled
+maneuver dynamics remain deferred.
 
 Definition of done:
 
@@ -173,7 +175,8 @@ Definition of done:
   acceleration, and local thrust-vector finite burns with mass-flow depletion.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported and local propagation can populate them from a
-  scenario initial covariance using finite-difference state transitions.
+  scenario initial covariance using finite-difference state transitions plus optional
+  white-acceleration process noise.
 
 Primary files:
 

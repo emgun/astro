@@ -669,3 +669,25 @@ def test_scenario_accepts_minimal_valid_orbital_case() -> None:
 
     assert scenario.scenario_id == "leo-demo"
     assert scenario.propagation.sample_count == 11
+
+
+def test_scenario_rejects_negative_covariance_process_noise() -> None:
+    payload = Scenario(
+        scenario_id="leo-demo",
+        description="LEO propagation demo",
+        spacecraft=Spacecraft(
+            name="demo",
+            mass_kg=120.0,
+            area_m2=2.5,
+            drag_coefficient=2.2,
+            reflectivity_coefficient=1.3,
+        ),
+        initial_state=make_state(),
+        force_model=ForceModelConfig(gravity=ForceModelName.TWO_BODY),
+        propagation=PropagationConfig(duration_s=600.0, step_s=60.0),
+    ).model_dump(mode="json")
+
+    with pytest.raises(ValidationError, match="greater than or equal to 0"):
+        Scenario.model_validate(
+            payload | {"covariance_process_noise_acceleration_km_s2": -1.0e-9}
+        )

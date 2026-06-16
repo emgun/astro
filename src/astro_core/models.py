@@ -638,9 +638,18 @@ class Scenario(AstroModel):
     propagation: PropagationConfig
     maneuvers: list[Maneuver] = Field(default_factory=list)
     initial_covariance: list[list[FiniteFloat]] | None = None
+    covariance_process_noise_acceleration_km_s2: FiniteFloat = Field(ge=0.0, default=0.0)
     ground_stations: list[GroundStation] = Field(default_factory=list)
     measurements: MeasurementConfig = Field(default_factory=MeasurementConfig)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("covariance_process_noise_acceleration_km_s2", mode="before")
+    @classmethod
+    def covariance_process_noise_input_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(
+            value,
+            "Scenario covariance process noise acceleration",
+        )
 
     @field_validator("initial_covariance", mode="before")
     @classmethod

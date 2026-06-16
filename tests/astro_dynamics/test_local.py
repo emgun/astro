@@ -171,6 +171,26 @@ def test_propagate_local_generates_covariance_history_from_initial_covariance() 
     assert trajectory.metadata["covariance_model"] == "finite_difference_state_transition"
 
 
+def test_propagate_local_adds_acceleration_process_noise_to_covariance() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    initial_covariance = [[0.0 for _column in range(6)] for _row in range(6)]
+    covariance_scenario = Scenario.model_validate(
+        scenario.model_dump(mode="json")
+        | {
+            "initial_covariance": initial_covariance,
+            "covariance_process_noise_acceleration_km_s2": 1.0e-9,
+        }
+    )
+
+    trajectory = propagate_local(covariance_scenario)
+
+    final_covariance = np.array(trajectory.covariance_history[-1].covariance)
+    assert np.any(np.diag(final_covariance) > 0.0)
+    np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-20)
+    assert trajectory.metadata["covariance_process_noise"] == "white_acceleration"
+    assert trajectory.metadata["covariance_process_noise_acceleration_km_s2"] == 1.0e-9
+
+
 def test_propagate_local_rejects_unsupported_local_force_model() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     unsupported_scenario = scenario.model_copy(

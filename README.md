@@ -11,8 +11,9 @@ The current implementation slice covers:
 - Pydantic scenario validation from YAML.
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
 - Flight-dynamics trajectory product fields for events, impulsive and finite-burn maneuvers, and
-  covariance history, plus local finite-difference covariance propagation, CSV ephemeris export, and
-  seeded initial-state Monte Carlo propagation.
+  covariance history, plus local finite-difference covariance propagation with optional
+  acceleration process noise, CSV ephemeris export, and seeded initial-state Monte Carlo
+  propagation.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
@@ -158,8 +159,10 @@ metadata. This remains an inertial thrust-vector baseline, not an attitude-contr
 
 Local propagation also accepts an optional `initial_covariance` 6x6 matrix. When present, the local
 backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference state
-transition with no process noise. This is useful for product wiring and first-order sensitivity
-screening; high-fidelity covariance dynamics remain a backend validation task.
+transition. The optional `covariance_process_noise_acceleration_km_s2` field adds a simple
+per-axis white-acceleration process-noise term over each propagation sample interval. This is useful
+for product wiring and first-order sensitivity screening; high-fidelity covariance dynamics remain a
+backend validation task.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage
