@@ -462,10 +462,32 @@ def _initial_covariance_matrix(scenario: Scenario) -> FloatArray | None:
     return cast(FloatArray, np.array(scenario.initial_covariance, dtype=np.float64))
 
 
-def _covariance_sample(epoch: datetime, covariance: FloatArray) -> CovarianceSample:
+def _matrix_to_nested_list(matrix: FloatArray) -> list[list[float]]:
+    return [[float(component) for component in row] for row in matrix]
+
+
+def _covariance_process_noise_model(acceleration_sigma_km_s2: float) -> str:
+    return "white_acceleration" if acceleration_sigma_km_s2 > 0.0 else "none"
+
+
+def _covariance_sample(
+    epoch: datetime,
+    covariance: FloatArray,
+    *,
+    state_transition_matrix: FloatArray,
+    accumulated_state_transition_matrix: FloatArray,
+    process_noise_covariance: FloatArray,
+    metadata: dict[str, Any],
+) -> CovarianceSample:
     return CovarianceSample(
         epoch=epoch,
-        covariance=[[float(component) for component in row] for row in covariance],
+        covariance=_matrix_to_nested_list(covariance),
+        state_transition_matrix=_matrix_to_nested_list(state_transition_matrix),
+        accumulated_state_transition_matrix=_matrix_to_nested_list(
+            accumulated_state_transition_matrix
+        ),
+        process_noise_covariance=_matrix_to_nested_list(process_noise_covariance),
+        metadata=metadata,
     )
 
 
@@ -517,10 +539,12 @@ def _covariance_metadata(scenario: Scenario, covariance: FloatArray | None) -> d
     process_noise_acceleration = scenario.covariance_process_noise_acceleration_km_s2
     return {
         "covariance_model": "finite_difference_state_transition",
-        "covariance_process_noise": (
-            "white_acceleration" if process_noise_acceleration > 0.0 else "none"
-        ),
+        "covariance_state_transition_storage": "per_sample_and_accumulated",
+        "covariance_process_noise": _covariance_process_noise_model(process_noise_acceleration),
         "covariance_process_noise_acceleration_km_s2": process_noise_acceleration,
+        "covariance_process_noise_storage": "per_sample_matrix",
+        "covariance_finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
+        "covariance_finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
     }
 
 
@@ -537,6 +561,12 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         scenario.covariance_process_noise_acceleration_km_s2,
         scenario.propagation.step_s,
     )
+    zero_process_noise = np.zeros((6, 6), dtype=np.float64)
+    identity_transition = np.eye(6, dtype=np.float64)
+    accumulated_transition = identity_transition.copy()
+    previous_transition = identity_transition.copy()
+    previous_process_noise = zero_process_noise
+    previous_transition_step_s = 0.0
     covariance_history: list[CovarianceSample] = []
 
     initial = scenario.initial_state.cartesian
@@ -559,7 +589,39 @@ def propagate_local(scenario: Scenario) -> Trajectory:
             )
         )
         if covariance_matrix is not None:
-            covariance_history.append(_covariance_sample(epoch, covariance_matrix))
+            covariance_history.append(
+                _covariance_sample(
+                    epoch,
+                    covariance_matrix,
+                    state_transition_matrix=previous_transition,
+                    accumulated_state_transition_matrix=accumulated_transition,
+                    process_noise_covariance=previous_process_noise,
+                    metadata={
+                        "covariance_sample_role": (
+                            "initial" if step_index == 0 else "propagated"
+                        ),
+                        "covariance_model": "finite_difference_state_transition",
+                        "state_transition_model": (
+                            "identity" if step_index == 0 else "finite_difference"
+                        ),
+                        "transition_step_s": previous_transition_step_s,
+                        "process_noise_model": (
+                            "none"
+                            if step_index == 0
+                            else _covariance_process_noise_model(
+                                scenario.covariance_process_noise_acceleration_km_s2
+                            )
+                        ),
+                        "process_noise_acceleration_km_s2": (
+                            0.0
+                            if step_index == 0
+                            else scenario.covariance_process_noise_acceleration_km_s2
+                        ),
+                        "finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
+                        "finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
+                    },
+                )
+            )
 
         if step_index < scenario.propagation.sample_count - 1:
             transition: FloatArray | None = None
@@ -615,6 +677,10 @@ def propagate_local(scenario: Scenario) -> Trajectory:
                     transition,
                     process_noise,
                 )
+                accumulated_transition = cast(FloatArray, transition @ accumulated_transition)
+                previous_transition = transition
+                previous_process_noise = process_noise
+                previous_transition_step_s = scenario.propagation.step_s
 
     mass_metadata = (
         {

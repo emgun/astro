@@ -12,8 +12,8 @@ The current implementation slice covers:
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
 - Flight-dynamics trajectory product fields for events, impulsive and finite-burn maneuvers, and
   covariance history, plus local finite-difference covariance propagation with optional
-  acceleration process noise, CSV ephemeris export, and seeded initial-state Monte Carlo
-  propagation.
+  acceleration process noise, per-sample state-transition/process-noise products, CSV ephemeris
+  export, and seeded initial-state Monte Carlo propagation.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
@@ -175,10 +175,12 @@ model, not a full attitude control simulation.
 
 Local propagation also accepts an optional `initial_covariance` 6x6 matrix. When present, the local
 backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference state
-transition. The optional `covariance_process_noise_acceleration_km_s2` field adds a simple
-per-axis white-acceleration process-noise term over each propagation sample interval. This is useful
-for product wiring and first-order sensitivity screening; high-fidelity covariance dynamics remain a
-backend validation task.
+transition. Each covariance sample can carry the per-step `state_transition_matrix`, the
+`accumulated_state_transition_matrix` from the initial epoch, the `process_noise_covariance` applied
+for that step, and metadata naming the model and step size. The optional
+`covariance_process_noise_acceleration_km_s2` field adds a simple per-axis white-acceleration
+process-noise term over each propagation sample interval. This is useful for product wiring and
+first-order sensitivity screening; backend-native covariance dynamics remain a validation task.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage

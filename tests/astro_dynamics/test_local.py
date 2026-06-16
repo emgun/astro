@@ -192,10 +192,33 @@ def test_propagate_local_generates_covariance_history_from_initial_covariance() 
     assert trajectory.covariance_history[0].covariance == initial_covariance
     assert trajectory.covariance_history[-1].epoch == trajectory.samples[-1].epoch
     final_covariance = np.array(trajectory.covariance_history[-1].covariance)
+    final_transition = np.array(trajectory.covariance_history[-1].state_transition_matrix)
+    final_accumulated_transition = np.array(
+        trajectory.covariance_history[-1].accumulated_state_transition_matrix
+    )
     assert final_covariance.shape == (6, 6)
+    assert final_transition.shape == (6, 6)
+    assert final_accumulated_transition.shape == (6, 6)
     np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-10)
     assert not np.allclose(final_covariance, np.array(initial_covariance))
     assert trajectory.metadata["covariance_model"] == "finite_difference_state_transition"
+    assert trajectory.metadata["covariance_state_transition_storage"] == (
+        "per_sample_and_accumulated"
+    )
+    assert trajectory.covariance_history[0].metadata["covariance_sample_role"] == "initial"
+    assert trajectory.covariance_history[-1].metadata["covariance_sample_role"] == "propagated"
+    assert trajectory.covariance_history[-1].metadata["transition_step_s"] == (
+        covariance_scenario.propagation.step_s
+    )
+    assert trajectory.covariance_history[-1].metadata["state_transition_model"] == (
+        "finite_difference"
+    )
+    np.testing.assert_allclose(
+        np.array(trajectory.covariance_history[0].state_transition_matrix),
+        np.eye(6),
+        rtol=0.0,
+        atol=0.0,
+    )
 
 
 def test_propagate_local_adds_acceleration_process_noise_to_covariance() -> None:
@@ -212,9 +235,15 @@ def test_propagate_local_adds_acceleration_process_noise_to_covariance() -> None
     trajectory = propagate_local(covariance_scenario)
 
     final_covariance = np.array(trajectory.covariance_history[-1].covariance)
+    final_process_noise = np.array(trajectory.covariance_history[-1].process_noise_covariance)
     assert np.any(np.diag(final_covariance) > 0.0)
+    assert np.any(np.diag(final_process_noise) > 0.0)
     np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-20)
+    np.testing.assert_allclose(final_process_noise, final_process_noise.T, rtol=0.0, atol=1.0e-20)
     assert trajectory.metadata["covariance_process_noise"] == "white_acceleration"
+    assert trajectory.covariance_history[-1].metadata["process_noise_model"] == (
+        "white_acceleration"
+    )
     assert trajectory.metadata["covariance_process_noise_acceleration_km_s2"] == 1.0e-9
 
 

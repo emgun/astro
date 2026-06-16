@@ -677,6 +677,9 @@ class Maneuver(AstroModel):
 class CovarianceSample(AstroModel):
     epoch: datetime
     covariance: list[list[FiniteFloat]]
+    state_transition_matrix: list[list[FiniteFloat]] | None = None
+    accumulated_state_transition_matrix: list[list[FiniteFloat]] | None = None
+    process_noise_covariance: list[list[FiniteFloat]] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("epoch", mode="before")
@@ -689,14 +692,32 @@ class CovarianceSample(AstroModel):
     def epoch_must_be_aware(cls, value: datetime) -> datetime:
         return _datetime_must_be_aware(value, "CovarianceSample epoch")
 
-    @field_validator("covariance", mode="before")
+    @field_validator(
+        "covariance",
+        "state_transition_matrix",
+        "accumulated_state_transition_matrix",
+        "process_noise_covariance",
+        mode="before",
+    )
     @classmethod
     def covariance_inputs_must_be_numeric(cls, value: Any) -> Any:
+        if value is None:
+            return None
         return _numeric_matrix_input_must_be_numbers(value, "CovarianceSample covariance")
 
-    @field_validator("covariance")
+    @field_validator(
+        "covariance",
+        "state_transition_matrix",
+        "accumulated_state_transition_matrix",
+        "process_noise_covariance",
+    )
     @classmethod
-    def covariance_must_be_6x6_and_finite(cls, value: list[list[float]]) -> list[list[float]]:
+    def covariance_must_be_6x6_and_finite(
+        cls,
+        value: list[list[float]] | None,
+    ) -> list[list[float]] | None:
+        if value is None:
+            return None
         if len(value) != 6 or any(len(row) != 6 for row in value):
             raise ValueError("CovarianceSample covariance must be 6x6")
         if any(not isfinite(component) for row in value for component in row):

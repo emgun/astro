@@ -476,6 +476,24 @@ def test_trajectory_accepts_events_maneuvers_and_covariance_history() -> None:
     assert trajectory.covariance_history == [covariance]
 
 
+def test_covariance_sample_accepts_transition_and_process_noise_products() -> None:
+    epoch = datetime(2026, 1, 1, tzinfo=UTC)
+    covariance = make_covariance()
+    zero_matrix = [[0.0 for _column in range(6)] for _row in range(6)]
+
+    sample = CovarianceSample(
+        epoch=epoch,
+        covariance=covariance,
+        state_transition_matrix=covariance,
+        accumulated_state_transition_matrix=covariance,
+        process_noise_covariance=zero_matrix,
+    )
+
+    assert sample.state_transition_matrix == covariance
+    assert sample.accumulated_state_transition_matrix == covariance
+    assert sample.process_noise_covariance == zero_matrix
+
+
 def test_trajectory_sample_accepts_optional_mass_history() -> None:
     epoch = datetime(2026, 1, 1, tzinfo=UTC)
     sample = make_trajectory_sample(epoch).model_copy(update={"mass_kg": 118.5})
@@ -550,6 +568,20 @@ def test_maneuver_and_covariance_validation() -> None:
 
     with pytest.raises(ValidationError, match="6x6"):
         CovarianceSample(epoch=epoch, covariance=[[1.0]])
+
+    with pytest.raises(ValidationError, match="6x6"):
+        CovarianceSample(
+            epoch=epoch,
+            covariance=make_covariance(),
+            state_transition_matrix=[[1.0]],
+        )
+
+    with pytest.raises(ValidationError, match="6x6"):
+        CovarianceSample(
+            epoch=epoch,
+            covariance=make_covariance(),
+            process_noise_covariance=[[1.0]],
+        )
 
 
 @pytest.mark.parametrize("field_name", ["mass_kg", "area_m2"])

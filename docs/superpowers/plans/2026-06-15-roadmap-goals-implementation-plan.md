@@ -33,7 +33,8 @@ Implemented and protected:
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV ephemeris export,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
   propagation, plus finite-difference local covariance propagation with optional acceleration
-  process noise and a velocity-aligned attitude-coupled thrust-vector burn mode.
+  process noise, explicit per-sample state-transition/process-noise covariance products, and a
+  velocity-aligned attitude-coupled thrust-vector burn mode.
 - `astro_od` synthetic range/range-rate/one-way Doppler/right-ascension/declination/azimuth/elevation
   generation, measurement JSON/CSV ingest/export, TDM range/range-rate/angle ingest/export, and
   local SciPy batch least-squares OD.
@@ -44,8 +45,7 @@ Implemented and protected:
 Still roadmap-level:
 
 - Native Orekit batch/sequential OD execution and suite result mapping.
-- High-fidelity covariance propagation with validated state transition matrices/process noise and
-  full attitude-control maneuver dynamics.
+- Backend-native high-fidelity covariance propagation and full attitude-control maneuver dynamics.
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
 - Live Tudat cross-check environment/body construction.
@@ -182,10 +182,11 @@ Primary files:
 
 Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
 finite burns, local thrust-vector finite burns with mass depletion, finite-difference local
-covariance propagation with optional white-acceleration process noise, CSV ephemeris export, and
-seeded initial-state Monte Carlo. The first attitude-coupled finite-burn mode rotates thrust along
-the instantaneous velocity direction; validated high-fidelity covariance dynamics and full
-attitude-control maneuver dynamics remain deferred.
+covariance propagation with optional white-acceleration process noise, explicit per-sample and
+accumulated state-transition matrices, per-sample process-noise covariance matrices, CSV ephemeris
+export, and seeded initial-state Monte Carlo. The first attitude-coupled finite-burn mode rotates
+thrust along the instantaneous velocity direction; backend-native high-fidelity covariance dynamics
+and full attitude-control maneuver dynamics remain deferred.
 
 Definition of done:
 
@@ -197,7 +198,8 @@ Definition of done:
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported and local propagation can populate them from a
   scenario initial covariance using finite-difference state transitions plus optional
-  white-acceleration process noise.
+  white-acceleration process noise, including per-sample state-transition matrices, accumulated
+  state-transition matrices, and process-noise covariance matrices.
 
 Primary files:
 
