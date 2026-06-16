@@ -46,6 +46,7 @@ adapters.
 | MEO/GEO examples | Tests validate and propagate the medium-Earth and geosynchronous-radius scenarios. |
 | Orekit two-body vs local | `orekit_live` test compares final LEO state with `abs(position) <= 1 km` and `abs(velocity) <= 1e-3 km/s` when `ASTRO_RUN_OREKIT_LIVE=1`. |
 | Orekit J2 vs local | `orekit_live` test compares final LEO J2 state with `norm(position delta) < 0.05 km` and `norm(velocity delta) < 1e-4 km/s` when `ASTRO_RUN_OREKIT_LIVE=1`. |
+| Orekit native OD bridge | Unit tests map suite WGS-84 geodetic range/range-rate records into Orekit `Range`/`RangeRate` objects and construct a native `BatchLSEstimator` boundary with a numerical propagator builder. |
 | Local finite burns | Tests compare finite-burn propagation against the no-maneuver local baseline and verify maneuver events, thrust-vector mass depletion, and provenance. |
 | Local covariance propagation | Tests verify covariance history length, epoch alignment, symmetry, finite-difference provenance metadata, and optional white-acceleration process-noise growth. |
 | Launch handoff | Tests confirm `LaunchTrajectory.insertion_state` converts into a normal orbital `Scenario` and propagates locally. |

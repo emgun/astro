@@ -32,6 +32,7 @@ def _fake_runtime_modules(
 ) -> dict[str, object]:
     frames_module = ModuleType("org.orekit.frames")
     frames_module.FramesFactory = frames_factory
+    frames_module.TopocentricFrame = object()
     time_module = ModuleType("org.orekit.time")
     time_module.TimeScalesFactory = time_scales_factory
     time_module.AbsoluteDate = object()
@@ -51,12 +52,16 @@ def _fake_runtime_modules(
     analytical_module.KeplerianPropagator = object()
     numerical_module = ModuleType("org.orekit.propagation.numerical")
     numerical_module.NumericalPropagator = object()
+    conversion_module = ModuleType("org.orekit.propagation.conversion")
+    conversion_module.NumericalPropagatorBuilder = object()
+    conversion_module.DormandPrince853IntegratorBuilder = object()
     gravity_module = ModuleType("org.orekit.forces.gravity")
     gravity_module.J2OnlyPerturbation = object()
     gravity_module.ThirdBodyAttraction = object()
     bodies_module = ModuleType("org.orekit.bodies")
     bodies_module.OneAxisEllipsoid = object()
     bodies_module.CelestialBodyFactory = object()
+    bodies_module.GeodeticPoint = object()
     atmosphere_module = ModuleType("org.orekit.models.earth.atmosphere")
     atmosphere_module.SimpleExponentialAtmosphere = object()
     drag_module = ModuleType("org.orekit.forces.drag")
@@ -65,8 +70,19 @@ def _fake_runtime_modules(
     radiation_module = ModuleType("org.orekit.forces.radiation")
     radiation_module.SolarRadiationPressure = object()
     radiation_module.IsotropicRadiationSingleCoefficient = object()
+    measurements_module = ModuleType("org.orekit.estimation.measurements")
+    measurements_module.GroundStation = object()
+    measurements_module.ObservableSatellite = object()
+    measurements_module.Range = object()
+    measurements_module.RangeRate = object()
+    least_squares_module = ModuleType("org.orekit.estimation.leastsquares")
+    least_squares_module.BatchLSEstimator = object()
     ode_module = ModuleType("org.hipparchus.ode.nonstiff")
     ode_module.DormandPrince853Integrator = object()
+    hipparchus_least_squares_module = ModuleType(
+        "org.hipparchus.optim.nonlinear.vector.leastsquares"
+    )
+    hipparchus_least_squares_module.LevenbergMarquardtOptimizer = object()
     return {
         "orekit_jpype": FakeOrekit(),
         "orekit_jpype.pyhelpers": FakePyHelpers,
@@ -78,12 +94,16 @@ def _fake_runtime_modules(
         "org.orekit.propagation": propagation_module,
         "org.orekit.propagation.analytical": analytical_module,
         "org.orekit.propagation.numerical": numerical_module,
+        "org.orekit.propagation.conversion": conversion_module,
         "org.orekit.forces.gravity": gravity_module,
         "org.orekit.bodies": bodies_module,
         "org.orekit.models.earth.atmosphere": atmosphere_module,
         "org.orekit.forces.drag": drag_module,
         "org.orekit.forces.radiation": radiation_module,
+        "org.orekit.estimation.measurements": measurements_module,
+        "org.orekit.estimation.leastsquares": least_squares_module,
         "org.hipparchus.ode.nonstiff": ode_module,
+        "org.hipparchus.optim.nonlinear.vector.leastsquares": hipparchus_least_squares_module,
     }
 
 

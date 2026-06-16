@@ -37,16 +37,26 @@ class OrekitRuntime:
     keplerian_propagator: Any
     spacecraft_state: Any
     numerical_propagator: Any
+    numerical_propagator_builder: Any
     dormand_prince_853_integrator: Any
+    dormand_prince_853_integrator_builder: Any
     j2_only_perturbation: Any
     third_body_attraction: Any
     one_axis_ellipsoid: Any
+    geodetic_point: Any
+    topocentric_frame: Any
     simple_exponential_atmosphere: Any
     drag_force: Any
     isotropic_drag: Any
     celestial_body_factory: Any
     solar_radiation_pressure: Any
     isotropic_radiation_single_coefficient: Any
+    orekit_ground_station: Any
+    observable_satellite: Any
+    range_measurement: Any
+    range_rate_measurement: Any
+    batch_ls_estimator: Any
+    levenberg_marquardt_optimizer: Any
     orbit_type: Any
     position_angle_type: Any
     iers_conventions: Any
@@ -122,12 +132,18 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         propagation_module = import_module("org.orekit.propagation")
         analytical_module = import_module("org.orekit.propagation.analytical")
         numerical_module = import_module("org.orekit.propagation.numerical")
+        conversion_module = import_module("org.orekit.propagation.conversion")
         gravity_module = import_module("org.orekit.forces.gravity")
         bodies_module = import_module("org.orekit.bodies")
         atmosphere_module = import_module("org.orekit.models.earth.atmosphere")
         drag_module = import_module("org.orekit.forces.drag")
         radiation_module = import_module("org.orekit.forces.radiation")
+        measurements_module = import_module("org.orekit.estimation.measurements")
+        least_squares_module = import_module("org.orekit.estimation.leastsquares")
         ode_module = import_module("org.hipparchus.ode.nonstiff")
+        hipparchus_least_squares_module = import_module(
+            "org.hipparchus.optim.nonlinear.vector.leastsquares"
+        )
     except Exception as exc:
         if strict:
             raise
@@ -149,10 +165,16 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         keplerian_propagator=analytical_module.KeplerianPropagator,
         spacecraft_state=propagation_module.SpacecraftState,
         numerical_propagator=numerical_module.NumericalPropagator,
+        numerical_propagator_builder=conversion_module.NumericalPropagatorBuilder,
         dormand_prince_853_integrator=ode_module.DormandPrince853Integrator,
+        dormand_prince_853_integrator_builder=(
+            conversion_module.DormandPrince853IntegratorBuilder
+        ),
         j2_only_perturbation=gravity_module.J2OnlyPerturbation,
         third_body_attraction=gravity_module.ThirdBodyAttraction,
         one_axis_ellipsoid=bodies_module.OneAxisEllipsoid,
+        geodetic_point=bodies_module.GeodeticPoint,
+        topocentric_frame=frames_module.TopocentricFrame,
         simple_exponential_atmosphere=atmosphere_module.SimpleExponentialAtmosphere,
         drag_force=drag_module.DragForce,
         isotropic_drag=drag_module.IsotropicDrag,
@@ -160,6 +182,14 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         solar_radiation_pressure=radiation_module.SolarRadiationPressure,
         isotropic_radiation_single_coefficient=(
             radiation_module.IsotropicRadiationSingleCoefficient
+        ),
+        orekit_ground_station=measurements_module.GroundStation,
+        observable_satellite=measurements_module.ObservableSatellite,
+        range_measurement=measurements_module.Range,
+        range_rate_measurement=measurements_module.RangeRate,
+        batch_ls_estimator=least_squares_module.BatchLSEstimator,
+        levenberg_marquardt_optimizer=(
+            hipparchus_least_squares_module.LevenbergMarquardtOptimizer
         ),
         orbit_type=orbits_module.OrbitType,
         position_angle_type=orbits_module.PositionAngleType,

@@ -100,6 +100,8 @@ def test_packages_import() -> None:
         "OrekitRuntime",
         "OrekitRuntimeUnavailable",
         "OrekitSmokeResult",
+        "build_orekit_batch_ls_estimator",
+        "build_orekit_observed_measurements",
         "load_orekit_runtime",
         "propagate_orekit",
         "run_orekit_smoke",

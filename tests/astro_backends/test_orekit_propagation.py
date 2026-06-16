@@ -363,6 +363,13 @@ class _FakeDormandPrince853Integrator:
         self.initial_step_s = initial_step_s
 
 
+class _FakeDormandPrince853IntegratorBuilder:
+    def __init__(self, min_step_s: float, max_step_s: float, position_scale_m: float) -> None:
+        self.min_step_s = min_step_s
+        self.max_step_s = max_step_s
+        self.position_scale_m = position_scale_m
+
+
 class _FakeJ2OnlyPerturbation:
     def __init__(self, mu: float, radius: float, j2: float, frame: str) -> None:
         self.mu = mu
@@ -376,6 +383,25 @@ class _FakeOneAxisEllipsoid:
         self.radius = radius
         self.flattening = flattening
         self.frame = frame
+
+
+class _FakeGeodeticPoint:
+    def __init__(self, latitude_rad: float, longitude_rad: float, altitude_m: float) -> None:
+        self.latitude_rad = latitude_rad
+        self.longitude_rad = longitude_rad
+        self.altitude_m = altitude_m
+
+
+class _FakeTopocentricFrame:
+    def __init__(
+        self,
+        earth_shape: _FakeOneAxisEllipsoid,
+        geodetic_point: _FakeGeodeticPoint,
+        name: str,
+    ) -> None:
+        self.earth_shape = earth_shape
+        self.geodetic_point = geodetic_point
+        self.name = name
 
 
 class _FakeSimpleExponentialAtmosphere:
@@ -475,6 +501,92 @@ class _FakeNumericalPropagator(_FakeKeplerianPropagator):
         return _FakeKeplerianPropagator(self._orbit).propagate(target_date)
 
 
+class _FakeNumericalPropagatorBuilder:
+    def __init__(
+        self,
+        reference_orbit: _FakeCartesianOrbit,
+        integrator_builder: _FakeDormandPrince853IntegratorBuilder,
+        position_angle_type: str,
+        position_scale_m: float,
+    ) -> None:
+        self.reference_orbit = reference_orbit
+        self.integrator_builder = integrator_builder
+        self.position_angle_type = position_angle_type
+        self.position_scale_m = position_scale_m
+        self.force_models: list[object] = []
+
+    def addForceModel(self, force_model: object) -> None:
+        self.force_models.append(force_model)
+
+
+class _FakeOrekitGroundStation:
+    def __init__(self, base_frame: _FakeTopocentricFrame) -> None:
+        self.base_frame = base_frame
+
+
+class _FakeObservableSatellite:
+    def __init__(self, index: int) -> None:
+        self.index = index
+
+
+class _FakeRangeMeasurement:
+    measurement_type = "Range"
+
+    def __init__(
+        self,
+        station: _FakeOrekitGroundStation,
+        two_way: bool,
+        date: _FakeAbsoluteDate,
+        observed_value_m: float,
+        sigma: float,
+        base_weight: float,
+        satellite: _FakeObservableSatellite,
+    ) -> None:
+        self.station = station
+        self.two_way = two_way
+        self.date = date
+        self.observed_value_m = observed_value_m
+        self.sigma = sigma
+        self.base_weight = base_weight
+        self.satellite = satellite
+
+
+class _FakeRangeRateMeasurement:
+    measurement_type = "RangeRate"
+
+    def __init__(
+        self,
+        station: _FakeOrekitGroundStation,
+        date: _FakeAbsoluteDate,
+        observed_value_m_s: float,
+        sigma: float,
+        base_weight: float,
+        two_way: bool,
+        satellite: _FakeObservableSatellite,
+    ) -> None:
+        self.station = station
+        self.date = date
+        self.observed_value_m_s = observed_value_m_s
+        self.sigma = sigma
+        self.base_weight = base_weight
+        self.two_way = two_way
+        self.satellite = satellite
+
+
+class _FakeBatchLSEstimator:
+    def __init__(self, optimizer: object, *propagator_builders: object) -> None:
+        self.optimizer = optimizer
+        self.propagator_builders = propagator_builders
+        self.measurements: list[object] = []
+
+    def addMeasurement(self, measurement: object) -> None:
+        self.measurements.append(measurement)
+
+
+class _FakeLevenbergMarquardtOptimizer:
+    pass
+
+
 class _FakeOrbitType:
     CARTESIAN = "CARTESIAN"
 
@@ -506,16 +618,26 @@ def _fake_runtime() -> OrekitRuntime:
         keplerian_propagator=_FakeKeplerianPropagator,
         spacecraft_state=_FakeSpacecraftState,
         numerical_propagator=_FakeNumericalPropagator,
+        numerical_propagator_builder=_FakeNumericalPropagatorBuilder,
         dormand_prince_853_integrator=_FakeDormandPrince853Integrator,
+        dormand_prince_853_integrator_builder=_FakeDormandPrince853IntegratorBuilder,
         j2_only_perturbation=_FakeJ2OnlyPerturbation,
         third_body_attraction=_FakeThirdBodyAttraction,
         one_axis_ellipsoid=_FakeOneAxisEllipsoid,
+        geodetic_point=_FakeGeodeticPoint,
+        topocentric_frame=_FakeTopocentricFrame,
         simple_exponential_atmosphere=_FakeSimpleExponentialAtmosphere,
         drag_force=_FakeDragForce,
         isotropic_drag=_FakeIsotropicDrag,
         celestial_body_factory=_FakeCelestialBodyFactory,
         solar_radiation_pressure=_FakeSolarRadiationPressure,
         isotropic_radiation_single_coefficient=_FakeIsotropicRadiationSingleCoefficient,
+        orekit_ground_station=_FakeOrekitGroundStation,
+        observable_satellite=_FakeObservableSatellite,
+        range_measurement=_FakeRangeMeasurement,
+        range_rate_measurement=_FakeRangeRateMeasurement,
+        batch_ls_estimator=_FakeBatchLSEstimator,
+        levenberg_marquardt_optimizer=_FakeLevenbergMarquardtOptimizer,
         orbit_type=_FakeOrbitType,
         position_angle_type=_FakePositionAngleType,
         iers_conventions=_FakeIERSConventions,

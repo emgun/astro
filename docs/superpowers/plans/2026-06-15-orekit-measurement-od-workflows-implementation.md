@@ -113,3 +113,14 @@ Type consistency:
 - Public trajectory product remains `Trajectory`.
 - Backend selection remains string-based at the CLI boundary and is validated in the dispatcher.
 
+## Current State Addendum
+
+Later roadmap slices added the first native Orekit OD construction boundary:
+
+- `build_orekit_observed_measurements` maps suite WGS-84 geodetic range/range-rate records to
+  Orekit `Range` and `RangeRate` observed measurements.
+- `build_orekit_batch_ls_estimator` constructs an Orekit `BatchLSEstimator` with a numerical
+  propagator builder and attached measurements.
+
+The native Orekit estimator is still not exposed as a public CLI workflow because live estimator
+execution, residual/covariance extraction, and suite `EstimateResult` mapping remain unvalidated.

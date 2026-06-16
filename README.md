@@ -142,7 +142,10 @@ adds in-memory demo geometry for observability, generates synthetic measurements
 initial state as an estimate seed, and records that provenance in the output metadata. The `--backend`
 option selects the propagation backend used for synthetic truth generation and residual propagation.
 With `--backend orekit`, the suite estimator uses Orekit-backed propagation when the optional Orekit
-runtime is installed; it is not yet Orekit's native `BatchLSEstimator`.
+runtime is installed. The Orekit backend also includes a native OD construction bridge that maps
+suite geodetic range/range-rate records into Orekit `Range`/`RangeRate` measurements and a
+`BatchLSEstimator` object. Live native-estimator execution and suite `EstimateResult` mapping remain
+separate validation work.
 
 `astro export-trajectory` converts suite trajectory JSON into a CSV ephemeris table containing
 epoch, position, and velocity samples. `astro monte-carlo` runs a seeded initial-state ensemble by

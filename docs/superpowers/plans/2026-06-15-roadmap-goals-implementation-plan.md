@@ -42,7 +42,7 @@ Implemented and protected:
 
 Still roadmap-level:
 
-- Orekit drag/SRP/third-body force-model implementations and native Orekit batch/sequential OD.
+- Native Orekit batch/sequential OD execution and suite result mapping.
 - High-fidelity covariance propagation with validated state transition matrices/process noise and
   attitude-coupled maneuver dynamics.
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
@@ -98,8 +98,10 @@ Tradeoff:
 
 Status: suite-level Orekit-backed measurement/OD, Orekit J2 numerical propagation, and the
 `orekit_high_fidelity` numerical propagation entry path, Orekit atmospheric drag, Orekit SRP, and
-Sun/Moon third-body gravity are implemented; native Orekit `BatchLSEstimator` remains a distinct
-future integration.
+Sun/Moon third-body gravity are implemented. Native Orekit OD now has a measurement-object and
+`BatchLSEstimator` construction bridge for WGS-84 geodetic range/range-rate records; live estimator
+execution, covariance/residual extraction, and suite `EstimateResult` mapping remain future
+integration work.
 
 Implemented slice:
 
@@ -129,6 +131,11 @@ Implemented slice:
 - `astro synth-measurements --backend orekit` routes truth propagation through the Orekit adapter.
 - `astro estimate --backend orekit` and `astro estimate-measurements --backend orekit` run the
   suite's SciPy least-squares estimator with Orekit-backed residual propagation.
+- `build_orekit_observed_measurements` maps suite WGS-84 geodetic range/range-rate records into
+  Orekit `Range` and `RangeRate` observed measurements with suite-to-Orekit unit conversion.
+- `build_orekit_batch_ls_estimator` constructs an Orekit `BatchLSEstimator` with a numerical
+  propagator builder and attached observed measurements, establishing the native estimator object
+  boundary before live execution is exposed.
 - The shared measurement surface supports range, range-rate, inertial right ascension, and
   declination plus local-horizon azimuth/elevation records; wrapped angle residuals handle 0/360
   degree crossings.
@@ -145,9 +152,12 @@ Implemented slice:
 
 Future native Orekit estimator scope:
 
-- Native Orekit `BatchLSEstimator` support can be added after a separate measurement-object bridge
-  maps suite measurements and ground-station definitions into Orekit's estimation API. It is not
-  required for the current suite-level Orekit-backed OD workflow.
+- Execute the native Orekit `BatchLSEstimator`, extract estimated orbit, residuals, RMS,
+  covariance, and iteration diagnostics, and map them into suite `EstimateResult`.
+- Extend native Orekit OD beyond geodetic range/range-rate records as Orekit measurement families
+  are validated.
+- Keep the current suite-level SciPy estimator as the deterministic always-on OD reference while
+  the native Java-backed estimator matures.
 
 Primary files:
 
