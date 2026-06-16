@@ -211,6 +211,32 @@ class PropagationConfig(AstroModel):
         return self
 
 
+class EarthOrientationConfig(AstroModel):
+    """Small Earth-orientation correction set for suite geodetic station transforms."""
+
+    ut1_minus_utc_s: FiniteFloat = 0.0
+    polar_motion_x_arcsec: FiniteFloat = 0.0
+    polar_motion_y_arcsec: FiniteFloat = 0.0
+    source: str = "zero"
+
+    @field_validator(
+        "ut1_minus_utc_s",
+        "polar_motion_x_arcsec",
+        "polar_motion_y_arcsec",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Earth orientation scalar")
+
+    @field_validator("ut1_minus_utc_s", "polar_motion_x_arcsec", "polar_motion_y_arcsec")
+    @classmethod
+    def values_must_be_finite(cls, value: float) -> float:
+        if not isfinite(value):
+            raise ValueError("Earth orientation values must be finite")
+        return value
+
+
 class GroundStation(AstroModel):
     name: str = Field(min_length=1)
     position_eci_km: Vector3 | None = None
@@ -275,12 +301,16 @@ class GroundStation(AstroModel):
             )
         return self
 
-    def position_array(self, epoch: datetime | None = None) -> NDArray[np.float64]:
+    def position_array(
+        self,
+        epoch: datetime | None = None,
+        earth_orientation: EarthOrientationConfig | None = None,
+    ) -> NDArray[np.float64]:
         if self.position_eci_km is not None:
             return np.array(self.position_eci_km, dtype=np.float64)
         if epoch is None:
             raise ValueError("Ground station geodetic position requires an epoch")
-        return _ecef_to_eci(_geodetic_to_ecef(self), epoch)
+        return _ecef_to_eci(_geodetic_to_ecef(self), epoch, earth_orientation)
 
 
 def _geodetic_to_ecef(station: GroundStation) -> NDArray[np.float64]:
@@ -308,11 +338,20 @@ def _geodetic_to_ecef(station: GroundStation) -> NDArray[np.float64]:
     return np.array((x_km, y_km, z_km), dtype=np.float64)
 
 
-def _ecef_to_eci(position_ecef_km: NDArray[np.float64], epoch: datetime) -> NDArray[np.float64]:
-    earth_rotation_angle_rad = _greenwich_sidereal_angle_rad(epoch)
+def _ecef_to_eci(
+    position_ecef_km: NDArray[np.float64],
+    epoch: datetime,
+    earth_orientation: EarthOrientationConfig | None = None,
+) -> NDArray[np.float64]:
+    earth_orientation = earth_orientation or EarthOrientationConfig()
+    polar_corrected_km = _apply_polar_motion(position_ecef_km, earth_orientation)
+    earth_rotation_angle_rad = _greenwich_sidereal_angle_rad(
+        epoch,
+        ut1_minus_utc_s=earth_orientation.ut1_minus_utc_s,
+    )
     cos_angle = cos(earth_rotation_angle_rad)
     sin_angle = sin(earth_rotation_angle_rad)
-    x_km, y_km, z_km = position_ecef_km
+    x_km, y_km, z_km = polar_corrected_km
     return np.array(
         (
             cos_angle * x_km - sin_angle * y_km,
@@ -323,9 +362,43 @@ def _ecef_to_eci(position_ecef_km: NDArray[np.float64], epoch: datetime) -> NDAr
     )
 
 
-def _greenwich_sidereal_angle_rad(epoch: datetime) -> float:
+def _apply_polar_motion(
+    position_ecef_km: NDArray[np.float64],
+    earth_orientation: EarthOrientationConfig,
+) -> NDArray[np.float64]:
+    arcsec_to_rad = radians(1.0 / 3600.0)
+    xp_rad = earth_orientation.polar_motion_x_arcsec * arcsec_to_rad
+    yp_rad = earth_orientation.polar_motion_y_arcsec * arcsec_to_rad
+    if xp_rad == 0.0 and yp_rad == 0.0:
+        return position_ecef_km
+
+    x_km, y_km, z_km = position_ecef_km
+    cos_xp = cos(-xp_rad)
+    sin_xp = sin(-xp_rad)
+    cos_yp = cos(-yp_rad)
+    sin_yp = sin(-yp_rad)
+
+    # Apply a compact polar-motion correction before the Earth rotation. This is an
+    # input-driven engineering approximation, not a replacement for full IERS reductions.
+    x_after_y = cos_xp * x_km + sin_xp * z_km
+    y_after_y = y_km
+    z_after_y = -sin_xp * x_km + cos_xp * z_km
+
+    return np.array(
+        (
+            x_after_y,
+            cos_yp * y_after_y - sin_yp * z_after_y,
+            sin_yp * y_after_y + cos_yp * z_after_y,
+        ),
+        dtype=np.float64,
+    )
+
+
+def _greenwich_sidereal_angle_rad(epoch: datetime, *, ut1_minus_utc_s: float = 0.0) -> float:
     epoch_utc = epoch.astimezone(UTC)
-    julian_date = epoch_utc.timestamp() / SECONDS_PER_DAY + UNIX_EPOCH_JULIAN_DATE
+    julian_date = (
+        epoch_utc.timestamp() + ut1_minus_utc_s
+    ) / SECONDS_PER_DAY + UNIX_EPOCH_JULIAN_DATE
     centuries_since_j2000 = (julian_date - J2000_JULIAN_DATE) / 36525.0
     sidereal_degrees = (
         280.46061837
@@ -636,6 +709,7 @@ class Scenario(AstroModel):
     initial_state: OrbitState
     force_model: ForceModelConfig
     propagation: PropagationConfig
+    earth_orientation: EarthOrientationConfig = Field(default_factory=EarthOrientationConfig)
     maneuvers: list[Maneuver] = Field(default_factory=list)
     initial_covariance: list[list[FiniteFloat]] | None = None
     covariance_process_noise_acceleration_km_s2: FiniteFloat = Field(ge=0.0, default=0.0)

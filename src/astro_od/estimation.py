@@ -61,7 +61,7 @@ def _station_position_for_observer(
 ) -> FloatArray:
     for station in scenario.ground_stations:
         if station.name == observer:
-            return station.position_array(epoch)
+            return station.position_array(epoch, scenario.earth_orientation)
     raise NumericalConvergenceError(f"Measurement observer {observer!r} is not in the scenario")
 
 

@@ -10,6 +10,7 @@ from astro_core.models import (
     Body,
     CartesianState,
     CovarianceSample,
+    EarthOrientationConfig,
     EstimateResult,
     ForceModelConfig,
     ForceModelName,
@@ -258,6 +259,41 @@ def test_ground_station_accepts_geodetic_position_with_epoch() -> None:
     assert position.shape == (3,)
     assert np.linalg.norm(position) == pytest.approx(6378.137)
     assert position[2] == pytest.approx(0.0)
+
+
+def test_ground_station_accepts_earth_orientation_for_geodetic_position() -> None:
+    station = GroundStation(
+        name="equator-geodetic",
+        latitude_deg=0.0,
+        longitude_deg=0.0,
+        altitude_km=0.0,
+        frame=Frame.EME2000,
+        elevation_mask_deg=0.0,
+    )
+    epoch = datetime(2026, 1, 1, tzinfo=UTC)
+
+    default_position = station.position_array(epoch)
+    zero_eop_position = station.position_array(epoch, EarthOrientationConfig())
+    oriented_position = station.position_array(
+        epoch,
+        EarthOrientationConfig(
+            ut1_minus_utc_s=60.0,
+            polar_motion_x_arcsec=0.1,
+            polar_motion_y_arcsec=-0.2,
+            source="unit-test-eop",
+        ),
+    )
+
+    assert zero_eop_position == pytest.approx(default_position)
+    assert np.linalg.norm(oriented_position - default_position) > 0.01
+
+
+def test_earth_orientation_rejects_string_and_bool_numeric_inputs() -> None:
+    with pytest.raises(ValidationError, match="numeric scalar"):
+        EarthOrientationConfig(ut1_minus_utc_s="0.1")
+
+    with pytest.raises(ValidationError, match="numeric scalar"):
+        EarthOrientationConfig(polar_motion_x_arcsec=True)
 
 
 def test_ground_station_rejects_missing_or_mixed_position_definitions() -> None:

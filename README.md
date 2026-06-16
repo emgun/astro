@@ -131,6 +131,7 @@ astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend or
 astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output angle_measurements.json
 astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output topocentric_measurements.json
 astro synth-measurements examples/scenarios/leo_geodetic_topocentric.yaml --backend local --output geodetic_topocentric_measurements.json
+astro synth-measurements examples/scenarios/leo_geodetic_eop_topocentric.yaml --backend local --output geodetic_eop_topocentric_measurements.json
 astro export-measurements measurements.json --format csv --output measurements.csv
 astro export-measurements measurements.json --format tdm --output measurements.tdm
 astro estimate examples/scenarios/leo_two_body.yaml --backend local --output estimate.json
@@ -223,8 +224,11 @@ range, range-rate, inertial right-ascension/declination, and local-horizon azimu
 records. Angle records use degrees. Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
-epoch using a deterministic UTC sidereal-time model. This supports scenario-level Earth-fixed
-station inputs, but it is not yet an IERS/EOP-aware ITRF-to-celestial transformation. JSON inputs
+epoch using a deterministic UTC sidereal-time model by default. Scenarios may also provide
+`earth_orientation` with `ut1_minus_utc_s`, `polar_motion_x_arcsec`, `polar_motion_y_arcsec`, and a
+`source` label; those values drive an approximate EOP-aware Earth-fixed to inertial correction for
+geodetic station pointing. This supports explicit fixed EOP values, but it is not a full IERS table
+interpolation or precession/nutation reduction. JSON inputs
 match the output of `astro synth-measurements`; CSV and TDM inputs are auto-detected by `.csv` and
 `.tdm` extensions or can be forced with `--format csv` / `--format tdm`.
 

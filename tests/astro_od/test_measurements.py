@@ -6,7 +6,7 @@ import numpy as np
 
 import astro_od.measurements as od_measurements
 from astro_core.io import load_scenario
-from astro_core.models import Frame, GroundStation, MeasurementType
+from astro_core.models import EarthOrientationConfig, Frame, GroundStation, MeasurementType
 from astro_dynamics.local import propagate_local
 from astro_od.measurements import (
     generate_synthetic_measurements,
@@ -155,6 +155,36 @@ def test_generate_synthetic_measurements_supports_geodetic_stations() -> None:
         MeasurementType.RANGE,
         MeasurementType.RANGE_RATE,
     }
+
+
+def test_generate_synthetic_measurements_applies_scenario_earth_orientation() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    geodetic_station = GroundStation(
+        name="equator-geodetic",
+        latitude_deg=0.0,
+        longitude_deg=0.0,
+        altitude_km=0.0,
+        frame=Frame.EME2000,
+        elevation_mask_deg=0.0,
+    )
+    geodetic_scenario = scenario.model_copy(update={"ground_stations": [geodetic_station]})
+    oriented_scenario = geodetic_scenario.model_copy(
+        update={
+            "earth_orientation": EarthOrientationConfig(
+                ut1_minus_utc_s=60.0,
+                polar_motion_x_arcsec=0.1,
+                polar_motion_y_arcsec=-0.2,
+                source="unit-test-eop",
+            )
+        }
+    )
+    trajectory = propagate_local(geodetic_scenario)
+
+    default_records = generate_synthetic_measurements(geodetic_scenario, trajectory)
+    oriented_records = generate_synthetic_measurements(oriented_scenario, trajectory)
+
+    assert default_records[0].metadata["truth"] != oriented_records[0].metadata["truth"]
+    assert oriented_scenario.earth_orientation.source == "unit-test-eop"
 
 
 def test_generate_synthetic_measurements_uses_scenario_noise_seed() -> None:
