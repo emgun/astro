@@ -58,6 +58,10 @@ def test_packages_import() -> None:
         "range_km",
         "range_rate_km_s",
         "right_ascension_deg",
+        "three_way_range_km",
+        "three_way_range_rate_km_s",
+        "two_way_range_km",
+        "two_way_range_rate_km_s",
     }
     expected_launch_exports = {
         "AtmosphereConfig",

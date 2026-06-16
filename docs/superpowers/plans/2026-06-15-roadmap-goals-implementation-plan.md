@@ -36,9 +36,9 @@ Implemented and protected:
   propagation, plus finite-difference local covariance propagation with optional acceleration
   process noise, explicit per-sample state-transition/process-noise covariance products, and a
   velocity-aligned attitude-coupled thrust-vector burn mode.
-- `astro_od` synthetic range/range-rate/one-way Doppler/right-ascension/declination/azimuth/elevation
-  generation, measurement JSON/CSV ingest/export, TDM range/range-rate/angle ingest/export, and
-  local SciPy batch least-squares OD.
+- `astro_od` synthetic range/range-rate/one-way Doppler/first-order two-way and three-way
+  range/range-rate/right-ascension/declination/azimuth/elevation generation, measurement JSON/CSV
+  ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy batch least-squares OD.
 - `astro_launch` local vertical and pitch-program ascent baselines, launch-to-orbit handoff, pitch sweep, two-knot tuning, tuned launch reports, batch ranking, and report comparison.
 - `astro_backends.orekit` optional `orekit_jpype` smoke gate, two-body Orekit propagation adapter,
   and J2 numerical propagation through `J2OnlyPerturbation`.
@@ -50,9 +50,9 @@ Still roadmap-level:
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
 - Live Tudat cross-check environment/body construction.
-- Full IERS finals parsing/precession-nutation reductions, two-way/three-way radiometric families,
-  and operational CCSDS support beyond current KVN TDM measurement families and OEM ephemeris
-  interchange.
+- Full IERS finals parsing/precession-nutation reductions, operational DSN light-time/media
+  corrections for two-way/three-way radiometrics, and operational CCSDS support beyond current KVN
+  TDM measurement families and OEM ephemeris interchange.
 - Richer JAX force models, sensitivities, and differentiable OD workflows.
 
 ## Goal Ledger
@@ -143,12 +143,15 @@ Implemented slice:
 - `estimate_orekit_native` executes the native Orekit `BatchLSEstimator` through the runtime
   abstraction and maps the resulting propagated state, residual vector, RMS, covariance, iteration
   count, evaluation count, and Orekit wrapper provenance into `EstimateResult`.
-- The shared measurement surface supports range, range-rate, one-way Doppler in Hz, inertial right
+- The shared measurement surface supports range, range-rate, one-way Doppler in Hz, first-order
+  two-way and three-way range/range-rate with explicit participant-path metadata, inertial right
   ascension, declination, and local-horizon azimuth/elevation records; wrapped angle residuals
   handle 0/360 degree crossings.
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
-  JSON/CSV product, and local residual-prediction fixture. TDM export deliberately rejects Hz
-  Doppler until a precise CCSDS Doppler count/frequency convention is added.
+  JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
+  checked-in first-order two-way/three-way radiometric synthesis fixture. TDM export deliberately
+  rejects Hz Doppler and explicit two-way/three-way suite records until precise CCSDS Doppler/count
+  and path-mapping conventions are added.
 - Ground stations support fixed `position_eci_km` definitions and WGS-84 geodetic
   `latitude_deg`/`longitude_deg`/`altitude_km` definitions, with geodetic stations rotated into
   inertial measurement geometry at each measurement epoch using a deterministic UTC sidereal-time

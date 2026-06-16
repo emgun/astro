@@ -6,6 +6,7 @@ from astro_core.errors import InvalidScenarioError
 from astro_core.io import load_scenario, load_trajectory
 from astro_core.models import ForceModelName, MeasurementType
 from astro_dynamics.local import propagate_local
+from astro_od.measurements import generate_synthetic_measurements
 
 
 def test_load_example_scenario() -> None:
@@ -48,6 +49,24 @@ def test_load_doppler_example_scenario() -> None:
     assert scenario.measurements.types == (MeasurementType.RANGE, MeasurementType.DOPPLER)
     assert scenario.measurements.doppler_transmit_frequency_hz == 8.4e9
     assert scenario.measurements.noise.doppler_sigma_hz == 0.05
+
+
+def test_load_radiometric_links_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_radiometric_links.yaml"))
+    trajectory = propagate_local(scenario)
+    measurements = generate_synthetic_measurements(scenario, trajectory)
+
+    assert scenario.scenario_id == "leo-radiometric-links"
+    assert scenario.measurements.types == (
+        MeasurementType.TWO_WAY_RANGE,
+        MeasurementType.TWO_WAY_RANGE_RATE,
+        MeasurementType.THREE_WAY_RANGE,
+        MeasurementType.THREE_WAY_RANGE_RATE,
+    )
+    assert len(scenario.ground_stations) == 2
+    assert {record.measurement_type for record in measurements} == set(
+        scenario.measurements.types
+    )
 
 
 def test_load_velocity_aligned_burn_example_scenario() -> None:

@@ -134,6 +134,68 @@ def test_load_measurements_round_trips_doppler_json_and_csv(tmp_path: Path) -> N
     assert csv_loaded == json_loaded
 
 
+def test_load_measurements_round_trips_three_way_radiometric_json_and_csv(
+    tmp_path: Path,
+) -> None:
+    scenario = _observable_scenario()
+    three_way_measurements = scenario.measurements.model_copy(
+        update={"types": (MeasurementType.THREE_WAY_RANGE, MeasurementType.THREE_WAY_RANGE_RATE)}
+    )
+    scenario = scenario.model_copy(update={"measurements": three_way_measurements})
+    measurements = generate_synthetic_measurements(scenario, propagate_local(scenario))
+    json_path = tmp_path / "three_way.json"
+    csv_path = tmp_path / "three_way.csv"
+    json_path.write_text(
+        json.dumps(
+            {
+                "scenario_id": scenario.scenario_id,
+                "measurements": [record.model_dump(mode="json") for record in measurements],
+            }
+        ),
+        encoding="utf-8",
+    )
+    fieldnames = [
+        "scenario_id",
+        "measurement_type",
+        "epoch",
+        "observer",
+        "observed_object",
+        "value",
+        "sigma",
+        "units",
+        "metadata_json",
+    ]
+    with csv_path.open("w", encoding="utf-8", newline="") as measurement_file:
+        writer = csv.DictWriter(measurement_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for record in measurements:
+            payload = record.model_dump(mode="json")
+            writer.writerow(
+                {
+                    "scenario_id": scenario.scenario_id,
+                    "measurement_type": payload["measurement_type"],
+                    "epoch": payload["epoch"],
+                    "observer": payload["observer"],
+                    "observed_object": payload["observed_object"],
+                    "value": payload["value"],
+                    "sigma": payload["sigma"],
+                    "units": payload["units"],
+                    "metadata_json": json.dumps(payload["metadata"]),
+                }
+            )
+
+    json_loaded = load_measurements(json_path, expected_scenario_id=scenario.scenario_id)
+    csv_loaded = load_measurements(csv_path, expected_scenario_id=scenario.scenario_id)
+
+    assert len(json_loaded) == 22
+    assert {record.measurement_type for record in json_loaded} == {
+        MeasurementType.THREE_WAY_RANGE,
+        MeasurementType.THREE_WAY_RANGE_RATE,
+    }
+    assert {record.metadata["transmitter"] for record in json_loaded} == {"equator-eci"}
+    assert csv_loaded == json_loaded
+
+
 def test_load_measurements_reads_csv_records(tmp_path: Path) -> None:
     scenario = _observable_scenario()
     path = tmp_path / "measurements.csv"

@@ -5,7 +5,14 @@ from typing import Any, Literal, cast
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from astro_core.models import MeasurementRecord, MeasurementType, Scenario, Trajectory
+from astro_core.models import (
+    GroundStation,
+    MeasurementRecord,
+    MeasurementType,
+    Scenario,
+    Trajectory,
+    TrajectorySample,
+)
 
 FloatArray = NDArray[np.float64]
 MeasurementUnits = Literal["km", "km/s", "Hz", "deg"]
@@ -47,6 +54,56 @@ def range_rate_km_s(
 
 def doppler_hz(range_rate_truth_km_s: float, transmit_frequency_hz: float) -> float:
     return float(-range_rate_truth_km_s / SPEED_OF_LIGHT_KM_S * transmit_frequency_hz)
+
+
+def two_way_range_km(spacecraft_position_km: ArrayLike, station_position_km: ArrayLike) -> float:
+    return float(2.0 * range_km(spacecraft_position_km, station_position_km))
+
+
+def two_way_range_rate_km_s(
+    spacecraft_position_km: ArrayLike,
+    spacecraft_velocity_km_s: ArrayLike,
+    station_position_km: ArrayLike,
+) -> float:
+    return float(
+        2.0
+        * range_rate_km_s(
+            spacecraft_position_km,
+            spacecraft_velocity_km_s,
+            station_position_km,
+        )
+    )
+
+
+def three_way_range_km(
+    spacecraft_position_km: ArrayLike,
+    transmitter_position_km: ArrayLike,
+    receiver_position_km: ArrayLike,
+) -> float:
+    return float(
+        range_km(spacecraft_position_km, transmitter_position_km)
+        + range_km(spacecraft_position_km, receiver_position_km)
+    )
+
+
+def three_way_range_rate_km_s(
+    spacecraft_position_km: ArrayLike,
+    spacecraft_velocity_km_s: ArrayLike,
+    transmitter_position_km: ArrayLike,
+    receiver_position_km: ArrayLike,
+) -> float:
+    return float(
+        range_rate_km_s(
+            spacecraft_position_km,
+            spacecraft_velocity_km_s,
+            transmitter_position_km,
+        )
+        + range_rate_km_s(
+            spacecraft_position_km,
+            spacecraft_velocity_km_s,
+            receiver_position_km,
+        )
+    )
 
 
 def _relative_line_of_sight(
@@ -127,15 +184,37 @@ def generate_synthetic_measurements(
         spacecraft_position = sample.state.position_array()
         spacecraft_velocity = sample.state.velocity_array()
 
-        for station in scenario.ground_stations:
-            station_position = station.position_array(sample.epoch, scenario.earth_orientation)
-            for measurement_type in scenario.measurements.types:
+        station_positions = [
+            (
+                station,
+                station.position_array(sample.epoch, scenario.earth_orientation),
+            )
+            for station in scenario.ground_stations
+        ]
+        for measurement_type in scenario.measurements.types:
+            if measurement_type in {
+                MeasurementType.THREE_WAY_RANGE,
+                MeasurementType.THREE_WAY_RANGE_RATE,
+            }:
+                records.extend(
+                    _three_way_measurement_records(
+                        measurement_type,
+                        sample,
+                        station_positions,
+                        scenario,
+                        rng,
+                    )
+                )
+                continue
+
+            for station, station_position in station_positions:
                 truth, sigma, units, metadata = _measurement_geometry(
                     measurement_type,
                     spacecraft_position,
                     spacecraft_velocity,
                     station_position,
                     scenario,
+                    observer_name=station.name,
                 )
                 records.append(
                     MeasurementRecord(
@@ -153,12 +232,59 @@ def generate_synthetic_measurements(
     return records
 
 
+def _three_way_measurement_records(
+    measurement_type: MeasurementType,
+    sample: TrajectorySample,
+    station_positions: list[tuple[GroundStation, FloatArray]],
+    scenario: Scenario,
+    rng: np.random.Generator,
+) -> list[MeasurementRecord]:
+    if len(station_positions) < 2:
+        return []
+
+    spacecraft_position = sample.state.position_array()
+    spacecraft_velocity = sample.state.velocity_array()
+    transmitter, transmitter_position = station_positions[0]
+    records: list[MeasurementRecord] = []
+
+    for receiver, receiver_position in station_positions[1:]:
+        truth, sigma, units, metadata = _three_way_measurement_geometry(
+            measurement_type,
+            spacecraft_position,
+            spacecraft_velocity,
+            transmitter_position,
+            receiver_position,
+            scenario,
+        )
+        path = f"{transmitter.name},{scenario.spacecraft.name},{receiver.name}"
+        records.append(
+            MeasurementRecord(
+                measurement_type=measurement_type,
+                epoch=sample.epoch,
+                observer=receiver.name,
+                observed_object=scenario.spacecraft.name,
+                value=float(truth + rng.normal(0.0, sigma)),
+                sigma=sigma,
+                units=units,
+                metadata={
+                    "truth": truth,
+                    "transmitter": transmitter.name,
+                    "participant_path": path,
+                }
+                | metadata,
+            )
+        )
+    return records
+
+
 def _measurement_geometry(
     measurement_type: MeasurementType,
     spacecraft_position_km: FloatArray,
     spacecraft_velocity_km_s: FloatArray,
     station_position_km: FloatArray,
     scenario: Scenario,
+    *,
+    observer_name: str | None = None,
 ) -> tuple[float, float, MeasurementUnits, dict[str, Any]]:
     if measurement_type is MeasurementType.RANGE:
         return (
@@ -177,6 +303,32 @@ def _measurement_geometry(
             scenario.measurements.noise.range_rate_sigma_km_s,
             "km/s",
             {},
+        )
+    if measurement_type is MeasurementType.TWO_WAY_RANGE:
+        observer = observer_name or scenario.ground_stations[0].name
+        return (
+            two_way_range_km(spacecraft_position_km, station_position_km),
+            scenario.measurements.noise.range_sigma_km,
+            "km",
+            {
+                "participant_path": f"{observer},{scenario.spacecraft.name},{observer}",
+                "radiometric_model": "first_order_two_way_same_epoch",
+            },
+        )
+    if measurement_type is MeasurementType.TWO_WAY_RANGE_RATE:
+        observer = observer_name or scenario.ground_stations[0].name
+        return (
+            two_way_range_rate_km_s(
+                spacecraft_position_km,
+                spacecraft_velocity_km_s,
+                station_position_km,
+            ),
+            scenario.measurements.noise.range_rate_sigma_km_s,
+            "km/s",
+            {
+                "participant_path": f"{observer},{scenario.spacecraft.name},{observer}",
+                "radiometric_model": "first_order_two_way_same_epoch",
+            },
         )
     if measurement_type is MeasurementType.DOPPLER:
         range_rate_truth = range_rate_km_s(
@@ -224,3 +376,37 @@ def _measurement_geometry(
             {},
         )
     raise ValueError(f"Unsupported measurement type: {measurement_type}")
+
+
+def _three_way_measurement_geometry(
+    measurement_type: MeasurementType,
+    spacecraft_position_km: FloatArray,
+    spacecraft_velocity_km_s: FloatArray,
+    transmitter_position_km: FloatArray,
+    receiver_position_km: FloatArray,
+    scenario: Scenario,
+) -> tuple[float, float, MeasurementUnits, dict[str, Any]]:
+    if measurement_type is MeasurementType.THREE_WAY_RANGE:
+        return (
+            three_way_range_km(
+                spacecraft_position_km,
+                transmitter_position_km,
+                receiver_position_km,
+            ),
+            scenario.measurements.noise.range_sigma_km,
+            "km",
+            {"radiometric_model": "first_order_three_way_same_epoch"},
+        )
+    if measurement_type is MeasurementType.THREE_WAY_RANGE_RATE:
+        return (
+            three_way_range_rate_km_s(
+                spacecraft_position_km,
+                spacecraft_velocity_km_s,
+                transmitter_position_km,
+                receiver_position_km,
+            ),
+            scenario.measurements.noise.range_rate_sigma_km_s,
+            "km/s",
+            {"radiometric_model": "first_order_three_way_same_epoch"},
+        )
+    raise ValueError(f"Unsupported three-way measurement type: {measurement_type}")

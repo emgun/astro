@@ -106,6 +106,10 @@ class ForceModelName(StrEnum):
 class MeasurementType(StrEnum):
     RANGE = "range"
     RANGE_RATE = "range_rate"
+    TWO_WAY_RANGE = "two_way_range"
+    TWO_WAY_RANGE_RATE = "two_way_range_rate"
+    THREE_WAY_RANGE = "three_way_range"
+    THREE_WAY_RANGE_RATE = "three_way_range_rate"
     DOPPLER = "doppler"
     RIGHT_ASCENSION = "right_ascension"
     DECLINATION = "declination"
@@ -584,6 +588,10 @@ class MeasurementRecord(AstroModel):
         expected_units = {
             MeasurementType.RANGE: "km",
             MeasurementType.RANGE_RATE: "km/s",
+            MeasurementType.TWO_WAY_RANGE: "km",
+            MeasurementType.TWO_WAY_RANGE_RATE: "km/s",
+            MeasurementType.THREE_WAY_RANGE: "km",
+            MeasurementType.THREE_WAY_RANGE_RATE: "km/s",
             MeasurementType.DOPPLER: "Hz",
             MeasurementType.RIGHT_ASCENSION: "deg",
             MeasurementType.DECLINATION: "deg",

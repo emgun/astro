@@ -739,6 +739,10 @@ def test_measurement_record_rejects_non_finite_value_or_sigma() -> None:
     [
         (MeasurementType.RANGE, "km/s"),
         (MeasurementType.RANGE_RATE, "km"),
+        (MeasurementType.TWO_WAY_RANGE, "km/s"),
+        (MeasurementType.TWO_WAY_RANGE_RATE, "km"),
+        (MeasurementType.THREE_WAY_RANGE, "km/s"),
+        (MeasurementType.THREE_WAY_RANGE_RATE, "km"),
         (MeasurementType.DOPPLER, "km/s"),
     ],
 )

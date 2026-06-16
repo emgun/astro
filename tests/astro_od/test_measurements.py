@@ -20,6 +20,10 @@ from astro_od.measurements import (
     generate_synthetic_measurements,
     range_km,
     range_rate_km_s,
+    three_way_range_km,
+    three_way_range_rate_km_s,
+    two_way_range_km,
+    two_way_range_rate_km_s,
 )
 
 
@@ -43,6 +47,39 @@ def test_doppler_hz_returns_one_way_frequency_shift() -> None:
     transmit_frequency_hz = 8.4e9
 
     assert doppler_hz(range_rate, transmit_frequency_hz) == pytest.approx(-28019.383983282765)
+
+
+def test_two_way_radiometric_geometry_returns_round_trip_path() -> None:
+    spacecraft_position = np.array([7000.0, 0.0, 0.0])
+    spacecraft_velocity = np.array([0.0, 7.5, 0.0])
+    station_position = np.array([6378.0, 0.0, 0.0])
+
+    assert two_way_range_km(spacecraft_position, station_position) == 1244.0
+    assert (
+        two_way_range_rate_km_s(spacecraft_position, spacecraft_velocity, station_position)
+        == 0.0
+    )
+
+
+def test_three_way_radiometric_geometry_returns_uplink_plus_downlink_path() -> None:
+    spacecraft_position = np.array([7000.0, 0.0, 0.0])
+    spacecraft_velocity = np.array([0.0, 7.5, 0.0])
+    transmitter_position = np.array([6378.0, 0.0, 0.0])
+    receiver_position = np.array([0.0, 6378.0, 0.0])
+
+    expected_downlink = np.linalg.norm(spacecraft_position - receiver_position)
+
+    assert three_way_range_km(
+        spacecraft_position,
+        transmitter_position,
+        receiver_position,
+    ) == pytest.approx(622.0 + expected_downlink)
+    assert three_way_range_rate_km_s(
+        spacecraft_position,
+        spacecraft_velocity,
+        transmitter_position,
+        receiver_position,
+    ) == pytest.approx(7.5 * -6378.0 / expected_downlink)
 
 
 def test_inertial_angle_measurements_return_line_of_sight_ra_dec() -> None:
@@ -145,6 +182,62 @@ def test_generate_synthetic_measurements_supports_one_way_doppler() -> None:
     )
     assert all(record.metadata["doppler_transmit_frequency_hz"] == 8.4e9 for record in records)
     assert all(record.metadata["range_rate_truth_km_s"] is not None for record in records)
+
+
+def test_generate_synthetic_measurements_supports_two_way_radiometric_records() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    two_way_measurements = scenario.measurements.model_copy(
+        update={"types": (MeasurementType.TWO_WAY_RANGE, MeasurementType.TWO_WAY_RANGE_RATE)}
+    )
+    two_way_scenario = scenario.model_copy(update={"measurements": two_way_measurements})
+    trajectory = propagate_local(two_way_scenario)
+
+    records = generate_synthetic_measurements(two_way_scenario, trajectory)
+
+    assert len(records) == 22
+    assert {record.measurement_type for record in records} == {
+        MeasurementType.TWO_WAY_RANGE,
+        MeasurementType.TWO_WAY_RANGE_RATE,
+    }
+    assert {record.metadata["radiometric_model"] for record in records} == {
+        "first_order_two_way_same_epoch"
+    }
+    assert {record.metadata["participant_path"] for record in records} == {
+        "equator-eci,demo-sat,equator-eci"
+    }
+
+
+def test_generate_synthetic_measurements_supports_three_way_radiometric_records() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    receiving_station = GroundStation(
+        name="y-axis-eci",
+        position_eci_km=(0.0, 6378.1363, 0.0),
+        frame=Frame.EME2000,
+        elevation_mask_deg=0.0,
+    )
+    three_way_measurements = scenario.measurements.model_copy(
+        update={"types": (MeasurementType.THREE_WAY_RANGE, MeasurementType.THREE_WAY_RANGE_RATE)}
+    )
+    three_way_scenario = scenario.model_copy(
+        update={
+            "ground_stations": [scenario.ground_stations[0], receiving_station],
+            "measurements": three_way_measurements,
+        }
+    )
+    trajectory = propagate_local(three_way_scenario)
+
+    records = generate_synthetic_measurements(three_way_scenario, trajectory)
+
+    assert len(records) == 22
+    assert {record.measurement_type for record in records} == {
+        MeasurementType.THREE_WAY_RANGE,
+        MeasurementType.THREE_WAY_RANGE_RATE,
+    }
+    assert {record.observer for record in records} == {"y-axis-eci"}
+    assert {record.metadata["transmitter"] for record in records} == {"equator-eci"}
+    assert {record.metadata["radiometric_model"] for record in records} == {
+        "first_order_three_way_same_epoch"
+    }
 
 
 def test_generate_synthetic_measurements_supports_topocentric_angles() -> None:

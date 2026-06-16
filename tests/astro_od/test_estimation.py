@@ -20,7 +20,12 @@ from astro_core.models import (
 )
 from astro_dynamics.local import propagate_local
 from astro_od.estimation import estimate_initial_state, residual_vector
-from astro_od.measurements import doppler_hz, generate_synthetic_measurements, range_rate_km_s
+from astro_od.measurements import (
+    doppler_hz,
+    generate_synthetic_measurements,
+    range_km,
+    range_rate_km_s,
+)
 
 
 def _observable_scenario() -> Scenario:
@@ -168,6 +173,69 @@ def test_residual_vector_supports_doppler_hz() -> None:
     )
 
     residuals = residual_vector(state_vector, scenario, [measurement], _single_sample_propagator)
+
+    assert residuals.tolist() == pytest.approx([2.0])
+
+
+def test_residual_vector_supports_two_way_radiometric_range() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    state = scenario.initial_state.cartesian
+    state_vector = np.concatenate([state.position_array(), state.velocity_array()])
+    station_position = scenario.ground_stations[0].position_array(scenario.initial_state.epoch)
+    predicted = 2.0 * range_km(state.position_array(), station_position)
+    measurement = MeasurementRecord(
+        measurement_type=MeasurementType.TWO_WAY_RANGE,
+        epoch=scenario.initial_state.epoch,
+        observer="equator-eci",
+        observed_object=scenario.spacecraft.name,
+        value=predicted - 0.02,
+        sigma=0.01,
+        units="km",
+    )
+
+    residuals = residual_vector(state_vector, scenario, [measurement], _single_sample_propagator)
+
+    assert residuals.tolist() == pytest.approx([2.0])
+
+
+def test_residual_vector_supports_three_way_radiometric_range() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    receiver = GroundStation(
+        name="y-axis-eci",
+        position_eci_km=(0.0, 6378.1363, 0.0),
+        frame=Frame.EME2000,
+        elevation_mask_deg=0.0,
+    )
+    three_way_scenario = scenario.model_copy(
+        update={"ground_stations": [scenario.ground_stations[0], receiver]}
+    )
+    state = three_way_scenario.initial_state.cartesian
+    state_vector = np.concatenate([state.position_array(), state.velocity_array()])
+    transmitter_position = three_way_scenario.ground_stations[0].position_array(
+        three_way_scenario.initial_state.epoch
+    )
+    receiver_position = receiver.position_array(three_way_scenario.initial_state.epoch)
+    predicted = range_km(state.position_array(), transmitter_position) + range_km(
+        state.position_array(),
+        receiver_position,
+    )
+    measurement = MeasurementRecord(
+        measurement_type=MeasurementType.THREE_WAY_RANGE,
+        epoch=three_way_scenario.initial_state.epoch,
+        observer=receiver.name,
+        observed_object=three_way_scenario.spacecraft.name,
+        value=predicted - 0.02,
+        sigma=0.01,
+        units="km",
+        metadata={"transmitter": "equator-eci"},
+    )
+
+    residuals = residual_vector(
+        state_vector,
+        three_way_scenario,
+        [measurement],
+        _single_sample_propagator,
+    )
 
     assert residuals.tolist() == pytest.approx([2.0])
 

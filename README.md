@@ -18,8 +18,8 @@ The current implementation slice covers:
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
   local ascent/orbit propagations, batch ranking, and report-to-report comparison.
-- Synthetic range, range-rate, one-way Doppler, inertial right ascension, declination, azimuth, and
-  elevation measurement generation.
+- Synthetic range, range-rate, one-way Doppler, first-order two-way/three-way range and
+  range-rate, inertial right ascension, declination, azimuth, and elevation measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
   measurements, synthetic OD, measurement-file OD ingest/export, and research propagation.
@@ -234,10 +234,12 @@ special launch-aware propagation path.
 `--backend orekit`. The explicit ingest workflow loads a scenario plus a JSON, CSV, or CCSDS
 Tracking Data Message (TDM) measurement file, then estimates from the caller-provided station
 geometry and measurement records without adding demo geometry. JSON and CSV can carry the suite's
-range, range-rate, one-way Doppler in Hz, inertial right-ascension/declination, and local-horizon
-azimuth/elevation records. Doppler uses the scenario's `doppler_transmit_frequency_hz` to convert
-line-of-sight range rate into a received-frequency shift; this is a first one-way radiometric model,
-not yet a two-way or three-way DSN observable. Angle records use degrees. Ground stations can be supplied either as fixed
+range, range-rate, one-way Doppler in Hz, first-order two-way/three-way range and range-rate,
+inertial right-ascension/declination, and local-horizon azimuth/elevation records. Doppler uses the
+scenario's `doppler_transmit_frequency_hz` to convert line-of-sight range rate into a
+received-frequency shift. Two-way and three-way range-like observables use same-epoch geometric
+uplink/downlink path sums and carry `participant_path`/`transmitter` metadata; they are product and
+estimator primitives, not full DSN light-time or media-correction models. Angle records use degrees. Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
 epoch using a deterministic UTC sidereal-time model by default. Scenarios may also provide fixed
@@ -251,9 +253,10 @@ match the output of `astro synth-measurements`; CSV and TDM inputs are auto-dete
 `.tdm` extensions or can be forced with `--format csv` / `--format tdm`.
 
 `astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
-JSON and CSV preserve all supported suite measurement types. TDM export supports range,
-range-rate, right-ascension/declination, and azimuth/elevation records; Hz Doppler remains JSON/CSV-only
-until a precise CCSDS Doppler count/frequency convention is added. The example files under
+JSON and CSV preserve all supported suite measurement types, including two-way and three-way
+radiometric metadata. TDM export supports range, range-rate, right-ascension/declination, and
+azimuth/elevation records; Hz Doppler and explicit two-way/three-way suite records remain
+JSON/CSV-only until precise CCSDS Doppler/count and path mapping conventions are added. The example files under
 `examples/measurements/` are generated from `leo_two_station_od.yaml` and cover all three
 range/range-rate ingest/export formats.
 
@@ -275,6 +278,8 @@ The optional `metadata_json` column can carry a JSON object for row-level metada
 `km`, `km/s`, `Hz`, and `deg`, depending on measurement type. The
 `leo_two_station_od.yaml` example includes two stations because the one-station propagation example
 is intentionally under-observed for six-state OD.
+`examples/scenarios/leo_radiometric_links.yaml` demonstrates two-way and three-way radiometric
+measurement synthesis with explicit uplink/downlink station metadata.
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,
 `PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped

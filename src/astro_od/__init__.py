@@ -9,6 +9,10 @@ from astro_od.measurements import (
     range_km,
     range_rate_km_s,
     right_ascension_deg,
+    three_way_range_km,
+    three_way_range_rate_km_s,
+    two_way_range_km,
+    two_way_range_rate_km_s,
 )
 
 __all__ = [
@@ -22,4 +26,8 @@ __all__ = [
     "range_km",
     "range_rate_km_s",
     "right_ascension_deg",
+    "three_way_range_km",
+    "three_way_range_rate_km_s",
+    "two_way_range_km",
+    "two_way_range_rate_km_s",
 ]

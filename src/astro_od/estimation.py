@@ -26,6 +26,10 @@ from astro_od.measurements import (
     range_km,
     range_rate_km_s,
     right_ascension_deg,
+    three_way_range_km,
+    three_way_range_rate_km_s,
+    two_way_range_km,
+    two_way_range_rate_km_s,
 )
 
 FloatArray = NDArray[np.float64]
@@ -64,6 +68,19 @@ def _station_position_for_observer(
         if station.name == observer:
             return station.position_array(epoch, scenario.earth_orientation)
     raise NumericalConvergenceError(f"Measurement observer {observer!r} is not in the scenario")
+
+
+def _station_position_from_metadata(
+    scenario: Scenario,
+    measurement: MeasurementRecord,
+    key: str,
+) -> FloatArray:
+    station_name = measurement.metadata.get(key)
+    if not isinstance(station_name, str) or not station_name:
+        raise NumericalConvergenceError(
+            f"{measurement.measurement_type} measurement requires metadata {key!r}"
+        )
+    return _station_position_for_observer(scenario, station_name, measurement.epoch)
 
 
 def _propagator_for_backend(backend: str) -> Propagator:
@@ -134,6 +151,37 @@ def _predicted_measurement(
         return range_km(spacecraft_position, station_position)
     if measurement.measurement_type is MeasurementType.RANGE_RATE:
         return range_rate_km_s(spacecraft_position, spacecraft_velocity, station_position)
+    if measurement.measurement_type is MeasurementType.TWO_WAY_RANGE:
+        return two_way_range_km(spacecraft_position, station_position)
+    if measurement.measurement_type is MeasurementType.TWO_WAY_RANGE_RATE:
+        return two_way_range_rate_km_s(
+            spacecraft_position,
+            spacecraft_velocity,
+            station_position,
+        )
+    if measurement.measurement_type is MeasurementType.THREE_WAY_RANGE:
+        transmitter_position = _station_position_from_metadata(
+            scenario,
+            measurement,
+            "transmitter",
+        )
+        return three_way_range_km(
+            spacecraft_position,
+            transmitter_position,
+            station_position,
+        )
+    if measurement.measurement_type is MeasurementType.THREE_WAY_RANGE_RATE:
+        transmitter_position = _station_position_from_metadata(
+            scenario,
+            measurement,
+            "transmitter",
+        )
+        return three_way_range_rate_km_s(
+            spacecraft_position,
+            spacecraft_velocity,
+            transmitter_position,
+            station_position,
+        )
     if measurement.measurement_type is MeasurementType.DOPPLER:
         range_rate_truth = range_rate_km_s(
             spacecraft_position,
