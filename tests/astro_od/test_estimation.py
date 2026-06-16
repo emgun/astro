@@ -93,6 +93,16 @@ def test_batch_od_recovers_synthetic_initial_state() -> None:
     assert result.metadata["jacobian_rank"] == 6
     assert len(result.metadata["singular_values"]) == 6
     assert result.metadata["condition_number"] > 0.0
+    assert result.metadata["estimator"] == "scipy.least_squares"
+    assert result.metadata["estimator_xtol"] == 1.0e-10
+    assert result.metadata["estimator_ftol"] == 1.0e-10
+    assert result.metadata["estimator_gtol"] == 1.0e-10
+    assert result.metadata["estimator_max_nfev"] == 80
+    assert result.metadata["residual_count"] == len(measurements)
+    assert result.metadata["residual_rms"] == pytest.approx(result.rms)
+    assert result.metadata["max_abs_residual"] == pytest.approx(
+        max(abs(residual) for residual in result.residuals)
+    )
 
 
 def test_residual_vector_wraps_right_ascension_across_zero_degrees() -> None:
@@ -160,7 +170,17 @@ def test_estimate_initial_state_supports_orekit_propagation_backend(
     def fake_backend_propagation(scenario: Scenario, backend: str) -> object:
         seen_backends.append(backend)
         trajectory = propagate_local(scenario)
-        return trajectory.model_copy(update={"backend": backend})
+        return trajectory.model_copy(
+            update={
+                "backend": backend,
+                "metadata": {
+                    "wrapper": "orekit_jpype",
+                    "wrapper_version": "13.1.5.0",
+                    "data_path": "/tmp/orekit-data.zip",
+                    "propagator": "KeplerianPropagator",
+                },
+            }
+        )
 
     monkeypatch.setattr(estimation, "propagate_with_backend", fake_backend_propagation)
 
@@ -169,8 +189,52 @@ def test_estimate_initial_state_supports_orekit_propagation_backend(
     assert result.converged is True
     assert result.metadata["backend"] == "orekit_scipy_least_squares"
     assert result.metadata["propagation_backend"] == "orekit"
+    assert result.metadata["orekit_wrapper"] == "orekit_jpype"
+    assert result.metadata["orekit_wrapper_version"] == "13.1.5.0"
+    assert result.metadata["orekit_data_path"] == "/tmp/orekit-data.zip"
+    assert result.metadata["orekit_propagator"] == "KeplerianPropagator"
     assert seen_backends
     assert set(seen_backends) == {"orekit"}
+
+
+def test_orekit_backed_two_body_od_matches_local_controlled_case(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    truth_scenario = _observable_scenario()
+    truth_trajectory = propagate_local(truth_scenario)
+    measurements = generate_synthetic_measurements(truth_scenario, truth_trajectory)
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+
+    def fake_orekit_propagation(scenario: Scenario, backend: str) -> object:
+        trajectory = propagate_local(scenario)
+        return trajectory.model_copy(
+            update={
+                "backend": backend,
+                "metadata": {
+                    "wrapper": "orekit_jpype",
+                    "wrapper_version": "13.1.5.0",
+                    "data_path": "/tmp/orekit-data.zip",
+                    "propagator": "KeplerianPropagator",
+                },
+            }
+        )
+
+    local_result = estimate_initial_state(estimate_scenario, measurements, backend="local")
+    monkeypatch.setattr(estimation, "propagate_with_backend", fake_orekit_propagation)
+    orekit_result = estimate_initial_state(estimate_scenario, measurements, backend="orekit")
+
+    np.testing.assert_allclose(
+        orekit_result.estimated_state.cartesian.position_array(),
+        local_result.estimated_state.cartesian.position_array(),
+        atol=1.0e-9,
+    )
+    np.testing.assert_allclose(
+        orekit_result.estimated_state.cartesian.velocity_array(),
+        local_result.estimated_state.cartesian.velocity_array(),
+        atol=1.0e-12,
+    )
+    assert orekit_result.rms == pytest.approx(local_result.rms, abs=1.0e-12)
+    assert orekit_result.metadata["orekit_wrapper"] == "orekit_jpype"
 
 
 def test_estimate_initial_state_rejects_too_few_measurements() -> None:

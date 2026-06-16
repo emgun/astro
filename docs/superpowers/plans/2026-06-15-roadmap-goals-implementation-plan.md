@@ -94,9 +94,10 @@ Tradeoff:
 
 ### Goal 2: Orekit Force Models, Measurements, and Batch OD
 
-Status: backend-aware measurement/OD slice, Orekit J2 numerical propagation, and the
+Status: suite-level Orekit-backed measurement/OD, Orekit J2 numerical propagation, and the
 `orekit_high_fidelity` numerical propagation entry path, Orekit atmospheric drag, Orekit SRP, and
-Sun/Moon third-body gravity are implemented; native Orekit estimator remains.
+Sun/Moon third-body gravity are implemented; native Orekit `BatchLSEstimator` remains a distinct
+future integration.
 
 Implemented slice:
 
@@ -124,32 +125,33 @@ Implemented slice:
   checked-in CLI case.
 - Optional live tests compare Orekit J2 against the local J2 reference scale on the LEO case.
 - `astro synth-measurements --backend orekit` routes truth propagation through the Orekit adapter.
-- `astro estimate --backend orekit` and `astro estimate-measurements --backend orekit` run the suite's SciPy least-squares estimator with Orekit-backed residual propagation.
+- `astro estimate --backend orekit` and `astro estimate-measurements --backend orekit` run the
+  suite's SciPy least-squares estimator with Orekit-backed residual propagation.
 - The shared measurement surface supports range, range-rate, inertial right ascension, and
   declination plus local-horizon azimuth/elevation records; wrapped angle residuals handle 0/360
   degree crossings.
-- OD metadata records the selected propagation backend.
+- OD metadata records the selected propagation backend, estimator settings, residual statistics,
+  convergence diagnostics, validation trajectory backend, and Orekit wrapper/version/data/propagator
+  provenance when Orekit propagation metadata is available.
+- Cross-check tests compare local two-body OD and Orekit-backed two-body OD on the controlled
+  two-station scenario.
 - Missing Java/`orekit-jpype` still produces actionable `UnsupportedBackendError` diagnostics.
 
-Remaining definition of done:
+Future native Orekit estimator scope:
 
-- Measurement models can predict range, range-rate, inertial right ascension/declination, and
-  local-horizon azimuth/elevation through the same measurement product surface.
-- `astro estimate --backend orekit` or `astro estimate-measurements --backend orekit` returns `EstimateResult`.
-- OD result metadata records Orekit version, wrapper, data source, estimator configuration, residual statistics, and convergence diagnostics.
-- Cross-check tests compare local two-body OD and Orekit two-body OD on the controlled two-station scenario.
+- Native Orekit `BatchLSEstimator` support can be added after a separate measurement-object bridge
+  maps suite measurements and ground-station definitions into Orekit's estimation API. It is not
+  required for the current suite-level Orekit-backed OD workflow.
 
 Primary files:
 
-- Create `src/astro_backends/orekit/force_models.py`
-- Create `src/astro_backends/orekit/measurements.py`
-- Create `src/astro_backends/orekit/estimation.py`
-- Modify `src/astro_od/estimation.py`
-- Modify `src/astro_cli/main.py`
-- Test `tests/astro_backends/test_orekit_force_models.py`
-- Test `tests/astro_backends/test_orekit_measurements.py`
-- Test `tests/astro_backends/test_orekit_estimation.py`
-- Test `tests/astro_cli/test_cli.py`
+- `src/astro_backends/orekit/force_models.py`
+- `src/astro_backends/orekit/propagation.py`
+- `src/astro_od/estimation.py`
+- `src/astro_cli/main.py`
+- `tests/astro_backends/test_orekit_propagation.py`
+- `tests/astro_od/test_estimation.py`
+- `tests/astro_cli/test_cli.py`
 
 ### Goal 3: Operational Flight Dynamics Products
 

@@ -31,6 +31,10 @@ FloatArray = NDArray[np.float64]
 Propagator = Callable[[Scenario], Trajectory]
 STATE_DIMENSION = 6
 JACOBIAN_RANK_RTOL = 1.0e-7
+ESTIMATOR_XTOL = 1.0e-10
+ESTIMATOR_FTOL = 1.0e-10
+ESTIMATOR_GTOL = 1.0e-10
+ESTIMATOR_MAX_NFEV = 80
 
 
 def _vector3_from_state_vector(state_vector: FloatArray, start: int) -> tuple[float, float, float]:
@@ -68,7 +72,7 @@ def _validate_measurements(
     scenario: Scenario,
     measurements: list[MeasurementRecord],
     propagator: Propagator,
-) -> None:
+) -> Trajectory:
     if not measurements:
         raise NumericalConvergenceError("At least one measurement is required for estimation")
     if len(measurements) < STATE_DIMENSION:
@@ -89,13 +93,15 @@ def _validate_measurements(
                 f"Measurement observer {measurement.observer!r} is not in the scenario"
             )
 
-    propagated_epochs = {sample.epoch for sample in propagator(scenario).samples}
+    validation_trajectory = propagator(scenario)
+    propagated_epochs = {sample.epoch for sample in validation_trajectory.samples}
     for measurement in measurements:
         if measurement.epoch not in propagated_epochs:
             epoch = measurement.epoch.isoformat()
             raise NumericalConvergenceError(
                 f"No propagated sample is available for measurement epoch {epoch}"
             )
+    return validation_trajectory
 
 
 def _predicted_measurement(
@@ -194,6 +200,31 @@ def _initial_state_vector(scenario: Scenario) -> FloatArray:
     )
 
 
+def _residual_diagnostics(residuals: FloatArray) -> dict[str, float | int]:
+    return {
+        "residual_count": int(residuals.size),
+        "residual_rms": float(np.sqrt(np.mean(residuals**2))),
+        "max_abs_residual": float(np.max(np.abs(residuals))),
+    }
+
+
+def _trajectory_provenance_metadata(backend: str, trajectory: Trajectory) -> dict[str, object]:
+    metadata: dict[str, object] = {
+        "validation_trajectory_backend": trajectory.backend,
+    }
+    if backend == "orekit":
+        for source_key, result_key in (
+            ("wrapper", "orekit_wrapper"),
+            ("wrapper_version", "orekit_wrapper_version"),
+            ("data_path", "orekit_data_path"),
+            ("propagator", "orekit_propagator"),
+            ("force_models", "orekit_force_models"),
+        ):
+            if source_key in trajectory.metadata:
+                metadata[result_key] = trajectory.metadata[source_key]
+    return metadata
+
+
 def estimate_initial_state(
     scenario: Scenario,
     measurements: list[MeasurementRecord],
@@ -202,16 +233,16 @@ def estimate_initial_state(
     propagator: Propagator | None = None,
 ) -> EstimateResult:
     selected_propagator = propagator or _propagator_for_backend(backend)
-    _validate_measurements(scenario, measurements, selected_propagator)
+    validation_trajectory = _validate_measurements(scenario, measurements, selected_propagator)
 
     optimizer_result = least_squares(
         residual_vector,
         _initial_state_vector(scenario),
         args=(scenario, measurements, selected_propagator),
-        xtol=1.0e-10,
-        ftol=1.0e-10,
-        gtol=1.0e-10,
-        max_nfev=80,
+        xtol=ESTIMATOR_XTOL,
+        ftol=ESTIMATOR_FTOL,
+        gtol=ESTIMATOR_GTOL,
+        max_nfev=ESTIMATOR_MAX_NFEV,
     )
 
     estimated_vector = cast(FloatArray, optimizer_result.x)
@@ -249,7 +280,14 @@ def estimate_initial_state(
         metadata={
             "backend": f"{backend}_scipy_least_squares",
             "propagation_backend": backend,
+            "estimator": "scipy.least_squares",
+            "estimator_xtol": ESTIMATOR_XTOL,
+            "estimator_ftol": ESTIMATOR_FTOL,
+            "estimator_gtol": ESTIMATOR_GTOL,
+            "estimator_max_nfev": ESTIMATOR_MAX_NFEV,
             "message": str(optimizer_result.message),
+            **_residual_diagnostics(residuals),
             **diagnostics,
+            **_trajectory_provenance_metadata(backend, validation_trajectory),
         },
     )
