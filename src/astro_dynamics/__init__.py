@@ -1,5 +1,5 @@
 from astro_dynamics.backends import propagate_with_backend
-from astro_dynamics.ephemeris import dump_trajectory_ephemeris_csv
+from astro_dynamics.ephemeris import dump_trajectory_ephemeris_csv, dump_trajectory_oem
 from astro_dynamics.local import (
     acceleration_km_s2,
     derivative,
@@ -22,6 +22,7 @@ __all__ = [
     "apply_impulsive_maneuver",
     "derivative",
     "dump_trajectory_ephemeris_csv",
+    "dump_trajectory_oem",
     "j2_acceleration_km_s2",
     "propagate_local",
     "propagate_with_backend",

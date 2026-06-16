@@ -21,7 +21,7 @@ from astro_core.errors import (
 from astro_core.io import load_scenario, load_trajectory
 from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario, Trajectory
 from astro_dynamics.backends import propagate_with_backend
-from astro_dynamics.ephemeris import dump_trajectory_ephemeris_csv
+from astro_dynamics.ephemeris import dump_trajectory_ephemeris_csv, dump_trajectory_oem
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
 from astro_launch.backends import propagate_launch_with_backend
 from astro_launch.handoff import launch_trajectory_to_orbit_scenario
@@ -334,16 +334,20 @@ def export_trajectory(
     output: Annotated[Path, typer.Option()],
     trajectory_format: Annotated[
         str,
-        typer.Option("--format", help="Output trajectory format: csv."),
+        typer.Option("--format", help="Output trajectory format: csv or oem."),
     ] = "csv",
 ) -> None:
     """Export a trajectory product to an ephemeris table."""
     trajectory = _load_trajectory_or_exit(trajectory_path)
-    if trajectory_format != "csv":
+    normalized_format = trajectory_format.lower()
+    if normalized_format == "csv":
+        payload = dump_trajectory_ephemeris_csv(trajectory)
+    elif normalized_format == "oem":
+        payload = dump_trajectory_oem(trajectory)
+    else:
         typer.echo(f"unsupported trajectory export format: {trajectory_format}", err=True)
         raise typer.Exit(code=2)
 
-    payload = dump_trajectory_ephemeris_csv(trajectory)
     _write_text_or_exit(output, payload, "trajectory")
     typer.echo(f"wrote trajectory: {output}")
 

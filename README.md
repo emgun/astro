@@ -12,8 +12,8 @@ The current implementation slice covers:
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
 - Flight-dynamics trajectory product fields for events, impulsive and finite-burn maneuvers, and
   covariance history, plus local finite-difference covariance propagation with optional
-  acceleration process noise, per-sample state-transition/process-noise products, CSV ephemeris
-  export, and seeded initial-state Monte Carlo propagation.
+  acceleration process noise, per-sample state-transition/process-noise products, CSV and CCSDS OEM
+  ephemeris export, and seeded initial-state Monte Carlo propagation.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
@@ -113,6 +113,7 @@ astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --outpu
 astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output orekit_srp_trajectory.json
 astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output orekit_third_body_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
+astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke
 astro dymos-smoke
@@ -157,8 +158,10 @@ suite geodetic range/range-rate records into Orekit `Range`/`RangeRate` measurem
 residuals, RMS, covariance, and iteration diagnostics into the suite `EstimateResult` model; public
 CLI exposure still waits on live Java/Orekit estimator validation.
 
-`astro export-trajectory` converts suite trajectory JSON into a CSV ephemeris table containing
-epoch, position, and velocity samples. `astro monte-carlo` runs a seeded initial-state ensemble by
+`astro export-trajectory` converts suite trajectory JSON into either a CSV ephemeris table or a
+CCSDS OEM KVN text product containing UTC epochs plus Cartesian position and velocity samples in km
+and km/s. OEM export is currently write-only and preserves the suite product boundary; OEM ingest
+can be added once generated products are stable. `astro monte-carlo` runs a seeded initial-state ensemble by
 perturbing the scenario's Cartesian state and propagating each case through the selected backend.
 This is a repeatable product workflow for uncertainty screening; it is not yet production covariance
 propagation or conjunction analysis.

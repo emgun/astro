@@ -219,6 +219,31 @@ def test_export_trajectory_command_writes_csv(tmp_path: Path) -> None:
     assert rows[0]["x_km"] == "7000.0"
 
 
+def test_export_trajectory_command_writes_oem(tmp_path: Path) -> None:
+    trajectory_path = tmp_path / "trajectory.json"
+    output = tmp_path / "trajectory.oem"
+    _write_orbit_trajectory(trajectory_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "export-trajectory",
+            str(trajectory_path),
+            "--format",
+            "oem",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote trajectory" in result.stdout
+    payload = output.read_text(encoding="utf-8")
+    assert payload.startswith("CCSDS_OEM_VERS = 2.0")
+    assert "OBJECT_NAME = leo-two-body" in payload
+    assert "2026-01-01T00:00:00.000000Z 7000.0 0.0 0.0 0.0 7.5 1.0" in payload
+
+
 def test_monte_carlo_command_writes_json(tmp_path: Path) -> None:
     output = tmp_path / "monte_carlo.json"
 

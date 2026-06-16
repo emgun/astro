@@ -38,6 +38,7 @@ def test_packages_import() -> None:
         "apply_impulsive_maneuver",
         "derivative",
         "dump_trajectory_ephemeris_csv",
+        "dump_trajectory_oem",
         "j2_acceleration_km_s2",
         "propagate_local",
         "propagate_with_backend",
