@@ -208,7 +208,11 @@ class LaunchRocketPyConfig(AstroModel):
     rocket_center_of_mass_without_motor_m: FiniteFloat
     rocket_power_off_drag_coefficient: FiniteFloat = Field(ge=0.0, le=10.0, default=0.5)
     rocket_power_on_drag_coefficient: FiniteFloat = Field(ge=0.0, le=10.0, default=0.5)
+    motor_thrust_source_n: tuple[tuple[FiniteFloat, FiniteFloat], ...] = Field(min_length=2)
+    motor_burn_time_s: FiniteFloat = Field(gt=0.0)
     motor_dry_mass_kg: FiniteFloat = Field(ge=0.0)
+    motor_dry_inertia_kg_m2: tuple[FiniteFloat, FiniteFloat, FiniteFloat]
+    motor_position_m: FiniteFloat
     motor_center_of_dry_mass_position_m: FiniteFloat
     motor_nozzle_position_m: FiniteFloat
     motor_nozzle_radius_m: FiniteFloat = Field(gt=0.0)
@@ -219,6 +223,9 @@ class LaunchRocketPyConfig(AstroModel):
     motor_grain_initial_height_m: FiniteFloat = Field(gt=0.0)
     motor_grain_separation_m: FiniteFloat = Field(ge=0.0)
     motor_grains_center_of_mass_position_m: FiniteFloat
+    rail_button_upper_position_m: FiniteFloat
+    rail_button_lower_position_m: FiniteFloat
+    rail_button_angular_position_deg: FiniteFloat = Field(ge=0.0, le=360.0, default=45.0)
 
     @field_validator(
         "rail_length_m",
@@ -229,7 +236,9 @@ class LaunchRocketPyConfig(AstroModel):
         "rocket_center_of_mass_without_motor_m",
         "rocket_power_off_drag_coefficient",
         "rocket_power_on_drag_coefficient",
+        "motor_burn_time_s",
         "motor_dry_mass_kg",
+        "motor_position_m",
         "motor_center_of_dry_mass_position_m",
         "motor_nozzle_position_m",
         "motor_nozzle_radius_m",
@@ -239,6 +248,9 @@ class LaunchRocketPyConfig(AstroModel):
         "motor_grain_initial_height_m",
         "motor_grain_separation_m",
         "motor_grains_center_of_mass_position_m",
+        "rail_button_upper_position_m",
+        "rail_button_lower_position_m",
+        "rail_button_angular_position_deg",
         mode="before",
     )
     @classmethod
@@ -246,11 +258,26 @@ class LaunchRocketPyConfig(AstroModel):
         return _numeric_scalar_input_must_be_number(value, "RocketPy config scalar")
 
     @model_validator(mode="after")
-    def grain_inner_radius_must_fit_outer_radius(self) -> LaunchRocketPyConfig:
+    def validate_rocketpy_geometry_and_curve(self) -> LaunchRocketPyConfig:
+        thrust_times_s = [point[0] for point in self.motor_thrust_source_n]
+        thrust_values_n = [point[1] for point in self.motor_thrust_source_n]
+        if thrust_times_s[0] != 0.0:
+            raise ValueError("RocketPy thrust curve must start at t=0")
+        if not all(
+            previous_time < next_time
+            for previous_time, next_time in zip(thrust_times_s, thrust_times_s[1:], strict=False)
+        ):
+            raise ValueError("RocketPy thrust curve time_s values must be strictly increasing")
+        if any(thrust_n < 0.0 for thrust_n in thrust_values_n):
+            raise ValueError("RocketPy thrust curve thrust_n values must be non-negative")
+        if self.motor_burn_time_s > thrust_times_s[-1]:
+            raise ValueError("RocketPy motor_burn_time_s must not exceed thrust curve duration")
         if self.motor_grain_initial_inner_radius_m >= self.motor_grain_outer_radius_m:
             raise ValueError("RocketPy motor grain inner radius must be smaller than outer radius")
         if self.motor_nozzle_radius_m >= self.motor_grain_outer_radius_m:
             raise ValueError("RocketPy motor nozzle radius must be smaller than grain outer radius")
+        if self.rail_button_upper_position_m <= self.rail_button_lower_position_m:
+            raise ValueError("RocketPy upper rail button position must be above lower position")
         return self
 
 

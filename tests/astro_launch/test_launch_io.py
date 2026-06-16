@@ -54,6 +54,15 @@ def test_load_rocketpy_configured_launch_scenario() -> None:
     assert scenario.rocketpy.motor_grain_number == 4
 
 
+def test_load_rocketpy_single_stage_launch_scenario() -> None:
+    scenario = load_launch_scenario(Path("examples/launch/rocketpy_configured_single_stage.yaml"))
+
+    assert scenario.scenario_id == "rocketpy-configured-single-stage"
+    assert len(scenario.vehicle.stages) == 1
+    assert scenario.rocketpy is not None
+    assert scenario.rocketpy.motor_thrust_source_n[-1] == (3.0, 0.0)
+
+
 def test_load_launch_trajectory_reads_json_product(tmp_path: Path) -> None:
     from astro_launch.io import load_launch_trajectory
 

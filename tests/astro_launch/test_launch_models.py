@@ -55,7 +55,11 @@ def test_launch_scenario_accepts_rocketpy_backend_configuration() -> None:
             rocket_mass_without_motor_kg=145.0,
             rocket_inertia_without_motor_kg_m2=(45.0, 45.0, 1.2),
             rocket_center_of_mass_without_motor_m=1.8,
+            motor_thrust_source_n=((0.0, 0.0), (1.0, 25000.0), (3.0, 0.0)),
+            motor_burn_time_s=3.0,
             motor_dry_mass_kg=28.0,
+            motor_dry_inertia_kg_m2=(2.4, 2.4, 0.08),
+            motor_position_m=-1.4,
             motor_center_of_dry_mass_position_m=-1.1,
             motor_nozzle_position_m=-1.9,
             motor_nozzle_radius_m=0.075,
@@ -66,6 +70,9 @@ def test_launch_scenario_accepts_rocketpy_backend_configuration() -> None:
             motor_grain_initial_height_m=0.42,
             motor_grain_separation_m=0.012,
             motor_grains_center_of_mass_position_m=-0.8,
+            rail_button_upper_position_m=0.7,
+            rail_button_lower_position_m=-1.1,
+            rail_button_angular_position_deg=45.0,
         )
     )
 
@@ -84,7 +91,11 @@ def test_rocketpy_configuration_rejects_invalid_motor_geometry() -> None:
             rocket_mass_without_motor_kg=145.0,
             rocket_inertia_without_motor_kg_m2=(45.0, 45.0, 1.2),
             rocket_center_of_mass_without_motor_m=1.8,
+            motor_thrust_source_n=((0.0, 0.0), (1.0, 25000.0), (3.0, 0.0)),
+            motor_burn_time_s=3.0,
             motor_dry_mass_kg=28.0,
+            motor_dry_inertia_kg_m2=(2.4, 2.4, 0.08),
+            motor_position_m=-1.4,
             motor_center_of_dry_mass_position_m=-1.1,
             motor_nozzle_position_m=-1.9,
             motor_nozzle_radius_m=0.075,
@@ -95,6 +106,40 @@ def test_rocketpy_configuration_rejects_invalid_motor_geometry() -> None:
             motor_grain_initial_height_m=0.42,
             motor_grain_separation_m=0.012,
             motor_grains_center_of_mass_position_m=-0.8,
+            rail_button_upper_position_m=0.7,
+            rail_button_lower_position_m=-1.1,
+            rail_button_angular_position_deg=45.0,
+        )
+
+
+def test_rocketpy_configuration_rejects_invalid_thrust_curve() -> None:
+    with pytest.raises(ValidationError, match="thrust curve time_s values"):
+        LaunchRocketPyConfig(
+            rail_length_m=5.2,
+            inclination_deg=85.0,
+            heading_deg=90.0,
+            rocket_radius_m=0.31,
+            rocket_mass_without_motor_kg=145.0,
+            rocket_inertia_without_motor_kg_m2=(45.0, 45.0, 1.2),
+            rocket_center_of_mass_without_motor_m=1.8,
+            motor_thrust_source_n=((0.0, 0.0), (1.0, 25000.0), (1.0, 0.0)),
+            motor_burn_time_s=3.0,
+            motor_dry_mass_kg=28.0,
+            motor_dry_inertia_kg_m2=(2.4, 2.4, 0.08),
+            motor_position_m=-1.4,
+            motor_center_of_dry_mass_position_m=-1.1,
+            motor_nozzle_position_m=-1.9,
+            motor_nozzle_radius_m=0.075,
+            motor_grain_number=4,
+            motor_grain_density_kg_m3=1815.0,
+            motor_grain_outer_radius_m=0.12,
+            motor_grain_initial_inner_radius_m=0.045,
+            motor_grain_initial_height_m=0.42,
+            motor_grain_separation_m=0.012,
+            motor_grains_center_of_mass_position_m=-0.8,
+            rail_button_upper_position_m=0.7,
+            rail_button_lower_position_m=-1.1,
+            rail_button_angular_position_deg=45.0,
         )
 
 

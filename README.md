@@ -24,9 +24,10 @@ The current implementation slice covers:
 - Optional backend smoke gates and product boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy,
   and JAX.
 
-Launch/ascent currently uses deliberately simple local vertical and pitch-program baselines.
-RocketPy and Dymos/OpenMDAO are recognized adapter boundaries, but live external-engine workflows
-still require backend-specific configuration beyond the aggregate local launch schema.
+Launch/ascent includes deliberately simple local vertical and pitch-program baselines plus a
+RocketPy direct-simulation path for explicitly configured single-stage solid rockets. Dymos/OpenMDAO
+is recognized as an optimization adapter boundary, but live Dymos phase transcription still requires
+backend-specific modeling beyond the aggregate local launch schema.
 
 ## Setup
 
@@ -68,8 +69,9 @@ Dymos `>=1.13.1,<1.14`, and OpenMDAO `>=3.41,<3.42`.
 
 RocketPy and Dymos/OpenMDAO are behind explicit adapter gates. The current `rocketpy` launch path
 loads the optional runtime, requires explicit `rocketpy` vehicle/motor/flight configuration on the
-launch scenario, and preserves the `LaunchTrajectory` product boundary. A validated RocketPy flight
-runner is still required before the suite promotes live RocketPy simulation beyond the adapter gate.
+launch scenario, runs single-stage solid-rocket flights through RocketPy, and preserves the
+`LaunchTrajectory` product boundary. Multi-stage RocketPy composition remains intentionally gated
+until a validated multi-motor/staging mapping is added.
 
 Optional research backend smoke checks:
 

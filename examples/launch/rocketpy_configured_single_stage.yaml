@@ -1,5 +1,5 @@
-scenario_id: rocketpy-configured-two-stage
-description: Two-stage launch reference with explicit RocketPy backend configuration.
+scenario_id: rocketpy-configured-single-stage
+description: Single-stage solid launch reference with explicit RocketPy backend configuration.
 epoch: '2026-01-01T00:00:00Z'
 time_scale: UTC
 frame: EME2000
@@ -10,7 +10,7 @@ launch_site:
   altitude_m: 0.0
   body: earth
 vehicle:
-  name: mvp-two-stage
+  name: mvp-single-stage-solid
   payload_mass_kg: 500.0
   stages:
     - name: stage-1
@@ -23,16 +23,6 @@ vehicle:
       burn_duration_s: 70.0
       reference_area_m2: 8.0
       drag_coefficient: 0.35
-    - name: stage-2
-      dry_mass_kg: 350.0
-      propellant_mass_kg: 900.0
-      engine:
-        name: upper
-        thrust_n: 35000.0
-        specific_impulse_s: 315.0
-      burn_duration_s: 50.0
-      reference_area_m2: 3.0
-      drag_coefficient: 0.25
 atmosphere:
   model: exponential
   sea_level_density_kg_m3: 1.225
