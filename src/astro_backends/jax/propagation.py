@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 
 from astro_backends.jax.runtime import JaxRuntime, load_jax_runtime
-from astro_core.constants import MU_EARTH_KM3_S2
+from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
 from astro_core.errors import UnsupportedBackendError
 from astro_core.models import (
     CartesianState,
@@ -49,27 +49,68 @@ def _internal_step_schedule(step_s: float) -> tuple[int, float]:
     return substep_count, step_s / substep_count
 
 
-def _two_body_derivative(jnp: Any, state: Any) -> Any:
+_SUPPORTED_JAX_GRAVITY_MODELS = {ForceModelName.TWO_BODY, ForceModelName.J2}
+
+
+def _two_body_acceleration(jnp: Any, position: Any) -> Any:
+    radius = jnp.linalg.norm(position, axis=1)
+    return -MU_EARTH_KM3_S2 * position / (radius[:, None] ** 3)
+
+
+def _j2_acceleration(jnp: Any, position: Any) -> Any:
+    x = position[:, 0]
+    y = position[:, 1]
+    z = position[:, 2]
+    radius2 = jnp.sum(position * position, axis=1)
+    radius = jnp.sqrt(radius2)
+    z2_over_r2 = (z * z) / radius2
+    factor = 1.5 * J2_EARTH * MU_EARTH_KM3_S2 * R_EARTH_KM**2 / (radius**5)
+    return factor[:, None] * jnp.stack(
+        (
+            x * (5.0 * z2_over_r2 - 1.0),
+            y * (5.0 * z2_over_r2 - 1.0),
+            z * (5.0 * z2_over_r2 - 3.0),
+        ),
+        axis=1,
+    )
+
+
+def _acceleration(jnp: Any, position: Any, force_model: ForceModelName) -> Any:
+    acceleration = _two_body_acceleration(jnp, position)
+    if force_model is ForceModelName.J2:
+        acceleration = acceleration + _j2_acceleration(jnp, position)
+    return acceleration
+
+
+def _derivative(jnp: Any, state: Any, force_model: ForceModelName) -> Any:
     position = state[:, :3]
     velocity = state[:, 3:]
-    radius = jnp.linalg.norm(position, axis=1)
-    acceleration = -MU_EARTH_KM3_S2 * position / (radius[:, None] ** 3)
-    return jnp.concatenate((velocity, acceleration), axis=1)
+    return jnp.concatenate((velocity, _acceleration(jnp, position, force_model)), axis=1)
 
 
-def _rk4_step_once(jnp: Any, state: Any, step_s: float) -> Any:
-    k1 = _two_body_derivative(jnp, state)
-    k2 = _two_body_derivative(jnp, state + 0.5 * step_s * k1)
-    k3 = _two_body_derivative(jnp, state + 0.5 * step_s * k2)
-    k4 = _two_body_derivative(jnp, state + step_s * k3)
+def _rk4_step_once(
+    jnp: Any,
+    state: Any,
+    step_s: float,
+    force_model: ForceModelName,
+) -> Any:
+    k1 = _derivative(jnp, state, force_model)
+    k2 = _derivative(jnp, state + 0.5 * step_s * k1, force_model)
+    k3 = _derivative(jnp, state + 0.5 * step_s * k2, force_model)
+    k4 = _derivative(jnp, state + step_s * k3, force_model)
     return state + (step_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
 
-def _rk4_step(jnp: Any, state: Any, step_s: float) -> Any:
+def _rk4_step(
+    jnp: Any,
+    state: Any,
+    step_s: float,
+    force_model: ForceModelName,
+) -> Any:
     substep_count, substep_s = _internal_step_schedule(step_s)
     next_state = state
     for _ in range(substep_count):
-        next_state = _rk4_step_once(jnp, next_state, substep_s)
+        next_state = _rk4_step_once(jnp, next_state, substep_s, force_model)
     return next_state
 
 
@@ -80,9 +121,9 @@ def _validate_jax_force_model(scenario: Scenario) -> None:
             "JAX research propagation does not support high-fidelity force model flags: "
             f"{', '.join(enabled_flags)}"
         )
-    if scenario.force_model.gravity is not ForceModelName.TWO_BODY:
+    if scenario.force_model.gravity not in _SUPPORTED_JAX_GRAVITY_MODELS:
         raise UnsupportedBackendError(
-            "JAX research propagation currently supports only two_body force models"
+            "JAX research propagation currently supports only two_body and j2 force models"
         )
 
 
@@ -119,7 +160,12 @@ def _default_jax_two_body_runner(
     for sample_index in range(scenario.propagation.sample_count):
         sample_states.append(state)
         if sample_index < scenario.propagation.sample_count - 1:
-            state = _rk4_step(jnp, state, scenario.propagation.step_s)
+            state = _rk4_step(
+                jnp,
+                state,
+                scenario.propagation.step_s,
+                scenario.force_model.gravity,
+            )
 
     sample_array = np.asarray(jnp.stack(sample_states, axis=1), dtype=np.float64)
     internal_substeps_per_sample, internal_step_s = _internal_step_schedule(
@@ -158,7 +204,7 @@ def _default_jax_two_body_runner(
                 "internal_max_step_s": _MAX_RK4_INTERNAL_STEP_S,
                 "internal_substeps_per_sample": internal_substeps_per_sample,
                 "internal_step_s": internal_step_s,
-                "runner": "jax_vectorized_two_body_rk4",
+                "runner": f"jax_vectorized_{scenario.force_model.gravity.value}_rk4",
             },
         )
         monte_carlo_cases.append(
@@ -179,7 +225,7 @@ def _default_jax_two_body_runner(
         velocity_sigma_km_s=velocity_sigma_km_s,
         cases=monte_carlo_cases,
         metadata={
-            "runner": "jax_vectorized_two_body_rk4",
+            "runner": f"jax_vectorized_{scenario.force_model.gravity.value}_rk4",
             "perturbation_rng": "numpy.default_rng",
             "force_model": scenario.force_model.gravity.value,
             "case_count": cases,

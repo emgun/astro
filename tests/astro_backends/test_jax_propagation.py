@@ -61,9 +61,32 @@ def test_research_propagate_jax_runs_builtin_two_body_runner() -> None:
     assert final_jax.velocity_km_s == pytest.approx(final_local.velocity_km_s)
 
 
+def test_research_propagate_jax_runs_builtin_j2_runner() -> None:
+    scenario = load_scenario("examples/scenarios/leo_j2.yaml")
+    local_trajectory = propagate_local(scenario)
+
+    result = research_propagate_jax(
+        scenario,
+        cases=1,
+        position_sigma_km=0.0,
+        velocity_sigma_km_s=0.0,
+        seed=7,
+        runtime_loader=_fake_runtime,
+    )
+
+    final_jax = result.cases[0].trajectory.samples[-1].state
+    final_local = local_trajectory.samples[-1].state
+    assert result.backend == "jax"
+    assert result.metadata["runner"] == "jax_vectorized_j2_rk4"
+    assert result.metadata["force_model"] == "j2"
+    assert result.cases[0].trajectory.metadata["runner"] == "jax_vectorized_j2_rk4"
+    assert final_jax.position_km == pytest.approx(final_local.position_km)
+    assert final_jax.velocity_km_s == pytest.approx(final_local.velocity_km_s)
+
+
 def test_research_propagate_jax_rejects_unsupported_force_model() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml").model_copy(
-        update={"force_model": ForceModelConfig(gravity=ForceModelName.J2)}
+        update={"force_model": ForceModelConfig(gravity=ForceModelName.OREKIT_HIGH_FIDELITY)}
     )
 
     with pytest.raises(UnsupportedBackendError, match="supports only two_body"):

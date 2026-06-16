@@ -74,8 +74,9 @@ python -m pip install -e '.[research]'
 astro jax-smoke
 ```
 
-The `research` extra installs JAX/JAXLIB for differentiable or accelerated research workflows. JAX is
-not the operational frame/time authority; compare research results against local/Orekit references.
+The `research` extra installs JAX/JAXLIB for differentiable or accelerated research workflows. The
+current JAX research runner supports vectorized two-body and J2 RK4 ensembles. JAX is not the
+operational frame/time authority; compare research results against local/Orekit references.
 
 TudatPy is intentionally not listed as a pip extra because it may not be available from PyPI for this
 environment. Install TudatPy through its supported distribution channel for your platform, then run:

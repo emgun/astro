@@ -245,10 +245,11 @@ Tradeoff:
 
 ### Goal 5: High-Fidelity and Research Backends
 
-Status: first high-fidelity/research backend slice implemented. TudatPy and JAX runtime gates,
-smoke commands, Tudat propagation dispatch, a built-in JAX two-body research propagation runner,
-and a Nyx/ANISE evaluation gate are implemented. Live Tudat environment construction and richer JAX
-force models or sensitivity workflows remain gated on validated runner implementations.
+Status: high-fidelity/research backend slices implemented for runtime gates, product boundaries,
+and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke commands, Tudat propagation
+dispatch, built-in JAX two-body and J2 research propagation runners, and a Nyx/ANISE evaluation gate
+are implemented. Live Tudat environment construction and JAX high-fidelity force flags,
+sensitivities, or differentiable OD workflows remain gated on validated runner implementations.
 
 Implemented slice:
 
@@ -256,14 +257,14 @@ Implemented slice:
 - `astro propagate --backend tudat` is a recognized propagation boundary and returns suite
   `Trajectory` products through a validated runner.
 - `astro research-propagate --backend local` runs seeded local ensembles.
-- `astro research-propagate --backend jax` runs a vectorized two-body RK4 seeded ensemble and returns
-  suite `MonteCarloResult` products.
+- `astro research-propagate --backend jax` runs vectorized two-body and J2 RK4 seeded ensembles and
+  returns suite `MonteCarloResult` products.
 - `docs/research/nyx-evaluation.md` records the current Nyx/ANISE decision as evaluation-only.
 
 Definition of done:
 
 - `astro propagate --backend tudat` supports at least one cross-check scenario and records Tudat provenance once a validated Tudat runner is supplied.
-- `astro research-propagate --backend jax` runs seeded two-body batch propagation without replacing operational Orekit semantics; richer force models and sensitivity experiments still require validated JAX runners.
+- `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation without replacing operational Orekit semantics; high-fidelity force flags, sensitivity experiments, and differentiable OD still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.
 - Batch acceleration and Monte Carlo workflows preserve deterministic seeds and validation tolerances.
 
