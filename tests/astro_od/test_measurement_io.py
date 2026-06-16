@@ -133,6 +133,74 @@ def test_load_measurements_reads_tdm_range_and_doppler_records(tmp_path: Path) -
     assert loaded[1].metadata["tdm_keyword"] == "DOPPLER_INSTANTANEOUS"
 
 
+def test_load_measurements_reads_tdm_angle_records(tmp_path: Path) -> None:
+    path = tmp_path / "measurements.tdm"
+    path.write_text(
+        "\n".join(
+            [
+                "CCSDS_TDM_VERS = 2.0",
+                "CREATION_DATE = 2026-01-01T00:00:00Z",
+                "ORIGINATOR = ASTRO_SUITE_TEST",
+                "META_START",
+                "SCENARIO_ID = leo-two-body",
+                "TIME_SYSTEM = UTC",
+                "MODE = SEQUENTIAL",
+                "PARTICIPANT_1 = measurement-file-y-axis-eci",
+                "PARTICIPANT_2 = demo-sat",
+                "PATH = 1,2,1",
+                "ANGLE_TYPE = RADEC",
+                "ANGLE_UNITS = deg",
+                "ANGLE_SIGMA_DEG = 0.002",
+                "META_STOP",
+                "DATA_START",
+                "ANGLE_1 = 2026-001T00:00:00 12.5",
+                "ANGLE_2 = 2026-001T00:00:00 -8.25",
+                "DATA_STOP",
+                "META_START",
+                "SCENARIO_ID = leo-two-body",
+                "TIME_SYSTEM = UTC",
+                "MODE = SEQUENTIAL",
+                "PARTICIPANT_1 = measurement-file-y-axis-eci",
+                "PARTICIPANT_2 = demo-sat",
+                "PATH = 1,2,1",
+                "ANGLE_TYPE = AZEL",
+                "ANGLE_UNITS = deg",
+                "ANGLE_SIGMA_DEG = 0.003",
+                "META_STOP",
+                "DATA_START",
+                "ANGLE_1 = 2026-001T00:01:00 95.0",
+                "ANGLE_2 = 2026-001T00:01:00 22.0",
+                "DATA_STOP",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = load_measurements(path, expected_scenario_id="leo-two-body")
+
+    assert [record.measurement_type for record in loaded] == [
+        MeasurementType.RIGHT_ASCENSION,
+        MeasurementType.DECLINATION,
+        MeasurementType.AZIMUTH,
+        MeasurementType.ELEVATION,
+    ]
+    assert [record.value for record in loaded] == [12.5, -8.25, 95.0, 22.0]
+    assert [record.sigma for record in loaded] == [0.002, 0.002, 0.003, 0.003]
+    assert [record.units for record in loaded] == ["deg", "deg", "deg", "deg"]
+    assert [record.metadata["tdm_keyword"] for record in loaded] == [
+        "ANGLE_1",
+        "ANGLE_2",
+        "ANGLE_1",
+        "ANGLE_2",
+    ]
+    assert [record.metadata["tdm_angle_type"] for record in loaded] == [
+        "RADEC",
+        "RADEC",
+        "AZEL",
+        "AZEL",
+    ]
+
+
 def test_load_measurements_rejects_tdm_scenario_mismatch(tmp_path: Path) -> None:
     path = tmp_path / "measurements.tdm"
     path.write_text(
@@ -204,20 +272,62 @@ def test_load_measurements_rejects_tdm_missing_participants(tmp_path: Path) -> N
         load_measurements(path)
 
 
-def test_dump_measurements_tdm_rejects_angle_measurements() -> None:
+def test_dump_measurements_tdm_round_trips_angle_measurements(tmp_path: Path) -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
-    record = MeasurementRecord(
-        measurement_type=MeasurementType.RIGHT_ASCENSION,
-        epoch=scenario.initial_state.epoch,
-        observer="equator-eci",
-        observed_object=scenario.spacecraft.name,
-        value=0.0,
-        sigma=0.001,
-        units="deg",
-    )
+    records = [
+        MeasurementRecord(
+            measurement_type=MeasurementType.RIGHT_ASCENSION,
+            epoch=scenario.initial_state.epoch,
+            observer="equator-eci",
+            observed_object=scenario.spacecraft.name,
+            value=12.5,
+            sigma=0.001,
+            units="deg",
+        ),
+        MeasurementRecord(
+            measurement_type=MeasurementType.DECLINATION,
+            epoch=scenario.initial_state.epoch,
+            observer="equator-eci",
+            observed_object=scenario.spacecraft.name,
+            value=-8.25,
+            sigma=0.001,
+            units="deg",
+        ),
+        MeasurementRecord(
+            measurement_type=MeasurementType.AZIMUTH,
+            epoch=scenario.initial_state.epoch,
+            observer="equator-eci",
+            observed_object=scenario.spacecraft.name,
+            value=95.0,
+            sigma=0.002,
+            units="deg",
+        ),
+        MeasurementRecord(
+            measurement_type=MeasurementType.ELEVATION,
+            epoch=scenario.initial_state.epoch,
+            observer="equator-eci",
+            observed_object=scenario.spacecraft.name,
+            value=22.0,
+            sigma=0.002,
+            units="deg",
+        ),
+    ]
 
-    with pytest.raises(InvalidMeasurementFileError, match="TDM export supports only"):
-        dump_measurements_tdm(scenario.scenario_id, [record])
+    exported = dump_measurements_tdm(scenario.scenario_id, records)
+    path = tmp_path / "angles.tdm"
+    path.write_text(exported, encoding="utf-8")
+
+    assert "ANGLE_TYPE = RADEC" in exported
+    assert "ANGLE_TYPE = AZEL" in exported
+    assert exported.count("ANGLE_1 =") == 2
+    assert exported.count("ANGLE_2 =") == 2
+    assert "ANGLE_SIGMA_DEG = 0.001" in exported
+    assert "ANGLE_SIGMA_DEG = 0.002" in exported
+    loaded = load_measurements(path, expected_scenario_id=scenario.scenario_id)
+
+    assert [(record.measurement_type, record.value, record.sigma) for record in loaded] == [
+        (record.measurement_type, record.value, record.sigma) for record in records
+    ]
 
 
 def test_load_measurements_rejects_csv_scenario_mismatch(tmp_path: Path) -> None:

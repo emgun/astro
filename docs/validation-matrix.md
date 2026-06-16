@@ -49,7 +49,7 @@ adapters.
 | Local finite burns | Tests compare finite-burn propagation against the no-maneuver local baseline and verify maneuver events, thrust-vector mass depletion, and provenance. |
 | Local covariance propagation | Tests verify covariance history length, epoch alignment, symmetry, and finite-difference provenance metadata. |
 | Launch handoff | Tests confirm `LaunchTrajectory.insertion_state` converts into a normal orbital `Scenario` and propagates locally. |
-| OD explicit measurements | Tests validate JSON, CSV, TDM range/range-rate ingest/export, inertial and local-horizon angle generation, angle wrapping, and local least-squares convergence. |
+| OD explicit measurements | Tests validate JSON, CSV, TDM range/range-rate/angle ingest/export, inertial and local-horizon angle generation, angle wrapping, and local least-squares convergence. |
 | Research Monte Carlo | Tests confirm seeded repeatability, local Monte Carlo provenance, and built-in JAX two-body/J2 runner parity against the local reference for zero dispersion. |
 
 ## Backend Boundary Rule

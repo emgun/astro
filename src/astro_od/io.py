@@ -16,12 +16,49 @@ from astro_core.models import MeasurementRecord, MeasurementType
 
 DEFAULT_TDM_RANGE_SIGMA_KM = 0.01
 DEFAULT_TDM_RANGE_RATE_SIGMA_KM_S = 1.0e-5
+DEFAULT_TDM_ANGLE_SIGMA_DEG = 0.001
 TDM_EXPORT_MEASUREMENT_TYPES = frozenset(
     {
         MeasurementType.RANGE,
         MeasurementType.RANGE_RATE,
+        MeasurementType.RIGHT_ASCENSION,
+        MeasurementType.DECLINATION,
+        MeasurementType.AZIMUTH,
+        MeasurementType.ELEVATION,
     }
 )
+
+ANGLE_MEASUREMENT_TYPES = frozenset(
+    {
+        MeasurementType.RIGHT_ASCENSION,
+        MeasurementType.DECLINATION,
+        MeasurementType.AZIMUTH,
+        MeasurementType.ELEVATION,
+    }
+)
+
+TDM_ANGLE_TYPE_BY_MEASUREMENT_TYPE = {
+    MeasurementType.RIGHT_ASCENSION: "RADEC",
+    MeasurementType.DECLINATION: "RADEC",
+    MeasurementType.AZIMUTH: "AZEL",
+    MeasurementType.ELEVATION: "AZEL",
+}
+
+TDM_DATA_KEYWORD_BY_MEASUREMENT_TYPE = {
+    MeasurementType.RANGE: "RANGE",
+    MeasurementType.RANGE_RATE: "DOPPLER_INSTANTANEOUS",
+    MeasurementType.RIGHT_ASCENSION: "ANGLE_1",
+    MeasurementType.DECLINATION: "ANGLE_2",
+    MeasurementType.AZIMUTH: "ANGLE_1",
+    MeasurementType.ELEVATION: "ANGLE_2",
+}
+
+TDM_ANGLE_MEASUREMENT_TYPE_BY_ANGLE_TYPE_AND_KEYWORD = {
+    ("RADEC", "ANGLE_1"): MeasurementType.RIGHT_ASCENSION,
+    ("RADEC", "ANGLE_2"): MeasurementType.DECLINATION,
+    ("AZEL", "ANGLE_1"): MeasurementType.AZIMUTH,
+    ("AZEL", "ANGLE_2"): MeasurementType.ELEVATION,
+}
 
 CSV_REQUIRED_COLUMNS = frozenset(
     {
@@ -41,6 +78,8 @@ SUPPORTED_TDM_DATA_KEYWORDS = frozenset(
         "RANGE",
         "DOPPLER_INSTANTANEOUS",
         "DOPPLER_INTEGRATED",
+        "ANGLE_1",
+        "ANGLE_2",
     }
 )
 
@@ -147,7 +186,8 @@ def dump_measurements_tdm(
             sorted(str(measurement_type) for measurement_type in unsupported_types)
         )
         raise InvalidMeasurementFileError(
-            "TDM export supports only range and range_rate measurements; "
+            "TDM export supports only range, range_rate, right_ascension, "
+            "declination, azimuth, and elevation measurements; "
             f"unsupported measurement types: {unsupported_text}"
         )
 
@@ -156,7 +196,11 @@ def dump_measurements_tdm(
         f"CREATION_DATE = {_format_tdm_epoch(measurements[0].epoch)}",
         f"ORIGINATOR = {originator}",
     ]
-    for (observer, observed_object), segment_records in _measurement_segments(measurements).items():
+    for (
+        observer,
+        observed_object,
+        angle_type,
+    ), segment_records in _measurement_segments(measurements).items():
         lines.extend(
             [
                 "META_START",
@@ -166,23 +210,25 @@ def dump_measurements_tdm(
                 f"PARTICIPANT_1 = {observer}",
                 f"PARTICIPANT_2 = {observed_object}",
                 "PATH = 1,2,1",
-                "RANGE_UNITS = km",
             ]
         )
-        range_sigma = _common_sigma(segment_records, MeasurementType.RANGE)
-        if range_sigma is not None:
-            lines.append(f"RANGE_SIGMA_KM = {_format_float(range_sigma)}")
-        range_rate_sigma = _common_sigma(segment_records, MeasurementType.RANGE_RATE)
-        if range_rate_sigma is not None:
-            lines.append(f"RANGE_RATE_SIGMA_KM_S = {_format_float(range_rate_sigma)}")
+        if angle_type is None:
+            lines.append("RANGE_UNITS = km")
+            range_sigma = _common_sigma(segment_records, MeasurementType.RANGE)
+            if range_sigma is not None:
+                lines.append(f"RANGE_SIGMA_KM = {_format_float(range_sigma)}")
+            range_rate_sigma = _common_sigma(segment_records, MeasurementType.RANGE_RATE)
+            if range_rate_sigma is not None:
+                lines.append(f"RANGE_RATE_SIGMA_KM_S = {_format_float(range_rate_sigma)}")
+        else:
+            lines.extend([f"ANGLE_TYPE = {angle_type}", "ANGLE_UNITS = deg"])
+            angle_sigma = _common_sigma_for_types(segment_records, ANGLE_MEASUREMENT_TYPES)
+            if angle_sigma is not None:
+                lines.append(f"ANGLE_SIGMA_DEG = {_format_float(angle_sigma)}")
 
         lines.extend(["META_STOP", "DATA_START"])
         for record in segment_records:
-            keyword = (
-                "RANGE"
-                if record.measurement_type is MeasurementType.RANGE
-                else "DOPPLER_INSTANTANEOUS"
-            )
+            keyword = TDM_DATA_KEYWORD_BY_MEASUREMENT_TYPE[record.measurement_type]
             epoch = _format_tdm_epoch(record.epoch)
             value = _format_float(record.value)
             lines.append(f"{keyword} = {epoch} {value}")
@@ -420,10 +466,14 @@ def _csv_metadata(
 
 def _measurement_segments(
     measurements: list[MeasurementRecord],
-) -> dict[tuple[str, str], list[MeasurementRecord]]:
-    segments: dict[tuple[str, str], list[MeasurementRecord]] = {}
+) -> dict[tuple[str, str, str | None], list[MeasurementRecord]]:
+    segments: dict[tuple[str, str, str | None], list[MeasurementRecord]] = {}
     for record in measurements:
-        key = (record.observer, record.observed_object)
+        key = (
+            record.observer,
+            record.observed_object,
+            TDM_ANGLE_TYPE_BY_MEASUREMENT_TYPE.get(record.measurement_type),
+        )
         segments.setdefault(key, []).append(record)
     return segments
 
@@ -436,6 +486,22 @@ def _common_sigma(
         record.sigma
         for record in measurements
         if record.measurement_type is measurement_type
+    }
+    if not sigmas:
+        return None
+    if len(sigmas) == 1:
+        return next(iter(sigmas))
+    return None
+
+
+def _common_sigma_for_types(
+    measurements: list[MeasurementRecord],
+    measurement_types: frozenset[MeasurementType],
+) -> float | None:
+    sigmas = {
+        record.sigma
+        for record in measurements
+        if record.measurement_type in measurement_types
     }
     if not sigmas:
         return None
@@ -544,7 +610,8 @@ def _load_tdm_measurements(
         raise InvalidMeasurementFileError(f"TDM file {measurement_path} ended inside DATA block")
     if not records:
         raise InvalidMeasurementFileError(
-            f"TDM file {measurement_path} contains no supported RANGE or Doppler measurements"
+            f"TDM file {measurement_path} contains no supported RANGE, Doppler, or angle "
+            "measurements"
         )
     return records
 
@@ -613,7 +680,7 @@ def _tdm_record_from_data_line(
                 f"TDM file {measurement_path} line {line_number} uses unsupported "
                 f"RANGE_UNITS {range_units!r}; only km is supported"
             )
-        measurement_type = "range"
+        measurement_type = MeasurementType.RANGE
         units = "km"
         sigma = _tdm_sigma(
             measurement_path,
@@ -622,8 +689,9 @@ def _tdm_record_from_data_line(
             key="RANGE_SIGMA_KM",
             default=DEFAULT_TDM_RANGE_SIGMA_KM,
         )
-    else:
-        measurement_type = "range_rate"
+        angle_type = None
+    elif keyword in {"DOPPLER_INSTANTANEOUS", "DOPPLER_INTEGRATED"}:
+        measurement_type = MeasurementType.RANGE_RATE
         units = "km/s"
         sigma = _tdm_sigma(
             measurement_path,
@@ -632,6 +700,39 @@ def _tdm_record_from_data_line(
             key="RANGE_RATE_SIGMA_KM_S",
             default=DEFAULT_TDM_RANGE_RATE_SIGMA_KM_S,
         )
+        angle_type = None
+    else:
+        measurement_type, angle_type = _tdm_angle_measurement_type(
+            measurement_path,
+            line_number=line_number,
+            metadata=metadata,
+            keyword=keyword,
+        )
+        angle_units = metadata.get("ANGLE_UNITS", "deg")
+        if angle_units.lower() != "deg":
+            raise InvalidMeasurementFileError(
+                f"TDM file {measurement_path} line {line_number} uses unsupported "
+                f"ANGLE_UNITS {angle_units!r}; only deg is supported"
+            )
+        units = "deg"
+        sigma = _tdm_sigma(
+            measurement_path,
+            line_number=line_number,
+            metadata=metadata,
+            key="ANGLE_SIGMA_DEG",
+            default=DEFAULT_TDM_ANGLE_SIGMA_DEG,
+        )
+
+    record_metadata = {
+        "source_format": "ccsds_tdm_kvn",
+        "tdm_keyword": keyword,
+        "tdm_time_system": time_system,
+        "tdm_mode": metadata.get("MODE"),
+        "tdm_path": metadata.get("PATH"),
+        "tdm_originator": header.get("ORIGINATOR"),
+    }
+    if angle_type is not None:
+        record_metadata["tdm_angle_type"] = angle_type
 
     try:
         return MeasurementRecord.model_validate(
@@ -643,20 +744,37 @@ def _tdm_record_from_data_line(
                 "value": value,
                 "sigma": sigma,
                 "units": units,
-                "metadata": {
-                    "source_format": "ccsds_tdm_kvn",
-                    "tdm_keyword": keyword,
-                    "tdm_time_system": time_system,
-                    "tdm_mode": metadata.get("MODE"),
-                    "tdm_path": metadata.get("PATH"),
-                    "tdm_originator": header.get("ORIGINATOR"),
-                },
+                "metadata": record_metadata,
             }
         )
     except ValidationError as exc:
         raise InvalidMeasurementFileError(
             f"TDM file {measurement_path} line {line_number} is invalid: {exc}"
         ) from exc
+
+
+def _tdm_angle_measurement_type(
+    measurement_path: Path,
+    *,
+    line_number: int,
+    metadata: dict[str, str],
+    keyword: str,
+) -> tuple[MeasurementType, str]:
+    angle_type = metadata.get("ANGLE_TYPE")
+    if angle_type is None or angle_type.strip() == "":
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} is missing ANGLE_TYPE metadata"
+        )
+    normalized_angle_type = angle_type.strip().upper()
+    measurement_type = TDM_ANGLE_MEASUREMENT_TYPE_BY_ANGLE_TYPE_AND_KEYWORD.get(
+        (normalized_angle_type, keyword)
+    )
+    if measurement_type is None:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} uses unsupported "
+            f"ANGLE_TYPE {angle_type!r} with {keyword}; supported angle types are RADEC and AZEL"
+        )
+    return measurement_type, normalized_angle_type
 
 
 def _tdm_observable_fields(

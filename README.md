@@ -215,10 +215,10 @@ CSV and TDM inputs are auto-detected by `.csv` and `.tdm` extensions or can be f
 `--format csv` / `--format tdm`.
 
 `astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
-JSON and CSV preserve all supported suite measurement types. TDM export is intentionally restricted
-to range and range-rate records until an operational CCSDS angle mapping is designed. The example
-files under `examples/measurements/` are generated from `leo_two_station_od.yaml` and cover all
-three range/range-rate ingest/export formats.
+JSON and CSV preserve all supported suite measurement types. TDM export supports range,
+range-rate, right-ascension/declination, and azimuth/elevation records. The example files under
+`examples/measurements/` are generated from `leo_two_station_od.yaml` and cover all three
+range/range-rate ingest/export formats.
 
 `astro research-propagate` is the research backend entry point for seeded propagation ensembles.
 With `--backend local`, it runs the deterministic Monte Carlo workflow. With `--backend jax`, it
@@ -238,11 +238,13 @@ The optional `metadata_json` column can carry a JSON object for row-level metada
 is intentionally under-observed for six-state OD.
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,
-`PARTICIPANT_n`, `PATH`, `RANGE` in `km`, and `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED`
-mapped to range-rate measurements in `km/s`. TDM does not provide the suite's scenario identifier
-or estimator sigmas directly, so an optional segment-level `SCENARIO_ID` extension is checked when
-present, and the parser uses default sigmas of `0.01 km` for range and `1e-5 km/s` for range-rate.
-TDM ingest/export does not yet support suite angle records.
+`PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped
+to range-rate measurements in `km/s`, and `ANGLE_1`/`ANGLE_2` records in `deg`. Angle segments use
+`ANGLE_TYPE = RADEC` for right ascension/declination and `ANGLE_TYPE = AZEL` for
+azimuth/elevation. TDM does not provide the suite's scenario identifier or estimator sigmas
+directly, so an optional segment-level `SCENARIO_ID` extension is checked when present, and the
+parser uses default sigmas of `0.01 km` for range, `1e-5 km/s` for range-rate, and `0.001 deg` for
+angles.
 
 ## Verification
 
