@@ -51,9 +51,10 @@ structured JSON explaining the missing piece. The runtime checks `ASTRO_OREKIT_D
 orekit` currently supports two-body propagation through Orekit's Keplerian propagator, J2 through
 Orekit's numerical propagator with `J2OnlyPerturbation`, and `orekit_high_fidelity` as the numerical
 propagation expansion path. Atmospheric drag is available through Orekit `DragForce` with
-`SimpleExponentialAtmosphere` and `IsotropicDrag`. Scenario force-model flags for solar radiation
-pressure and third-body gravity are accepted by the schema but currently produce explicit
-unsupported-feature diagnostics until those Orekit force models are implemented.
+`SimpleExponentialAtmosphere` and `IsotropicDrag`; solar radiation pressure is available through
+Orekit `SolarRadiationPressure` and `IsotropicRadiationSingleCoefficient`. The scenario
+force-model flag for third-body gravity is accepted by the schema but currently produces explicit
+unsupported-feature diagnostics until that Orekit force model is implemented.
 
 Optional launch backend smoke checks:
 
@@ -95,6 +96,7 @@ astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output o
 astro propagate examples/scenarios/leo_j2.yaml --backend orekit --output orekit_j2_trajectory.json
 astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend orekit --output orekit_high_fidelity_trajectory.json
 astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --output orekit_drag_trajectory.json
+astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output orekit_srp_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke

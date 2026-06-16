@@ -52,6 +52,14 @@ def test_load_orekit_drag_example_scenario() -> None:
     assert scenario.force_model.enabled_high_fidelity_flags() == ("atmospheric_drag",)
 
 
+def test_load_orekit_srp_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_orekit_srp.yaml"))
+
+    assert scenario.scenario_id == "leo-orekit-srp"
+    assert scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+    assert scenario.force_model.enabled_high_fidelity_flags() == ("solar_radiation_pressure",)
+
+
 @pytest.mark.parametrize(
     ("scenario_path", "scenario_id", "minimum_radius_km"),
     [

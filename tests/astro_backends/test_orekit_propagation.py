@@ -131,10 +131,38 @@ def test_propagate_orekit_high_fidelity_drag_adds_drag_force_with_fake_runtime()
     assert trajectory.metadata["unsupported_force_model_flags"] == []
 
 
+def test_propagate_orekit_high_fidelity_srp_adds_srp_force_with_fake_runtime() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+                solar_radiation_pressure=True,
+            )
+        }
+    )
+
+    trajectory = propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.backend == "orekit"
+    assert trajectory.metadata["propagator"] == "NumericalPropagator"
+    assert trajectory.metadata["force_models"] == [
+        "J2OnlyPerturbation",
+        "SolarRadiationPressure",
+    ]
+    assert (
+        trajectory.metadata["radiation_spacecraft_model"]
+        == "IsotropicRadiationSingleCoefficient"
+    )
+    assert trajectory.metadata["srp_area_m2"] == scenario.spacecraft.area_m2
+    assert trajectory.metadata["srp_reflectivity_coefficient"] == (
+        scenario.spacecraft.reflectivity_coefficient
+    )
+    assert trajectory.metadata["unsupported_force_model_flags"] == []
+
+
 @pytest.mark.parametrize(
     "force_model_update",
     [
-        {"solar_radiation_pressure": True},
         {"third_body_gravity": True},
     ],
 )
@@ -380,6 +408,30 @@ class _FakeDragForce:
         self.spacecraft = spacecraft
 
 
+class _FakeCelestialBodyFactory:
+    @staticmethod
+    def getSun() -> str:
+        return "Sun"
+
+
+class _FakeIsotropicRadiationSingleCoefficient:
+    def __init__(self, cross_section: float, reflectivity_coefficient: float) -> None:
+        self.cross_section = cross_section
+        self.reflectivity_coefficient = reflectivity_coefficient
+
+
+class _FakeSolarRadiationPressure:
+    def __init__(
+        self,
+        sun: str,
+        earth_shape: _FakeOneAxisEllipsoid,
+        spacecraft: _FakeIsotropicRadiationSingleCoefficient,
+    ) -> None:
+        self.sun = sun
+        self.earth_shape = earth_shape
+        self.spacecraft = spacecraft
+
+
 class _FakeNumericalPropagator(_FakeKeplerianPropagator):
     def __init__(self, integrator: _FakeDormandPrince853Integrator) -> None:
         self.integrator = integrator
@@ -451,6 +503,9 @@ def _fake_runtime() -> OrekitRuntime:
         simple_exponential_atmosphere=_FakeSimpleExponentialAtmosphere,
         drag_force=_FakeDragForce,
         isotropic_drag=_FakeIsotropicDrag,
+        celestial_body_factory=_FakeCelestialBodyFactory,
+        solar_radiation_pressure=_FakeSolarRadiationPressure,
+        isotropic_radiation_single_coefficient=_FakeIsotropicRadiationSingleCoefficient,
         orbit_type=_FakeOrbitType,
         position_angle_type=_FakePositionAngleType,
         iers_conventions=_FakeIERSConventions,

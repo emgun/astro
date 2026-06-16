@@ -43,6 +43,9 @@ class OrekitRuntime:
     simple_exponential_atmosphere: Any
     drag_force: Any
     isotropic_drag: Any
+    celestial_body_factory: Any
+    solar_radiation_pressure: Any
+    isotropic_radiation_single_coefficient: Any
     orbit_type: Any
     position_angle_type: Any
     iers_conventions: Any
@@ -122,6 +125,7 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         bodies_module = import_module("org.orekit.bodies")
         atmosphere_module = import_module("org.orekit.models.earth.atmosphere")
         drag_module = import_module("org.orekit.forces.drag")
+        radiation_module = import_module("org.orekit.forces.radiation")
         ode_module = import_module("org.hipparchus.ode.nonstiff")
     except Exception as exc:
         if strict:
@@ -150,6 +154,11 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         simple_exponential_atmosphere=atmosphere_module.SimpleExponentialAtmosphere,
         drag_force=drag_module.DragForce,
         isotropic_drag=drag_module.IsotropicDrag,
+        celestial_body_factory=bodies_module.CelestialBodyFactory,
+        solar_radiation_pressure=radiation_module.SolarRadiationPressure,
+        isotropic_radiation_single_coefficient=(
+            radiation_module.IsotropicRadiationSingleCoefficient
+        ),
         orbit_type=orbits_module.OrbitType,
         position_angle_type=orbits_module.PositionAngleType,
         iers_conventions=utils_module.IERSConventions,

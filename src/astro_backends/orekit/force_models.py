@@ -54,3 +54,27 @@ def build_atmospheric_drag_force_model(
             "drag_coefficient": scenario.spacecraft.drag_coefficient,
         },
     )
+
+
+def build_solar_radiation_pressure_force_model(
+    scenario: Scenario,
+    runtime: OrekitRuntime,
+    earth_shape: Any,
+) -> OrekitForceModel:
+    spacecraft = runtime.isotropic_radiation_single_coefficient(
+        scenario.spacecraft.area_m2,
+        scenario.spacecraft.reflectivity_coefficient,
+    )
+    return OrekitForceModel(
+        model=runtime.solar_radiation_pressure(
+            runtime.celestial_body_factory.getSun(),
+            earth_shape,
+            spacecraft,
+        ),
+        name="SolarRadiationPressure",
+        metadata={
+            "radiation_spacecraft_model": "IsotropicRadiationSingleCoefficient",
+            "srp_area_m2": scenario.spacecraft.area_m2,
+            "srp_reflectivity_coefficient": scenario.spacecraft.reflectivity_coefficient,
+        },
+    )

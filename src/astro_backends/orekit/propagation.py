@@ -16,6 +16,7 @@ from astro_backends.orekit.conversion import (
 from astro_backends.orekit.force_models import (
     build_atmospheric_drag_force_model,
     build_earth_shape,
+    build_solar_radiation_pressure_force_model,
 )
 from astro_backends.orekit.runtime import OrekitRuntime, load_orekit_runtime
 from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
@@ -51,7 +52,7 @@ def _validate_orekit_scenario(scenario: Scenario) -> None:
     unsupported_flags = tuple(
         flag
         for flag in scenario.force_model.enabled_high_fidelity_flags()
-        if flag != "atmospheric_drag"
+        if flag not in {"atmospheric_drag", "solar_radiation_pressure"}
     )
     if unsupported_flags:
         raise UnsupportedBackendError(
@@ -141,6 +142,15 @@ def _build_j2_numerical_propagator(
         propagator.addForceModel(drag_force_model.model)
         force_model_names.append(drag_force_model.name)
         force_model_metadata.update(drag_force_model.metadata)
+    if scenario.force_model.solar_radiation_pressure:
+        srp_force_model = build_solar_radiation_pressure_force_model(
+            scenario,
+            runtime,
+            earth_shape,
+        )
+        propagator.addForceModel(srp_force_model.model)
+        force_model_names.append(srp_force_model.name)
+        force_model_metadata.update(srp_force_model.metadata)
 
     return _OrekitPropagatorConfig(
         propagator=propagator,

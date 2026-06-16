@@ -55,11 +55,15 @@ def _fake_runtime_modules(
     gravity_module.J2OnlyPerturbation = object()
     bodies_module = ModuleType("org.orekit.bodies")
     bodies_module.OneAxisEllipsoid = object()
+    bodies_module.CelestialBodyFactory = object()
     atmosphere_module = ModuleType("org.orekit.models.earth.atmosphere")
     atmosphere_module.SimpleExponentialAtmosphere = object()
     drag_module = ModuleType("org.orekit.forces.drag")
     drag_module.DragForce = object()
     drag_module.IsotropicDrag = object()
+    radiation_module = ModuleType("org.orekit.forces.radiation")
+    radiation_module.SolarRadiationPressure = object()
+    radiation_module.IsotropicRadiationSingleCoefficient = object()
     ode_module = ModuleType("org.hipparchus.ode.nonstiff")
     ode_module.DormandPrince853Integrator = object()
     return {
@@ -77,6 +81,7 @@ def _fake_runtime_modules(
         "org.orekit.bodies": bodies_module,
         "org.orekit.models.earth.atmosphere": atmosphere_module,
         "org.orekit.forces.drag": drag_module,
+        "org.orekit.forces.radiation": radiation_module,
         "org.hipparchus.ode.nonstiff": ode_module,
     }
 
