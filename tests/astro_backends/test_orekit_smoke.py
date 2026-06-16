@@ -1,4 +1,5 @@
 from importlib.metadata import PackageNotFoundError
+from pathlib import Path
 from types import ModuleType
 
 import pytest
@@ -7,6 +8,21 @@ from astro_backends.orekit import runtime
 from astro_backends.orekit.smoke import OrekitSmokeResult, run_orekit_smoke
 
 OREKIT_VERSION = "13.1.0"
+
+
+class FakeOrekit:
+    def initVM(self) -> None:
+        return None
+
+
+class FakePyHelpers:
+    loaded_filenames: list[str] = []
+    loaded_from_pip_library: list[bool] = []
+
+    @classmethod
+    def setup_orekit_data(cls, filenames: str, from_pip_library: bool) -> None:
+        cls.loaded_filenames.append(filenames)
+        cls.loaded_from_pip_library.append(from_pip_library)
 
 
 def test_run_orekit_smoke_reports_forced_unavailable_without_importing_wrapper() -> None:
@@ -69,11 +85,11 @@ def test_run_orekit_smoke_reports_wrapper_import_failure_with_version(
 
 
 def test_run_orekit_smoke_reports_vm_frame_time_failure_with_version(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class FakeOrekit:
-        def initVM(self) -> None:
-            return None
+    data_path = tmp_path / "orekit-data.zip"
+    data_path.write_bytes(b"placeholder")
 
     class FailingFramesFactory:
         @staticmethod
@@ -106,6 +122,7 @@ def test_run_orekit_smoke_reports_vm_frame_time_failure_with_version(
     def fake_import(module_name: str) -> object:
         modules: dict[str, object] = {
             "orekit_jpype": FakeOrekit(),
+            "orekit_jpype.pyhelpers": FakePyHelpers,
             "org.orekit.frames": frames_module,
             "org.orekit.time": time_module,
             "org.hipparchus.geometry.euclidean.threed": geometry_module,
@@ -115,6 +132,7 @@ def test_run_orekit_smoke_reports_vm_frame_time_failure_with_version(
         }
         return modules[module_name]
 
+    monkeypatch.setenv("ASTRO_OREKIT_DATA_PATH", str(data_path))
     monkeypatch.setattr(runtime, "version", fake_version)
     monkeypatch.setattr(runtime, "import_module", fake_import)
 
@@ -125,6 +143,80 @@ def test_run_orekit_smoke_reports_vm_frame_time_failure_with_version(
     assert result.version == OREKIT_VERSION
     assert "VM/frame/time smoke failure" in result.message
     assert "frame unavailable" in result.message
+
+
+def test_load_orekit_runtime_sets_up_data_from_env_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data_path = tmp_path / "orekit-data.zip"
+    data_path.write_bytes(b"placeholder")
+    FakePyHelpers.loaded_filenames = []
+    FakePyHelpers.loaded_from_pip_library = []
+    frames_module = ModuleType("org.orekit.frames")
+    frames_module.FramesFactory = object()
+    time_module = ModuleType("org.orekit.time")
+    time_module.TimeScalesFactory = object()
+    time_module.AbsoluteDate = object()
+    geometry_module = ModuleType("org.hipparchus.geometry.euclidean.threed")
+    geometry_module.Vector3D = object()
+    utils_module = ModuleType("org.orekit.utils")
+    utils_module.PVCoordinates = object()
+    orbits_module = ModuleType("org.orekit.orbits")
+    orbits_module.CartesianOrbit = object()
+    propagation_module = ModuleType("org.orekit.propagation.analytical")
+    propagation_module.KeplerianPropagator = object()
+
+    def fake_version(_distribution_name: str) -> str:
+        return OREKIT_VERSION
+
+    def fake_import(module_name: str) -> object:
+        modules: dict[str, object] = {
+            "orekit_jpype": FakeOrekit(),
+            "orekit_jpype.pyhelpers": FakePyHelpers,
+            "org.orekit.frames": frames_module,
+            "org.orekit.time": time_module,
+            "org.hipparchus.geometry.euclidean.threed": geometry_module,
+            "org.orekit.utils": utils_module,
+            "org.orekit.orbits": orbits_module,
+            "org.orekit.propagation.analytical": propagation_module,
+        }
+        return modules[module_name]
+
+    monkeypatch.setenv("ASTRO_OREKIT_DATA_PATH", str(data_path))
+    monkeypatch.setattr(runtime, "version", fake_version)
+    monkeypatch.setattr(runtime, "import_module", fake_import)
+
+    orekit_runtime = runtime.load_orekit_runtime()
+
+    assert orekit_runtime.data_path == str(data_path)
+    assert FakePyHelpers.loaded_filenames == [str(data_path)]
+    assert FakePyHelpers.loaded_from_pip_library == [False]
+
+
+def test_run_orekit_smoke_reports_missing_data_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    missing_data_path = tmp_path / "missing-orekit-data.zip"
+
+    def fake_version(_distribution_name: str) -> str:
+        return OREKIT_VERSION
+
+    def fake_import(module_name: str) -> object:
+        assert module_name == "orekit_jpype"
+        return FakeOrekit()
+
+    monkeypatch.setenv("ASTRO_OREKIT_DATA_PATH", str(missing_data_path))
+    monkeypatch.setattr(runtime, "version", fake_version)
+    monkeypatch.setattr(runtime, "import_module", fake_import)
+
+    result = run_orekit_smoke(strict=False)
+
+    assert result.available is False
+    assert result.version == OREKIT_VERSION
+    assert "Orekit data path" in result.message
+    assert str(missing_data_path) in result.message
 
 
 def test_run_orekit_smoke_strict_re_raises_missing_distribution(
@@ -156,8 +248,12 @@ def test_run_orekit_smoke_strict_re_raises_import_failure(
 
 
 def test_run_orekit_smoke_strict_re_raises_vm_frame_time_failure(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    data_path = tmp_path / "orekit-data.zip"
+    data_path.write_bytes(b"placeholder")
+
     class FailingOrekit:
         def initVM(self) -> object:
             raise RuntimeError("vm unavailable")
@@ -169,6 +265,7 @@ def test_run_orekit_smoke_strict_re_raises_vm_frame_time_failure(
         assert module_name == "orekit_jpype"
         return FailingOrekit()
 
+    monkeypatch.setenv("ASTRO_OREKIT_DATA_PATH", str(data_path))
     monkeypatch.setattr(runtime, "version", fake_version)
     monkeypatch.setattr(runtime, "import_module", fake_import)
 

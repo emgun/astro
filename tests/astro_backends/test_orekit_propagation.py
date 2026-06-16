@@ -46,6 +46,7 @@ def test_propagate_orekit_returns_suite_trajectory_with_fake_runtime() -> None:
     assert trajectory.metadata == {
         "wrapper": "orekit_jpype",
         "wrapper_version": "13.1.0",
+        "data_path": "fake-orekit-data.zip",
         "propagator": "KeplerianPropagator",
         "frame": "EME2000",
         "units": "suite km/km_s converted to Orekit m/m_s",
@@ -185,6 +186,7 @@ def _fake_runtime() -> OrekitRuntime:
     return OrekitRuntime(
         wrapper="orekit_jpype",
         wrapper_version="13.1.0",
+        data_path="fake-orekit-data.zip",
         frames_factory=_FakeFramesFactory,
         time_scales_factory=_FakeTimeScalesFactory,
         absolute_date=_FakeAbsoluteDate,

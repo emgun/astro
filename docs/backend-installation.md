@@ -26,6 +26,17 @@ A working Java runtime and Orekit data context are also required for live propag
 wrapper, JVM, or data setup is unavailable, `astro orekit-smoke` and `astro propagate --backend
 orekit` fail with structured diagnostics.
 
+On macOS with Homebrew OpenJDK, a local shell can use:
+
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home
+export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
+export ASTRO_OREKIT_DATA_PATH="$HOME/.orekit/orekit-data.zip"
+```
+
+`ASTRO_OREKIT_DATA_PATH` may point to an Orekit data zip or directory. If it is not set, the suite
+also checks `OREKIT_DATA_PATH`, then `~/.orekit/orekit-data.zip`.
+
 ## Launch Backends
 
 ```bash

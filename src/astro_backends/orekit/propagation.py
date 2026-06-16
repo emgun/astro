@@ -100,6 +100,7 @@ def propagate_orekit(
         metadata={
             "wrapper": runtime.wrapper,
             "wrapper_version": runtime.wrapper_version,
+            "data_path": runtime.data_path,
             "propagator": "KeplerianPropagator",
             "frame": "EME2000",
             "units": "suite km/km_s converted to Orekit m/m_s",
