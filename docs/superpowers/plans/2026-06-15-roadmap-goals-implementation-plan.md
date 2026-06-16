@@ -184,7 +184,7 @@ Primary files:
 
 ### Goal 4: Launch External Backends and Optimization
 
-Status: first external-backend boundary implemented and first live RocketPy direct runner added. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured launch examples, a single-stage solid RocketPy direct simulation adapter, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, and Dymos adapter optimization diagnostics are implemented. Multi-stage RocketPy composition and Dymos phase transcription remain gated on validated backend runners.
+Status: first external-backend boundary implemented, first live RocketPy direct runner added, and first live Dymos/OpenMDAO phase transcription added. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured launch examples, a single-stage solid RocketPy direct simulation adapter, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, Dymos vertical-ascent phase transcription, and Dymos adapter optimization diagnostics are implemented. Multi-stage RocketPy composition and full multistage Dymos ascent optimization remain gated on validated backend runners.
 
 Implemented slice:
 
@@ -203,10 +203,13 @@ Implemented slice:
   `scenario.rocketpy` configuration are available, and fails clearly for unsupported multi-stage
   RocketPy scenarios.
 - `astro optimize-launch --backend local` runs the existing pitch-program tuner through a neutral optimization entry point.
-- `astro optimize-launch --backend dymos` routes through a Dymos/OpenMDAO adapter boundary and fails clearly until a validated Dymos phase runner is provided.
+- `astro optimize-launch --backend dymos` runs a small Dymos/OpenMDAO vertical-ascent phase
+  transcription, then returns the existing suite launch-tuning product with explicit Dymos phase
+  diagnostics.
 - Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
   iteration count, candidate count, path-constraint summary, best score, target insertion
-  residuals, Dymos version, and OpenMDAO version.
+  residuals, Dymos version, OpenMDAO version, phase duration, final altitude, final velocity, and
+  optimizer message.
 
 Definition of done:
 
@@ -214,7 +217,8 @@ Definition of done:
   installed and a single-stage scenario supplies RocketPy-specific vehicle/motor/flight
   configuration.
 - RocketPy adapter returns the existing `LaunchTrajectory` schema, not RocketPy-native objects.
-- `astro optimize-launch --backend dymos` solves a small ascent optimization example once a validated Dymos phase model is added.
+- `astro optimize-launch --backend dymos` solves a small ascent optimization example through a
+  bounded vertical-ascent Dymos phase model.
 - Dymos/OpenMDAO adapter reports path constraints, optimizer status, convergence diagnostics, and target insertion residuals.
 - Launch validation includes deterministic direct-simulation cases and one small optimization case.
 - Launch-to-orbit handoff still produces a normal orbital `Scenario`.

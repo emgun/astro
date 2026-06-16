@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from astro_backends.dymos.optimization import optimize_launch_dymos
+from astro_backends.dymos.optimization import DymosPhaseSummary, optimize_launch_dymos
 from astro_backends.dymos.runtime import DymosRuntime
 from astro_core.errors import UnsupportedBackendError
 from astro_launch.models import LaunchPitchTuningResult, LaunchScenario
@@ -36,12 +36,46 @@ def test_optimize_launch_dymos_reports_runtime_unavailable() -> None:
         )
 
 
-def test_optimize_launch_dymos_requires_phase_model_runner() -> None:
-    with pytest.raises(UnsupportedBackendError, match="requires a validated Dymos phase"):
-        optimize_launch_dymos(
-            make_pitch_program_launch_scenario(),
-            runtime_loader=_fake_runtime,
+def test_optimize_launch_dymos_runs_default_phase_transcription(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = make_pitch_program_launch_scenario()
+    seen_runtime: list[DymosRuntime] = []
+
+    def fake_phase_solver(candidate: LaunchScenario, runtime: DymosRuntime) -> DymosPhaseSummary:
+        assert candidate is scenario
+        seen_runtime.append(runtime)
+        return DymosPhaseSummary(
+            transcription="GaussLobatto",
+            num_segments=3,
+            order=3,
+            duration_s=42.0,
+            final_altitude_km=1.2,
+            final_velocity_km_s=0.08,
+            optimizer_success=True,
+            optimizer_message="Optimization terminated successfully",
         )
+
+    monkeypatch.setattr(
+        "astro_backends.dymos.optimization._solve_dymos_vertical_phase",
+        fake_phase_solver,
+    )
+
+    result = optimize_launch_dymos(scenario, runtime_loader=_fake_runtime)
+
+    assert len(seen_runtime) == 1
+    assert result.backend == "dymos"
+    assert result.metadata["source_backend"] == "dymos_phase"
+    assert result.metadata["dymos_phase"] == {
+        "transcription": "GaussLobatto",
+        "num_segments": 3,
+        "order": 3,
+        "duration_s": 42.0,
+        "final_altitude_km": 1.2,
+        "final_velocity_km_s": 0.08,
+        "optimizer_success": True,
+        "optimizer_message": "Optimization terminated successfully",
+    }
 
 
 def test_optimize_launch_dymos_returns_suite_product_with_fake_runner() -> None:
