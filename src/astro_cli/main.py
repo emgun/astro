@@ -386,6 +386,7 @@ def research_propagate(
     position_sigma_km: Annotated[float, typer.Option()] = 0.0,
     velocity_sigma_km_s: Annotated[float, typer.Option()] = 0.0,
     seed: Annotated[int, typer.Option()] = 42,
+    include_sensitivities: Annotated[bool, typer.Option()] = False,
 ) -> None:
     """Run a seeded research propagation workflow."""
     scenario = _load_scenario_or_exit(scenario_path)
@@ -406,6 +407,7 @@ def research_propagate(
                 position_sigma_km=position_sigma_km,
                 velocity_sigma_km_s=velocity_sigma_km_s,
                 seed=seed,
+                include_sensitivities=include_sensitivities,
             )
         else:
             raise UnsupportedBackendError(f"unsupported research propagation backend: {backend}")

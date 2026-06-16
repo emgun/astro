@@ -36,7 +36,7 @@ adapters.
 | Dymos/OpenMDAO | `astro dymos-smoke` | Exits 0 when Dymos and OpenMDAO APIs import. | Exits 1 with structured JSON explaining missing package/import failure. |
 | Dymos launch optimization | `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --output /tmp/astro-dymos-optimized-launch.json` | Runs a small Dymos/OpenMDAO vertical-ascent phase transcription and returns a suite `LaunchPitchTuningResult` with Dymos phase diagnostics. | Exits 2 with structured `UnsupportedBackendError` diagnostics when Dymos/OpenMDAO cannot be imported. |
 | TudatPy | `astro tudat-smoke` | Exits 0 when TudatPy imports. | Exits 1 with structured JSON; install path is platform-specific and not assumed to be pip-only. |
-| JAX/JAXLIB | `astro jax-smoke` | Exits 0 when JAX and `jax.numpy` import; `astro research-propagate --backend jax` can run two-body and J2 seeded ensembles. | Exits 1 with structured JSON explaining missing `astro-suite[research]` runtime. |
+| JAX/JAXLIB | `astro jax-smoke` | Exits 0 when JAX and `jax.numpy` import; `astro research-propagate --backend jax` can run two-body and J2 seeded ensembles and can add an opt-in final-state transition matrix with `--include-sensitivities`. | Exits 1 with structured JSON explaining missing `astro-suite[research]` runtime. |
 
 ## Reference Tolerances
 
@@ -51,7 +51,7 @@ adapters.
 | Local covariance propagation | Tests verify covariance history length, epoch alignment, symmetry, finite-difference provenance metadata, and optional white-acceleration process-noise growth. |
 | Launch handoff | Tests confirm `LaunchTrajectory.insertion_state` converts into a normal orbital `Scenario` and propagates locally. |
 | OD explicit measurements | Tests validate JSON, CSV, TDM range/range-rate/angle ingest/export, inertial and local-horizon angle generation, WGS-84 geodetic station measurement generation, angle wrapping, and local least-squares convergence. |
-| Research Monte Carlo | Tests confirm seeded repeatability, local Monte Carlo provenance, and built-in JAX two-body/J2 runner parity against the local reference for zero dispersion. |
+| Research Monte Carlo | Tests confirm seeded repeatability, local Monte Carlo provenance, built-in JAX two-body/J2 runner parity against the local reference for zero dispersion, and opt-in JAX final-state sensitivity metadata. |
 
 ## Backend Boundary Rule
 

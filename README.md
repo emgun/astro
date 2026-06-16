@@ -88,7 +88,8 @@ astro jax-smoke
 Tudat and JAX are optional research/cross-check boundaries. TudatPy is not currently assumed to be
 available from PyPI on every platform, so its smoke command reports installation state without
 promising a pip-only install path. JAX research propagation returns suite `MonteCarloResult` products
-and remains separate from operational Orekit semantics.
+and can optionally include a final-state transition sensitivity matrix. It remains separate from
+operational Orekit semantics.
 
 ## Commands
 
@@ -232,8 +233,10 @@ range/range-rate ingest/export formats.
 `astro research-propagate` is the research backend entry point for seeded propagation ensembles.
 With `--backend local`, it runs the deterministic Monte Carlo workflow. With `--backend jax`, it
 loads the optional JAX runtime and runs vectorized RK4 ensembles for current two-body and J2
-scenarios. JAX remains a research backend, not a replacement for operational Orekit semantics or
-validated high-fidelity force-model combinations.
+scenarios. With `--include-sensitivities`, the JAX path adds a nominal final-state transition matrix
+computed through JAX autodiff to the `MonteCarloResult` metadata. JAX remains a research backend,
+not a replacement for operational Orekit semantics or validated high-fidelity force-model
+combinations.
 
 CSV inputs use one row per measurement with these required columns:
 

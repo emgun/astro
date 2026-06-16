@@ -233,6 +233,66 @@ def _default_jax_two_body_runner(
     )
 
 
+def _propagate_nominal_final_state(
+    jnp: Any,
+    scenario: Scenario,
+    state_vector: Any,
+) -> Any:
+    state = jnp.reshape(state_vector, (1, 6))
+    for _sample_index in range(scenario.propagation.sample_count - 1):
+        state = _rk4_step(
+            jnp,
+            state,
+            scenario.propagation.step_s,
+            scenario.force_model.gravity,
+        )
+    return state[0]
+
+
+def _final_state_transition_matrix(
+    scenario: Scenario,
+    runtime: JaxRuntime,
+) -> list[list[float]]:
+    _validate_jax_force_model(scenario)
+    jacfwd = getattr(runtime.jax_module, "jacfwd", None)
+    if jacfwd is None:
+        raise UnsupportedBackendError(
+            "JAX sensitivity propagation requires jax.jacfwd; install a complete "
+            "astro-suite[research] JAX runtime."
+        )
+
+    jnp = runtime.jnp_module
+    initial = np.concatenate(
+        (
+            np.asarray(scenario.initial_state.cartesian.position_km, dtype=np.float64),
+            np.asarray(scenario.initial_state.cartesian.velocity_km_s, dtype=np.float64),
+        )
+    )
+
+    def final_state(state_vector: Any) -> Any:
+        return _propagate_nominal_final_state(jnp, scenario, state_vector)
+
+    transition_matrix = np.asarray(jacfwd(final_state)(jnp.asarray(initial)), dtype=np.float64)
+    return [[float(component) for component in row] for row in transition_matrix]
+
+
+def _with_jax_sensitivities(
+    result: MonteCarloResult,
+    scenario: Scenario,
+    runtime: JaxRuntime,
+    *,
+    include_sensitivities: bool,
+) -> MonteCarloResult:
+    if not include_sensitivities:
+        return result
+    metadata = {
+        **result.metadata,
+        "sensitivity_model": "jax_jacfwd_final_state_transition",
+        "final_state_transition_matrix": _final_state_transition_matrix(scenario, runtime),
+    }
+    return result.model_copy(update={"metadata": metadata})
+
+
 def _with_jax_provenance(
     result: MonteCarloResult,
     runtime: JaxRuntime,
@@ -256,6 +316,7 @@ def research_propagate_jax(
     seed: int,
     runtime_loader: JaxRuntimeLoader = load_jax_runtime,
     research_runner: JaxResearchRunner | None = None,
+    include_sensitivities: bool = False,
 ) -> MonteCarloResult:
     runtime = runtime_loader()
     selected_runner = research_runner or _default_jax_two_body_runner
@@ -268,4 +329,10 @@ def research_propagate_jax(
         velocity_sigma_km_s,
         seed,
     )
-    return _with_jax_provenance(result, runtime)
+    result_with_sensitivities = _with_jax_sensitivities(
+        result,
+        scenario,
+        runtime,
+        include_sensitivities=include_sensitivities,
+    )
+    return _with_jax_provenance(result_with_sensitivities, runtime)

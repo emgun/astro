@@ -21,6 +21,30 @@ def _fake_runtime() -> JaxRuntime:
     )
 
 
+def _fake_autodiff_runtime() -> JaxRuntime:
+    def jacfwd(function: object) -> object:
+        def jacobian(state_vector: object) -> np.ndarray:
+            state = np.asarray(state_vector, dtype=np.float64)
+            columns = []
+            for index in range(state.size):
+                step = max(abs(float(state[index])) * 1.0e-6, 1.0e-8)
+                perturbation = np.zeros_like(state)
+                perturbation[index] = step
+                plus = np.asarray(function(state + perturbation), dtype=np.float64)
+                minus = np.asarray(function(state - perturbation), dtype=np.float64)
+                columns.append((plus - minus) / (2.0 * step))
+            return np.stack(columns, axis=1)
+
+        return jacobian
+
+    return JaxRuntime(
+        jax_version="0.10.1",
+        jaxlib_version="0.10.1",
+        jax_module=SimpleNamespace(jacfwd=jacfwd),
+        jnp_module=np,
+    )
+
+
 def test_research_propagate_jax_reports_runtime_unavailable() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml")
 
@@ -82,6 +106,28 @@ def test_research_propagate_jax_runs_builtin_j2_runner() -> None:
     assert result.cases[0].trajectory.metadata["runner"] == "jax_vectorized_j2_rk4"
     assert final_jax.position_km == pytest.approx(final_local.position_km)
     assert final_jax.velocity_km_s == pytest.approx(final_local.velocity_km_s)
+
+
+def test_research_propagate_jax_can_include_final_state_sensitivities() -> None:
+    scenario = load_scenario("examples/scenarios/leo_two_body.yaml")
+
+    result = research_propagate_jax(
+        scenario,
+        cases=1,
+        position_sigma_km=0.0,
+        velocity_sigma_km_s=0.0,
+        seed=7,
+        runtime_loader=_fake_autodiff_runtime,
+        include_sensitivities=True,
+    )
+
+    transition_matrix = result.metadata["final_state_transition_matrix"]
+    assert result.metadata["sensitivity_model"] == "jax_jacfwd_final_state_transition"
+    assert len(transition_matrix) == 6
+    assert all(len(row) == 6 for row in transition_matrix)
+    assert np.all(np.isfinite(np.asarray(transition_matrix)))
+    assert abs(transition_matrix[0][0]) > 0.0
+    assert transition_matrix[0][3] > 0.0
 
 
 def test_research_propagate_jax_rejects_unsupported_force_model() -> None:

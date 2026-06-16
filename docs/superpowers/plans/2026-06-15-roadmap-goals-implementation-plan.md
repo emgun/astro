@@ -265,9 +265,10 @@ Tradeoff:
 
 Status: high-fidelity/research backend slices implemented for runtime gates, product boundaries,
 and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke commands, Tudat propagation
-dispatch, built-in JAX two-body and J2 research propagation runners, and a Nyx/ANISE evaluation gate
-are implemented. Live Tudat environment construction and JAX high-fidelity force flags,
-sensitivities, or differentiable OD workflows remain gated on validated runner implementations.
+dispatch, built-in JAX two-body and J2 research propagation runners, opt-in JAX final-state
+transition sensitivities, and a Nyx/ANISE evaluation gate are implemented. Live Tudat environment
+construction and JAX high-fidelity force flags or differentiable OD workflows remain gated on
+validated runner implementations.
 
 Implemented slice:
 
@@ -277,12 +278,14 @@ Implemented slice:
 - `astro research-propagate --backend local` runs seeded local ensembles.
 - `astro research-propagate --backend jax` runs vectorized two-body and J2 RK4 seeded ensembles and
   returns suite `MonteCarloResult` products.
+- `astro research-propagate --backend jax --include-sensitivities` records a nominal final-state
+  transition matrix in `MonteCarloResult.metadata` using JAX autodiff.
 - `docs/research/nyx-evaluation.md` records the current Nyx/ANISE decision as evaluation-only.
 
 Definition of done:
 
 - `astro propagate --backend tudat` supports at least one cross-check scenario and records Tudat provenance once a validated Tudat runner is supplied.
-- `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation without replacing operational Orekit semantics; high-fidelity force flags, sensitivity experiments, and differentiable OD still require validated JAX runners.
+- `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation without replacing operational Orekit semantics; high-fidelity force flags and differentiable OD still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.
 - Batch acceleration and Monte Carlo workflows preserve deterministic seeds and validation tolerances.
 

@@ -297,8 +297,10 @@ def test_research_propagate_command_accepts_jax_backend(
         position_sigma_km: float,
         velocity_sigma_km_s: float,
         seed: int,
+        include_sensitivities: bool,
     ) -> object:
         seen_scenarios.append(scenario.scenario_id)
+        assert include_sensitivities is True
         result = run_initial_state_monte_carlo(
             scenario,
             cases=cases,
@@ -326,6 +328,7 @@ def test_research_propagate_command_accepts_jax_backend(
             "0.000001",
             "--seed",
             "7",
+            "--include-sensitivities",
             "--output",
             str(output),
         ],
