@@ -67,9 +67,9 @@ These extras are pinned to NumPy-1-compatible backend lines: RocketPy `>=1.11,<1
 Dymos `>=1.13.1,<1.14`, and OpenMDAO `>=3.41,<3.42`.
 
 RocketPy and Dymos/OpenMDAO are behind explicit adapter gates. The current `rocketpy` launch path
-loads the optional runtime and preserves the `LaunchTrajectory` product boundary, but live RocketPy
-simulation still requires backend-specific rocket/motor configuration beyond the aggregate local
-launch schema.
+loads the optional runtime, requires explicit `rocketpy` vehicle/motor/flight configuration on the
+launch scenario, and preserves the `LaunchTrajectory` product boundary. A validated RocketPy flight
+runner is still required before the suite promotes live RocketPy simulation beyond the adapter gate.
 
 Optional research backend smoke checks:
 

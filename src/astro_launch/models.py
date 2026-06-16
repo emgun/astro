@@ -198,6 +198,62 @@ class LaunchPropagationConfig(AstroModel):
         return self
 
 
+class LaunchRocketPyConfig(AstroModel):
+    rail_length_m: FiniteFloat = Field(gt=0.0)
+    inclination_deg: FiniteFloat = Field(ge=0.0, le=180.0)
+    heading_deg: FiniteFloat = Field(ge=0.0, le=360.0)
+    rocket_radius_m: FiniteFloat = Field(gt=0.0)
+    rocket_mass_without_motor_kg: FiniteFloat = Field(ge=0.0)
+    rocket_inertia_without_motor_kg_m2: tuple[FiniteFloat, FiniteFloat, FiniteFloat]
+    rocket_center_of_mass_without_motor_m: FiniteFloat
+    rocket_power_off_drag_coefficient: FiniteFloat = Field(ge=0.0, le=10.0, default=0.5)
+    rocket_power_on_drag_coefficient: FiniteFloat = Field(ge=0.0, le=10.0, default=0.5)
+    motor_dry_mass_kg: FiniteFloat = Field(ge=0.0)
+    motor_center_of_dry_mass_position_m: FiniteFloat
+    motor_nozzle_position_m: FiniteFloat
+    motor_nozzle_radius_m: FiniteFloat = Field(gt=0.0)
+    motor_grain_number: int = Field(ge=1)
+    motor_grain_density_kg_m3: FiniteFloat = Field(gt=0.0)
+    motor_grain_outer_radius_m: FiniteFloat = Field(gt=0.0)
+    motor_grain_initial_inner_radius_m: FiniteFloat = Field(gt=0.0)
+    motor_grain_initial_height_m: FiniteFloat = Field(gt=0.0)
+    motor_grain_separation_m: FiniteFloat = Field(ge=0.0)
+    motor_grains_center_of_mass_position_m: FiniteFloat
+
+    @field_validator(
+        "rail_length_m",
+        "inclination_deg",
+        "heading_deg",
+        "rocket_radius_m",
+        "rocket_mass_without_motor_kg",
+        "rocket_center_of_mass_without_motor_m",
+        "rocket_power_off_drag_coefficient",
+        "rocket_power_on_drag_coefficient",
+        "motor_dry_mass_kg",
+        "motor_center_of_dry_mass_position_m",
+        "motor_nozzle_position_m",
+        "motor_nozzle_radius_m",
+        "motor_grain_density_kg_m3",
+        "motor_grain_outer_radius_m",
+        "motor_grain_initial_inner_radius_m",
+        "motor_grain_initial_height_m",
+        "motor_grain_separation_m",
+        "motor_grains_center_of_mass_position_m",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "RocketPy config scalar")
+
+    @model_validator(mode="after")
+    def grain_inner_radius_must_fit_outer_radius(self) -> LaunchRocketPyConfig:
+        if self.motor_grain_initial_inner_radius_m >= self.motor_grain_outer_radius_m:
+            raise ValueError("RocketPy motor grain inner radius must be smaller than outer radius")
+        if self.motor_nozzle_radius_m >= self.motor_grain_outer_radius_m:
+            raise ValueError("RocketPy motor nozzle radius must be smaller than grain outer radius")
+        return self
+
+
 class LaunchScenario(AstroModel):
     scenario_id: str = Field(min_length=1)
     description: str = ""
@@ -208,6 +264,7 @@ class LaunchScenario(AstroModel):
     vehicle: LaunchVehicle
     atmosphere: AtmosphereConfig = Field(default_factory=AtmosphereConfig)
     guidance: GuidanceConfig = Field(default_factory=GuidanceConfig)
+    rocketpy: LaunchRocketPyConfig | None = None
     target_orbit: TargetOrbit
     propagation: LaunchPropagationConfig
 

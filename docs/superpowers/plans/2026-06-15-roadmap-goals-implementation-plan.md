@@ -184,7 +184,7 @@ Primary files:
 
 ### Goal 4: Launch External Backends and Optimization
 
-Status: first external-backend boundary implemented. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, a RocketPy product adapter boundary, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, and Dymos adapter optimization diagnostics are implemented. Full live RocketPy motor/rocket geometry mapping and Dymos phase transcription remain gated on richer backend-specific configuration.
+Status: first external-backend boundary implemented. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, a RocketPy product adapter boundary, typed RocketPy launch-scenario configuration, a checked-in RocketPy-configured launch example, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, and Dymos adapter optimization diagnostics are implemented. Full live RocketPy motor/rocket geometry mapping and Dymos phase transcription remain gated on validated backend runners.
 
 Implemented slice:
 
@@ -193,7 +193,12 @@ Implemented slice:
   RocketPy `>=1.11,<1.12`, Dymos `>=1.13.1,<1.14`, and OpenMDAO `>=3.41,<3.42`.
 - Optional backend imports have timeout diagnostics so Matplotlib/OpenMDAO/RocketPy import-time
   stalls report as backend-unavailable errors instead of hanging indefinitely.
-- `astro launch --backend rocketpy` routes through a recognized RocketPy adapter boundary and fails clearly when dependencies or backend-specific configuration are unavailable.
+- `LaunchScenario.rocketpy` provides typed RocketPy vehicle/motor/flight configuration for the
+  backend-specific path, with validation for rail settings and solid-motor grain geometry.
+- `examples/launch/rocketpy_configured_two_stage.yaml` provides a checked-in RocketPy-configured
+  launch scenario.
+- `astro launch --backend rocketpy` routes through a recognized RocketPy adapter boundary and fails
+  clearly when dependencies, `scenario.rocketpy`, or a validated flight runner are unavailable.
 - `astro optimize-launch --backend local` runs the existing pitch-program tuner through a neutral optimization entry point.
 - `astro optimize-launch --backend dymos` routes through a Dymos/OpenMDAO adapter boundary and fails clearly until a validated Dymos phase runner is provided.
 - Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
@@ -202,7 +207,9 @@ Implemented slice:
 
 Definition of done:
 
-- `astro launch --backend rocketpy` runs a direct simulation adapter when `astro[launch]` is installed and the scenario supplies RocketPy-specific vehicle/motor configuration.
+- `astro launch --backend rocketpy` runs a direct simulation adapter when `astro[launch]` is
+  installed, the scenario supplies RocketPy-specific vehicle/motor/flight configuration, and a
+  validated RocketPy flight runner is provided.
 - RocketPy adapter returns the existing `LaunchTrajectory` schema, not RocketPy-native objects.
 - `astro optimize-launch --backend dymos` solves a small ascent optimization example once a validated Dymos phase model is added.
 - Dymos/OpenMDAO adapter reports path constraints, optimizer status, convergence diagnostics, and target insertion residuals.

@@ -45,6 +45,15 @@ def test_load_pitch_program_launch_scenario() -> None:
     ]
 
 
+def test_load_rocketpy_configured_launch_scenario() -> None:
+    scenario = load_launch_scenario(Path("examples/launch/rocketpy_configured_two_stage.yaml"))
+
+    assert scenario.scenario_id == "rocketpy-configured-two-stage"
+    assert scenario.rocketpy is not None
+    assert scenario.rocketpy.rail_length_m == 5.2
+    assert scenario.rocketpy.motor_grain_number == 4
+
+
 def test_load_launch_trajectory_reads_json_product(tmp_path: Path) -> None:
     from astro_launch.io import load_launch_trajectory
 

@@ -71,6 +71,7 @@ def test_packages_import() -> None:
         "LaunchReportInsertionMetrics",
         "LaunchReportMetricDelta",
         "LaunchReportShortArcMetrics",
+        "LaunchRocketPyConfig",
         "LaunchScenario",
         "LaunchSite",
         "LaunchStage",

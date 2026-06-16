@@ -9,6 +9,7 @@ from astro_launch.models import (
     LaunchEngine,
     LaunchEvent,
     LaunchPropagationConfig,
+    LaunchRocketPyConfig,
     LaunchScenario,
     LaunchStage,
     LaunchTrajectory,
@@ -41,6 +42,60 @@ def test_launch_scenario_accepts_two_stage_vertical_case() -> None:
     assert scenario.propagation.sample_count == 15
     assert scenario.frame is Frame.EME2000
     assert scenario.time_scale is TimeScale.UTC
+    assert scenario.rocketpy is None
+
+
+def test_launch_scenario_accepts_rocketpy_backend_configuration() -> None:
+    scenario = make_launch_scenario(
+        rocketpy=LaunchRocketPyConfig(
+            rail_length_m=5.2,
+            inclination_deg=85.0,
+            heading_deg=90.0,
+            rocket_radius_m=0.31,
+            rocket_mass_without_motor_kg=145.0,
+            rocket_inertia_without_motor_kg_m2=(45.0, 45.0, 1.2),
+            rocket_center_of_mass_without_motor_m=1.8,
+            motor_dry_mass_kg=28.0,
+            motor_center_of_dry_mass_position_m=-1.1,
+            motor_nozzle_position_m=-1.9,
+            motor_nozzle_radius_m=0.075,
+            motor_grain_number=4,
+            motor_grain_density_kg_m3=1815.0,
+            motor_grain_outer_radius_m=0.12,
+            motor_grain_initial_inner_radius_m=0.045,
+            motor_grain_initial_height_m=0.42,
+            motor_grain_separation_m=0.012,
+            motor_grains_center_of_mass_position_m=-0.8,
+        )
+    )
+
+    assert scenario.rocketpy is not None
+    assert scenario.rocketpy.rail_length_m == 5.2
+    assert scenario.rocketpy.motor_grain_number == 4
+
+
+def test_rocketpy_configuration_rejects_invalid_motor_geometry() -> None:
+    with pytest.raises(ValidationError, match="inner radius"):
+        LaunchRocketPyConfig(
+            rail_length_m=5.2,
+            inclination_deg=85.0,
+            heading_deg=90.0,
+            rocket_radius_m=0.31,
+            rocket_mass_without_motor_kg=145.0,
+            rocket_inertia_without_motor_kg_m2=(45.0, 45.0, 1.2),
+            rocket_center_of_mass_without_motor_m=1.8,
+            motor_dry_mass_kg=28.0,
+            motor_center_of_dry_mass_position_m=-1.1,
+            motor_nozzle_position_m=-1.9,
+            motor_nozzle_radius_m=0.075,
+            motor_grain_number=4,
+            motor_grain_density_kg_m3=1815.0,
+            motor_grain_outer_radius_m=0.12,
+            motor_grain_initial_inner_radius_m=0.13,
+            motor_grain_initial_height_m=0.42,
+            motor_grain_separation_m=0.012,
+            motor_grains_center_of_mass_position_m=-0.8,
+        )
 
 
 def test_pitch_program_guidance_requires_ordered_pitch_knots() -> None:
