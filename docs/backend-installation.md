@@ -66,9 +66,10 @@ configured solid rockets and can annotate multistage suite scenarios with stage 
 reached by one configured RocketPy flight, with metadata for whether the RocketPy solution covered
 the full suite stage schedule. That multistage path is a composition adapter, not a validated
 multi-motor RocketPy staging solver. Live Dymos optimization currently supports a small
-vertical-ascent phase transcription wrapped in the suite launch-tuning product. Full multistage Dymos
-optimization still requires a validated backend runner before it should be promoted beyond the
-adapter gate.
+vertical-ascent phase transcription wrapped in the suite launch-tuning product, with suite
+stage-plan metadata and a coverage flag showing whether the phase duration spans the full stage
+schedule. Full multistage Dymos optimization still requires a validated backend runner before it
+should be promoted beyond the adapter gate.
 
 ## Research Backends
 

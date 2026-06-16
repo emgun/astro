@@ -76,6 +76,8 @@ def test_optimize_launch_dymos_runs_default_phase_transcription(
         "optimizer_success": True,
         "optimizer_message": "Optimization terminated successfully",
     }
+    assert result.metadata["stage_plan"]["total_burn_duration_s"] == 120.0
+    assert result.metadata["dymos_phase_covers_stage_schedule"] is False
 
 
 def test_optimize_launch_dymos_returns_suite_product_with_fake_runner() -> None:
@@ -105,6 +107,16 @@ def test_optimize_launch_dymos_returns_suite_product_with_fake_runner() -> None:
     assert result.metadata["candidate_count"] == result.metadata["source_candidate_count"]
     assert result.metadata["best_score"] == result.best_case.score
     assert result.metadata["target_insertion_residuals"] == result.best_case.target_miss
+    assert result.metadata["stage_plan"] == {
+        "stage_count": 2,
+        "total_burn_duration_s": 120.0,
+        "stages": [
+            {"name": "stage-1", "start_s": 0.0, "burnout_s": 70.0},
+            {"name": "stage-2", "start_s": 70.0, "burnout_s": 120.0},
+        ],
+    }
+    assert result.metadata["multistage"] is True
+    assert result.metadata["dymos_phase_covers_stage_schedule"] is None
     assert result.metadata["path_constraints"] == {
         "pitch_deg": {"lower": 0.0, "upper": 90.0},
     }

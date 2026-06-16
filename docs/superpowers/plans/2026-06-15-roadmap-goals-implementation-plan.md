@@ -206,7 +206,7 @@ Primary files:
 
 ### Goal 4: Launch External Backends and Optimization
 
-Status: first external-backend boundary implemented, first live RocketPy direct runner added, RocketPy multistage suite-stage composition added, and first live Dymos/OpenMDAO phase transcription added. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured launch examples, configured solid RocketPy direct simulation, multistage suite stage-event/sample annotation around one configured RocketPy flight, stage-schedule completeness metadata, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, Dymos vertical-ascent phase transcription, and Dymos adapter optimization diagnostics are implemented. Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization remain gated on validated backend runners.
+Status: first external-backend boundary implemented, first live RocketPy direct runner added, RocketPy multistage suite-stage composition added, and first live Dymos/OpenMDAO phase transcription added. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured launch examples, configured solid RocketPy direct simulation, multistage suite stage-event/sample annotation around one configured RocketPy flight, stage-schedule completeness metadata, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, Dymos vertical-ascent phase transcription, Dymos suite stage-plan metadata, and Dymos adapter optimization diagnostics are implemented. Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization remain gated on validated backend runners.
 
 Implemented slice:
 
@@ -234,6 +234,8 @@ Implemented slice:
   iteration count, candidate count, path-constraint summary, best score, target insertion
   residuals, Dymos version, OpenMDAO version, phase duration, final altitude, final velocity, and
   optimizer message.
+- Dymos adapter provenance includes the suite stage plan, multistage flag, total burn duration, and
+  whether the Dymos phase duration covers the full stage schedule.
 
 Definition of done:
 
@@ -245,6 +247,8 @@ Definition of done:
 - `astro optimize-launch --backend dymos` solves a small ascent optimization example through a
   bounded vertical-ascent Dymos phase model.
 - Dymos/OpenMDAO adapter reports path constraints, optimizer status, convergence diagnostics, and target insertion residuals.
+- Dymos/OpenMDAO adapter reports the suite multistage plan without claiming the current
+  vertical-phase model is a full multistage ascent optimizer.
 - Launch validation includes deterministic direct-simulation cases and one small optimization case.
 - Launch-to-orbit handoff still produces a normal orbital `Scenario`.
 

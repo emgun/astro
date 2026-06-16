@@ -76,8 +76,9 @@ events/samples reached by a single configured RocketPy flight, including metadat
 RocketPy solution covered the full suite stage schedule. That multistage path is an adapter
 composition layer, not a validated multi-motor RocketPy staging solver. The `dymos` launch
 optimization path runs a small Dymos/OpenMDAO vertical-ascent phase transcription and returns the existing
-`LaunchPitchTuningResult` product with explicit phase diagnostics; full multistage Dymos ascent
-optimization remains future work.
+`LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan metadata, and a
+flag showing whether the Dymos phase duration covers the full stage schedule; full multistage Dymos
+ascent optimization remains future work.
 
 Optional research backend smoke checks:
 

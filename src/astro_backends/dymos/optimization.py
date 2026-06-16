@@ -32,10 +32,13 @@ class DymosPhaseSummary:
 
 def _with_dymos_provenance(
     result: LaunchPitchTuningResult,
+    scenario: LaunchScenario,
     runtime: DymosRuntime,
 ) -> LaunchPitchTuningResult:
     source_candidate_count = result.metadata.get("candidate_count")
     converged = bool(result.metadata.get("converged", isfinite(float(result.best_case.score))))
+    stage_plan = _stage_plan_metadata(scenario)
+    phase_duration_s = _dymos_phase_duration_s(result)
     metadata = {
         **result.metadata,
         "adapter": "dymos",
@@ -49,11 +52,48 @@ def _with_dymos_provenance(
         "candidate_count": source_candidate_count,
         "best_score": result.best_case.score,
         "target_insertion_residuals": result.best_case.target_miss,
+        "stage_plan": stage_plan,
+        "multistage": stage_plan["stage_count"] > 1,
+        "dymos_phase_covers_stage_schedule": (
+            None
+            if phase_duration_s is None
+            else phase_duration_s >= stage_plan["total_burn_duration_s"] - 1.0e-9
+        ),
         "path_constraints": {
             "pitch_deg": {"lower": 0.0, "upper": 90.0},
         },
     }
     return result.model_copy(update={"backend": "dymos", "metadata": metadata})
+
+
+def _stage_plan_metadata(scenario: LaunchScenario) -> dict[str, Any]:
+    stages: list[dict[str, float | str]] = []
+    start_s = 0.0
+    for stage in scenario.vehicle.stages:
+        burnout_s = start_s + stage.burn_duration_s
+        stages.append(
+            {
+                "name": stage.name,
+                "start_s": start_s,
+                "burnout_s": burnout_s,
+            }
+        )
+        start_s = burnout_s
+    return {
+        "stage_count": len(stages),
+        "total_burn_duration_s": start_s,
+        "stages": stages,
+    }
+
+
+def _dymos_phase_duration_s(result: LaunchPitchTuningResult) -> float | None:
+    phase_metadata = result.metadata.get("dymos_phase")
+    if not isinstance(phase_metadata, dict):
+        return None
+    duration_s = phase_metadata.get("duration_s")
+    if duration_s is None:
+        return None
+    return float(duration_s)
 
 
 def _thrust_acceleration_m_s2(scenario: LaunchScenario) -> float:
@@ -194,4 +234,4 @@ def optimize_launch_dymos(
         optimizer_runner = run_dymos_phase_optimization
 
     result = optimizer_runner(scenario, runtime)
-    return _with_dymos_provenance(result, runtime)
+    return _with_dymos_provenance(result, scenario, runtime)
