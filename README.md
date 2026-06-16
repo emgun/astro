@@ -145,8 +145,9 @@ option selects the propagation backend used for synthetic truth generation and r
 With `--backend orekit`, the suite estimator uses Orekit-backed propagation when the optional Orekit
 runtime is installed. The Orekit backend also includes a native OD construction bridge that maps
 suite geodetic range/range-rate records into Orekit `Range`/`RangeRate` measurements and a
-`BatchLSEstimator` object. Live native-estimator execution and suite `EstimateResult` mapping remain
-separate validation work.
+`BatchLSEstimator` object. The bridge can execute the native estimator and map the estimated state,
+residuals, RMS, covariance, and iteration diagnostics into the suite `EstimateResult` model; public
+CLI exposure still waits on live Java/Orekit estimator validation.
 
 `astro export-trajectory` converts suite trajectory JSON into a CSV ephemeris table containing
 epoch, position, and velocity samples. `astro monte-carlo` runs a seeded initial-state ensemble by

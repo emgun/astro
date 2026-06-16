@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from math import radians
 from typing import Any
 
@@ -7,6 +8,8 @@ from astro_backends.orekit.conversion import (
     absolute_date_from_datetime,
     km_s_to_m_s,
     km_to_m,
+    m_s_to_km_s,
+    m_to_km,
     validate_orekit_state_support,
 )
 from astro_backends.orekit.force_models import (
@@ -22,14 +25,17 @@ from astro_backends.orekit.propagation import (
     R_EARTH_M,
     _initial_orbit,
 )
-from astro_backends.orekit.runtime import OrekitRuntime
+from astro_backends.orekit.runtime import OrekitRuntime, load_orekit_runtime
 from astro_core.constants import J2_EARTH
 from astro_core.errors import UnsupportedBackendError
 from astro_core.models import (
+    CartesianState,
+    EstimateResult,
     ForceModelName,
     GroundStation,
     MeasurementRecord,
     MeasurementType,
+    OrbitState,
     Scenario,
 )
 
@@ -39,6 +45,7 @@ SUPPORTED_NATIVE_OREKIT_MEASUREMENTS = frozenset(
         MeasurementType.RANGE_RATE,
     }
 )
+COVARIANCE_SINGULARITY_THRESHOLD = 1.0e-12
 
 
 def _station_by_name(scenario: Scenario) -> dict[str, GroundStation]:
@@ -199,3 +206,85 @@ def build_orekit_batch_ls_estimator(
     for observed_measurement in observed_measurements:
         estimator.addMeasurement(observed_measurement)
     return estimator
+
+
+def _matrix_to_nested_list(matrix: Any, size: int = 6) -> list[list[float]]:
+    return [
+        [float(matrix.getEntry(row, column)) for column in range(size)]
+        for row in range(size)
+    ]
+
+
+def _vector_to_list(vector: Any) -> list[float]:
+    if hasattr(vector, "toArray"):
+        return [float(value) for value in vector.toArray()]
+    return [float(value) for value in vector]
+
+
+def _estimated_state_from_propagator(
+    scenario: Scenario,
+    runtime: OrekitRuntime,
+    propagator: Any,
+) -> OrbitState:
+    frame = runtime.frames_factory.getEME2000()
+    initial_date = absolute_date_from_datetime(runtime, scenario.initial_state.epoch)
+    spacecraft_state = propagator.propagate(initial_date)
+    pv_coordinates = spacecraft_state.getPVCoordinates(frame)
+    position = pv_coordinates.getPosition()
+    velocity = pv_coordinates.getVelocity()
+    return scenario.initial_state.model_copy(
+        update={
+            "cartesian": CartesianState(
+                position_km=(
+                    m_to_km(float(position.getX())),
+                    m_to_km(float(position.getY())),
+                    m_to_km(float(position.getZ())),
+                ),
+                velocity_km_s=(
+                    m_s_to_km_s(float(velocity.getX())),
+                    m_s_to_km_s(float(velocity.getY())),
+                    m_s_to_km_s(float(velocity.getZ())),
+                ),
+            )
+        }
+    )
+
+
+def estimate_orekit_native(
+    scenario: Scenario,
+    measurements: list[MeasurementRecord],
+    *,
+    runtime_loader: Callable[[], OrekitRuntime] | None = None,
+) -> EstimateResult:
+    """Run Orekit BatchLSEstimator and map the result into the suite OD product."""
+    runtime = runtime_loader() if runtime_loader is not None else load_orekit_runtime()
+    estimator = build_orekit_batch_ls_estimator(scenario, measurements, runtime)
+    propagators = estimator.estimate()
+    if len(propagators) == 0:
+        raise UnsupportedBackendError("Native Orekit OD returned no estimated propagators")
+
+    optimum = estimator.getOptimum()
+    residuals = _vector_to_list(optimum.getResiduals())
+    covariance = _matrix_to_nested_list(
+        estimator.getPhysicalCovariances(COVARIANCE_SINGULARITY_THRESHOLD)
+    )
+
+    return EstimateResult(
+        estimated_state=_estimated_state_from_propagator(scenario, runtime, propagators[0]),
+        residuals=residuals,
+        covariance=covariance,
+        rms=float(optimum.getRMS()),
+        iterations=int(estimator.getIterationsCount()),
+        converged=True,
+        metadata={
+            "backend": "orekit_batch_ls_estimator",
+            "propagation_backend": "orekit",
+            "estimator": "Orekit BatchLSEstimator",
+            "evaluations": int(estimator.getEvaluationsCount()),
+            "measurement_count": len(measurements),
+            "covariance_singularity_threshold": COVARIANCE_SINGULARITY_THRESHOLD,
+            "wrapper": runtime.wrapper,
+            "wrapper_version": runtime.wrapper_version,
+            "data_path": runtime.data_path,
+        },
+    )

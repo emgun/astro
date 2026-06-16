@@ -518,6 +518,19 @@ class _FakeNumericalPropagatorBuilder:
     def addForceModel(self, force_model: object) -> None:
         self.force_models.append(force_model)
 
+    def buildPropagator(self) -> _FakeKeplerianPropagator:
+        return _FakeKeplerianPropagator(
+            _FakeCartesianOrbit(
+                _FakePVCoordinates(
+                    _FakeVector3D(7_001_000.0, 2_000.0, 3_000.0),
+                    _FakeVector3D(10.0, 7_510.0, 1_020.0),
+                ),
+                self.reference_orbit.frame,
+                self.reference_orbit.date,
+                self.reference_orbit.mu,
+            )
+        )
+
 
 class _FakeOrekitGroundStation:
     def __init__(self, base_frame: _FakeTopocentricFrame) -> None:
@@ -581,6 +594,50 @@ class _FakeBatchLSEstimator:
 
     def addMeasurement(self, measurement: object) -> None:
         self.measurements.append(measurement)
+
+    def estimate(self) -> list[_FakeKeplerianPropagator]:
+        return [self.propagator_builders[0].buildPropagator()]
+
+    def getOptimum(self) -> object:
+        return _FakeLeastSquaresOptimum()
+
+    def getPhysicalCovariances(self, _threshold: float) -> object:
+        return _FakeRealMatrix(
+            [
+                [1.0e-6 if row == column else 0.0 for column in range(6)]
+                for row in range(6)
+            ]
+        )
+
+    def getIterationsCount(self) -> int:
+        return 3
+
+    def getEvaluationsCount(self) -> int:
+        return 5
+
+
+class _FakeRealVector:
+    def __init__(self, values: list[float]) -> None:
+        self.values = values
+
+    def toArray(self) -> list[float]:
+        return self.values
+
+
+class _FakeRealMatrix:
+    def __init__(self, values: list[list[float]]) -> None:
+        self.values = values
+
+    def getEntry(self, row: int, column: int) -> float:
+        return self.values[row][column]
+
+
+class _FakeLeastSquaresOptimum:
+    def getResiduals(self) -> _FakeRealVector:
+        return _FakeRealVector([0.1, -0.2])
+
+    def getRMS(self) -> float:
+        return (0.1**2 + (-0.2) ** 2) ** 0.5
 
 
 class _FakeLevenbergMarquardtOptimizer:

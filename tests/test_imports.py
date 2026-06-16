@@ -102,6 +102,7 @@ def test_packages_import() -> None:
         "OrekitSmokeResult",
         "build_orekit_batch_ls_estimator",
         "build_orekit_observed_measurements",
+        "estimate_orekit_native",
         "load_orekit_runtime",
         "propagate_orekit",
         "run_orekit_smoke",

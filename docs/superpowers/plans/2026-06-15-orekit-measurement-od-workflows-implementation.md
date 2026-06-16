@@ -121,6 +121,9 @@ Later roadmap slices added the first native Orekit OD construction boundary:
   Orekit `Range` and `RangeRate` observed measurements.
 - `build_orekit_batch_ls_estimator` constructs an Orekit `BatchLSEstimator` with a numerical
   propagator builder and attached measurements.
+- `estimate_orekit_native` executes the native estimator through the runtime abstraction and maps
+  the estimated state, residual vector, RMS, covariance, iteration count, evaluation count, and
+  Orekit wrapper provenance into the suite `EstimateResult` product.
 
-The native Orekit estimator is still not exposed as a public CLI workflow because live estimator
-execution, residual/covariance extraction, and suite `EstimateResult` mapping remain unvalidated.
+The native Orekit estimator is still not exposed as a public CLI workflow because live Java/Orekit
+estimator execution remains unvalidated on checked-in geodetic range/range-rate fixtures.

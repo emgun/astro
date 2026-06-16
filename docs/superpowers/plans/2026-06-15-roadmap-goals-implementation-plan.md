@@ -99,9 +99,10 @@ Tradeoff:
 Status: suite-level Orekit-backed measurement/OD, Orekit J2 numerical propagation, and the
 `orekit_high_fidelity` numerical propagation entry path, Orekit atmospheric drag, Orekit SRP, and
 Sun/Moon third-body gravity are implemented. Native Orekit OD now has a measurement-object and
-`BatchLSEstimator` construction bridge for WGS-84 geodetic range/range-rate records; live estimator
-execution, covariance/residual extraction, and suite `EstimateResult` mapping remain future
-integration work.
+`BatchLSEstimator` construction/execution bridge for WGS-84 geodetic range/range-rate records. It
+maps estimated state, residuals, RMS, covariance, and iteration diagnostics into the suite
+`EstimateResult` model through the runtime abstraction; public CLI exposure and live Java/Orekit
+estimator validation remain future integration work.
 
 Implemented slice:
 
@@ -136,6 +137,9 @@ Implemented slice:
 - `build_orekit_batch_ls_estimator` constructs an Orekit `BatchLSEstimator` with a numerical
   propagator builder and attached observed measurements, establishing the native estimator object
   boundary before live execution is exposed.
+- `estimate_orekit_native` executes the native Orekit `BatchLSEstimator` through the runtime
+  abstraction and maps the resulting propagated state, residual vector, RMS, covariance, iteration
+  count, evaluation count, and Orekit wrapper provenance into `EstimateResult`.
 - The shared measurement surface supports range, range-rate, inertial right ascension, and
   declination plus local-horizon azimuth/elevation records; wrapped angle residuals handle 0/360
   degree crossings.
@@ -152,8 +156,8 @@ Implemented slice:
 
 Future native Orekit estimator scope:
 
-- Execute the native Orekit `BatchLSEstimator`, extract estimated orbit, residuals, RMS,
-  covariance, and iteration diagnostics, and map them into suite `EstimateResult`.
+- Add live Java/Orekit validation for native estimator execution against checked-in geodetic
+  range/range-rate fixtures before exposing the native estimator as a public CLI workflow.
 - Extend native Orekit OD beyond geodetic range/range-rate records as Orekit measurement families
   are validated.
 - Keep the current suite-level SciPy estimator as the deterministic always-on OD reference while
