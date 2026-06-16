@@ -21,7 +21,11 @@ from astro_core.errors import (
 from astro_core.io import load_scenario, load_trajectory
 from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario, Trajectory
 from astro_dynamics.backends import propagate_with_backend
-from astro_dynamics.ephemeris import dump_trajectory_ephemeris_csv, dump_trajectory_oem
+from astro_dynamics.ephemeris import (
+    dump_trajectory_ephemeris_csv,
+    dump_trajectory_oem,
+    load_trajectory_oem,
+)
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
 from astro_launch.backends import propagate_launch_with_backend
 from astro_launch.handoff import launch_trajectory_to_orbit_scenario
@@ -349,6 +353,39 @@ def export_trajectory(
         raise typer.Exit(code=2)
 
     _write_text_or_exit(output, payload, "trajectory")
+    typer.echo(f"wrote trajectory: {output}")
+
+
+@app.command("import-trajectory")
+def import_trajectory(
+    trajectory_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    scenario_path: Annotated[Path, typer.Option("--scenario", exists=True, readable=True)],
+    trajectory_format: Annotated[
+        str,
+        typer.Option("--format", help="Input trajectory format: oem."),
+    ] = "oem",
+) -> None:
+    """Import an external trajectory product into suite trajectory JSON."""
+    scenario = _load_scenario_or_exit(scenario_path)
+    normalized_format = trajectory_format.lower()
+    try:
+        payload = trajectory_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        typer.echo(f"could not read trajectory {trajectory_path}: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    if normalized_format == "oem":
+        try:
+            trajectory = load_trajectory_oem(payload, force_model=scenario.force_model)
+        except ValueError as exc:
+            typer.echo(f"invalid OEM trajectory {trajectory_path}: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+    else:
+        typer.echo(f"unsupported trajectory import format: {trajectory_format}", err=True)
+        raise typer.Exit(code=2)
+
+    _write_text_or_exit(output, trajectory.model_dump_json(indent=2), "trajectory")
     typer.echo(f"wrote trajectory: {output}")
 
 

@@ -1,7 +1,11 @@
 from pathlib import Path
 
 from astro_core.io import load_scenario
-from astro_dynamics.ephemeris import dump_trajectory_ephemeris_csv, dump_trajectory_oem
+from astro_dynamics.ephemeris import (
+    dump_trajectory_ephemeris_csv,
+    dump_trajectory_oem,
+    load_trajectory_oem,
+)
 from astro_dynamics.local import propagate_local
 
 
@@ -44,3 +48,38 @@ def test_dump_trajectory_oem_writes_ccsds_oem_kvn_product() -> None:
             if line.startswith("2026-01-01T")
         ]
     ) == len(trajectory.samples)
+
+
+def test_load_trajectory_oem_round_trips_export_with_scenario_force_model() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    trajectory = propagate_local(scenario)
+    payload = dump_trajectory_oem(trajectory)
+
+    loaded = load_trajectory_oem(payload, force_model=scenario.force_model)
+
+    assert loaded.scenario_id == trajectory.scenario_id
+    assert loaded.backend == trajectory.backend
+    assert loaded.force_model == scenario.force_model
+    assert [sample.epoch for sample in loaded.samples] == [
+        sample.epoch for sample in trajectory.samples
+    ]
+    assert [sample.state for sample in loaded.samples] == [
+        sample.state for sample in trajectory.samples
+    ]
+    assert {sample.mass_kg for sample in loaded.samples} == {None}
+    assert loaded.metadata["source_format"] == "ccsds_oem_kvn"
+    assert loaded.metadata["oem_time_system"] == "UTC"
+    assert loaded.metadata["oem_ref_frame"] == "EME2000"
+
+
+def test_load_trajectory_oem_rejects_unsupported_frame() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    trajectory = propagate_local(scenario)
+    payload = dump_trajectory_oem(trajectory).replace("REF_FRAME = EME2000", "REF_FRAME = ITRF")
+
+    try:
+        load_trajectory_oem(payload, force_model=scenario.force_model)
+    except ValueError as exc:
+        assert "REF_FRAME" in str(exc)
+    else:
+        raise AssertionError("expected unsupported OEM frame to fail")

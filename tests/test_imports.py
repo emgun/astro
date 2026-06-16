@@ -40,6 +40,7 @@ def test_packages_import() -> None:
         "dump_trajectory_ephemeris_csv",
         "dump_trajectory_oem",
         "j2_acceleration_km_s2",
+        "load_trajectory_oem",
         "propagate_local",
         "propagate_with_backend",
         "rk4_step",

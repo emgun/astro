@@ -15,6 +15,7 @@ from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, MeasurementType, Scenario
+from astro_dynamics.ephemeris import dump_trajectory_oem
 from astro_dynamics.local import propagate_local
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
 from astro_launch.io import load_launch_scenario
@@ -242,6 +243,36 @@ def test_export_trajectory_command_writes_oem(tmp_path: Path) -> None:
     assert payload.startswith("CCSDS_OEM_VERS = 2.0")
     assert "OBJECT_NAME = leo-two-body" in payload
     assert "2026-01-01T00:00:00.000000Z 7000.0 0.0 0.0 0.0 7.5 1.0" in payload
+
+
+def test_import_trajectory_command_reads_oem_with_scenario_context(tmp_path: Path) -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    trajectory = propagate_local(scenario)
+    oem_path = tmp_path / "trajectory.oem"
+    output = tmp_path / "trajectory.json"
+    oem_path.write_text(dump_trajectory_oem(trajectory), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "import-trajectory",
+            str(oem_path),
+            "--format",
+            "oem",
+            "--scenario",
+            "examples/scenarios/leo_two_body.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote trajectory" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "leo-two-body"
+    assert payload["backend"] == "local"
+    assert payload["metadata"]["source_format"] == "ccsds_oem_kvn"
+    assert len(payload["samples"]) == 11
 
 
 def test_monte_carlo_command_writes_json(tmp_path: Path) -> None:

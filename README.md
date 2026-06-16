@@ -114,6 +114,7 @@ astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output
 astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output orekit_third_body_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
+astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke
 astro dymos-smoke
@@ -160,9 +161,10 @@ CLI exposure still waits on live Java/Orekit estimator validation.
 
 `astro export-trajectory` converts suite trajectory JSON into either a CSV ephemeris table or a
 CCSDS OEM KVN text product containing UTC epochs plus Cartesian position and velocity samples in km
-and km/s. OEM export is currently write-only and preserves the suite product boundary; OEM ingest
-can be added once generated products are stable. `astro monte-carlo` runs a seeded initial-state ensemble by
-perturbing the scenario's Cartesian state and propagating each case through the selected backend.
+and km/s. `astro import-trajectory --format oem` converts a CCSDS OEM KVN text product back into a
+suite `Trajectory`; it requires `--scenario` because OEM does not encode the suite force model.
+The importer is intentionally strict: UTC time system, EME2000 reference frame, and Earth center are
+required. `astro monte-carlo` runs a seeded initial-state ensemble by perturbing the scenario's Cartesian state and propagating each case through the selected backend.
 This is a repeatable product workflow for uncertainty screening; it is not yet production covariance
 propagation or conjunction analysis.
 

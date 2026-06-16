@@ -30,8 +30,8 @@ Implemented and protected:
   fixed and tabulated-interpolation Earth-orientation correction, measurement, trajectory, and
   estimate products.
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
-- `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV and CCSDS OEM
-  ephemeris export,
+- `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV export and CCSDS
+  OEM ephemeris export/import,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
   propagation, plus finite-difference local covariance propagation with optional acceleration
   process noise, explicit per-sample state-transition/process-noise covariance products, and a
@@ -51,7 +51,8 @@ Still roadmap-level:
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
 - Live Tudat cross-check environment/body construction.
 - Full IERS finals parsing/precession-nutation reductions, two-way/three-way radiometric families,
-  and operational CCSDS ingest/support beyond current KVN TDM measurement families and OEM export.
+  and operational CCSDS support beyond current KVN TDM measurement families and OEM ephemeris
+  interchange.
 - Richer JAX force models, sensitivities, and differentiable OD workflows.
 
 ## Goal Ledger
@@ -182,8 +183,8 @@ Primary files:
 ### Goal 3: Operational Flight Dynamics Products
 
 Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
-finite burns, local thrust-vector finite burns with mass depletion, CSV and CCSDS OEM ephemeris
-export, finite-difference local covariance propagation with optional white-acceleration process
+finite burns, local thrust-vector finite burns with mass depletion, CSV export and CCSDS OEM
+ephemeris export/import, finite-difference local covariance propagation with optional white-acceleration process
 noise, explicit per-sample and accumulated state-transition matrices, per-sample process-noise
 covariance matrices, and seeded initial-state Monte Carlo. The first attitude-coupled finite-burn
 mode rotates thrust along the instantaneous velocity direction; backend-native high-fidelity
@@ -192,8 +193,9 @@ covariance dynamics and full attitude-control maneuver dynamics remain deferred.
 Definition of done:
 
 - Orbital `Trajectory` supports event and maneuver records without breaking launch products.
-- Ephemeris export supports JSON plus CSV and CCSDS OEM KVN standard interchange formats selected
-  for the suite's current maturity.
+- Ephemeris export/import supports JSON plus CSV export and CCSDS OEM KVN interchange selected for
+  the suite's current maturity. OEM import requires scenario context because OEM does not encode
+  the suite force model.
 - Maneuver products cover impulsive delta-v, local finite burns with constant inertial
   acceleration, local thrust-vector finite burns with mass-flow depletion, and velocity-aligned
   thrust direction for the first attitude-coupled burn mode.
