@@ -150,11 +150,35 @@ def test_propagate_launch_rocketpy_requires_live_adapter_configuration() -> None
         propagate_launch_rocketpy(make_launch_scenario(), runtime_loader=_fake_runtime)
 
 
-def test_propagate_launch_rocketpy_rejects_multistage_default_runner() -> None:
+def test_propagate_launch_rocketpy_composes_multistage_stage_schedule() -> None:
+    model = _FakeRocketPyModel()
     scenario = make_launch_scenario(rocketpy=_rocketpy_config())
 
-    with pytest.raises(UnsupportedBackendError, match="single-stage"):
-        propagate_launch_rocketpy(scenario, runtime_loader=_fake_runtime)
+    trajectory = propagate_launch_rocketpy(scenario, runtime_loader=model.runtime)
+
+    event_signatures = [
+        (event.event_type, event.stage_name, event.time_s) for event in trajectory.events
+    ]
+
+    assert event_signatures == [
+        ("stage_ignition", "stage-1", 0.0),
+        ("stage_burnout", "stage-1", 70.0),
+        ("stage_separation", "stage-1", 70.0),
+        ("stage_ignition", "stage-2", 70.0),
+        ("stage_burnout", "stage-2", 120.0),
+        ("stage_separation", "stage-2", 120.0),
+        ("insertion", "payload", 140.0),
+    ]
+    assert trajectory.backend == "rocketpy"
+    assert trajectory.metadata["source_backend"] == "rocketpy_direct"
+    assert trajectory.metadata["model"] == "rocketpy_configured_multistage_composition"
+    assert trajectory.metadata["rocketpy_stage_count"] == 2
+    assert trajectory.metadata["rocketpy_stage_schedule_duration_s"] == 120.0
+    assert trajectory.metadata["rocketpy_stage_schedule_complete"] is True
+    assert trajectory.metadata["rocketpy_composition"] == "single_flight_suite_stage_schedule"
+    assert trajectory.samples[0].stage_name == "stage-1"
+    assert trajectory.samples[7].stage_name == "stage-2"
+    assert trajectory.samples[-1].stage_name == "payload"
 
 
 def test_propagate_launch_rocketpy_returns_suite_product_with_fake_runner() -> None:
@@ -257,3 +281,4 @@ def test_propagate_launch_rocketpy_stops_at_actual_solution_end() -> None:
     assert [sample.time_s for sample in trajectory.samples] == [0.0, 10.0, 20.0, 25.0]
     assert trajectory.events[-1].time_s == 25.0
     assert trajectory.metadata["rocketpy_solution_end_s"] == 25.0
+    assert trajectory.metadata["rocketpy_stage_schedule_complete"] is False

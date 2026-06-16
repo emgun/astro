@@ -70,10 +70,12 @@ Dymos `>=1.13.1,<1.14`, and OpenMDAO `>=3.41,<3.42`.
 
 RocketPy and Dymos/OpenMDAO are behind explicit adapter gates. The current `rocketpy` launch path
 loads the optional runtime, requires explicit `rocketpy` vehicle/motor/flight configuration on the
-launch scenario, runs single-stage solid-rocket flights through RocketPy, and preserves the
-`LaunchTrajectory` product boundary. Multi-stage RocketPy composition remains intentionally gated
-until a validated multi-motor/staging mapping is added. The `dymos` launch optimization path runs a
-small Dymos/OpenMDAO vertical-ascent phase transcription and returns the existing
+launch scenario, runs configured solid-rocket flights through RocketPy, preserves the
+`LaunchTrajectory` product boundary, and can annotate multistage suite scenarios with stage
+events/samples reached by a single configured RocketPy flight, including metadata for whether the
+RocketPy solution covered the full suite stage schedule. That multistage path is an adapter
+composition layer, not a validated multi-motor RocketPy staging solver. The `dymos` launch
+optimization path runs a small Dymos/OpenMDAO vertical-ascent phase transcription and returns the existing
 `LaunchPitchTuningResult` product with explicit phase diagnostics; full multistage Dymos ascent
 optimization remains future work.
 

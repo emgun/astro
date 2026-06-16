@@ -62,10 +62,13 @@ SciPy/Matplotlib binary stack in shared Anaconda environments.
 RocketPy and Dymos/OpenMDAO are optional adapter boundaries. The current local launch schema remains
 an aggregate point-mass model, while RocketPy-specific vehicle/motor/flight fields live under the
 optional `rocketpy` launch-scenario section. Live RocketPy simulation currently supports explicitly
-configured single-stage solid rockets. Live Dymos optimization currently supports a small
-vertical-ascent phase transcription wrapped in the suite launch-tuning product. Multi-stage RocketPy
-composition and full multistage Dymos optimization still require validated backend runners before
-they should be promoted beyond the adapter gates.
+configured solid rockets and can annotate multistage suite scenarios with stage events/samples
+reached by one configured RocketPy flight, with metadata for whether the RocketPy solution covered
+the full suite stage schedule. That multistage path is a composition adapter, not a validated
+multi-motor RocketPy staging solver. Live Dymos optimization currently supports a small
+vertical-ascent phase transcription wrapped in the suite launch-tuning product. Full multistage Dymos
+optimization still requires a validated backend runner before it should be promoted beyond the
+adapter gate.
 
 ## Research Backends
 

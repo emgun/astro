@@ -206,7 +206,7 @@ Primary files:
 
 ### Goal 4: Launch External Backends and Optimization
 
-Status: first external-backend boundary implemented, first live RocketPy direct runner added, and first live Dymos/OpenMDAO phase transcription added. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured launch examples, a single-stage solid RocketPy direct simulation adapter, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, Dymos vertical-ascent phase transcription, and Dymos adapter optimization diagnostics are implemented. Multi-stage RocketPy composition and full multistage Dymos ascent optimization remain gated on validated backend runners.
+Status: first external-backend boundary implemented, first live RocketPy direct runner added, RocketPy multistage suite-stage composition added, and first live Dymos/OpenMDAO phase transcription added. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured launch examples, configured solid RocketPy direct simulation, multistage suite stage-event/sample annotation around one configured RocketPy flight, stage-schedule completeness metadata, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, Dymos vertical-ascent phase transcription, and Dymos adapter optimization diagnostics are implemented. Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization remain gated on validated backend runners.
 
 Implemented slice:
 
@@ -221,9 +221,11 @@ Implemented slice:
 - `examples/launch/rocketpy_configured_two_stage.yaml` provides a checked-in RocketPy configuration
   fixture, and `examples/launch/rocketpy_configured_single_stage.yaml` provides the live direct-run
   fixture.
-- `astro launch --backend rocketpy` runs a single-stage solid RocketPy flight when dependencies and
-  `scenario.rocketpy` configuration are available, and fails clearly for unsupported multi-stage
-  RocketPy scenarios.
+- `astro launch --backend rocketpy` runs a configured solid RocketPy flight when dependencies and
+  `scenario.rocketpy` configuration are available. For multistage suite scenarios, it annotates the
+  returned `LaunchTrajectory` with reached suite stage events and sample stage names around one
+  configured RocketPy flight, with metadata identifying the composition tradeoff and whether the
+  RocketPy solution covered the full suite stage schedule.
 - `astro optimize-launch --backend local` runs the existing pitch-program tuner through a neutral optimization entry point.
 - `astro optimize-launch --backend dymos` runs a small Dymos/OpenMDAO vertical-ascent phase
   transcription, then returns the existing suite launch-tuning product with explicit Dymos phase
@@ -236,9 +238,10 @@ Implemented slice:
 Definition of done:
 
 - `astro launch --backend rocketpy` runs a direct simulation adapter when `astro[launch]` is
-  installed and a single-stage scenario supplies RocketPy-specific vehicle/motor/flight
-  configuration.
+  installed and a scenario supplies RocketPy-specific vehicle/motor/flight configuration.
 - RocketPy adapter returns the existing `LaunchTrajectory` schema, not RocketPy-native objects.
+- RocketPy multistage suite composition reports reached stage ignition, burnout, separation, sample
+  stage names, and stage-schedule completeness without claiming native RocketPy multi-motor staging.
 - `astro optimize-launch --backend dymos` solves a small ascent optimization example through a
   bounded vertical-ascent Dymos phase model.
 - Dymos/OpenMDAO adapter reports path constraints, optimizer status, convergence diagnostics, and target insertion residuals.

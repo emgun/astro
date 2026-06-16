@@ -17,6 +17,7 @@ from astro_launch.models import (
     LaunchEvent,
     LaunchRocketPyConfig,
     LaunchScenario,
+    LaunchStage,
     LaunchTrajectory,
     LaunchTrajectorySample,
 )
@@ -168,12 +169,104 @@ def _rocketpy_sample_times_s(scenario: LaunchScenario, flight: Any) -> list[floa
     return times_s
 
 
+def _stage_windows(scenario: LaunchScenario) -> list[tuple[LaunchStage, float, float]]:
+    windows: list[tuple[LaunchStage, float, float]] = []
+    start_s = 0.0
+    for stage in scenario.vehicle.stages:
+        end_s = start_s + stage.burn_duration_s
+        windows.append((stage, start_s, end_s))
+        start_s = end_s
+    return windows
+
+
+def _stage_name_at_time(scenario: LaunchScenario, time_s: float) -> str:
+    windows = _stage_windows(scenario)
+    if len(windows) == 1:
+        return windows[0][0].name
+    for index, (_stage, _start_s, end_s) in enumerate(windows):
+        if time_s < end_s - 1.0e-9:
+            return windows[index][0].name
+        if abs(time_s - end_s) <= 1.0e-9:
+            if index + 1 < len(windows):
+                return windows[index + 1][0].name
+            return "payload"
+    return "payload"
+
+
+def _stage_events(
+    scenario: LaunchScenario,
+    config: LaunchRocketPyConfig,
+    insertion_sample: LaunchTrajectorySample,
+) -> list[LaunchEvent]:
+    events: list[LaunchEvent] = []
+    windows = _stage_windows(scenario)
+    if len(windows) == 1:
+        stage = windows[0][0]
+        burnout_s = min(config.motor_burn_time_s, insertion_sample.time_s)
+        events.extend(
+            [
+                LaunchEvent(
+                    event_type="stage_ignition",
+                    epoch=scenario.epoch,
+                    time_s=0.0,
+                    stage_name=stage.name,
+                ),
+                LaunchEvent(
+                    event_type="stage_burnout",
+                    epoch=scenario.epoch + timedelta(seconds=burnout_s),
+                    time_s=burnout_s,
+                    stage_name=stage.name,
+                ),
+            ]
+        )
+    insertion_time_s = insertion_sample.time_s
+    for index, (stage, start_s, end_s) in enumerate(windows):
+        if len(windows) == 1:
+            break
+        if start_s > insertion_time_s + 1.0e-9:
+            break
+        if index == 0 or len(windows) > 1:
+            events.append(
+                LaunchEvent(
+                    event_type="stage_ignition",
+                    epoch=scenario.epoch + timedelta(seconds=start_s),
+                    time_s=start_s,
+                    stage_name=stage.name,
+                )
+            )
+        if end_s <= insertion_time_s + 1.0e-9:
+            events.append(
+                LaunchEvent(
+                    event_type="stage_burnout",
+                    epoch=scenario.epoch + timedelta(seconds=end_s),
+                    time_s=end_s,
+                    stage_name=stage.name,
+                )
+            )
+            events.append(
+                LaunchEvent(
+                    event_type="stage_separation",
+                    epoch=scenario.epoch + timedelta(seconds=end_s),
+                    time_s=end_s,
+                    stage_name=stage.name,
+                )
+            )
+    events.append(
+        LaunchEvent(
+            event_type="insertion",
+            epoch=insertion_sample.epoch,
+            time_s=insertion_sample.time_s,
+            stage_name="payload",
+        )
+    )
+    return events
+
+
 def _trajectory_from_rocketpy_flight(
     scenario: LaunchScenario,
     config: LaunchRocketPyConfig,
     flight: Any,
 ) -> LaunchTrajectory:
-    stage = scenario.vehicle.stages[0]
     samples: list[LaunchTrajectorySample] = []
     previous_speed_m_s: float | None = None
     previous_time_s: float | None = None
@@ -215,7 +308,7 @@ def _trajectory_from_rocketpy_flight(
                 radial_velocity_km_s=vz_m_s / 1000.0,
                 horizontal_velocity_km_s=horizontal_velocity_m_s / 1000.0,
                 mass_kg=mass_kg,
-                stage_name=stage.name,
+                stage_name=_stage_name_at_time(scenario, time_s),
                 dynamic_pressure_pa=_dynamic_pressure_pa(scenario, altitude_m, speed_m_s),
                 acceleration_m_s2=acceleration_m_s2,
                 flight_path_angle_deg=_flight_path_angle_deg(vz_m_s, horizontal_velocity_m_s),
@@ -230,31 +323,14 @@ def _trajectory_from_rocketpy_flight(
         radial_velocity_km_s=insertion_sample.radial_velocity_km_s,
         horizontal_velocity_km_s=insertion_sample.horizontal_velocity_km_s,
     )
-    events = [
-        LaunchEvent(
-            event_type="stage_ignition",
-            epoch=scenario.epoch,
-            time_s=0.0,
-            stage_name=stage.name,
-        ),
-        LaunchEvent(
-            event_type="stage_burnout",
-            epoch=scenario.epoch + timedelta(seconds=config.motor_burn_time_s),
-            time_s=config.motor_burn_time_s,
-            stage_name=stage.name,
-        ),
-        LaunchEvent(
-            event_type="insertion",
-            epoch=insertion_sample.epoch,
-            time_s=insertion_sample.time_s,
-            stage_name="payload",
-        ),
-    ]
+    events = _stage_events(scenario, config, insertion_sample)
     target_miss = {
         "altitude_miss_km": insertion_sample.altitude_km - scenario.target_orbit.altitude_km,
         "velocity_miss_km_s": insertion_sample.velocity_km_s
         - _circular_velocity_km_s(scenario.target_orbit.altitude_km),
     }
+    is_multistage = len(scenario.vehicle.stages) > 1
+    stage_schedule_duration_s = _stage_windows(scenario)[-1][2]
     return LaunchTrajectory(
         scenario_id=scenario.scenario_id,
         samples=samples,
@@ -263,13 +339,27 @@ def _trajectory_from_rocketpy_flight(
         target_miss=target_miss,
         backend="rocketpy_direct",
         metadata={
-            "model": "rocketpy_single_stage_solid",
+            "model": (
+                "rocketpy_configured_multistage_composition"
+                if is_multistage
+                else "rocketpy_single_stage_solid"
+            ),
             "integrator": "rocketpy",
             "sample_step_s": scenario.propagation.step_s,
             "rocketpy_solution_end_s": sample_times_s[-1],
             "rail_length_m": config.rail_length_m,
             "inclination_deg": config.inclination_deg,
             "heading_deg": config.heading_deg,
+            "rocketpy_stage_count": len(scenario.vehicle.stages),
+            "rocketpy_stage_schedule_duration_s": stage_schedule_duration_s,
+            "rocketpy_stage_schedule_complete": (
+                sample_times_s[-1] >= stage_schedule_duration_s - 1.0e-9
+            ),
+            "rocketpy_composition": (
+                "single_flight_suite_stage_schedule"
+                if is_multistage
+                else "single_stage_direct_flight"
+            ),
         },
     )
 
@@ -279,13 +369,6 @@ def run_rocketpy_flight(
     runtime: RocketPyRuntime,
     config: LaunchRocketPyConfig,
 ) -> LaunchTrajectory:
-    if len(scenario.vehicle.stages) != 1:
-        raise UnsupportedBackendError(
-            "RocketPy direct launch simulation currently supports single-stage "
-            "configured solid rockets; use --backend local for aggregate multistage "
-            "scenarios until multistage RocketPy composition is validated."
-        )
-
     environment = _build_environment(scenario, runtime)
     motor = _build_solid_motor(config, runtime)
     rocket = _build_rocket(config, runtime, motor)
