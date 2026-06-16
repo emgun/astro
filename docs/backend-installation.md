@@ -42,9 +42,9 @@ The Orekit propagation adapter currently supports suite `two_body` scenarios thr
 `J2OnlyPerturbation`, and suite `orekit_high_fidelity` scenarios through the same numerical
 propagation expansion path. Atmospheric drag is implemented with Orekit `DragForce`,
 `SimpleExponentialAtmosphere`, and `IsotropicDrag`. Solar radiation pressure is implemented with
-Orekit `SolarRadiationPressure` and `IsotropicRadiationSingleCoefficient`. The third-body gravity
-flag is schema-supported but fails with explicit unsupported-feature diagnostics until that Orekit
-force model is implemented. Native Orekit OD remains a separate roadmap item.
+Orekit `SolarRadiationPressure` and `IsotropicRadiationSingleCoefficient`. Third-body gravity is
+implemented with Orekit `ThirdBodyAttraction` for the Sun and Moon. Native Orekit OD remains a
+separate roadmap item.
 
 ## Launch Backends
 

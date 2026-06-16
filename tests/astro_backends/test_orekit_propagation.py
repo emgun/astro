@@ -160,27 +160,27 @@ def test_propagate_orekit_high_fidelity_srp_adds_srp_force_with_fake_runtime() -
     assert trajectory.metadata["unsupported_force_model_flags"] == []
 
 
-@pytest.mark.parametrize(
-    "force_model_update",
-    [
-        {"third_body_gravity": True},
-    ],
-)
-def test_propagate_orekit_reports_unsupported_high_fidelity_flags(
-    force_model_update: dict[str, bool],
-) -> None:
+def test_propagate_orekit_high_fidelity_third_body_adds_sun_and_moon_with_fake_runtime() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
         update={
             "force_model": ForceModelConfig(
                 gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
-                **force_model_update,
+                third_body_gravity=True,
             )
         }
     )
-    flag_name = next(iter(force_model_update))
 
-    with pytest.raises(UnsupportedBackendError, match=flag_name):
-        propagate_orekit(scenario, runtime_loader=_fake_runtime)
+    trajectory = propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.backend == "orekit"
+    assert trajectory.metadata["propagator"] == "NumericalPropagator"
+    assert trajectory.metadata["force_models"] == [
+        "J2OnlyPerturbation",
+        "ThirdBodyAttraction(Sun)",
+        "ThirdBodyAttraction(Moon)",
+    ]
+    assert trajectory.metadata["third_body_gravity_bodies"] == ["Sun", "Moon"]
+    assert trajectory.metadata["unsupported_force_model_flags"] == []
 
 
 @pytest.mark.orekit_live
@@ -413,6 +413,15 @@ class _FakeCelestialBodyFactory:
     def getSun() -> str:
         return "Sun"
 
+    @staticmethod
+    def getMoon() -> str:
+        return "Moon"
+
+
+class _FakeThirdBodyAttraction:
+    def __init__(self, body: str) -> None:
+        self.body = body
+
 
 class _FakeIsotropicRadiationSingleCoefficient:
     def __init__(self, cross_section: float, reflectivity_coefficient: float) -> None:
@@ -499,6 +508,7 @@ def _fake_runtime() -> OrekitRuntime:
         numerical_propagator=_FakeNumericalPropagator,
         dormand_prince_853_integrator=_FakeDormandPrince853Integrator,
         j2_only_perturbation=_FakeJ2OnlyPerturbation,
+        third_body_attraction=_FakeThirdBodyAttraction,
         one_axis_ellipsoid=_FakeOneAxisEllipsoid,
         simple_exponential_atmosphere=_FakeSimpleExponentialAtmosphere,
         drag_force=_FakeDragForce,

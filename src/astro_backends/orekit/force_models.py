@@ -78,3 +78,18 @@ def build_solar_radiation_pressure_force_model(
             "srp_reflectivity_coefficient": scenario.spacecraft.reflectivity_coefficient,
         },
     )
+
+
+def build_third_body_gravity_force_models(runtime: OrekitRuntime) -> tuple[OrekitForceModel, ...]:
+    bodies = (
+        ("Sun", runtime.celestial_body_factory.getSun()),
+        ("Moon", runtime.celestial_body_factory.getMoon()),
+    )
+    return tuple(
+        OrekitForceModel(
+            model=runtime.third_body_attraction(body),
+            name=f"ThirdBodyAttraction({name})",
+            metadata={},
+        )
+        for name, body in bodies
+    )

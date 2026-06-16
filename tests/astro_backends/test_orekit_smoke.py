@@ -53,6 +53,7 @@ def _fake_runtime_modules(
     numerical_module.NumericalPropagator = object()
     gravity_module = ModuleType("org.orekit.forces.gravity")
     gravity_module.J2OnlyPerturbation = object()
+    gravity_module.ThirdBodyAttraction = object()
     bodies_module = ModuleType("org.orekit.bodies")
     bodies_module.OneAxisEllipsoid = object()
     bodies_module.CelestialBodyFactory = object()

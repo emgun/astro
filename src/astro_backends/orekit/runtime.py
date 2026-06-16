@@ -39,6 +39,7 @@ class OrekitRuntime:
     numerical_propagator: Any
     dormand_prince_853_integrator: Any
     j2_only_perturbation: Any
+    third_body_attraction: Any
     one_axis_ellipsoid: Any
     simple_exponential_atmosphere: Any
     drag_force: Any
@@ -150,6 +151,7 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         numerical_propagator=numerical_module.NumericalPropagator,
         dormand_prince_853_integrator=ode_module.DormandPrince853Integrator,
         j2_only_perturbation=gravity_module.J2OnlyPerturbation,
+        third_body_attraction=gravity_module.ThirdBodyAttraction,
         one_axis_ellipsoid=bodies_module.OneAxisEllipsoid,
         simple_exponential_atmosphere=atmosphere_module.SimpleExponentialAtmosphere,
         drag_force=drag_module.DragForce,

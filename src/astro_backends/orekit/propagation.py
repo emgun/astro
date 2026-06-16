@@ -17,6 +17,7 @@ from astro_backends.orekit.force_models import (
     build_atmospheric_drag_force_model,
     build_earth_shape,
     build_solar_radiation_pressure_force_model,
+    build_third_body_gravity_force_models,
 )
 from astro_backends.orekit.runtime import OrekitRuntime, load_orekit_runtime
 from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
@@ -49,16 +50,6 @@ class _OrekitPropagatorConfig:
 
 def _validate_orekit_scenario(scenario: Scenario) -> None:
     validate_orekit_state_support(scenario.initial_state)
-    unsupported_flags = tuple(
-        flag
-        for flag in scenario.force_model.enabled_high_fidelity_flags()
-        if flag not in {"atmospheric_drag", "solar_radiation_pressure"}
-    )
-    if unsupported_flags:
-        raise UnsupportedBackendError(
-            "Orekit propagation does not yet support high-fidelity force model flags: "
-            f"{', '.join(unsupported_flags)}"
-        )
     if scenario.force_model.gravity not in _SUPPORTED_OREKIT_GRAVITY_MODELS:
         raise UnsupportedBackendError(
             "Orekit propagation supports two_body, j2, and orekit_high_fidelity gravity"
@@ -151,6 +142,15 @@ def _build_j2_numerical_propagator(
         propagator.addForceModel(srp_force_model.model)
         force_model_names.append(srp_force_model.name)
         force_model_metadata.update(srp_force_model.metadata)
+    if scenario.force_model.third_body_gravity:
+        third_body_force_models = build_third_body_gravity_force_models(runtime)
+        for third_body_force_model in third_body_force_models:
+            propagator.addForceModel(third_body_force_model.model)
+            force_model_names.append(third_body_force_model.name)
+        force_model_metadata["third_body_gravity_bodies"] = [
+            "Sun",
+            "Moon",
+        ]
 
     return _OrekitPropagatorConfig(
         propagator=propagator,

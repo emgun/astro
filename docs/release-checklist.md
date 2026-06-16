@@ -34,6 +34,7 @@ Run when the matching runtime is expected to be present:
 - [ ] `astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend orekit --output /tmp/astro-orekit-high-fidelity.json`
 - [ ] `astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --output /tmp/astro-orekit-drag.json`
 - [ ] `astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output /tmp/astro-orekit-srp.json`
+- [ ] `astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output /tmp/astro-orekit-third-body.json`
 - [ ] `astro rocketpy-smoke`
 - [ ] `astro dymos-smoke`
 - [ ] `astro tudat-smoke`
