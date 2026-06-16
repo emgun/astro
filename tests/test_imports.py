@@ -47,6 +47,7 @@ def test_packages_import() -> None:
     expected_od_exports = {
         "azimuth_deg",
         "declination_deg",
+        "doppler_hz",
         "elevation_deg",
         "estimate_initial_state",
         "generate_synthetic_measurements",

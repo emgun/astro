@@ -75,6 +75,65 @@ def test_load_measurements_round_trips_synth_measurement_payload(tmp_path: Path)
     assert loaded == measurements
 
 
+def test_load_measurements_round_trips_doppler_json_and_csv(tmp_path: Path) -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_doppler.yaml"))
+    measurements = generate_synthetic_measurements(scenario, propagate_local(scenario))
+    json_path = tmp_path / "doppler.json"
+    csv_path = tmp_path / "doppler.csv"
+    json_path.write_text(
+        json.dumps(
+            {
+                "scenario_id": scenario.scenario_id,
+                "measurements": [record.model_dump(mode="json") for record in measurements],
+            }
+        ),
+        encoding="utf-8",
+    )
+    fieldnames = [
+        "scenario_id",
+        "measurement_type",
+        "epoch",
+        "observer",
+        "observed_object",
+        "value",
+        "sigma",
+        "units",
+        "metadata_json",
+    ]
+    with csv_path.open("w", encoding="utf-8", newline="") as measurement_file:
+        writer = csv.DictWriter(measurement_file, fieldnames=fieldnames)
+        writer.writeheader()
+        for record in measurements:
+            payload = record.model_dump(mode="json")
+            writer.writerow(
+                {
+                    "scenario_id": scenario.scenario_id,
+                    "measurement_type": payload["measurement_type"],
+                    "epoch": payload["epoch"],
+                    "observer": payload["observer"],
+                    "observed_object": payload["observed_object"],
+                    "value": payload["value"],
+                    "sigma": payload["sigma"],
+                    "units": payload["units"],
+                    "metadata_json": json.dumps(payload["metadata"]),
+                }
+            )
+
+    json_loaded = load_measurements(json_path, expected_scenario_id=scenario.scenario_id)
+    csv_loaded = load_measurements(csv_path, expected_scenario_id=scenario.scenario_id)
+
+    assert {record.measurement_type for record in json_loaded} == {
+        MeasurementType.RANGE,
+        MeasurementType.DOPPLER,
+    }
+    assert {
+        record.units
+        for record in json_loaded
+        if record.measurement_type is MeasurementType.DOPPLER
+    } == {"Hz"}
+    assert csv_loaded == json_loaded
+
+
 def test_load_measurements_reads_csv_records(tmp_path: Path) -> None:
     scenario = _observable_scenario()
     path = tmp_path / "measurements.csv"
@@ -328,6 +387,24 @@ def test_dump_measurements_tdm_round_trips_angle_measurements(tmp_path: Path) ->
     assert [(record.measurement_type, record.value, record.sigma) for record in loaded] == [
         (record.measurement_type, record.value, record.sigma) for record in records
     ]
+
+
+def test_dump_measurements_tdm_rejects_hz_doppler_until_ccsds_mapping_exists() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    records = [
+        MeasurementRecord(
+            measurement_type=MeasurementType.DOPPLER,
+            epoch=scenario.initial_state.epoch,
+            observer="equator-eci",
+            observed_object=scenario.spacecraft.name,
+            value=-12.5,
+            sigma=0.05,
+            units="Hz",
+        )
+    ]
+
+    with pytest.raises(InvalidMeasurementFileError, match="doppler"):
+        dump_measurements_tdm(scenario.scenario_id, records)
 
 
 def test_load_measurements_rejects_csv_scenario_mismatch(tmp_path: Path) -> None:

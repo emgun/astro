@@ -20,7 +20,7 @@ from astro_core.models import (
 )
 from astro_dynamics.local import propagate_local
 from astro_od.estimation import estimate_initial_state, residual_vector
-from astro_od.measurements import generate_synthetic_measurements
+from astro_od.measurements import doppler_hz, generate_synthetic_measurements, range_rate_km_s
 
 
 def _observable_scenario() -> Scenario:
@@ -146,6 +146,30 @@ def test_residual_vector_wraps_azimuth_across_zero_degrees() -> None:
     residuals = residual_vector(state_vector, scenario, [measurement], _single_sample_propagator)
 
     assert residuals.tolist() == pytest.approx([1.0])
+
+
+def test_residual_vector_supports_doppler_hz() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    state = scenario.initial_state.cartesian
+    state_vector = np.concatenate([state.position_array(), state.velocity_array()])
+    station_position = scenario.ground_stations[0].position_array(scenario.initial_state.epoch)
+    predicted = doppler_hz(
+        range_rate_km_s(state.position_array(), state.velocity_array(), station_position),
+        scenario.measurements.doppler_transmit_frequency_hz,
+    )
+    measurement = MeasurementRecord(
+        measurement_type=MeasurementType.DOPPLER,
+        epoch=scenario.initial_state.epoch,
+        observer="equator-eci",
+        observed_object=scenario.spacecraft.name,
+        value=predicted - 0.2,
+        sigma=0.1,
+        units="Hz",
+    )
+
+    residuals = residual_vector(state_vector, scenario, [measurement], _single_sample_propagator)
+
+    assert residuals.tolist() == pytest.approx([2.0])
 
 
 def test_estimate_initial_state_requires_measurements() -> None:

@@ -4,7 +4,7 @@ import pytest
 
 from astro_core.errors import InvalidScenarioError
 from astro_core.io import load_scenario, load_trajectory
-from astro_core.models import ForceModelName
+from astro_core.models import ForceModelName, MeasurementType
 from astro_dynamics.local import propagate_local
 
 
@@ -31,6 +31,15 @@ def test_load_geodetic_eop_example_scenario() -> None:
     assert scenario.scenario_id == "leo-geodetic-eop-topocentric"
     assert scenario.earth_orientation.source == "example-fixed-eop"
     assert scenario.earth_orientation.ut1_minus_utc_s == 0.12
+
+
+def test_load_doppler_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_doppler.yaml"))
+
+    assert scenario.scenario_id == "leo-doppler"
+    assert scenario.measurements.types == (MeasurementType.RANGE, MeasurementType.DOPPLER)
+    assert scenario.measurements.doppler_transmit_frequency_hz == 8.4e9
+    assert scenario.measurements.noise.doppler_sigma_hz == 0.05
 
 
 def test_load_velocity_aligned_burn_example_scenario() -> None:

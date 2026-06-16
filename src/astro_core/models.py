@@ -106,6 +106,7 @@ class ForceModelName(StrEnum):
 class MeasurementType(StrEnum):
     RANGE = "range"
     RANGE_RATE = "range_rate"
+    DOPPLER = "doppler"
     RIGHT_ASCENSION = "right_ascension"
     DECLINATION = "declination"
     AZIMUTH = "azimuth"
@@ -412,10 +413,17 @@ def _greenwich_sidereal_angle_rad(epoch: datetime, *, ut1_minus_utc_s: float = 0
 class MeasurementNoise(AstroModel):
     range_sigma_km: FiniteFloat = Field(gt=0.0, default=0.01)
     range_rate_sigma_km_s: FiniteFloat = Field(gt=0.0, default=1.0e-5)
+    doppler_sigma_hz: FiniteFloat = Field(gt=0.0, default=0.1)
     angle_sigma_deg: FiniteFloat = Field(gt=0.0, default=0.001)
     seed: int = 42
 
-    @field_validator("range_sigma_km", "range_rate_sigma_km_s", "angle_sigma_deg", mode="before")
+    @field_validator(
+        "range_sigma_km",
+        "range_rate_sigma_km_s",
+        "doppler_sigma_hz",
+        "angle_sigma_deg",
+        mode="before",
+    )
     @classmethod
     def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
         return _numeric_scalar_input_must_be_number(value, "Measurement noise scalar")
@@ -432,12 +440,13 @@ class MeasurementConfig(AstroModel):
         min_length=1,
     )
     cadence_s: FiniteFloat = Field(gt=0.0, default=60.0)
+    doppler_transmit_frequency_hz: FiniteFloat = Field(gt=0.0, default=8.4e9)
     noise: MeasurementNoise = Field(default_factory=MeasurementNoise)
 
-    @field_validator("cadence_s", mode="before")
+    @field_validator("cadence_s", "doppler_transmit_frequency_hz", mode="before")
     @classmethod
     def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
-        return _numeric_scalar_input_must_be_number(value, "Measurement cadence")
+        return _numeric_scalar_input_must_be_number(value, "Measurement config scalar")
 
 
 class MeasurementRecord(AstroModel):
@@ -447,7 +456,7 @@ class MeasurementRecord(AstroModel):
     observed_object: str
     value: FiniteFloat
     sigma: FiniteFloat = Field(gt=0.0)
-    units: Literal["km", "km/s", "deg"]
+    units: Literal["km", "km/s", "Hz", "deg"]
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("epoch", mode="before")
@@ -477,6 +486,7 @@ class MeasurementRecord(AstroModel):
         expected_units = {
             MeasurementType.RANGE: "km",
             MeasurementType.RANGE_RATE: "km/s",
+            MeasurementType.DOPPLER: "Hz",
             MeasurementType.RIGHT_ASCENSION: "deg",
             MeasurementType.DECLINATION: "deg",
             MeasurementType.AZIMUTH: "deg",

@@ -21,6 +21,7 @@ from astro_dynamics.backends import propagate_with_backend
 from astro_od.measurements import (
     azimuth_deg,
     declination_deg,
+    doppler_hz,
     elevation_deg,
     range_km,
     range_rate_km_s,
@@ -133,6 +134,13 @@ def _predicted_measurement(
         return range_km(spacecraft_position, station_position)
     if measurement.measurement_type is MeasurementType.RANGE_RATE:
         return range_rate_km_s(spacecraft_position, spacecraft_velocity, station_position)
+    if measurement.measurement_type is MeasurementType.DOPPLER:
+        range_rate_truth = range_rate_km_s(
+            spacecraft_position,
+            spacecraft_velocity,
+            station_position,
+        )
+        return doppler_hz(range_rate_truth, scenario.measurements.doppler_transmit_frequency_hz)
     if measurement.measurement_type is MeasurementType.RIGHT_ASCENSION:
         return right_ascension_deg(spacecraft_position, station_position)
     if measurement.measurement_type is MeasurementType.DECLINATION:

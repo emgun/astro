@@ -603,7 +603,25 @@ def test_measurement_noise_and_config_reject_non_finite_scalars() -> None:
         MeasurementNoise(range_rate_sigma_km_s=float("nan"))
 
     with pytest.raises(ValidationError, match="finite"):
+        MeasurementNoise(doppler_sigma_hz=float("nan"))
+
+    with pytest.raises(ValidationError, match="finite"):
         MeasurementConfig(cadence_s=float("inf"))
+
+    with pytest.raises(ValidationError, match="finite"):
+        MeasurementConfig(doppler_transmit_frequency_hz=float("inf"))
+
+
+def test_measurement_config_accepts_doppler_frequency_and_noise() -> None:
+    measurement_config = MeasurementConfig(
+        types=(MeasurementType.DOPPLER,),
+        doppler_transmit_frequency_hz=8.4e9,
+        noise=MeasurementNoise(doppler_sigma_hz=0.05),
+    )
+
+    assert measurement_config.types == (MeasurementType.DOPPLER,)
+    assert measurement_config.doppler_transmit_frequency_hz == 8.4e9
+    assert measurement_config.noise.doppler_sigma_hz == 0.05
 
 
 def test_measurement_config_requires_non_empty_types() -> None:
@@ -636,6 +654,7 @@ def test_measurement_record_rejects_non_finite_value_or_sigma() -> None:
     [
         (MeasurementType.RANGE, "km/s"),
         (MeasurementType.RANGE_RATE, "km"),
+        (MeasurementType.DOPPLER, "km/s"),
     ],
 )
 def test_measurement_record_rejects_mismatched_type_and_units(
@@ -643,6 +662,18 @@ def test_measurement_record_rejects_mismatched_type_and_units(
 ) -> None:
     with pytest.raises(ValidationError, match="units"):
         make_measurement_record(measurement_type=measurement_type, units=units)
+
+
+def test_measurement_record_accepts_doppler_hz_units() -> None:
+    record = make_measurement_record(
+        measurement_type=MeasurementType.DOPPLER,
+        value=-120.5,
+        sigma=0.05,
+        units="Hz",
+    )
+
+    assert record.measurement_type is MeasurementType.DOPPLER
+    assert record.units == "Hz"
 
 
 def test_estimate_result_rejects_invalid_covariance_shape_and_negative_iterations() -> None:

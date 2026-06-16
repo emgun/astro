@@ -18,7 +18,8 @@ The current implementation slice covers:
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
   local ascent/orbit propagations, batch ranking, and report-to-report comparison.
-- Synthetic range, range-rate, inertial right ascension, and declination measurement generation.
+- Synthetic range, range-rate, one-way Doppler, inertial right ascension, declination, azimuth, and
+  elevation measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
   measurements, synthetic OD, measurement-file OD ingest/export, and research propagation.
@@ -133,6 +134,7 @@ astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backen
 astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output topocentric_measurements.json
 astro synth-measurements examples/scenarios/leo_geodetic_topocentric.yaml --backend local --output geodetic_topocentric_measurements.json
 astro synth-measurements examples/scenarios/leo_geodetic_eop_topocentric.yaml --backend local --output geodetic_eop_topocentric_measurements.json
+astro synth-measurements examples/scenarios/leo_doppler.yaml --backend local --output doppler_measurements.json
 astro export-measurements measurements.json --format csv --output measurements.csv
 astro export-measurements measurements.json --format tdm --output measurements.tdm
 astro estimate examples/scenarios/leo_two_body.yaml --backend local --output estimate.json
@@ -224,8 +226,10 @@ special launch-aware propagation path.
 `--backend orekit`. The explicit ingest workflow loads a scenario plus a JSON, CSV, or CCSDS
 Tracking Data Message (TDM) measurement file, then estimates from the caller-provided station
 geometry and measurement records without adding demo geometry. JSON and CSV can carry the suite's
-range, range-rate, inertial right-ascension/declination, and local-horizon azimuth/elevation
-records. Angle records use degrees. Ground stations can be supplied either as fixed
+range, range-rate, one-way Doppler in Hz, inertial right-ascension/declination, and local-horizon
+azimuth/elevation records. Doppler uses the scenario's `doppler_transmit_frequency_hz` to convert
+line-of-sight range rate into a received-frequency shift; this is a first one-way radiometric model,
+not yet a two-way or three-way DSN observable. Angle records use degrees. Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
 epoch using a deterministic UTC sidereal-time model by default. Scenarios may also provide
@@ -238,7 +242,8 @@ match the output of `astro synth-measurements`; CSV and TDM inputs are auto-dete
 
 `astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
 JSON and CSV preserve all supported suite measurement types. TDM export supports range,
-range-rate, right-ascension/declination, and azimuth/elevation records. The example files under
+range-rate, right-ascension/declination, and azimuth/elevation records; Hz Doppler remains JSON/CSV-only
+until a precise CCSDS Doppler count/frequency convention is added. The example files under
 `examples/measurements/` are generated from `leo_two_station_od.yaml` and cover all three
 range/range-rate ingest/export formats.
 
@@ -257,13 +262,14 @@ scenario_id,measurement_type,epoch,observer,observed_object,value,sigma,units
 ```
 
 The optional `metadata_json` column can carry a JSON object for row-level metadata. Valid units are
-`km`, `km/s`, and `deg`, depending on measurement type. The
+`km`, `km/s`, `Hz`, and `deg`, depending on measurement type. The
 `leo_two_station_od.yaml` example includes two stations because the one-station propagation example
 is intentionally under-observed for six-state OD.
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,
 `PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped
-to range-rate measurements in `km/s`, and `ANGLE_1`/`ANGLE_2` records in `deg`. Angle segments use
+to range-rate measurements in `km/s`, and `ANGLE_1`/`ANGLE_2` records in `deg`. Suite Doppler
+records in `Hz` are deliberately not exported to TDM yet. Angle segments use
 `ANGLE_TYPE = RADEC` for right ascension/declination and `ANGLE_TYPE = AZEL` for
 azimuth/elevation. TDM does not provide the suite's scenario identifier or estimator sigmas
 directly, so an optional segment-level `SCENARIO_ID` extension is checked when present, and the

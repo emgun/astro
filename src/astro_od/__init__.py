@@ -3,6 +3,7 @@ from astro_od.io import load_measurements
 from astro_od.measurements import (
     azimuth_deg,
     declination_deg,
+    doppler_hz,
     elevation_deg,
     generate_synthetic_measurements,
     range_km,
@@ -13,6 +14,7 @@ from astro_od.measurements import (
 __all__ = [
     "azimuth_deg",
     "declination_deg",
+    "doppler_hz",
     "elevation_deg",
     "estimate_initial_state",
     "generate_synthetic_measurements",

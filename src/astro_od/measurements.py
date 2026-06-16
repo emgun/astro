@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
@@ -8,7 +8,8 @@ from numpy.typing import ArrayLike, NDArray
 from astro_core.models import MeasurementRecord, MeasurementType, Scenario, Trajectory
 
 FloatArray = NDArray[np.float64]
-MeasurementUnits = Literal["km", "km/s", "deg"]
+MeasurementUnits = Literal["km", "km/s", "Hz", "deg"]
+SPEED_OF_LIGHT_KM_S = 299792.458
 _ECI_NORTH_POLE = np.array([0.0, 0.0, 1.0], dtype=np.float64)
 _ECI_Y_AXIS = np.array([0.0, 1.0, 0.0], dtype=np.float64)
 
@@ -42,6 +43,10 @@ def range_rate_km_s(
 
     line_of_sight = relative_position / distance
     return float(np.dot(spacecraft_velocity, line_of_sight))
+
+
+def doppler_hz(range_rate_truth_km_s: float, transmit_frequency_hz: float) -> float:
+    return float(-range_rate_truth_km_s / SPEED_OF_LIGHT_KM_S * transmit_frequency_hz)
 
 
 def _relative_line_of_sight(
@@ -125,7 +130,7 @@ def generate_synthetic_measurements(
         for station in scenario.ground_stations:
             station_position = station.position_array(sample.epoch, scenario.earth_orientation)
             for measurement_type in scenario.measurements.types:
-                truth, sigma, units = _measurement_geometry(
+                truth, sigma, units, metadata = _measurement_geometry(
                     measurement_type,
                     spacecraft_position,
                     spacecraft_velocity,
@@ -141,7 +146,7 @@ def generate_synthetic_measurements(
                         value=float(truth + rng.normal(0.0, sigma)),
                         sigma=sigma,
                         units=units,
-                        metadata={"truth": truth},
+                        metadata={"truth": truth} | metadata,
                     )
                 )
 
@@ -154,12 +159,13 @@ def _measurement_geometry(
     spacecraft_velocity_km_s: FloatArray,
     station_position_km: FloatArray,
     scenario: Scenario,
-) -> tuple[float, float, MeasurementUnits]:
+) -> tuple[float, float, MeasurementUnits, dict[str, Any]]:
     if measurement_type is MeasurementType.RANGE:
         return (
             range_km(spacecraft_position_km, station_position_km),
             scenario.measurements.noise.range_sigma_km,
             "km",
+            {},
         )
     if measurement_type is MeasurementType.RANGE_RATE:
         return (
@@ -170,29 +176,51 @@ def _measurement_geometry(
             ),
             scenario.measurements.noise.range_rate_sigma_km_s,
             "km/s",
+            {},
+        )
+    if measurement_type is MeasurementType.DOPPLER:
+        range_rate_truth = range_rate_km_s(
+            spacecraft_position_km,
+            spacecraft_velocity_km_s,
+            station_position_km,
+        )
+        transmit_frequency_hz = scenario.measurements.doppler_transmit_frequency_hz
+        return (
+            doppler_hz(range_rate_truth, transmit_frequency_hz),
+            scenario.measurements.noise.doppler_sigma_hz,
+            "Hz",
+            {
+                "range_rate_truth_km_s": range_rate_truth,
+                "doppler_transmit_frequency_hz": transmit_frequency_hz,
+                "doppler_model": "one_way_range_rate",
+            },
         )
     if measurement_type is MeasurementType.RIGHT_ASCENSION:
         return (
             right_ascension_deg(spacecraft_position_km, station_position_km),
             scenario.measurements.noise.angle_sigma_deg,
             "deg",
+            {},
         )
     if measurement_type is MeasurementType.DECLINATION:
         return (
             declination_deg(spacecraft_position_km, station_position_km),
             scenario.measurements.noise.angle_sigma_deg,
             "deg",
+            {},
         )
     if measurement_type is MeasurementType.AZIMUTH:
         return (
             azimuth_deg(spacecraft_position_km, station_position_km),
             scenario.measurements.noise.angle_sigma_deg,
             "deg",
+            {},
         )
     if measurement_type is MeasurementType.ELEVATION:
         return (
             elevation_deg(spacecraft_position_km, station_position_km),
             scenario.measurements.noise.angle_sigma_deg,
             "deg",
+            {},
         )
     raise ValueError(f"Unsupported measurement type: {measurement_type}")

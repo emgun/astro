@@ -3,12 +3,14 @@ from datetime import timedelta
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 import astro_od.measurements as od_measurements
 from astro_core.io import load_scenario
 from astro_core.models import EarthOrientationConfig, Frame, GroundStation, MeasurementType
 from astro_dynamics.local import propagate_local
 from astro_od.measurements import (
+    doppler_hz,
     generate_synthetic_measurements,
     range_km,
     range_rate_km_s,
@@ -28,6 +30,13 @@ def test_range_rate_km_s_returns_line_of_sight_velocity() -> None:
     station_position = np.array([6378.0, 0.0, 0.0])
 
     assert range_rate_km_s(spacecraft_position, spacecraft_velocity, station_position) == 0.0
+
+
+def test_doppler_hz_returns_one_way_frequency_shift() -> None:
+    range_rate = 1.0
+    transmit_frequency_hz = 8.4e9
+
+    assert doppler_hz(range_rate, transmit_frequency_hz) == pytest.approx(-28019.383983282765)
 
 
 def test_inertial_angle_measurements_return_line_of_sight_ra_dec() -> None:
@@ -106,6 +115,30 @@ def test_generate_synthetic_measurements_supports_inertial_angles() -> None:
         assert record.units == "deg"
         assert record.sigma == angle_scenario.measurements.noise.angle_sigma_deg
         assert isinstance(record.metadata["truth"], float)
+
+
+def test_generate_synthetic_measurements_supports_one_way_doppler() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    doppler_measurements = scenario.measurements.model_copy(
+        update={
+            "types": (MeasurementType.DOPPLER,),
+            "doppler_transmit_frequency_hz": 8.4e9,
+        }
+    )
+    doppler_scenario = scenario.model_copy(update={"measurements": doppler_measurements})
+    trajectory = propagate_local(doppler_scenario)
+
+    records = generate_synthetic_measurements(doppler_scenario, trajectory)
+
+    assert len(records) == 11
+    assert {record.measurement_type for record in records} == {MeasurementType.DOPPLER}
+    assert {record.units for record in records} == {"Hz"}
+    assert all(
+        record.sigma == doppler_scenario.measurements.noise.doppler_sigma_hz
+        for record in records
+    )
+    assert all(record.metadata["doppler_transmit_frequency_hz"] == 8.4e9 for record in records)
+    assert all(record.metadata["range_rate_truth_km_s"] is not None for record in records)
 
 
 def test_generate_synthetic_measurements_supports_topocentric_angles() -> None:
