@@ -21,10 +21,30 @@ TDM_EXPORT_MEASUREMENT_TYPES = frozenset(
     {
         MeasurementType.RANGE,
         MeasurementType.RANGE_RATE,
+        MeasurementType.TWO_WAY_RANGE,
+        MeasurementType.TWO_WAY_RANGE_RATE,
+        MeasurementType.THREE_WAY_RANGE,
+        MeasurementType.THREE_WAY_RANGE_RATE,
         MeasurementType.RIGHT_ASCENSION,
         MeasurementType.DECLINATION,
         MeasurementType.AZIMUTH,
         MeasurementType.ELEVATION,
+    }
+)
+
+RANGE_MEASUREMENT_TYPES = frozenset(
+    {
+        MeasurementType.RANGE,
+        MeasurementType.TWO_WAY_RANGE,
+        MeasurementType.THREE_WAY_RANGE,
+    }
+)
+
+RANGE_RATE_MEASUREMENT_TYPES = frozenset(
+    {
+        MeasurementType.RANGE_RATE,
+        MeasurementType.TWO_WAY_RANGE_RATE,
+        MeasurementType.THREE_WAY_RANGE_RATE,
     }
 )
 
@@ -47,6 +67,10 @@ TDM_ANGLE_TYPE_BY_MEASUREMENT_TYPE = {
 TDM_DATA_KEYWORD_BY_MEASUREMENT_TYPE = {
     MeasurementType.RANGE: "RANGE",
     MeasurementType.RANGE_RATE: "DOPPLER_INSTANTANEOUS",
+    MeasurementType.TWO_WAY_RANGE: "RANGE",
+    MeasurementType.TWO_WAY_RANGE_RATE: "DOPPLER_INSTANTANEOUS",
+    MeasurementType.THREE_WAY_RANGE: "RANGE",
+    MeasurementType.THREE_WAY_RANGE_RATE: "DOPPLER_INSTANTANEOUS",
     MeasurementType.RIGHT_ASCENSION: "ANGLE_1",
     MeasurementType.DECLINATION: "ANGLE_2",
     MeasurementType.AZIMUTH: "ANGLE_1",
@@ -58,6 +82,15 @@ TDM_ANGLE_MEASUREMENT_TYPE_BY_ANGLE_TYPE_AND_KEYWORD = {
     ("RADEC", "ANGLE_2"): MeasurementType.DECLINATION,
     ("AZEL", "ANGLE_1"): MeasurementType.AZIMUTH,
     ("AZEL", "ANGLE_2"): MeasurementType.ELEVATION,
+}
+
+TDM_RADIOMETRIC_MEASUREMENT_TYPE_BY_LINK_AND_KEYWORD = {
+    ("two_way", "RANGE"): MeasurementType.TWO_WAY_RANGE,
+    ("two_way", "DOPPLER_INSTANTANEOUS"): MeasurementType.TWO_WAY_RANGE_RATE,
+    ("two_way", "DOPPLER_INTEGRATED"): MeasurementType.TWO_WAY_RANGE_RATE,
+    ("three_way", "RANGE"): MeasurementType.THREE_WAY_RANGE,
+    ("three_way", "DOPPLER_INSTANTANEOUS"): MeasurementType.THREE_WAY_RANGE_RATE,
+    ("three_way", "DOPPLER_INTEGRATED"): MeasurementType.THREE_WAY_RANGE_RATE,
 }
 
 CSV_REQUIRED_COLUMNS = frozenset(
@@ -88,6 +121,9 @@ SUPPORTED_TDM_DATA_KEYWORDS = frozenset(
 class MeasurementProduct:
     scenario_id: str
     measurements: list[MeasurementRecord]
+
+
+TdmSegmentKey = tuple[str, str, str | None, str | None, str | None]
 
 
 def load_measurements(
@@ -186,8 +222,9 @@ def dump_measurements_tdm(
             sorted(str(measurement_type) for measurement_type in unsupported_types)
         )
         raise InvalidMeasurementFileError(
-            "TDM export supports only range, range_rate, right_ascension, "
-            "declination, azimuth, and elevation measurements; "
+            "TDM export supports range, range_rate, two_way_range, "
+            "two_way_range_rate, three_way_range, three_way_range_rate, "
+            "right_ascension, declination, azimuth, and elevation measurements; "
             f"unsupported measurement types: {unsupported_text}"
         )
 
@@ -200,24 +237,45 @@ def dump_measurements_tdm(
         observer,
         observed_object,
         angle_type,
+        link_type,
+        transmitter,
     ), segment_records in _measurement_segments(measurements).items():
-        lines.extend(
-            [
-                "META_START",
-                f"SCENARIO_ID = {scenario_id}",
-                "TIME_SYSTEM = UTC",
-                "MODE = SEQUENTIAL",
-                f"PARTICIPANT_1 = {observer}",
-                f"PARTICIPANT_2 = {observed_object}",
-                "PATH = 1,2,1",
-            ]
-        )
+        lines.extend(["META_START", f"SCENARIO_ID = {scenario_id}", "TIME_SYSTEM = UTC"])
+        lines.append("MODE = SEQUENTIAL")
+        if link_type == "three_way":
+            if transmitter is None:
+                raise InvalidMeasurementFileError(
+                    "TDM three-way measurements require metadata transmitter"
+                )
+            lines.extend(
+                [
+                    f"PARTICIPANT_1 = {transmitter}",
+                    f"PARTICIPANT_2 = {observed_object}",
+                    f"PARTICIPANT_3 = {observer}",
+                    "PATH = 1,2,3",
+                    "ASTRO_MEASUREMENT_TYPE = three_way",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    f"PARTICIPANT_1 = {observer}",
+                    f"PARTICIPANT_2 = {observed_object}",
+                    "PATH = 1,2,1",
+                ]
+            )
+            if link_type == "two_way":
+                lines.append("ASTRO_MEASUREMENT_TYPE = two_way")
+
         if angle_type is None:
             lines.append("RANGE_UNITS = km")
-            range_sigma = _common_sigma(segment_records, MeasurementType.RANGE)
+            range_sigma = _common_sigma_for_types(segment_records, RANGE_MEASUREMENT_TYPES)
             if range_sigma is not None:
                 lines.append(f"RANGE_SIGMA_KM = {_format_float(range_sigma)}")
-            range_rate_sigma = _common_sigma(segment_records, MeasurementType.RANGE_RATE)
+            range_rate_sigma = _common_sigma_for_types(
+                segment_records,
+                RANGE_RATE_MEASUREMENT_TYPES,
+            )
             if range_rate_sigma is not None:
                 lines.append(f"RANGE_RATE_SIGMA_KM_S = {_format_float(range_rate_sigma)}")
         else:
@@ -466,16 +524,43 @@ def _csv_metadata(
 
 def _measurement_segments(
     measurements: list[MeasurementRecord],
-) -> dict[tuple[str, str, str | None], list[MeasurementRecord]]:
-    segments: dict[tuple[str, str, str | None], list[MeasurementRecord]] = {}
+) -> dict[TdmSegmentKey, list[MeasurementRecord]]:
+    segments: dict[TdmSegmentKey, list[MeasurementRecord]] = {}
     for record in measurements:
+        link_type = _tdm_link_type(record)
+        transmitter = _tdm_transmitter(record) if link_type == "three_way" else None
         key = (
             record.observer,
             record.observed_object,
             TDM_ANGLE_TYPE_BY_MEASUREMENT_TYPE.get(record.measurement_type),
+            link_type,
+            transmitter,
         )
         segments.setdefault(key, []).append(record)
     return segments
+
+
+def _tdm_link_type(record: MeasurementRecord) -> str | None:
+    if record.measurement_type in {
+        MeasurementType.TWO_WAY_RANGE,
+        MeasurementType.TWO_WAY_RANGE_RATE,
+    }:
+        return "two_way"
+    if record.measurement_type in {
+        MeasurementType.THREE_WAY_RANGE,
+        MeasurementType.THREE_WAY_RANGE_RATE,
+    }:
+        return "three_way"
+    return None
+
+
+def _tdm_transmitter(record: MeasurementRecord) -> str:
+    transmitter = record.metadata.get("transmitter")
+    if not isinstance(transmitter, str) or transmitter.strip() == "":
+        raise InvalidMeasurementFileError(
+            "TDM three-way measurements require metadata transmitter"
+        )
+    return transmitter.strip()
 
 
 def _common_sigma(
@@ -663,7 +748,13 @@ def _tdm_record_from_data_line(
     epoch_text, value_text = _tdm_observable_fields(measurement_path, line_number, raw_value)
     time_system = _required_tdm_metadata(measurement_path, line_number, metadata, "TIME_SYSTEM")
     epoch = _tdm_epoch(measurement_path, line_number, epoch_text, time_system)
-    observer, observed_object = _tdm_observer_and_object(measurement_path, line_number, metadata)
+    link_type = _tdm_link_type_from_metadata(measurement_path, line_number, metadata)
+    observer, observed_object, participant_metadata = _tdm_observer_and_object(
+        measurement_path,
+        line_number,
+        metadata,
+        link_type=link_type,
+    )
 
     try:
         value = float(value_text)
@@ -680,7 +771,13 @@ def _tdm_record_from_data_line(
                 f"TDM file {measurement_path} line {line_number} uses unsupported "
                 f"RANGE_UNITS {range_units!r}; only km is supported"
             )
-        measurement_type = MeasurementType.RANGE
+        measurement_type = _tdm_radiometric_measurement_type(
+            measurement_path,
+            line_number=line_number,
+            link_type=link_type,
+            keyword=keyword,
+            default=MeasurementType.RANGE,
+        )
         units = "km"
         sigma = _tdm_sigma(
             measurement_path,
@@ -691,7 +788,13 @@ def _tdm_record_from_data_line(
         )
         angle_type = None
     elif keyword in {"DOPPLER_INSTANTANEOUS", "DOPPLER_INTEGRATED"}:
-        measurement_type = MeasurementType.RANGE_RATE
+        measurement_type = _tdm_radiometric_measurement_type(
+            measurement_path,
+            line_number=line_number,
+            link_type=link_type,
+            keyword=keyword,
+            default=MeasurementType.RANGE_RATE,
+        )
         units = "km/s"
         sigma = _tdm_sigma(
             measurement_path,
@@ -730,7 +833,9 @@ def _tdm_record_from_data_line(
         "tdm_mode": metadata.get("MODE"),
         "tdm_path": metadata.get("PATH"),
         "tdm_originator": header.get("ORIGINATOR"),
-    }
+    } | participant_metadata
+    if link_type is not None:
+        record_metadata["astro_measurement_type"] = link_type
     if angle_type is not None:
         record_metadata["tdm_angle_type"] = angle_type
 
@@ -775,6 +880,45 @@ def _tdm_angle_measurement_type(
             f"ANGLE_TYPE {angle_type!r} with {keyword}; supported angle types are RADEC and AZEL"
         )
     return measurement_type, normalized_angle_type
+
+
+def _tdm_link_type_from_metadata(
+    measurement_path: Path,
+    line_number: int,
+    metadata: dict[str, str],
+) -> str | None:
+    raw_link_type = metadata.get("ASTRO_MEASUREMENT_TYPE")
+    if raw_link_type is None or raw_link_type.strip() == "":
+        return None
+    link_type = raw_link_type.strip().lower()
+    if link_type not in {"two_way", "three_way"}:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} uses unsupported "
+            f"ASTRO_MEASUREMENT_TYPE {raw_link_type!r}; supported values are two_way and "
+            "three_way"
+        )
+    return link_type
+
+
+def _tdm_radiometric_measurement_type(
+    measurement_path: Path,
+    *,
+    line_number: int,
+    link_type: str | None,
+    keyword: str,
+    default: MeasurementType,
+) -> MeasurementType:
+    if link_type is None:
+        return default
+    measurement_type = TDM_RADIOMETRIC_MEASUREMENT_TYPE_BY_LINK_AND_KEYWORD.get(
+        (link_type, keyword)
+    )
+    if measurement_type is None:
+        raise InvalidMeasurementFileError(
+            f"TDM file {measurement_path} line {line_number} uses unsupported "
+            f"ASTRO_MEASUREMENT_TYPE {link_type!r} with {keyword}"
+        )
+    return measurement_type
 
 
 def _tdm_observable_fields(
@@ -848,9 +992,32 @@ def _tdm_observer_and_object(
     measurement_path: Path,
     line_number: int,
     metadata: dict[str, str],
-) -> tuple[str, str]:
+    *,
+    link_type: str | None,
+) -> tuple[str, str, dict[str, str]]:
     participants = _tdm_participants(metadata)
     path = _tdm_path(metadata.get("PATH"))
+
+    if link_type == "three_way":
+        if path and len(path) >= 3:
+            transmitter_index = path[0]
+            observed_index = path[1]
+            observer_index = path[2]
+        else:
+            transmitter_index = 1
+            observed_index = 2
+            observer_index = 3
+        try:
+            return (
+                participants[observer_index],
+                participants[observed_index],
+                {"transmitter": participants[transmitter_index]},
+            )
+        except KeyError as exc:
+            raise InvalidMeasurementFileError(
+                f"TDM file {measurement_path} line {line_number} is missing PARTICIPANT "
+                f"metadata for PATH-derived participant {exc.args[0]}"
+            ) from exc
 
     if path and len(path) >= 2:
         observer_index = path[0]
@@ -860,7 +1027,7 @@ def _tdm_observer_and_object(
         observed_index = 2
 
     try:
-        return participants[observer_index], participants[observed_index]
+        return participants[observer_index], participants[observed_index], {}
     except KeyError as exc:
         raise InvalidMeasurementFileError(
             f"TDM file {measurement_path} line {line_number} is missing PARTICIPANT "

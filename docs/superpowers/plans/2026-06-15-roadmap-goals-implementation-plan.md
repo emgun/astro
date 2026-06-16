@@ -52,7 +52,8 @@ Still roadmap-level:
 - Live Tudat cross-check environment/body construction.
 - Full IERS finals parsing/precession-nutation reductions, operational DSN light-time/media
   corrections for two-way/three-way radiometrics, and operational CCSDS support beyond current KVN
-  TDM measurement families and OEM ephemeris interchange.
+  TDM measurement families, suite multi-leg radiometric TDM extension, and OEM ephemeris
+  interchange.
 - Richer JAX force models, sensitivities, and differentiable OD workflows.
 
 ## Goal Ledger
@@ -150,8 +151,9 @@ Implemented slice:
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
   checked-in first-order two-way/three-way radiometric synthesis fixture. TDM export deliberately
-  rejects Hz Doppler and explicit two-way/three-way suite records until precise CCSDS Doppler/count
-  and path-mapping conventions are added.
+  rejects Hz Doppler until a precise CCSDS Doppler/count convention is added; explicit two-way and
+  three-way suite records round-trip through TDM with an `ASTRO_MEASUREMENT_TYPE` metadata
+  extension so legacy TDM files are not reinterpreted.
 - Ground stations support fixed `position_eci_km` definitions and WGS-84 geodetic
   `latitude_deg`/`longitude_deg`/`altitude_km` definitions, with geodetic stations rotated into
   inertial measurement geometry at each measurement epoch using a deterministic UTC sidereal-time

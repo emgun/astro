@@ -254,9 +254,10 @@ match the output of `astro synth-measurements`; CSV and TDM inputs are auto-dete
 
 `astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
 JSON and CSV preserve all supported suite measurement types, including two-way and three-way
-radiometric metadata. TDM export supports range, range-rate, right-ascension/declination, and
-azimuth/elevation records; Hz Doppler and explicit two-way/three-way suite records remain
-JSON/CSV-only until precise CCSDS Doppler/count and path mapping conventions are added. The example files under
+radiometric metadata. TDM export supports range, range-rate, explicit two-way/three-way
+range/range-rate through a suite `ASTRO_MEASUREMENT_TYPE` metadata extension,
+right-ascension/declination, and azimuth/elevation records; Hz Doppler remains JSON/CSV-only until
+a precise CCSDS Doppler count/frequency convention is added. The example files under
 `examples/measurements/` are generated from `leo_two_station_od.yaml` and cover all three
 range/range-rate ingest/export formats.
 
@@ -283,7 +284,9 @@ measurement synthesis with explicit uplink/downlink station metadata.
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,
 `PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped
-to range-rate measurements in `km/s`, and `ANGLE_1`/`ANGLE_2` records in `deg`. Suite Doppler
+to range-rate measurements in `km/s`, and `ANGLE_1`/`ANGLE_2` records in `deg`. Segments with
+`ASTRO_MEASUREMENT_TYPE = two_way` or `three_way` preserve the suite's explicit multi-leg
+radiometric types without reinterpreting legacy TDM files that omit the extension. Suite Doppler
 records in `Hz` are deliberately not exported to TDM yet. Angle segments use
 `ANGLE_TYPE = RADEC` for right ascension/declination and `ANGLE_TYPE = AZEL` for
 azimuth/elevation. TDM does not provide the suite's scenario identifier or estimator sigmas

@@ -451,6 +451,71 @@ def test_dump_measurements_tdm_round_trips_angle_measurements(tmp_path: Path) ->
     ]
 
 
+def test_dump_measurements_tdm_round_trips_multi_leg_radiometric_measurements(
+    tmp_path: Path,
+) -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_radiometric_links.yaml"))
+    records = [
+        MeasurementRecord(
+            measurement_type=MeasurementType.TWO_WAY_RANGE,
+            epoch=scenario.initial_state.epoch,
+            observer="uplink-eci",
+            observed_object=scenario.spacecraft.name,
+            value=1243.7274,
+            sigma=0.01,
+            units="km",
+        ),
+        MeasurementRecord(
+            measurement_type=MeasurementType.TWO_WAY_RANGE_RATE,
+            epoch=scenario.initial_state.epoch,
+            observer="uplink-eci",
+            observed_object=scenario.spacecraft.name,
+            value=0.0,
+            sigma=1.0e-5,
+            units="km/s",
+        ),
+        MeasurementRecord(
+            measurement_type=MeasurementType.THREE_WAY_RANGE,
+            epoch=scenario.initial_state.epoch,
+            observer="downlink-eci",
+            observed_object=scenario.spacecraft.name,
+            value=10092.0,
+            sigma=0.01,
+            units="km",
+            metadata={"transmitter": "uplink-eci"},
+        ),
+        MeasurementRecord(
+            measurement_type=MeasurementType.THREE_WAY_RANGE_RATE,
+            epoch=scenario.initial_state.epoch,
+            observer="downlink-eci",
+            observed_object=scenario.spacecraft.name,
+            value=-5.0,
+            sigma=1.0e-5,
+            units="km/s",
+            metadata={"transmitter": "uplink-eci"},
+        ),
+    ]
+
+    exported = dump_measurements_tdm(scenario.scenario_id, records)
+    path = tmp_path / "radiometric.tdm"
+    path.write_text(exported, encoding="utf-8")
+    loaded = load_measurements(path, expected_scenario_id=scenario.scenario_id)
+
+    assert "ASTRO_MEASUREMENT_TYPE = two_way" in exported
+    assert "ASTRO_MEASUREMENT_TYPE = three_way" in exported
+    assert "PATH = 1,2,1" in exported
+    assert "PATH = 1,2,3" in exported
+    assert [record.measurement_type for record in loaded] == [
+        record.measurement_type for record in records
+    ]
+    assert [record.observer for record in loaded] == [record.observer for record in records]
+    assert [record.value for record in loaded] == [record.value for record in records]
+    assert [record.metadata.get("transmitter") for record in loaded[2:]] == [
+        "uplink-eci",
+        "uplink-eci",
+    ]
+
+
 def test_dump_measurements_tdm_rejects_hz_doppler_until_ccsds_mapping_exists() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     records = [
