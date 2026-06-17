@@ -247,8 +247,9 @@ range, range-rate, one-way Doppler in Hz, first-order two-way/three-way range an
 inertial right-ascension/declination, and local-horizon azimuth/elevation records. Doppler uses the
 scenario's `doppler_transmit_frequency_hz` to convert line-of-sight range rate into a
 received-frequency shift. Two-way and three-way range-like observables use same-epoch geometric
-uplink/downlink path sums and carry `participant_path`/`transmitter` metadata; they are product and
-estimator primitives, not full DSN light-time or media-correction models. Angle records use degrees. Ground stations can be supplied either as fixed
+uplink/downlink path sums and carry `participant_path`/`transmitter` metadata plus vacuum
+geometric light-time diagnostics for each leg; they are product and estimator primitives, not full
+DSN media-correction or iterative transmit/receive-time models. Angle records use degrees. Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
 epoch using a deterministic UTC sidereal-time model by default. Scenarios may also provide fixed
@@ -273,11 +274,12 @@ range/range-rate ingest/export formats.
 
 `astro research-propagate` is the research backend entry point for seeded propagation ensembles.
 With `--backend local`, it runs the deterministic Monte Carlo workflow. With `--backend jax`, it
-loads the optional JAX runtime and runs vectorized RK4 ensembles for current two-body and J2
-scenarios. With `--include-sensitivities`, the JAX path adds a nominal final-state transition matrix
-computed through JAX autodiff to the `MonteCarloResult` metadata. JAX remains a research backend,
-not a replacement for operational Orekit semantics or validated high-fidelity force-model
-combinations.
+loads the optional JAX runtime and runs vectorized RK4 ensembles for two-body, J2, and
+screening-only `orekit_high_fidelity` scenarios, including research approximations for atmospheric
+drag and solar radiation pressure. With `--include-sensitivities`, the JAX path adds a nominal
+final-state transition matrix computed through JAX autodiff to the `MonteCarloResult` metadata. JAX
+remains a research backend, not a replacement for operational Orekit semantics or validated
+third-body/high-fidelity force-model combinations.
 
 `astro research-od-sensitivity --backend jax` loads an explicit measurement file and writes an
 `OdSensitivityResult` containing normalized OD residuals and the residual Jacobian with respect to
@@ -296,7 +298,8 @@ The optional `metadata_json` column can carry a JSON object for row-level metada
 `leo_two_station_od.yaml` example includes two stations because the one-station propagation example
 is intentionally under-observed for six-state OD.
 `examples/scenarios/leo_radiometric_links.yaml` demonstrates two-way and three-way radiometric
-measurement synthesis with explicit uplink/downlink station metadata.
+measurement synthesis with explicit uplink/downlink station metadata and vacuum light-time
+diagnostics.
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,
 `PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped

@@ -51,9 +51,10 @@ Still roadmap-level:
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
 - Live Tudat cross-check environment/body construction.
-- Full precession-nutation reductions, operational DSN light-time/media corrections for
-  two-way/three-way radiometrics, and operational CCSDS support beyond current KVN TDM measurement
-  families, suite multi-leg radiometric TDM extension, and OEM ephemeris interchange.
+- Full precession-nutation reductions, operational DSN iterative transmit/receive-time and media
+  corrections for two-way/three-way radiometrics, and operational CCSDS support beyond current KVN
+  TDM measurement families, suite multi-leg radiometric TDM extension, and OEM ephemeris
+  interchange.
 - Richer JAX high-fidelity force models and full differentiable OD estimator workflows.
 
 ## Goal Ledger
@@ -151,6 +152,9 @@ Implemented slice:
   two-way and three-way range/range-rate with explicit participant-path metadata, inertial right
   ascension, declination, and local-horizon azimuth/elevation records; wrapped angle residuals
   handle 0/360 degree crossings.
+- First-order two-way/three-way radiometric records now carry vacuum geometric uplink/downlink
+  light-time diagnostics. These are provenance fields for same-epoch path-sum products, not full
+  DSN media corrections or iterative transmit/receive-time observables.
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
   checked-in first-order two-way/three-way radiometric synthesis fixture. TDM export deliberately

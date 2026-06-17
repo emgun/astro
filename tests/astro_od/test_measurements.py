@@ -18,10 +18,13 @@ from astro_dynamics.local import propagate_local
 from astro_od.measurements import (
     doppler_hz,
     generate_synthetic_measurements,
+    light_time_s,
     range_km,
     range_rate_km_s,
+    three_way_light_time_s,
     three_way_range_km,
     three_way_range_rate_km_s,
+    two_way_light_time_s,
     two_way_range_km,
     two_way_range_rate_km_s,
 )
@@ -47,6 +50,30 @@ def test_doppler_hz_returns_one_way_frequency_shift() -> None:
     transmit_frequency_hz = 8.4e9
 
     assert doppler_hz(range_rate, transmit_frequency_hz) == pytest.approx(-28019.383983282765)
+
+
+def test_radiometric_light_time_helpers_return_vacuum_path_times() -> None:
+    spacecraft_position = np.array([7000.0, 0.0, 0.0])
+    station_position = np.array([6378.0, 0.0, 0.0])
+    receiver_position = np.array([0.0, 6378.0, 0.0])
+
+    one_way = light_time_s(spacecraft_position, station_position)
+    two_way = two_way_light_time_s(spacecraft_position, station_position)
+    three_way = three_way_light_time_s(
+        spacecraft_position,
+        station_position,
+        receiver_position,
+    )
+
+    assert one_way == pytest.approx(622.0 / od_measurements.SPEED_OF_LIGHT_KM_S)
+    assert two_way == pytest.approx(2.0 * one_way)
+    assert three_way == pytest.approx(
+        (
+            np.linalg.norm(spacecraft_position - station_position)
+            + np.linalg.norm(spacecraft_position - receiver_position)
+        )
+        / od_measurements.SPEED_OF_LIGHT_KM_S
+    )
 
 
 def test_two_way_radiometric_geometry_returns_round_trip_path() -> None:
@@ -202,6 +229,10 @@ def test_generate_synthetic_measurements_supports_two_way_radiometric_records() 
     assert {record.metadata["radiometric_model"] for record in records} == {
         "first_order_two_way_same_epoch"
     }
+    assert {record.metadata["light_time_model"] for record in records} == {
+        "vacuum_geometric_same_epoch"
+    }
+    assert all(record.metadata["round_trip_light_time_s"] > 0.0 for record in records)
     assert {record.metadata["participant_path"] for record in records} == {
         "equator-eci,demo-sat,equator-eci"
     }
@@ -238,6 +269,12 @@ def test_generate_synthetic_measurements_supports_three_way_radiometric_records(
     assert {record.metadata["radiometric_model"] for record in records} == {
         "first_order_three_way_same_epoch"
     }
+    assert {record.metadata["light_time_model"] for record in records} == {
+        "vacuum_geometric_same_epoch"
+    }
+    assert all(record.metadata["uplink_light_time_s"] > 0.0 for record in records)
+    assert all(record.metadata["downlink_light_time_s"] > 0.0 for record in records)
+    assert all(record.metadata["total_light_time_s"] > 0.0 for record in records)
 
 
 def test_generate_synthetic_measurements_supports_topocentric_angles() -> None:

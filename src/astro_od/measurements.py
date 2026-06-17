@@ -56,8 +56,19 @@ def doppler_hz(range_rate_truth_km_s: float, transmit_frequency_hz: float) -> fl
     return float(-range_rate_truth_km_s / SPEED_OF_LIGHT_KM_S * transmit_frequency_hz)
 
 
+def light_time_s(spacecraft_position_km: ArrayLike, station_position_km: ArrayLike) -> float:
+    return float(range_km(spacecraft_position_km, station_position_km) / SPEED_OF_LIGHT_KM_S)
+
+
 def two_way_range_km(spacecraft_position_km: ArrayLike, station_position_km: ArrayLike) -> float:
     return float(2.0 * range_km(spacecraft_position_km, station_position_km))
+
+
+def two_way_light_time_s(
+    spacecraft_position_km: ArrayLike,
+    station_position_km: ArrayLike,
+) -> float:
+    return float(2.0 * light_time_s(spacecraft_position_km, station_position_km))
 
 
 def two_way_range_rate_km_s(
@@ -83,6 +94,21 @@ def three_way_range_km(
     return float(
         range_km(spacecraft_position_km, transmitter_position_km)
         + range_km(spacecraft_position_km, receiver_position_km)
+    )
+
+
+def three_way_light_time_s(
+    spacecraft_position_km: ArrayLike,
+    transmitter_position_km: ArrayLike,
+    receiver_position_km: ArrayLike,
+) -> float:
+    return float(
+        three_way_range_km(
+            spacecraft_position_km,
+            transmitter_position_km,
+            receiver_position_km,
+        )
+        / SPEED_OF_LIGHT_KM_S
     )
 
 
@@ -306,6 +332,10 @@ def _measurement_geometry(
         )
     if measurement_type is MeasurementType.TWO_WAY_RANGE:
         observer = observer_name or scenario.ground_stations[0].name
+        round_trip_light_time_s = two_way_light_time_s(
+            spacecraft_position_km,
+            station_position_km,
+        )
         return (
             two_way_range_km(spacecraft_position_km, station_position_km),
             scenario.measurements.noise.range_sigma_km,
@@ -313,10 +343,18 @@ def _measurement_geometry(
             {
                 "participant_path": f"{observer},{scenario.spacecraft.name},{observer}",
                 "radiometric_model": "first_order_two_way_same_epoch",
+                "light_time_model": "vacuum_geometric_same_epoch",
+                "uplink_light_time_s": round_trip_light_time_s / 2.0,
+                "downlink_light_time_s": round_trip_light_time_s / 2.0,
+                "round_trip_light_time_s": round_trip_light_time_s,
             },
         )
     if measurement_type is MeasurementType.TWO_WAY_RANGE_RATE:
         observer = observer_name or scenario.ground_stations[0].name
+        round_trip_light_time_s = two_way_light_time_s(
+            spacecraft_position_km,
+            station_position_km,
+        )
         return (
             two_way_range_rate_km_s(
                 spacecraft_position_km,
@@ -328,6 +366,10 @@ def _measurement_geometry(
             {
                 "participant_path": f"{observer},{scenario.spacecraft.name},{observer}",
                 "radiometric_model": "first_order_two_way_same_epoch",
+                "light_time_model": "vacuum_geometric_same_epoch",
+                "uplink_light_time_s": round_trip_light_time_s / 2.0,
+                "downlink_light_time_s": round_trip_light_time_s / 2.0,
+                "round_trip_light_time_s": round_trip_light_time_s,
             },
         )
     if measurement_type is MeasurementType.DOPPLER:
@@ -387,6 +429,8 @@ def _three_way_measurement_geometry(
     scenario: Scenario,
 ) -> tuple[float, float, MeasurementUnits, dict[str, Any]]:
     if measurement_type is MeasurementType.THREE_WAY_RANGE:
+        uplink_light_time_s = light_time_s(spacecraft_position_km, transmitter_position_km)
+        downlink_light_time_s = light_time_s(spacecraft_position_km, receiver_position_km)
         return (
             three_way_range_km(
                 spacecraft_position_km,
@@ -395,9 +439,17 @@ def _three_way_measurement_geometry(
             ),
             scenario.measurements.noise.range_sigma_km,
             "km",
-            {"radiometric_model": "first_order_three_way_same_epoch"},
+            {
+                "radiometric_model": "first_order_three_way_same_epoch",
+                "light_time_model": "vacuum_geometric_same_epoch",
+                "uplink_light_time_s": uplink_light_time_s,
+                "downlink_light_time_s": downlink_light_time_s,
+                "total_light_time_s": uplink_light_time_s + downlink_light_time_s,
+            },
         )
     if measurement_type is MeasurementType.THREE_WAY_RANGE_RATE:
+        uplink_light_time_s = light_time_s(spacecraft_position_km, transmitter_position_km)
+        downlink_light_time_s = light_time_s(spacecraft_position_km, receiver_position_km)
         return (
             three_way_range_rate_km_s(
                 spacecraft_position_km,
@@ -407,6 +459,12 @@ def _three_way_measurement_geometry(
             ),
             scenario.measurements.noise.range_rate_sigma_km_s,
             "km/s",
-            {"radiometric_model": "first_order_three_way_same_epoch"},
+            {
+                "radiometric_model": "first_order_three_way_same_epoch",
+                "light_time_model": "vacuum_geometric_same_epoch",
+                "uplink_light_time_s": uplink_light_time_s,
+                "downlink_light_time_s": downlink_light_time_s,
+                "total_light_time_s": uplink_light_time_s + downlink_light_time_s,
+            },
         )
     raise ValueError(f"Unsupported three-way measurement type: {measurement_type}")
