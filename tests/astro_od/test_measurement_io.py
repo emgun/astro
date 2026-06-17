@@ -516,7 +516,9 @@ def test_dump_measurements_tdm_round_trips_multi_leg_radiometric_measurements(
     ]
 
 
-def test_dump_measurements_tdm_rejects_hz_doppler_until_ccsds_mapping_exists() -> None:
+def test_dump_measurements_tdm_round_trips_hz_doppler_with_suite_extension(
+    tmp_path: Path,
+) -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     records = [
         MeasurementRecord(
@@ -530,8 +532,21 @@ def test_dump_measurements_tdm_rejects_hz_doppler_until_ccsds_mapping_exists() -
         )
     ]
 
-    with pytest.raises(InvalidMeasurementFileError, match="doppler"):
-        dump_measurements_tdm(scenario.scenario_id, records)
+    exported = dump_measurements_tdm(scenario.scenario_id, records)
+    path = tmp_path / "doppler_hz.tdm"
+    path.write_text(exported, encoding="utf-8")
+    loaded = load_measurements(path, expected_scenario_id=scenario.scenario_id)
+
+    assert "ASTRO_MEASUREMENT_TYPE = doppler_hz" in exported
+    assert "DOPPLER_UNITS = Hz" in exported
+    assert "DOPPLER_SIGMA_HZ = 0.05" in exported
+    assert "DOPPLER_INSTANTANEOUS =" in exported
+    loaded_values = [
+        (record.measurement_type, record.value, record.sigma, record.units)
+        for record in loaded
+    ]
+    assert loaded_values == [(MeasurementType.DOPPLER, -12.5, 0.05, "Hz")]
+    assert loaded[0].metadata["astro_measurement_type"] == "doppler_hz"
 
 
 def test_load_measurements_rejects_csv_scenario_mismatch(tmp_path: Path) -> None:

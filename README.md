@@ -275,11 +275,11 @@ match the output of `astro synth-measurements`; CSV and TDM inputs are auto-dete
 `.tdm` extensions or can be forced with `--format csv` / `--format tdm`.
 
 `astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
-JSON and CSV preserve all supported suite measurement types, including two-way and three-way
-radiometric metadata. TDM export supports range, range-rate, explicit two-way/three-way
-range/range-rate through a suite `ASTRO_MEASUREMENT_TYPE` metadata extension,
-right-ascension/declination, and azimuth/elevation records; Hz Doppler remains JSON/CSV-only until
-a precise CCSDS Doppler count/frequency convention is added. The example files under
+JSON and CSV preserve all supported suite measurement types, including one-way Doppler in Hz and
+two-way/three-way radiometric metadata. TDM export supports range, range-rate, explicit
+two-way/three-way range/range-rate, one-way Hz Doppler through a suite
+`ASTRO_MEASUREMENT_TYPE = doppler_hz` metadata extension, right-ascension/declination, and
+azimuth/elevation records. The example files under
 `examples/measurements/` are generated from `leo_two_station_od.yaml` and cover all three
 range/range-rate ingest/export formats.
 
@@ -317,13 +317,14 @@ TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTE
 `PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped
 to range-rate measurements in `km/s`, and `ANGLE_1`/`ANGLE_2` records in `deg`. Segments with
 `ASTRO_MEASUREMENT_TYPE = two_way` or `three_way` preserve the suite's explicit multi-leg
-radiometric types without reinterpreting legacy TDM files that omit the extension. Suite Doppler
-records in `Hz` are deliberately not exported to TDM yet. Angle segments use
+radiometric types without reinterpreting legacy TDM files that omit the extension. Segments with
+`ASTRO_MEASUREMENT_TYPE = doppler_hz` preserve suite one-way Doppler records in `Hz` with
+`DOPPLER_UNITS = Hz` and optional `DOPPLER_SIGMA_HZ`. Angle segments use
 `ANGLE_TYPE = RADEC` for right ascension/declination and `ANGLE_TYPE = AZEL` for
 azimuth/elevation. TDM does not provide the suite's scenario identifier or estimator sigmas
 directly, so an optional segment-level `SCENARIO_ID` extension is checked when present, and the
-parser uses default sigmas of `0.01 km` for range, `1e-5 km/s` for range-rate, and `0.001 deg` for
-angles.
+parser uses default sigmas of `0.01 km` for range, `1e-5 km/s` for range-rate, `0.1 Hz` for
+suite Doppler, and `0.001 deg` for angles.
 
 ## Verification
 

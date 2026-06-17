@@ -170,10 +170,9 @@ Implemented slice:
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
   checked-in iterative two-way/three-way radiometric synthesis fixture. `leo_radiometric_media.yaml`
-  provides a checked-in configured constant media-delay fixture. TDM export deliberately
-  rejects Hz Doppler until a precise CCSDS Doppler/count convention is added; explicit two-way and
-  three-way suite records round-trip through TDM with an `ASTRO_MEASUREMENT_TYPE` metadata
-  extension so legacy TDM files are not reinterpreted.
+  provides a checked-in configured constant media-delay fixture. Explicit Hz Doppler, two-way, and
+  three-way suite records round-trip through TDM with `ASTRO_MEASUREMENT_TYPE` metadata extensions
+  so legacy TDM files are not reinterpreted.
 - Ground stations support fixed `position_eci_km` definitions and WGS-84 geodetic
   `latitude_deg`/`longitude_deg`/`altitude_km` definitions, with geodetic stations rotated into
   inertial measurement geometry at each measurement epoch using a deterministic UTC sidereal-time

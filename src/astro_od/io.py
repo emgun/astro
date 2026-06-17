@@ -16,11 +16,13 @@ from astro_core.models import MeasurementRecord, MeasurementType
 
 DEFAULT_TDM_RANGE_SIGMA_KM = 0.01
 DEFAULT_TDM_RANGE_RATE_SIGMA_KM_S = 1.0e-5
+DEFAULT_TDM_DOPPLER_SIGMA_HZ = 0.1
 DEFAULT_TDM_ANGLE_SIGMA_DEG = 0.001
 TDM_EXPORT_MEASUREMENT_TYPES = frozenset(
     {
         MeasurementType.RANGE,
         MeasurementType.RANGE_RATE,
+        MeasurementType.DOPPLER,
         MeasurementType.TWO_WAY_RANGE,
         MeasurementType.TWO_WAY_RANGE_RATE,
         MeasurementType.THREE_WAY_RANGE,
@@ -67,6 +69,7 @@ TDM_ANGLE_TYPE_BY_MEASUREMENT_TYPE = {
 TDM_DATA_KEYWORD_BY_MEASUREMENT_TYPE = {
     MeasurementType.RANGE: "RANGE",
     MeasurementType.RANGE_RATE: "DOPPLER_INSTANTANEOUS",
+    MeasurementType.DOPPLER: "DOPPLER_INSTANTANEOUS",
     MeasurementType.TWO_WAY_RANGE: "RANGE",
     MeasurementType.TWO_WAY_RANGE_RATE: "DOPPLER_INSTANTANEOUS",
     MeasurementType.THREE_WAY_RANGE: "RANGE",
@@ -85,6 +88,8 @@ TDM_ANGLE_MEASUREMENT_TYPE_BY_ANGLE_TYPE_AND_KEYWORD = {
 }
 
 TDM_RADIOMETRIC_MEASUREMENT_TYPE_BY_LINK_AND_KEYWORD = {
+    ("doppler_hz", "DOPPLER_INSTANTANEOUS"): MeasurementType.DOPPLER,
+    ("doppler_hz", "DOPPLER_INTEGRATED"): MeasurementType.DOPPLER,
     ("two_way", "RANGE"): MeasurementType.TWO_WAY_RANGE,
     ("two_way", "DOPPLER_INSTANTANEOUS"): MeasurementType.TWO_WAY_RANGE_RATE,
     ("two_way", "DOPPLER_INTEGRATED"): MeasurementType.TWO_WAY_RANGE_RATE,
@@ -223,7 +228,7 @@ def dump_measurements_tdm(
         )
         raise InvalidMeasurementFileError(
             "TDM export supports range, range_rate, two_way_range, "
-            "two_way_range_rate, three_way_range, three_way_range_rate, "
+            "doppler, two_way_range_rate, three_way_range, three_way_range_rate, "
             "right_ascension, declination, azimuth, and elevation measurements; "
             f"unsupported measurement types: {unsupported_text}"
         )
@@ -256,6 +261,15 @@ def dump_measurements_tdm(
                     "ASTRO_MEASUREMENT_TYPE = three_way",
                 ]
             )
+        elif link_type == "doppler_hz":
+            lines.extend(
+                [
+                    f"PARTICIPANT_1 = {observer}",
+                    f"PARTICIPANT_2 = {observed_object}",
+                    "PATH = 1,2",
+                    "ASTRO_MEASUREMENT_TYPE = doppler_hz",
+                ]
+            )
         else:
             lines.extend(
                 [
@@ -267,7 +281,15 @@ def dump_measurements_tdm(
             if link_type == "two_way":
                 lines.append("ASTRO_MEASUREMENT_TYPE = two_way")
 
-        if angle_type is None:
+        if link_type == "doppler_hz":
+            lines.append("DOPPLER_UNITS = Hz")
+            doppler_sigma = _common_sigma_for_types(
+                segment_records,
+                frozenset({MeasurementType.DOPPLER}),
+            )
+            if doppler_sigma is not None:
+                lines.append(f"DOPPLER_SIGMA_HZ = {_format_float(doppler_sigma)}")
+        elif angle_type is None:
             lines.append("RANGE_UNITS = km")
             range_sigma = _common_sigma_for_types(segment_records, RANGE_MEASUREMENT_TYPES)
             if range_sigma is not None:
@@ -541,6 +563,8 @@ def _measurement_segments(
 
 
 def _tdm_link_type(record: MeasurementRecord) -> str | None:
+    if record.measurement_type is MeasurementType.DOPPLER:
+        return "doppler_hz"
     if record.measurement_type in {
         MeasurementType.TWO_WAY_RANGE,
         MeasurementType.TWO_WAY_RANGE_RATE,
@@ -795,14 +819,31 @@ def _tdm_record_from_data_line(
             keyword=keyword,
             default=MeasurementType.RANGE_RATE,
         )
-        units = "km/s"
-        sigma = _tdm_sigma(
-            measurement_path,
-            line_number=line_number,
-            metadata=metadata,
-            key="RANGE_RATE_SIGMA_KM_S",
-            default=DEFAULT_TDM_RANGE_RATE_SIGMA_KM_S,
-        )
+        if measurement_type is MeasurementType.DOPPLER:
+            doppler_units = metadata.get("DOPPLER_UNITS", "Hz")
+            if doppler_units.lower() != "hz":
+                raise InvalidMeasurementFileError(
+                    f"TDM file {measurement_path} line {line_number} uses unsupported "
+                    f"DOPPLER_UNITS {doppler_units!r}; only Hz is supported for "
+                    "ASTRO_MEASUREMENT_TYPE = doppler_hz"
+                )
+            units = "Hz"
+            sigma = _tdm_sigma(
+                measurement_path,
+                line_number=line_number,
+                metadata=metadata,
+                key="DOPPLER_SIGMA_HZ",
+                default=DEFAULT_TDM_DOPPLER_SIGMA_HZ,
+            )
+        else:
+            units = "km/s"
+            sigma = _tdm_sigma(
+                measurement_path,
+                line_number=line_number,
+                metadata=metadata,
+                key="RANGE_RATE_SIGMA_KM_S",
+                default=DEFAULT_TDM_RANGE_RATE_SIGMA_KM_S,
+            )
         angle_type = None
     else:
         measurement_type, angle_type = _tdm_angle_measurement_type(
@@ -892,10 +933,12 @@ def _tdm_link_type_from_metadata(
         return None
     link_type = raw_link_type.strip().lower()
     if link_type not in {"two_way", "three_way"}:
+        if link_type == "doppler_hz":
+            return link_type
         raise InvalidMeasurementFileError(
             f"TDM file {measurement_path} line {line_number} uses unsupported "
-            f"ASTRO_MEASUREMENT_TYPE {raw_link_type!r}; supported values are two_way and "
-            "three_way"
+            f"ASTRO_MEASUREMENT_TYPE {raw_link_type!r}; supported values are two_way, "
+            "three_way, and doppler_hz"
         )
     return link_type
 
