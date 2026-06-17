@@ -133,8 +133,8 @@ def load_trajectory_oem(payload: str, *, force_model: ForceModelConfig) -> Traje
             TrajectorySample(
                 epoch=epoch,
                 state=CartesianState(
-                    position_km=tuple(state_values[:3]),
-                    velocity_km_s=tuple(state_values[3:]),
+                    position_km=(state_values[0], state_values[1], state_values[2]),
+                    velocity_km_s=(state_values[3], state_values[4], state_values[5]),
                 ),
             )
         )

@@ -6,6 +6,7 @@ from math import ceil, isfinite
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 from astro_backends.jax.runtime import JaxRuntime, load_jax_runtime
 from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
@@ -25,6 +26,7 @@ from astro_dynamics.monte_carlo import MonteCarloCase, MonteCarloResult
 
 JaxRuntimeLoader = Callable[[], JaxRuntime]
 JaxResearchRunner = Callable[[Scenario, JaxRuntime, int, float, float, int], MonteCarloResult]
+FloatArray = NDArray[np.float64]
 _MAX_RK4_INTERNAL_STEP_S = 30.0
 _STATE_DIMENSION = 6
 _SUPPORTED_JAX_OD_MEASUREMENTS = {MeasurementType.RANGE, MeasurementType.RANGE_RATE}
@@ -315,7 +317,7 @@ def _propagate_nominal_final_state(
     return state[0]
 
 
-def _initial_state_vector(scenario: Scenario) -> np.ndarray:
+def _initial_state_vector(scenario: Scenario) -> FloatArray:
     return np.concatenate(
         (
             np.asarray(scenario.initial_state.cartesian.position_km, dtype=np.float64),
@@ -357,11 +359,11 @@ def _measurement_sample_index(scenario: Scenario, record: MeasurementRecord) -> 
 def _jax_od_measurement_specs(
     scenario: Scenario,
     measurements: list[MeasurementRecord],
-) -> list[tuple[MeasurementType, int, np.ndarray, float, float]]:
+) -> list[tuple[MeasurementType, int, FloatArray, float, float]]:
     if not measurements:
         raise UnsupportedBackendError("JAX OD sensitivity requires at least one measurement")
     stations = {station.name: station for station in scenario.ground_stations}
-    specs: list[tuple[MeasurementType, int, np.ndarray, float, float]] = []
+    specs: list[tuple[MeasurementType, int, FloatArray, float, float]] = []
     for record in measurements:
         if record.measurement_type not in _SUPPORTED_JAX_OD_MEASUREMENTS:
             raise UnsupportedBackendError(
@@ -398,7 +400,7 @@ def _jax_od_measurement_specs(
 def _jax_od_residual_vector(
     jnp: Any,
     scenario: Scenario,
-    measurement_specs: list[tuple[MeasurementType, int, np.ndarray, float, float]],
+    measurement_specs: list[tuple[MeasurementType, int, FloatArray, float, float]],
     state_vector: Any,
 ) -> Any:
     state_history = _jax_state_history(jnp, scenario, state_vector)
