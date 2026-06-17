@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from math import sqrt
 from statistics import fmean
 from typing import Any
 
@@ -42,6 +43,29 @@ class DsnCalibrationProduct(AstroModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class StationCalibrationEntry(AstroModel):
+    station: str
+    measurement_type: str
+    units: str
+    sample_count: int = Field(ge=1)
+    bias_mean: FiniteFloat
+    bias_min: FiniteFloat
+    bias_max: FiniteFloat
+    bias_rms: FiniteFloat = Field(ge=0.0)
+    sigma_mean: FiniteFloat = Field(gt=0.0)
+    normalized_bias_mean: FiniteFloat
+
+
+class StationCalibrationProduct(AstroModel):
+    scenario_id: str
+    calibration_model: str = "station_measurement_bias_from_truth_metadata"
+    station_count: int = Field(ge=1)
+    entry_count: int = Field(ge=1)
+    measurement_count: int = Field(ge=1)
+    entries: tuple[StationCalibrationEntry, ...] = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 def generate_dsn_calibration_product(
     scenario: Scenario,
     trajectory: Trajectory,
@@ -56,6 +80,51 @@ def generate_dsn_calibration_product(
             measurement_type.value for measurement_type in scenario.measurements.types
         ),
         metadata=_scenario_calibration_metadata(scenario),
+    )
+
+
+def generate_station_calibration_product_from_measurements(
+    scenario_id: str,
+    measurement_records: list[MeasurementRecord],
+    *,
+    metadata: dict[str, Any] | None = None,
+) -> StationCalibrationProduct:
+    """Estimate station/type measurement biases from records carrying truth metadata."""
+    grouped_residuals: dict[tuple[str, str, str], list[tuple[float, float]]] = {}
+    calibrated_measurement_count = 0
+    for record in measurement_records:
+        if "truth" not in record.metadata:
+            continue
+        truth = _metadata_float(record.metadata, "truth")
+        residual = float(record.value) - truth
+        key = (record.observer, record.measurement_type.value, record.units)
+        grouped_residuals.setdefault(key, []).append((residual, float(record.sigma)))
+        calibrated_measurement_count += 1
+
+    if not grouped_residuals:
+        raise ValueError("station calibration requires measurement records with truth metadata")
+
+    entries = tuple(
+        _station_calibration_entry(station, measurement_type, units, residual_sigma_pairs)
+        for (station, measurement_type, units), residual_sigma_pairs in sorted(
+            grouped_residuals.items()
+        )
+    )
+    product_metadata: dict[str, Any] = {
+        "workflow": "station_calibration",
+        "calibration_reference": "measurement_metadata_truth",
+        "source_measurement_count": len(measurement_records),
+        "calibrated_measurement_count": calibrated_measurement_count,
+    }
+    if metadata:
+        product_metadata |= metadata
+    return StationCalibrationProduct(
+        scenario_id=scenario_id,
+        station_count=len({entry.station for entry in entries}),
+        entry_count=len(entries),
+        measurement_count=calibrated_measurement_count,
+        entries=entries,
+        metadata=product_metadata,
     )
 
 
@@ -106,6 +175,30 @@ def generate_dsn_calibration_product_from_measurements(
             source_measurement_count=len(measurement_records),
             metadata=metadata,
         ),
+    )
+
+
+def _station_calibration_entry(
+    station: str,
+    measurement_type: str,
+    units: str,
+    residual_sigma_pairs: list[tuple[float, float]],
+) -> StationCalibrationEntry:
+    residuals = [residual for residual, _sigma in residual_sigma_pairs]
+    sigmas = [sigma for _residual, sigma in residual_sigma_pairs]
+    bias_mean = fmean(residuals)
+    sigma_mean = fmean(sigmas)
+    return StationCalibrationEntry(
+        station=station,
+        measurement_type=measurement_type,
+        units=units,
+        sample_count=len(residuals),
+        bias_mean=bias_mean,
+        bias_min=min(residuals),
+        bias_max=max(residuals),
+        bias_rms=sqrt(fmean([residual * residual for residual in residuals])),
+        sigma_mean=sigma_mean,
+        normalized_bias_mean=bias_mean / sigma_mean,
     )
 
 

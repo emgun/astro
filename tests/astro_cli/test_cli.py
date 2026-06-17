@@ -1428,6 +1428,32 @@ def test_dsn_calibration_command_accepts_tdm_measurements(tmp_path: Path) -> Non
     assert payload["metadata"]["measurement_format"] == "tdm"
 
 
+def test_station_calibration_command_writes_json(tmp_path: Path) -> None:
+    output = tmp_path / "station-calibration.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "station-calibration",
+            "examples/scenarios/leo_two_station_od.yaml",
+            "examples/measurements/leo_two_station_od_measurements.json",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "leo-two-station-od"
+    assert payload["calibration_model"] == "station_measurement_bias_from_truth_metadata"
+    assert payload["station_count"] == 2
+    assert payload["entry_count"] == 4
+    assert payload["metadata"]["measurement_file"].endswith(
+        "leo_two_station_od_measurements.json"
+    )
+    assert "wrote station calibration" in result.stdout
+
+
 def test_synth_measurements_command_accepts_orekit_backend(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

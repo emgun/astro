@@ -3,11 +3,12 @@ from pathlib import Path
 import pytest
 
 from astro_core.io import load_scenario
-from astro_core.models import MeasurementRecord
+from astro_core.models import MeasurementRecord, MeasurementType
 from astro_dynamics.local import propagate_local
 from astro_od.calibration import (
     generate_dsn_calibration_product,
     generate_dsn_calibration_product_from_measurements,
+    generate_station_calibration_product_from_measurements,
 )
 from astro_od.io import dump_measurements_tdm, load_measurements
 from astro_od.measurements import generate_synthetic_measurements
@@ -81,6 +82,56 @@ def test_generate_dsn_calibration_product_from_tdm_measurements(tmp_path: Path) 
     assert product.metadata["source_measurement_count"] == len(loaded)
     assert product.metadata["source_format"] == "measurement_records"
     assert product.metadata["media_frequency_hz"] == 8.4e9
+
+
+def test_generate_station_calibration_product_summarizes_station_biases() -> None:
+    records = [
+        MeasurementRecord(
+            measurement_type=MeasurementType.RANGE,
+            epoch="2026-01-01T00:00:00+00:00",
+            observer="DSS-14",
+            observed_object="demo-sat",
+            value=10.25,
+            sigma=0.5,
+            units="km",
+            metadata={"truth": 10.0},
+        ),
+        MeasurementRecord(
+            measurement_type=MeasurementType.RANGE,
+            epoch="2026-01-01T00:01:00+00:00",
+            observer="DSS-14",
+            observed_object="demo-sat",
+            value=11.15,
+            sigma=0.5,
+            units="km",
+            metadata={"truth": 11.0},
+        ),
+        MeasurementRecord(
+            measurement_type=MeasurementType.RANGE_RATE,
+            epoch="2026-01-01T00:00:00+00:00",
+            observer="DSS-43",
+            observed_object="demo-sat",
+            value=-0.02,
+            sigma=0.01,
+            units="km/s",
+            metadata={"truth": -0.01},
+        ),
+    ]
+
+    product = generate_station_calibration_product_from_measurements("dsn-demo", records)
+
+    assert product.scenario_id == "dsn-demo"
+    assert product.calibration_model == "station_measurement_bias_from_truth_metadata"
+    assert product.station_count == 2
+    assert product.entry_count == 2
+    dss14 = product.entries[0]
+    assert dss14.station == "DSS-14"
+    assert dss14.measurement_type == "range"
+    assert dss14.bias_mean == pytest.approx(0.2)
+    assert dss14.bias_rms == pytest.approx(((0.25**2 + 0.15**2) / 2.0) ** 0.5)
+    assert dss14.normalized_bias_mean == pytest.approx(0.4)
+    assert product.metadata["source_measurement_count"] == 3
+    assert product.metadata["calibrated_measurement_count"] == 3
 
 
 def load_measurements_from_text(

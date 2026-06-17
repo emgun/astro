@@ -65,6 +65,8 @@ def test_packages_import() -> None:
     expected_od_exports = {
         "DsnCalibrationProduct",
         "DsnCalibrationSample",
+        "StationCalibrationEntry",
+        "StationCalibrationProduct",
         "azimuth_deg",
         "declination_deg",
         "doppler_hz",
@@ -72,6 +74,7 @@ def test_packages_import() -> None:
         "estimate_initial_state",
         "generate_dsn_calibration_product",
         "generate_dsn_calibration_product_from_measurements",
+        "generate_station_calibration_product_from_measurements",
         "generate_synthetic_measurements",
         "light_time_s",
         "load_dsn_tracking_measurements",

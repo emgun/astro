@@ -182,6 +182,7 @@ astro synth-measurements examples/scenarios/leo_geodetic_precession_nutation_top
 astro synth-measurements examples/scenarios/leo_doppler.yaml --backend local --output doppler_measurements.json
 astro export-measurements measurements.json --format csv --output measurements.csv
 astro export-measurements measurements.json --format tdm --output measurements.tdm
+astro station-calibration examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --output station_calibration.json
 astro estimate examples/scenarios/leo_two_body.yaml --backend local --output estimate.json
 astro estimate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_estimate.json
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend local --output estimate.json
@@ -348,9 +349,10 @@ delay plus first-order TEC/frequency ionosphere group delay with per-leg elevati
 `astro dsn-calibration` turns those generated radiometric records into an auditable DSN-style media
 calibration summary product with per-record leg delays, elevation diagnostics, and aggregate delay
 statistics. This is a calibration product over the suite's supported radiometric primitives, not a
-full binary DSN ODF/TNF or station-calibration pipeline. `astro import-dsn-tracking` ingests a
-normalized CSV bridge for ODF/TNF-style DSN tracking rows into normal suite measurement JSON with
-format provenance. Angle records use degrees.
+full binary DSN ODF/TNF standards pipeline. `astro station-calibration` estimates per-station and
+per-measurement-type biases from truth-tagged measurement records. `astro import-dsn-tracking`
+ingests a normalized CSV bridge for ODF/TNF-style DSN tracking rows into normal suite measurement
+JSON with format provenance. Angle records use degrees.
 Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
@@ -432,6 +434,9 @@ astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml 
 
 astro import-dsn-tracking examples/measurements/dsn_tracking_normalized.csv \
   --output /tmp/astro-dsn-tracking-measurements.json
+astro station-calibration examples/scenarios/leo_two_station_od.yaml \
+  examples/measurements/leo_two_station_od_measurements.json \
+  --output /tmp/astro-station-calibration.json
 ```
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,

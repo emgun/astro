@@ -53,6 +53,7 @@ from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
 from astro_od.calibration import (
     generate_dsn_calibration_product,
     generate_dsn_calibration_product_from_measurements,
+    generate_station_calibration_product_from_measurements,
 )
 from astro_od.dsn import load_dsn_tracking_measurements
 from astro_od.estimation import estimate_initial_state
@@ -1189,6 +1190,46 @@ def import_dsn_tracking(
     )
     _write_text_or_exit(output, payload, "measurements")
     typer.echo(f"wrote measurements: {output}")
+
+
+@app.command("station-calibration")
+def station_calibration(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    measurements_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    measurement_format: Annotated[
+        str,
+        typer.Option("--format", help="Input measurement format: auto, json, csv, or tdm."),
+    ] = "auto",
+) -> None:
+    """Estimate per-station measurement biases from truth-tagged measurement records."""
+    scenario = _load_scenario_or_exit(scenario_path)
+    try:
+        measurement_format_name = resolve_measurement_format(
+            measurements_path,
+            measurement_format,
+        )
+        measurements = load_measurements(
+            measurements_path,
+            expected_scenario_id=scenario.scenario_id,
+            measurement_format=measurement_format_name,
+        )
+        product = generate_station_calibration_product_from_measurements(
+            scenario.scenario_id,
+            measurements,
+            metadata={
+                "measurement_file": str(measurements_path),
+                "measurement_format": measurement_format_name,
+                "spacecraft": scenario.spacecraft.name,
+                "ground_stations": [station.name for station in scenario.ground_stations],
+            },
+        )
+    except (InvalidMeasurementFileError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, product.model_dump_json(indent=2), "station calibration")
+    typer.echo(f"wrote station calibration: {output}")
 
 
 @app.command("export-measurements")
