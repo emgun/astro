@@ -42,14 +42,16 @@ Implemented and protected:
   ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy batch least-squares OD.
 - `astro_launch` local vertical and pitch-program ascent baselines, launch-to-orbit handoff, pitch sweep, two-knot tuning, tuned launch reports, batch ranking, and report comparison.
 - `astro_backends.orekit` optional `orekit_jpype` smoke gate, two-body Orekit propagation adapter,
-  and J2 numerical propagation through `J2OnlyPerturbation`.
+  J2 numerical propagation through `J2OnlyPerturbation`, Orekit drag/SRP/Sun-Moon third-body
+  force-model adapters, and a live-gated native Orekit OD bridge for geodetic range/range-rate
+  records.
+- Optional RocketPy and Dymos/OpenMDAO launch backend gates, including configured RocketPy direct
+  flight mapping and a small Dymos vertical-ascent phase transcription.
 
 Still roadmap-level:
 
-- Live Java/Orekit validation of native Orekit batch OD execution and suite result mapping.
 - Backend-native high-fidelity covariance propagation and full attitude-control maneuver dynamics.
-- Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
-- Live Dymos/OpenMDAO ascent phase transcription and optimization.
+- Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization.
 - Live Tudat cross-check environment/body construction.
 - Full precession-nutation reductions, operational DSN iterative transmit/receive-time and media
   corrections for two-way/three-way radiometrics, and operational CCSDS support beyond current KVN
@@ -107,8 +109,10 @@ Sun/Moon third-body gravity are implemented. Native Orekit OD now has a measurem
 `BatchLSEstimator` construction/execution bridge for WGS-84 geodetic range/range-rate records. It
 maps estimated state, residuals, RMS, covariance, and iteration diagnostics into the suite
 `EstimateResult` model through the runtime abstraction. Public CLI exposure is available through
-`astro estimate-measurements --estimator orekit-native`; live Java/Orekit estimator validation
-remains future integration work.
+`astro estimate-measurements --estimator orekit-native`, and the real Java/Orekit estimator has an
+opt-in live validation gate. Short-arc singular covariance extraction is handled explicitly by
+returning a zero covariance fallback with `covariance_status = "unavailable"` and the Orekit error
+recorded in metadata.
 
 Implemented slice:
 
@@ -148,6 +152,12 @@ Implemented slice:
   count, evaluation count, and Orekit wrapper provenance into `EstimateResult`.
 - `astro estimate-measurements --estimator orekit-native` exposes the native Orekit estimator
   bridge explicitly while preserving the suite SciPy estimator as the default.
+- `tests/astro_backends/test_orekit_estimation.py::test_live_orekit_native_od_executes_batch_estimator`
+  is an opt-in `ASTRO_RUN_OREKIT_LIVE=1` gate that executes the real Java/Orekit
+  `BatchLSEstimator` against generated geodetic range/range-rate measurements.
+- Native Orekit covariance extraction records `covariance_status = "available"` when the physical
+  covariance matrix is returned and `covariance_status = "unavailable"` with `covariance_fallback =
+  "zero_6x6"` when Orekit reports a singular matrix.
 - The shared measurement surface supports range, range-rate, one-way Doppler in Hz, first-order
   two-way and three-way range/range-rate with explicit participant-path metadata, inertial right
   ascension, declination, and local-horizon azimuth/elevation records; wrapped angle residuals
@@ -177,8 +187,8 @@ Implemented slice:
 
 Future native Orekit estimator scope:
 
-- Add live Java/Orekit validation for native estimator execution against checked-in geodetic
-  range/range-rate fixtures.
+- Add checked-in calibrated native Orekit OD fixtures with tighter accuracy expectations, not just
+  execution and product-shape validation.
 - Extend native Orekit OD beyond geodetic range/range-rate records as Orekit measurement families
   are validated.
 - Keep the current suite-level SciPy estimator as the deterministic always-on OD reference while

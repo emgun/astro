@@ -46,6 +46,8 @@ SUPPORTED_NATIVE_OREKIT_MEASUREMENTS = frozenset(
     }
 )
 COVARIANCE_SINGULARITY_THRESHOLD = 1.0e-12
+NATIVE_OD_MAX_ITERATIONS = 100
+NATIVE_OD_MAX_EVALUATIONS = 100
 
 
 def _station_by_name(scenario: Scenario) -> dict[str, GroundStation]:
@@ -124,7 +126,7 @@ def build_orekit_observed_measurements(
             observed_measurements.append(
                 runtime.range_measurement(
                     orekit_station,
-                    True,
+                    False,
                     measurement_date,
                     km_to_m(record.value),
                     km_to_m(record.sigma),
@@ -140,7 +142,7 @@ def build_orekit_observed_measurements(
                     km_s_to_m_s(record.value),
                     km_s_to_m_s(record.sigma),
                     1.0,
-                    True,
+                    False,
                     satellite,
                 )
             )
@@ -203,6 +205,8 @@ def build_orekit_batch_ls_estimator(
         runtime.levenberg_marquardt_optimizer(),
         propagator_builder,
     )
+    estimator.setMaxIterations(NATIVE_OD_MAX_ITERATIONS)
+    estimator.setMaxEvaluations(NATIVE_OD_MAX_EVALUATIONS)
     for observed_measurement in observed_measurements:
         estimator.addMeasurement(observed_measurement)
     return estimator
@@ -213,6 +217,24 @@ def _matrix_to_nested_list(matrix: Any, size: int = 6) -> list[list[float]]:
         [float(matrix.getEntry(row, column)) for column in range(size)]
         for row in range(size)
     ]
+
+
+def _zero_covariance(size: int = 6) -> list[list[float]]:
+    return [[0.0 for _ in range(size)] for _ in range(size)]
+
+
+def _physical_covariance_with_status(estimator: Any) -> tuple[list[list[float]], dict[str, Any]]:
+    try:
+        covariance = _matrix_to_nested_list(
+            estimator.getPhysicalCovariances(COVARIANCE_SINGULARITY_THRESHOLD)
+        )
+    except Exception as exc:
+        return _zero_covariance(), {
+            "covariance_status": "unavailable",
+            "covariance_error": str(exc),
+            "covariance_fallback": "zero_6x6",
+        }
+    return covariance, {"covariance_status": "available"}
 
 
 def _vector_to_list(vector: Any) -> list[float]:
@@ -265,9 +287,7 @@ def estimate_orekit_native(
 
     optimum = estimator.getOptimum()
     residuals = _vector_to_list(optimum.getResiduals())
-    covariance = _matrix_to_nested_list(
-        estimator.getPhysicalCovariances(COVARIANCE_SINGULARITY_THRESHOLD)
-    )
+    covariance, covariance_metadata = _physical_covariance_with_status(estimator)
 
     return EstimateResult(
         estimated_state=_estimated_state_from_propagator(scenario, runtime, propagators[0]),
@@ -281,10 +301,13 @@ def estimate_orekit_native(
             "propagation_backend": "orekit",
             "estimator": "Orekit BatchLSEstimator",
             "evaluations": int(estimator.getEvaluationsCount()),
+            "max_iterations": NATIVE_OD_MAX_ITERATIONS,
+            "max_evaluations": NATIVE_OD_MAX_EVALUATIONS,
             "measurement_count": len(measurements),
             "covariance_singularity_threshold": COVARIANCE_SINGULARITY_THRESHOLD,
             "wrapper": runtime.wrapper,
             "wrapper_version": runtime.wrapper_version,
             "data_path": runtime.data_path,
+            **covariance_metadata,
         },
     )

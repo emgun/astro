@@ -591,9 +591,17 @@ class _FakeBatchLSEstimator:
         self.optimizer = optimizer
         self.propagator_builders = propagator_builders
         self.measurements: list[object] = []
+        self.max_iterations: int | None = None
+        self.max_evaluations: int | None = None
 
     def addMeasurement(self, measurement: object) -> None:
         self.measurements.append(measurement)
+
+    def setMaxIterations(self, max_iterations: int) -> None:
+        self.max_iterations = max_iterations
+
+    def setMaxEvaluations(self, max_evaluations: int) -> None:
+        self.max_evaluations = max_evaluations
 
     def estimate(self) -> list[_FakeKeplerianPropagator]:
         return [self.propagator_builders[0].buildPropagator()]

@@ -166,7 +166,9 @@ suite geodetic range/range-rate records into Orekit `Range`/`RangeRate` measurem
 residuals, RMS, covariance, and iteration diagnostics into the suite `EstimateResult` model. Use
 `astro estimate-measurements --estimator orekit-native` to select that bridge explicitly. It remains
 limited to geodetic range/range-rate records and still depends on a live Java/Orekit runtime and
-data context.
+data context. Orekit covariance extraction can be singular on short or weakly observed arcs; when
+that happens the suite returns a zero covariance fallback with `covariance_status = "unavailable"`
+and the backend error recorded in metadata instead of treating the fallback as a valid covariance.
 
 `astro export-trajectory` converts suite trajectory JSON into either a CSV ephemeris table or a
 CCSDS OEM KVN text product containing UTC epochs plus Cartesian position and velocity samples in km
