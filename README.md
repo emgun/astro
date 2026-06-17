@@ -189,14 +189,17 @@ metadata. Thrust-vector finite burns default to inertial direction; setting
 velocity direction as the first attitude-coupled burn mode. This is still a commanded-direction
 model, not a full attitude control simulation.
 
-Local propagation also accepts an optional `initial_covariance` 6x6 matrix. When present, the local
-backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference state
-transition. Each covariance sample can carry the per-step `state_transition_matrix`, the
-`accumulated_state_transition_matrix` from the initial epoch, the `process_noise_covariance` applied
-for that step, and metadata naming the model and step size. The optional
-`covariance_process_noise_acceleration_km_s2` field adds a simple per-axis white-acceleration
-process-noise term over each propagation sample interval. This is useful for product wiring and
-first-order sensitivity screening; backend-native covariance dynamics remain a validation task.
+Local and Orekit propagation also accept an optional `initial_covariance` 6x6 matrix. When present,
+the backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference
+state transition. The local backend computes finite differences through its deterministic RK4
+reference dynamics; the Orekit backend computes finite differences by rebuilding and propagating
+perturbed Orekit states through the selected Orekit force model. Each covariance sample can carry
+the per-step `state_transition_matrix`, the `accumulated_state_transition_matrix` from the initial
+epoch, the `process_noise_covariance` applied for that step, and metadata naming the model and step
+size. The optional `covariance_process_noise_acceleration_km_s2` field adds a simple per-axis
+white-acceleration process-noise term over each propagation sample interval. This is useful for
+product wiring and first-order sensitivity screening; analytic variational-equation covariance
+dynamics and production conjunction analysis remain future work.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage

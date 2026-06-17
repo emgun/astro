@@ -58,6 +58,35 @@ def test_propagate_orekit_returns_suite_trajectory_with_fake_runtime() -> None:
     assert final_state.velocity_km_s == pytest.approx((0.0, 7.5, 1.0))
 
 
+def test_propagate_orekit_populates_covariance_history_with_fake_runtime() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+
+    trajectory = propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+    assert len(trajectory.covariance_history) == scenario.propagation.sample_count
+    assert trajectory.metadata["covariance_model"] == "orekit_finite_difference_state_transition"
+    assert trajectory.metadata["covariance_process_noise"] == "white_acceleration"
+    assert trajectory.metadata["covariance_state_transition_storage"] == (
+        "per_sample_and_accumulated"
+    )
+    initial_covariance = trajectory.covariance_history[0]
+    assert initial_covariance.covariance == scenario.initial_covariance
+    assert initial_covariance.metadata["covariance_sample_role"] == "initial"
+    assert initial_covariance.metadata["state_transition_model"] == "identity"
+    propagated_covariance = trajectory.covariance_history[1]
+    assert propagated_covariance.metadata["covariance_sample_role"] == "propagated"
+    assert propagated_covariance.metadata["state_transition_model"] == "orekit_finite_difference"
+    assert propagated_covariance.state_transition_matrix is not None
+    assert propagated_covariance.state_transition_matrix[0][0] == pytest.approx(1.0)
+    assert propagated_covariance.state_transition_matrix[0][3] == pytest.approx(
+        scenario.propagation.step_s
+    )
+    assert propagated_covariance.state_transition_matrix[3][3] == pytest.approx(1.0)
+    assert propagated_covariance.process_noise_covariance is not None
+    assert propagated_covariance.process_noise_covariance[0][0] > 0.0
+    assert propagated_covariance.covariance[0][0] > initial_covariance.covariance[0][0]
+
+
 def test_propagate_orekit_j2_uses_numerical_force_model_with_fake_runtime() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
         update={"force_model": ForceModelConfig(gravity=ForceModelName.J2)}
@@ -222,6 +251,26 @@ def test_live_orekit_j2_matches_local_reference_scale() -> None:
     velocity_delta_km_s = final_orekit.velocity_array() - final_local.velocity_array()
     assert np.linalg.norm(position_delta_km) < 0.05
     assert np.linalg.norm(velocity_delta_km_s) < 1.0e-4
+
+
+@pytest.mark.orekit_live
+def test_live_orekit_covariance_history_returns_suite_product() -> None:
+    if os.environ.get("ASTRO_RUN_OREKIT_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_OREKIT_LIVE=1 to run live Orekit covariance propagation")
+    pytest.importorskip("orekit_jpype")
+
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+    trajectory = propagate_orekit(scenario)
+
+    assert trajectory.backend == "orekit"
+    assert len(trajectory.covariance_history) == scenario.propagation.sample_count
+    assert trajectory.metadata["covariance_model"] == "orekit_finite_difference_state_transition"
+    assert trajectory.covariance_history[0].metadata["state_transition_model"] == "identity"
+    assert trajectory.covariance_history[1].metadata["state_transition_model"] == (
+        "orekit_finite_difference"
+    )
+    assert trajectory.covariance_history[1].state_transition_matrix is not None
+    assert np.all(np.isfinite(trajectory.covariance_history[-1].covariance))
 
 
 class _FakeFramesFactory:

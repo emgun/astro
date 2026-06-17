@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import timedelta
-from typing import Any
+from datetime import datetime, timedelta
+from typing import Any, cast
+
+import numpy as np
+from numpy.typing import NDArray
 
 from astro_backends.orekit.conversion import (
     absolute_date_from_datetime,
@@ -24,17 +27,21 @@ from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
 from astro_core.errors import UnsupportedBackendError
 from astro_core.models import (
     CartesianState,
+    CovarianceSample,
     ForceModelName,
     Scenario,
     Trajectory,
     TrajectorySample,
 )
 
+FloatArray = NDArray[np.float64]
 RuntimeLoader = Callable[[], OrekitRuntime]
 MU_EARTH_M3_S2 = MU_EARTH_KM3_S2 * 1.0e9
 R_EARTH_M = R_EARTH_KM * 1.0e3
 J2_POSITION_TOLERANCE_M = 0.001
 NUMERICAL_MIN_STEP_S = 0.001
+_COVARIANCE_FD_REL_STEP = 1.0e-6
+_COVARIANCE_FD_ABS_STEP = 1.0e-8
 _SUPPORTED_OREKIT_GRAVITY_MODELS = {
     ForceModelName.TWO_BODY,
     ForceModelName.J2,
@@ -57,18 +64,37 @@ def _validate_orekit_scenario(scenario: Scenario) -> None:
 
 
 def _initial_orbit(scenario: Scenario, runtime: OrekitRuntime, frame: Any) -> Any:
-    initial_date = absolute_date_from_datetime(runtime, scenario.initial_state.epoch)
     initial = scenario.initial_state.cartesian
+    state_vector = np.array(
+        [*initial.position_km, *initial.velocity_km_s],
+        dtype=np.float64,
+    )
+    return _orbit_from_state_vector(
+        scenario,
+        runtime,
+        frame,
+        scenario.initial_state.epoch,
+        state_vector,
+    )
 
+
+def _orbit_from_state_vector(
+    scenario: Scenario,
+    runtime: OrekitRuntime,
+    frame: Any,
+    epoch: datetime,
+    state_vector: FloatArray,
+) -> Any:
+    initial_date = absolute_date_from_datetime(runtime, epoch)
     position = runtime.vector3d(
-        km_to_m(initial.position_km[0]),
-        km_to_m(initial.position_km[1]),
-        km_to_m(initial.position_km[2]),
+        km_to_m(float(state_vector[0])),
+        km_to_m(float(state_vector[1])),
+        km_to_m(float(state_vector[2])),
     )
     velocity = runtime.vector3d(
-        km_s_to_m_s(initial.velocity_km_s[0]),
-        km_s_to_m_s(initial.velocity_km_s[1]),
-        km_s_to_m_s(initial.velocity_km_s[2]),
+        km_s_to_m_s(float(state_vector[3])),
+        km_s_to_m_s(float(state_vector[4])),
+        km_s_to_m_s(float(state_vector[5])),
     )
     pv_coordinates = runtime.pv_coordinates(position, velocity)
     return runtime.cartesian_orbit(
@@ -189,6 +215,155 @@ def _build_propagator_config(
     return _build_j2_numerical_propagator(scenario, runtime, orbit)
 
 
+def _state_vector_from_spacecraft_state(
+    runtime: OrekitRuntime,
+    spacecraft_state: Any,
+    frame: Any,
+) -> FloatArray:
+    pv_coordinates = spacecraft_state.getPVCoordinates(frame)
+    position = pv_coordinates.getPosition()
+    velocity = pv_coordinates.getVelocity()
+    return cast(
+        FloatArray,
+        np.array(
+            [
+                m_to_km(float(position.getX())),
+                m_to_km(float(position.getY())),
+                m_to_km(float(position.getZ())),
+                m_s_to_km_s(float(velocity.getX())),
+                m_s_to_km_s(float(velocity.getY())),
+                m_s_to_km_s(float(velocity.getZ())),
+            ],
+            dtype=np.float64,
+        ),
+    )
+
+
+def _cartesian_from_state_vector(state_vector: FloatArray) -> CartesianState:
+    return CartesianState(
+        position_km=(
+            float(state_vector[0]),
+            float(state_vector[1]),
+            float(state_vector[2]),
+        ),
+        velocity_km_s=(
+            float(state_vector[3]),
+            float(state_vector[4]),
+            float(state_vector[5]),
+        ),
+    )
+
+
+def _propagate_state_vector(
+    scenario: Scenario,
+    runtime: OrekitRuntime,
+    frame: Any,
+    state_vector: FloatArray,
+    start_epoch: datetime,
+    target_epoch: datetime,
+) -> FloatArray:
+    orbit = _orbit_from_state_vector(scenario, runtime, frame, start_epoch, state_vector)
+    propagator_config = _build_propagator_config(scenario, runtime, orbit)
+    target_date = absolute_date_from_datetime(runtime, target_epoch)
+    spacecraft_state = propagator_config.propagator.propagate(target_date)
+    return _state_vector_from_spacecraft_state(runtime, spacecraft_state, frame)
+
+
+def _initial_covariance_matrix(scenario: Scenario) -> FloatArray | None:
+    if scenario.initial_covariance is None:
+        return None
+    return cast(FloatArray, np.array(scenario.initial_covariance, dtype=np.float64))
+
+
+def _matrix_to_nested_list(matrix: FloatArray) -> list[list[float]]:
+    return [[float(component) for component in row] for row in matrix]
+
+
+def _finite_difference_state_transition(
+    state_vector: FloatArray,
+    advance_state: Callable[[FloatArray], FloatArray],
+) -> FloatArray:
+    transition = np.zeros((6, 6), dtype=np.float64)
+    for column in range(6):
+        step = max(
+            abs(float(state_vector[column])) * _COVARIANCE_FD_REL_STEP,
+            _COVARIANCE_FD_ABS_STEP,
+        )
+        perturbation = np.zeros(6, dtype=np.float64)
+        perturbation[column] = step
+        plus = advance_state(state_vector + perturbation)
+        minus = advance_state(state_vector - perturbation)
+        transition[:, column] = (plus - minus) / (2.0 * step)
+    return cast(FloatArray, transition)
+
+
+def _covariance_process_noise_model(acceleration_sigma_km_s2: float) -> str:
+    return "white_acceleration" if acceleration_sigma_km_s2 > 0.0 else "none"
+
+
+def _process_noise_covariance(acceleration_sigma_km_s2: float, step_s: float) -> FloatArray:
+    process_noise = np.zeros((6, 6), dtype=np.float64)
+    if acceleration_sigma_km_s2 == 0.0:
+        return cast(FloatArray, process_noise)
+
+    acceleration_variance = acceleration_sigma_km_s2**2
+    position_variance = 0.25 * acceleration_variance * step_s**4
+    position_velocity_covariance = 0.5 * acceleration_variance * step_s**3
+    velocity_variance = acceleration_variance * step_s**2
+    for axis in range(3):
+        velocity_axis = axis + 3
+        process_noise[axis, axis] = position_variance
+        process_noise[axis, velocity_axis] = position_velocity_covariance
+        process_noise[velocity_axis, axis] = position_velocity_covariance
+        process_noise[velocity_axis, velocity_axis] = velocity_variance
+    return cast(FloatArray, process_noise)
+
+
+def _propagate_covariance(
+    covariance: FloatArray,
+    transition: FloatArray,
+    process_noise: FloatArray,
+) -> FloatArray:
+    propagated = transition @ covariance @ transition.T + process_noise
+    return cast(FloatArray, 0.5 * (propagated + propagated.T))
+
+
+def _covariance_sample(
+    epoch: datetime,
+    covariance: FloatArray,
+    *,
+    state_transition_matrix: FloatArray,
+    accumulated_state_transition_matrix: FloatArray,
+    process_noise_covariance: FloatArray,
+    metadata: dict[str, object],
+) -> CovarianceSample:
+    return CovarianceSample(
+        epoch=epoch,
+        covariance=_matrix_to_nested_list(covariance),
+        state_transition_matrix=_matrix_to_nested_list(state_transition_matrix),
+        accumulated_state_transition_matrix=_matrix_to_nested_list(
+            accumulated_state_transition_matrix
+        ),
+        process_noise_covariance=_matrix_to_nested_list(process_noise_covariance),
+        metadata=metadata,
+    )
+
+
+def _covariance_metadata(scenario: Scenario, covariance: FloatArray | None) -> dict[str, object]:
+    if covariance is None:
+        return {}
+    process_noise_acceleration = scenario.covariance_process_noise_acceleration_km_s2
+    return {
+        "covariance_model": "orekit_finite_difference_state_transition",
+        "covariance_state_transition_storage": "per_sample_and_accumulated",
+        "covariance_process_noise": _covariance_process_noise_model(process_noise_acceleration),
+        "covariance_process_noise_acceleration_km_s2": process_noise_acceleration,
+        "covariance_process_noise_storage": "per_sample_matrix",
+        "covariance_finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
+        "covariance_finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
+    }
+
+
 def propagate_orekit(
     scenario: Scenario,
     *,
@@ -199,6 +374,18 @@ def propagate_orekit(
     frame = runtime.frames_factory.getEME2000()
     orbit = _initial_orbit(scenario, runtime, frame)
     propagator_config = _build_propagator_config(scenario, runtime, orbit)
+    covariance_matrix = _initial_covariance_matrix(scenario)
+    process_noise = _process_noise_covariance(
+        scenario.covariance_process_noise_acceleration_km_s2,
+        scenario.propagation.step_s,
+    )
+    zero_process_noise = np.zeros((6, 6), dtype=np.float64)
+    identity_transition = np.eye(6, dtype=np.float64)
+    accumulated_transition = identity_transition.copy()
+    previous_transition = identity_transition.copy()
+    previous_process_noise = zero_process_noise
+    previous_transition_step_s = 0.0
+    covariance_history: list[CovarianceSample] = []
 
     samples: list[TrajectorySample] = []
     for step_index in range(scenario.propagation.sample_count):
@@ -207,37 +394,91 @@ def propagate_orekit(
         )
         target_date = absolute_date_from_datetime(runtime, epoch)
         spacecraft_state = propagator_config.propagator.propagate(target_date)
-        propagated_pv = spacecraft_state.getPVCoordinates(frame)
-        propagated_position = propagated_pv.getPosition()
-        propagated_velocity = propagated_pv.getVelocity()
+        state_vector = _state_vector_from_spacecraft_state(runtime, spacecraft_state, frame)
         samples.append(
             TrajectorySample(
                 epoch=epoch,
-                state=CartesianState(
-                    position_km=(
-                        m_to_km(float(propagated_position.getX())),
-                        m_to_km(float(propagated_position.getY())),
-                        m_to_km(float(propagated_position.getZ())),
-                    ),
-                    velocity_km_s=(
-                        m_s_to_km_s(float(propagated_velocity.getX())),
-                        m_s_to_km_s(float(propagated_velocity.getY())),
-                        m_s_to_km_s(float(propagated_velocity.getZ())),
-                    ),
-                ),
+                state=_cartesian_from_state_vector(state_vector),
             )
         )
+        if covariance_matrix is not None:
+            covariance_history.append(
+                _covariance_sample(
+                    epoch,
+                    covariance_matrix,
+                    state_transition_matrix=previous_transition,
+                    accumulated_state_transition_matrix=accumulated_transition,
+                    process_noise_covariance=previous_process_noise,
+                    metadata={
+                        "covariance_sample_role": (
+                            "initial" if step_index == 0 else "propagated"
+                        ),
+                        "covariance_model": "orekit_finite_difference_state_transition",
+                        "state_transition_model": (
+                            "identity" if step_index == 0 else "orekit_finite_difference"
+                        ),
+                        "transition_step_s": previous_transition_step_s,
+                        "process_noise_model": (
+                            "none"
+                            if step_index == 0
+                            else _covariance_process_noise_model(
+                                scenario.covariance_process_noise_acceleration_km_s2
+                            )
+                        ),
+                        "process_noise_acceleration_km_s2": (
+                            0.0
+                            if step_index == 0
+                            else scenario.covariance_process_noise_acceleration_km_s2
+                        ),
+                        "finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
+                        "finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
+                    },
+                )
+            )
+
+            if step_index < scenario.propagation.sample_count - 1:
+                next_epoch = scenario.initial_state.epoch + timedelta(
+                    seconds=(step_index + 1) * scenario.propagation.step_s
+                )
+
+                def advance_trial(
+                    trial_state: FloatArray,
+                    *,
+                    start_epoch: datetime = epoch,
+                    target_epoch: datetime = next_epoch,
+                ) -> FloatArray:
+                    return _propagate_state_vector(
+                        scenario,
+                        runtime,
+                        frame,
+                        trial_state,
+                        start_epoch,
+                        target_epoch,
+                    )
+
+                transition = _finite_difference_state_transition(state_vector, advance_trial)
+                covariance_matrix = _propagate_covariance(
+                    covariance_matrix,
+                    transition,
+                    process_noise,
+                )
+                accumulated_transition = cast(FloatArray, transition @ accumulated_transition)
+                previous_transition = transition
+                previous_process_noise = process_noise
+                previous_transition_step_s = scenario.propagation.step_s
 
     return Trajectory(
         scenario_id=scenario.scenario_id,
         samples=samples,
         force_model=scenario.force_model,
         backend="orekit",
+        covariance_history=covariance_history,
         metadata={
             "wrapper": runtime.wrapper,
             "wrapper_version": runtime.wrapper_version,
             "data_path": runtime.data_path,
             **propagator_config.metadata,
             "units": "suite km/km_s converted to Orekit m/m_s",
+            **_covariance_metadata(scenario, _initial_covariance_matrix(scenario)),
         },
     )
