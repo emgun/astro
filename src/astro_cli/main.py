@@ -12,6 +12,7 @@ from astro_backends.jax import research_od_sensitivity_jax, research_propagate_j
 from astro_backends.orekit import estimate_orekit_native, run_orekit_smoke
 from astro_backends.rocketpy import run_rocketpy_smoke
 from astro_backends.tudat import run_tudat_smoke
+from astro_core.eop import load_iers_finals_eop
 from astro_core.errors import (
     InvalidMeasurementFileError,
     InvalidScenarioError,
@@ -265,6 +266,36 @@ def validate(scenario_path: Annotated[Path, typer.Argument(exists=True, readable
     scenario = _load_scenario_or_exit(scenario_path)
 
     typer.echo(f"valid scenario: {scenario.scenario_id}")
+
+
+@app.command("import-earth-orientation")
+def import_earth_orientation(
+    eop_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    eop_format: Annotated[
+        str,
+        typer.Option("--format", help="Earth-orientation input format: iers-finals."),
+    ] = "iers-finals",
+    source: Annotated[
+        str,
+        typer.Option("--source", help="Source label to store on the EOP table."),
+    ] = "iers-finals",
+) -> None:
+    """Import an Earth-orientation table into suite JSON."""
+    try:
+        if eop_format.lower() != "iers-finals":
+            raise ValueError(f"unsupported Earth-orientation format: {eop_format}")
+        earth_orientation = load_iers_finals_eop(eop_path, source=source)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(
+        output,
+        earth_orientation.model_dump_json(indent=2),
+        "earth orientation",
+    )
+    typer.echo(f"wrote earth orientation: {output}")
 
 
 @app.command("orekit-smoke")

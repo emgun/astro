@@ -173,6 +173,31 @@ def test_validate_command_accepts_example_scenario() -> None:
     assert "leo-two-body" in result.stdout
 
 
+def test_import_earth_orientation_command_reads_iers_finals(tmp_path: Path) -> None:
+    output = tmp_path / "eop.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "import-earth-orientation",
+            "examples/eop/finals2000A_excerpt.txt",
+            "--format",
+            "iers-finals",
+            "--source",
+            "cli-finals2000A",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote earth orientation" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["source"] == "cli-finals2000A"
+    assert len(payload["samples"]) == 2
+    assert payload["samples"][0]["ut1_minus_utc_s"] == 0.073
+
+
 def test_propagate_command_writes_json(tmp_path: Path) -> None:
     output = tmp_path / "trajectory.json"
 

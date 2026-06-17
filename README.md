@@ -130,6 +130,7 @@ astro batch-report-tuned-launch examples/launch/pitch_program_two_stage.yaml --p
 astro compare-tuned-launch-reports tuned_launch_report_baseline.json tuned_launch_report_candidate.json --output tuned_launch_comparison.json
 astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
 astro propagate insertion.yaml --backend local --output insertion_trajectory.json
+astro import-earth-orientation examples/eop/finals2000A_excerpt.txt --format iers-finals --source finals2000A-example --output earth_orientation.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output measurements.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend orekit --output orekit_measurements.json
 astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output angle_measurements.json
@@ -251,8 +252,9 @@ epoch using a deterministic UTC sidereal-time model by default. Scenarios may al
 `polar_motion_y_arcsec`, and a `source` label, or a `samples` table with timestamped values that
 are linearly interpolated per measurement epoch. These values drive an approximate EOP-aware
 Earth-fixed to inertial correction for geodetic station pointing. This supports explicit fixed EOP
-values and simple tabulated interpolation, but it is not a full IERS finals parser or
-precession/nutation reduction. JSON inputs
+values, simple tabulated interpolation, and `astro import-earth-orientation --format iers-finals`
+conversion from IERS finals/finals2000A-style rows into suite Earth-orientation JSON. It is not a
+full precession/nutation reduction. JSON inputs
 match the output of `astro synth-measurements`; CSV and TDM inputs are auto-detected by `.csv` and
 `.tdm` extensions or can be forced with `--format csv` / `--format tdm`.
 

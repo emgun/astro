@@ -1,4 +1,5 @@
 from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM, SECONDS_PER_DAY
+from astro_core.eop import load_iers_finals_eop, parse_iers_finals_eop
 from astro_core.errors import (
     AstroError,
     InvalidMeasurementFileError,
@@ -70,6 +71,8 @@ __all__ = [
     "TrajectoryEvent",
     "TrajectorySample",
     "UnsupportedBackendError",
+    "load_iers_finals_eop",
     "load_scenario",
     "load_trajectory",
+    "parse_iers_finals_eop",
 ]

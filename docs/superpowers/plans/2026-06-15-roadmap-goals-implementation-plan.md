@@ -28,7 +28,8 @@ Implemented and protected:
 - Core package scaffold, CLI entrypoint, strict typing, linting, and tests.
 - `astro_core` scenario, state, spacecraft, force model, ECI and WGS-84 geodetic ground station,
   fixed and tabulated-interpolation Earth-orientation correction, measurement, trajectory, and
-  estimate products.
+  estimate products, plus IERS finals/finals2000A-style Earth-orientation ingest for UT1-UTC and
+  polar motion samples.
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV export and CCSDS
   OEM ephemeris export/import,
@@ -50,10 +51,9 @@ Still roadmap-level:
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
 - Live Tudat cross-check environment/body construction.
-- Full IERS finals parsing/precession-nutation reductions, operational DSN light-time/media
-  corrections for two-way/three-way radiometrics, and operational CCSDS support beyond current KVN
-  TDM measurement families, suite multi-leg radiometric TDM extension, and OEM ephemeris
-  interchange.
+- Full precession-nutation reductions, operational DSN light-time/media corrections for
+  two-way/three-way radiometrics, and operational CCSDS support beyond current KVN TDM measurement
+  families, suite multi-leg radiometric TDM extension, and OEM ephemeris interchange.
 - Richer JAX high-fidelity force models and full differentiable OD estimator workflows.
 
 ## Goal Ledger
@@ -161,7 +161,9 @@ Implemented slice:
   `latitude_deg`/`longitude_deg`/`altitude_km` definitions, with geodetic stations rotated into
   inertial measurement geometry at each measurement epoch using a deterministic UTC sidereal-time
   model, scenario-provided fixed Earth-orientation corrections, or linearly interpolated tabulated
-  Earth-orientation samples for UT1-UTC and polar motion.
+  Earth-orientation samples for UT1-UTC and polar motion. `astro import-earth-orientation
+  --format iers-finals` converts IERS finals/finals2000A-style rows into suite
+  `EarthOrientationConfig` JSON for those tabulated samples.
 - OD metadata records the selected propagation backend, estimator settings, residual statistics,
   convergence diagnostics, validation trajectory backend, and Orekit wrapper/version/data/propagator
   provenance when Orekit propagation metadata is available.
