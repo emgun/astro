@@ -54,7 +54,7 @@ Still roadmap-level:
   corrections for two-way/three-way radiometrics, and operational CCSDS support beyond current KVN
   TDM measurement families, suite multi-leg radiometric TDM extension, and OEM ephemeris
   interchange.
-- Richer JAX force models, sensitivities, and differentiable OD workflows.
+- Richer JAX high-fidelity force models and full differentiable OD estimator workflows.
 
 ## Goal Ledger
 
@@ -298,9 +298,10 @@ Tradeoff:
 Status: high-fidelity/research backend slices implemented for runtime gates, product boundaries,
 and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke commands, Tudat propagation
 dispatch, built-in JAX two-body and J2 research propagation runners, opt-in JAX final-state
-transition sensitivities, and a Nyx/ANISE evaluation gate are implemented. Live Tudat environment
-construction and JAX high-fidelity force flags or differentiable OD workflows remain gated on
-validated runner implementations.
+transition sensitivities, JAX range/range-rate OD residual Jacobian products, and a Nyx/ANISE
+evaluation gate are implemented. Live Tudat environment construction, JAX high-fidelity force
+flags, and full differentiable OD estimator workflows remain gated on validated runner
+implementations.
 
 Implemented slice:
 
@@ -312,12 +313,17 @@ Implemented slice:
   returns suite `MonteCarloResult` products.
 - `astro research-propagate --backend jax --include-sensitivities` records a nominal final-state
   transition matrix in `MonteCarloResult.metadata` using JAX autodiff.
+- `astro research-od-sensitivity --backend jax` records normalized range/range-rate residuals and
+  a residual Jacobian with respect to the initial Cartesian state in an `OdSensitivityResult`.
 - `docs/research/nyx-evaluation.md` records the current Nyx/ANISE decision as evaluation-only.
 
 Definition of done:
 
 - `astro propagate --backend tudat` supports at least one cross-check scenario and records Tudat provenance once a validated Tudat runner is supplied.
-- `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation without replacing operational Orekit semantics; high-fidelity force flags and differentiable OD still require validated JAX runners.
+- `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation without
+  replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` provides
+  the first differentiable OD residual/Jacobian primitive. High-fidelity force flags and full
+  differentiable OD estimators still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.
 - Batch acceleration and Monte Carlo workflows preserve deterministic seeds and validation tolerances.
 

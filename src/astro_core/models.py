@@ -838,6 +838,45 @@ class EstimateResult(AstroModel):
         return _integer_input_must_be_int(value, "EstimateResult iterations")
 
 
+class OdSensitivityResult(AstroModel):
+    scenario_id: str = Field(min_length=1)
+    backend: str = Field(min_length=1)
+    measurement_count: int = Field(ge=0)
+    state_dimension: int = Field(gt=0)
+    residuals: list[FiniteFloat]
+    jacobian: list[list[FiniteFloat]]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("measurement_count", "state_dimension", mode="before")
+    @classmethod
+    def dimension_inputs_must_be_integer(cls, value: Any) -> Any:
+        return _integer_input_must_be_int(value, "OD sensitivity dimension")
+
+    @field_validator("residuals", mode="before")
+    @classmethod
+    def residual_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_sequence_input_must_be_numbers(value, "OD sensitivity residuals")
+
+    @field_validator("jacobian", mode="before")
+    @classmethod
+    def jacobian_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_matrix_input_must_be_numbers(value, "OD sensitivity Jacobian")
+
+    @model_validator(mode="after")
+    def validate_residual_jacobian_shape(self) -> OdSensitivityResult:
+        if len(self.residuals) != self.measurement_count:
+            raise ValueError("OD sensitivity residuals length must match measurement_count")
+        if len(self.jacobian) != self.measurement_count:
+            raise ValueError("OD sensitivity Jacobian rows must match measurement_count")
+        if any(len(row) != self.state_dimension for row in self.jacobian):
+            raise ValueError("OD sensitivity Jacobian columns must match state_dimension")
+        if any(not isfinite(component) for component in self.residuals):
+            raise ValueError("OD sensitivity residuals must be finite")
+        if any(not isfinite(component) for row in self.jacobian for component in row):
+            raise ValueError("OD sensitivity Jacobian values must be finite")
+        return self
+
+
 class Scenario(AstroModel):
     model_config = ConfigDict(extra="forbid", use_enum_values=False)
 

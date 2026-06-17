@@ -1,4 +1,4 @@
-from astro_backends.jax.propagation import research_propagate_jax
+from astro_backends.jax.propagation import research_od_sensitivity_jax, research_propagate_jax
 from astro_backends.jax.runtime import (
     JaxRuntime,
     JaxRuntimeUnavailable,
@@ -11,6 +11,7 @@ __all__ = [
     "JaxRuntimeUnavailable",
     "JaxSmokeResult",
     "load_jax_runtime",
+    "research_od_sensitivity_jax",
     "research_propagate_jax",
     "run_jax_smoke",
 ]

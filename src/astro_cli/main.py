@@ -8,7 +8,7 @@ import typer
 import yaml
 
 from astro_backends.dymos import optimize_launch_dymos, run_dymos_smoke
-from astro_backends.jax import research_propagate_jax, run_jax_smoke
+from astro_backends.jax import research_od_sensitivity_jax, research_propagate_jax, run_jax_smoke
 from astro_backends.orekit import estimate_orekit_native, run_orekit_smoke
 from astro_backends.rocketpy import run_rocketpy_smoke
 from astro_backends.tudat import run_tudat_smoke
@@ -468,6 +468,52 @@ def research_propagate(
     )
     _write_text_or_exit(output, result.model_dump_json(indent=2), "research propagation")
     typer.echo(f"wrote research propagation: {output}")
+
+
+@app.command("research-od-sensitivity")
+def research_od_sensitivity(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    measurements_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    measurement_format: Annotated[
+        str,
+        typer.Option("--format", help="Measurement file format: auto, json, csv, or tdm."),
+    ] = "auto",
+    backend: Annotated[str, typer.Option()] = "jax",
+) -> None:
+    """Compute a research OD residual Jacobian product."""
+    scenario = _load_scenario_or_exit(scenario_path)
+    try:
+        resolved_measurement_format = resolve_measurement_format(
+            measurements_path,
+            measurement_format,
+        )
+        measurements = load_measurements(
+            measurements_path,
+            expected_scenario_id=scenario.scenario_id,
+            measurement_format=resolved_measurement_format,
+        )
+        if backend != "jax":
+            raise UnsupportedBackendError(
+                f"research OD sensitivity backend {backend!r} is unsupported; use jax"
+            )
+        result = research_od_sensitivity_jax(scenario, measurements)
+    except (InvalidMeasurementFileError, UnsupportedBackendError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    result = result.model_copy(
+        update={
+            "metadata": {
+                **result.metadata,
+                "workflow": "research_od_sensitivity",
+                "measurement_file": str(measurements_path),
+                "measurement_format": resolved_measurement_format,
+            }
+        }
+    )
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "OD sensitivity")
+    typer.echo(f"wrote OD sensitivity: {output}")
 
 
 @app.command()

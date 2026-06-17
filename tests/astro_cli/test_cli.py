@@ -397,6 +397,58 @@ def test_research_propagate_command_accepts_jax_backend(
     assert payload["backend"] == "jax"
 
 
+def test_research_od_sensitivity_command_accepts_jax_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    scenario = _observable_scenario()
+    measurements_path = tmp_path / "measurements.json"
+    output = tmp_path / "od_sensitivity.json"
+    _write_measurements(measurements_path, scenario)
+    seen: dict[str, object] = {}
+
+    def fake_jax_od_sensitivity(
+        candidate: Scenario,
+        measurements: list[MeasurementRecord],
+    ) -> object:
+        seen["scenario_id"] = candidate.scenario_id
+        seen["measurement_count"] = len(measurements)
+        from astro_core.models import OdSensitivityResult
+
+        return OdSensitivityResult(
+            scenario_id=candidate.scenario_id,
+            backend="jax",
+            measurement_count=len(measurements),
+            state_dimension=6,
+            residuals=[0.0 for _ in measurements],
+            jacobian=[[0.0 for _ in range(6)] for _ in measurements],
+            metadata={"adapter": "jax"},
+        )
+
+    monkeypatch.setattr("astro_cli.main.research_od_sensitivity_jax", fake_jax_od_sensitivity)
+
+    result = runner.invoke(
+        app,
+        [
+            "research-od-sensitivity",
+            "examples/scenarios/leo_two_station_od.yaml",
+            str(measurements_path),
+            "--backend",
+            "jax",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen == {"scenario_id": scenario.scenario_id, "measurement_count": 44}
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == scenario.scenario_id
+    assert payload["backend"] == "jax"
+    assert payload["measurement_count"] == 44
+    assert payload["metadata"]["workflow"] == "research_od_sensitivity"
+
+
 def test_launch_command_writes_json(tmp_path: Path) -> None:
     scenario_path = tmp_path / "launch.yaml"
     output = tmp_path / "launch.json"

@@ -24,6 +24,7 @@ def test_packages_import() -> None:
         "Maneuver",
         "MU_EARTH_KM3_S2",
         "NumericalConvergenceError",
+        "OdSensitivityResult",
         "R_EARTH_KM",
         "SECONDS_PER_DAY",
         "Scenario",

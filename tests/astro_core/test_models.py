@@ -22,6 +22,7 @@ from astro_core.models import (
     MeasurementNoise,
     MeasurementRecord,
     MeasurementType,
+    OdSensitivityResult,
     OrbitRepresentation,
     OrbitState,
     PropagationConfig,
@@ -117,6 +118,20 @@ def make_estimate_result(**overrides: object) -> EstimateResult:
     }
     payload.update(overrides)
     return EstimateResult(**payload)
+
+
+def make_od_sensitivity_result(**overrides: object) -> OdSensitivityResult:
+    payload = {
+        "scenario_id": "leo-demo",
+        "backend": "jax",
+        "measurement_count": 2,
+        "state_dimension": 6,
+        "residuals": [0.1, -0.1],
+        "jacobian": [[0.0 for _ in range(6)] for _ in range(2)],
+        "metadata": {"model": "unit-test"},
+    }
+    payload.update(overrides)
+    return OdSensitivityResult(**payload)
 
 
 def assert_epoch_rejected(epoch: object) -> None:
@@ -793,6 +808,28 @@ def test_estimate_result_rejects_numpy_array_outputs() -> None:
 
     with pytest.raises(ValidationError, match="NumPy arrays"):
         make_estimate_result(covariance=np.array([[True] * 6 for _ in range(6)], dtype=object))
+
+
+def test_od_sensitivity_result_accepts_rectangular_jacobian() -> None:
+    result = make_od_sensitivity_result()
+
+    assert result.scenario_id == "leo-demo"
+    assert result.backend == "jax"
+    assert result.measurement_count == 2
+    assert result.state_dimension == 6
+    assert len(result.jacobian) == 2
+    assert all(len(row) == 6 for row in result.jacobian)
+
+
+def test_od_sensitivity_result_rejects_mismatched_residual_and_jacobian_shapes() -> None:
+    with pytest.raises(ValidationError, match="measurement_count"):
+        make_od_sensitivity_result(measurement_count=3)
+
+    with pytest.raises(ValidationError, match="state_dimension"):
+        make_od_sensitivity_result(jacobian=[[0.0, 1.0], [0.0, 1.0]])
+
+    with pytest.raises(ValidationError, match="finite"):
+        make_od_sensitivity_result(residuals=[0.0, float("nan")])
 
 
 def test_spacecraft_requires_positive_mass_and_area() -> None:

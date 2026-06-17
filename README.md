@@ -146,6 +146,7 @@ astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measureme
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend orekit --output orekit_estimate.json
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --estimator orekit-native --output orekit_native_estimate.json
 astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output research_propagation.json
+astro research-od-sensitivity examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --output od_sensitivity.json
 astro orekit-smoke
 ```
 
@@ -271,6 +272,12 @@ scenarios. With `--include-sensitivities`, the JAX path adds a nominal final-sta
 computed through JAX autodiff to the `MonteCarloResult` metadata. JAX remains a research backend,
 not a replacement for operational Orekit semantics or validated high-fidelity force-model
 combinations.
+
+`astro research-od-sensitivity --backend jax` loads an explicit measurement file and writes an
+`OdSensitivityResult` containing normalized OD residuals and the residual Jacobian with respect to
+the initial Cartesian state. This is the first differentiable OD primitive for range/range-rate
+workflows; it currently supports two-body/J2 force models and measurement epochs aligned with
+propagation samples.
 
 CSV inputs use one row per measurement with these required columns:
 

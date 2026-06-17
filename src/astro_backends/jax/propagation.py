@@ -13,6 +13,9 @@ from astro_core.errors import UnsupportedBackendError
 from astro_core.models import (
     CartesianState,
     ForceModelName,
+    MeasurementRecord,
+    MeasurementType,
+    OdSensitivityResult,
     Scenario,
     Trajectory,
     TrajectorySample,
@@ -23,6 +26,8 @@ from astro_dynamics.monte_carlo import MonteCarloCase, MonteCarloResult
 JaxRuntimeLoader = Callable[[], JaxRuntime]
 JaxResearchRunner = Callable[[Scenario, JaxRuntime, int, float, float, int], MonteCarloResult]
 _MAX_RK4_INTERNAL_STEP_S = 30.0
+_STATE_DIMENSION = 6
+_SUPPORTED_JAX_OD_MEASUREMENTS = {MeasurementType.RANGE, MeasurementType.RANGE_RATE}
 
 
 def _validate_research_inputs(
@@ -249,6 +254,119 @@ def _propagate_nominal_final_state(
     return state[0]
 
 
+def _initial_state_vector(scenario: Scenario) -> np.ndarray:
+    return np.concatenate(
+        (
+            np.asarray(scenario.initial_state.cartesian.position_km, dtype=np.float64),
+            np.asarray(scenario.initial_state.cartesian.velocity_km_s, dtype=np.float64),
+        )
+    )
+
+
+def _jax_state_history(jnp: Any, scenario: Scenario, state_vector: Any) -> Any:
+    state = jnp.reshape(state_vector, (1, _STATE_DIMENSION))
+    samples = []
+    for sample_index in range(scenario.propagation.sample_count):
+        samples.append(state[0])
+        if sample_index < scenario.propagation.sample_count - 1:
+            state = _rk4_step(
+                jnp,
+                state,
+                scenario.propagation.step_s,
+                scenario.force_model.gravity,
+            )
+    return jnp.stack(samples, axis=0)
+
+
+def _measurement_sample_index(scenario: Scenario, record: MeasurementRecord) -> int:
+    elapsed_s = (record.epoch - scenario.initial_state.epoch).total_seconds()
+    sample_index = round(elapsed_s / scenario.propagation.step_s)
+    expected_elapsed_s = sample_index * scenario.propagation.step_s
+    if (
+        sample_index < 0
+        or sample_index >= scenario.propagation.sample_count
+        or abs(elapsed_s - expected_elapsed_s) > 1.0e-9
+    ):
+        raise UnsupportedBackendError(
+            "JAX OD sensitivity requires measurement epochs to align with propagation samples"
+        )
+    return sample_index
+
+
+def _jax_od_measurement_specs(
+    scenario: Scenario,
+    measurements: list[MeasurementRecord],
+) -> list[tuple[MeasurementType, int, np.ndarray, float, float]]:
+    if not measurements:
+        raise UnsupportedBackendError("JAX OD sensitivity requires at least one measurement")
+    stations = {station.name: station for station in scenario.ground_stations}
+    specs: list[tuple[MeasurementType, int, np.ndarray, float, float]] = []
+    for record in measurements:
+        if record.measurement_type not in _SUPPORTED_JAX_OD_MEASUREMENTS:
+            raise UnsupportedBackendError(
+                "JAX OD sensitivity currently supports only range and range_rate measurements; "
+                f"unsupported measurement type: {record.measurement_type}"
+            )
+        if record.observed_object != scenario.spacecraft.name:
+            raise UnsupportedBackendError(
+                "JAX OD sensitivity measurement observed object "
+                f"{record.observed_object!r} does not match scenario spacecraft "
+                f"{scenario.spacecraft.name!r}"
+            )
+        try:
+            station = stations[record.observer]
+        except KeyError as exc:
+            raise UnsupportedBackendError(
+                "JAX OD sensitivity measurement observer "
+                f"{record.observer!r} is not in the scenario"
+            ) from exc
+        sample_index = _measurement_sample_index(scenario, record)
+        station_position = station.position_array(record.epoch, scenario.earth_orientation)
+        specs.append(
+            (
+                record.measurement_type,
+                sample_index,
+                np.asarray(station_position, dtype=np.float64),
+                float(record.value),
+                float(record.sigma),
+            )
+        )
+    return specs
+
+
+def _jax_od_residual_vector(
+    jnp: Any,
+    scenario: Scenario,
+    measurement_specs: list[tuple[MeasurementType, int, np.ndarray, float, float]],
+    state_vector: Any,
+) -> Any:
+    state_history = _jax_state_history(jnp, scenario, state_vector)
+    residuals = []
+    for measurement_type, sample_index, station_position, value, sigma in measurement_specs:
+        sample_state = state_history[sample_index]
+        position = sample_state[:3]
+        velocity = sample_state[3:]
+        station = jnp.asarray(station_position)
+        relative_position = position - station
+        distance = jnp.linalg.norm(relative_position)
+        if measurement_type is MeasurementType.RANGE:
+            predicted = distance
+        else:
+            line_of_sight = relative_position / distance
+            predicted = jnp.dot(velocity, line_of_sight)
+        residuals.append((predicted - value) / sigma)
+    return jnp.stack(residuals)
+
+
+def _unique_measurement_type_values(measurements: list[MeasurementRecord]) -> list[str]:
+    values: list[str] = []
+    for measurement in measurements:
+        value = measurement.measurement_type.value
+        if value not in values:
+            values.append(value)
+    return values
+
+
 def _final_state_transition_matrix(
     scenario: Scenario,
     runtime: JaxRuntime,
@@ -262,18 +380,61 @@ def _final_state_transition_matrix(
         )
 
     jnp = runtime.jnp_module
-    initial = np.concatenate(
-        (
-            np.asarray(scenario.initial_state.cartesian.position_km, dtype=np.float64),
-            np.asarray(scenario.initial_state.cartesian.velocity_km_s, dtype=np.float64),
-        )
-    )
+    initial = _initial_state_vector(scenario)
 
     def final_state(state_vector: Any) -> Any:
         return _propagate_nominal_final_state(jnp, scenario, state_vector)
 
     transition_matrix = np.asarray(jacfwd(final_state)(jnp.asarray(initial)), dtype=np.float64)
     return [[float(component) for component in row] for row in transition_matrix]
+
+
+def research_od_sensitivity_jax(
+    scenario: Scenario,
+    measurements: list[MeasurementRecord],
+    *,
+    runtime_loader: JaxRuntimeLoader = load_jax_runtime,
+) -> OdSensitivityResult:
+    _validate_jax_force_model(scenario)
+    runtime = runtime_loader()
+    jacfwd = getattr(runtime.jax_module, "jacfwd", None)
+    if jacfwd is None:
+        raise UnsupportedBackendError(
+            "JAX OD sensitivity requires jax.jacfwd; install a complete "
+            "astro-suite[research] JAX runtime."
+        )
+
+    jnp = runtime.jnp_module
+    measurement_specs = _jax_od_measurement_specs(scenario, measurements)
+    initial = _initial_state_vector(scenario)
+
+    def residual_function(state_vector: Any) -> Any:
+        return _jax_od_residual_vector(
+            jnp,
+            scenario,
+            measurement_specs,
+            state_vector,
+        )
+
+    residuals = np.asarray(residual_function(jnp.asarray(initial)), dtype=np.float64)
+    jacobian = np.asarray(jacfwd(residual_function)(jnp.asarray(initial)), dtype=np.float64)
+    return OdSensitivityResult(
+        scenario_id=scenario.scenario_id,
+        backend="jax",
+        measurement_count=len(measurements),
+        state_dimension=_STATE_DIMENSION,
+        residuals=[float(value) for value in residuals],
+        jacobian=[[float(component) for component in row] for row in jacobian],
+        metadata={
+            "adapter": "jax",
+            "jax_version": runtime.jax_version,
+            "jaxlib_version": runtime.jaxlib_version,
+            "sensitivity_model": "jax_jacfwd_od_residuals",
+            "force_model": scenario.force_model.gravity.value,
+            "measurement_types": _unique_measurement_type_values(measurements),
+            "residual_convention": "(predicted - observed) / sigma",
+        },
+    )
 
 
 def _with_jax_sensitivities(

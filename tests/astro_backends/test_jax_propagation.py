@@ -3,13 +3,14 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from astro_backends.jax.propagation import research_propagate_jax
+from astro_backends.jax.propagation import research_od_sensitivity_jax, research_propagate_jax
 from astro_backends.jax.runtime import JaxRuntime
 from astro_core.errors import UnsupportedBackendError
 from astro_core.io import load_scenario
 from astro_core.models import ForceModelConfig, ForceModelName, Scenario
 from astro_dynamics.local import propagate_local
 from astro_dynamics.monte_carlo import MonteCarloResult, run_initial_state_monte_carlo
+from astro_od.measurements import generate_synthetic_measurements
 
 
 def _fake_runtime() -> JaxRuntime:
@@ -128,6 +129,46 @@ def test_research_propagate_jax_can_include_final_state_sensitivities() -> None:
     assert np.all(np.isfinite(np.asarray(transition_matrix)))
     assert abs(transition_matrix[0][0]) > 0.0
     assert transition_matrix[0][3] > 0.0
+
+
+def test_research_od_sensitivity_jax_returns_residual_jacobian_product() -> None:
+    scenario = load_scenario("examples/scenarios/leo_two_station_od.yaml")
+    trajectory = propagate_local(scenario)
+    noisy_measurements = generate_synthetic_measurements(scenario, trajectory)
+    truth_measurements = [
+        record.model_copy(update={"value": record.metadata["truth"]})
+        for record in noisy_measurements
+    ]
+
+    result = research_od_sensitivity_jax(
+        scenario,
+        truth_measurements,
+        runtime_loader=_fake_autodiff_runtime,
+    )
+
+    jacobian = np.asarray(result.jacobian)
+    assert result.scenario_id == scenario.scenario_id
+    assert result.backend == "jax"
+    assert result.measurement_count == len(truth_measurements)
+    assert result.state_dimension == 6
+    assert result.metadata["sensitivity_model"] == "jax_jacfwd_od_residuals"
+    assert result.metadata["measurement_types"] == ["range", "range_rate"]
+    assert max(abs(value) for value in result.residuals) < 1.0e-6
+    assert jacobian.shape == (len(truth_measurements), 6)
+    assert np.all(np.isfinite(jacobian))
+    assert np.linalg.matrix_rank(jacobian) >= 6
+
+
+def test_research_od_sensitivity_jax_rejects_unsupported_measurement_type() -> None:
+    scenario = load_scenario("examples/scenarios/leo_doppler.yaml")
+    measurements = generate_synthetic_measurements(scenario, propagate_local(scenario))
+
+    with pytest.raises(UnsupportedBackendError, match="range and range_rate"):
+        research_od_sensitivity_jax(
+            scenario,
+            measurements,
+            runtime_loader=_fake_autodiff_runtime,
+        )
 
 
 def test_research_propagate_jax_rejects_unsupported_force_model() -> None:
