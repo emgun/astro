@@ -54,11 +54,14 @@ def test_packages_import() -> None:
         "two_body_acceleration_km_s2",
     }
     expected_od_exports = {
+        "DsnCalibrationProduct",
+        "DsnCalibrationSample",
         "azimuth_deg",
         "declination_deg",
         "doppler_hz",
         "elevation_deg",
         "estimate_initial_state",
+        "generate_dsn_calibration_product",
         "generate_synthetic_measurements",
         "light_time_s",
         "load_measurements",

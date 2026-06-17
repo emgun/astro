@@ -1210,6 +1210,29 @@ def test_synth_measurements_command_writes_json(tmp_path: Path) -> None:
     assert len(payload["measurements"]) == 22
 
 
+def test_dsn_calibration_command_writes_json(tmp_path: Path) -> None:
+    output = tmp_path / "dsn-calibration.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "dsn-calibration",
+            "examples/scenarios/leo_radiometric_weather_frequency.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "leo-radiometric-weather-frequency"
+    assert payload["calibration_model"] == "weather_frequency_range_delay"
+    assert payload["sample_count"] == len(payload["samples"])
+    assert payload["sample_count"] > 0
+    assert payload["metadata"]["media_frequency_hz"] == 8.4e9
+    assert "wrote DSN calibration" in result.stdout
+
+
 def test_synth_measurements_command_accepts_orekit_backend(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

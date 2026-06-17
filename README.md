@@ -327,9 +327,11 @@ media-corrections marker. Scenarios may set `radiometric_media_uplink_delay_km` 
 `radiometric_media_downlink_delay_km` for configured constant range-delay corrections, or set
 `radiometric_media_model: weather_frequency` to apply a configured surface-weather troposphere
 delay plus first-order TEC/frequency ionosphere group delay with per-leg elevation mapping.
-`radiometric_media_source` and the component delays are preserved in measurement metadata. These
-are configurable product and estimator primitives, not full DSN calibration pipelines. Angle
-records use degrees.
+`radiometric_media_source` and the component delays are preserved in measurement metadata.
+`astro dsn-calibration` turns those generated radiometric records into an auditable DSN-style media
+calibration summary product with per-record leg delays, elevation diagnostics, and aggregate delay
+statistics. This is a calibration product over the suite's supported radiometric primitives, not a
+full DSN ODF/TNF ingest or station-calibration pipeline. Angle records use degrees.
 Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
@@ -394,6 +396,12 @@ diagnostics. `examples/scenarios/leo_radiometric_media.yaml` adds configured con
 delays to the same product family. `examples/scenarios/leo_radiometric_weather_frequency.yaml`
 adds configured pressure, temperature, humidity, TEC, carrier frequency, and elevation mapping
 metadata for weather/frequency-dependent media corrections.
+
+```bash
+astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml \
+  --backend local \
+  --output /tmp/astro-dsn-calibration.json
+```
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,
 `PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped

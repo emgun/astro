@@ -183,8 +183,10 @@ Implemented slice:
   offsets, iteration count, tolerance, and media-correction metadata. Scenarios can configure
   constant uplink/downlink media range delays with a source label, or opt into a configured
   `weather_frequency` model with surface pressure, temperature, relative humidity, zenith TEC,
-  carrier frequency, and per-leg elevation mapping. These remain product and estimator primitives,
-  not full DSN calibration products.
+  carrier frequency, and per-leg elevation mapping. `astro dsn-calibration` now summarizes those
+  generated radiometric media records into a DSN-style calibration product with per-record leg
+  delays, elevation diagnostics, model/source provenance, and aggregate delay statistics. This is
+  not yet full DSN ODF/TNF ingest or station-calibration processing.
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
   checked-in iterative two-way/three-way radiometric synthesis fixture. `leo_radiometric_media.yaml`

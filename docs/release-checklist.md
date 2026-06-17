@@ -29,6 +29,7 @@ Use this checklist before tagging or publishing a release candidate.
 - [ ] `astro export-measurements /tmp/astro-doppler-measurements.json --format tdm --output /tmp/astro-doppler-measurements.tdm`
 - [ ] `astro synth-measurements examples/scenarios/leo_radiometric_media.yaml --backend local --output /tmp/astro-radiometric-media.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_radiometric_weather_frequency.yaml --backend local --output /tmp/astro-radiometric-weather-frequency.json`
+- [ ] `astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml --backend local --output /tmp/astro-dsn-calibration.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output /tmp/astro-topocentric-measurements.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml --backend local --output /tmp/astro-geodetic-precession-nutation-measurements.json`
