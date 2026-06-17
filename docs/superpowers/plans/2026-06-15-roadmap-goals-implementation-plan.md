@@ -220,13 +220,15 @@ and J2 variational covariance propagation with analytic two-body and finite-diff
 acceleration Jacobians, optional white-acceleration process noise, explicit per-sample and
 accumulated state-transition matrices, per-sample process-noise covariance matrices, Orekit
 finite-difference covariance propagation through the selected Orekit force model, seeded
-initial-state Monte Carlo, and commanded-attitude trajectory samples for maneuvered local
-propagation. The attitude-coupled finite-burn modes rotate thrust along instantaneous velocity or
+initial-state Monte Carlo, time-aligned conjunction screening, and commanded-attitude trajectory
+samples for maneuvered local propagation. The attitude-coupled finite-burn modes rotate thrust
+along instantaneous velocity or
 local radial directions and record body-to-inertial unit quaternion samples for the commanded body
 +X axis. Local orbital propagation annotates sampled periapsis/apoapsis radius extrema as
 `TrajectoryEvent` records for deterministic mission-analysis products; drag/SRP/third-body
-variational-equation covariance dynamics, sub-step root-solved event location, and torque-level
-attitude-control maneuver dynamics remain deferred.
+variational-equation covariance dynamics, sub-step root-solved event location,
+probability-of-collision analysis, and torque-level attitude-control maneuver dynamics remain
+deferred.
 
 Definition of done:
 

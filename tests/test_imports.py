@@ -35,6 +35,7 @@ def test_packages_import() -> None:
         "parse_iers_finals_eop",
     }
     expected_dynamics_exports = {
+        "ConjunctionScreeningResult",
         "MonteCarloCase",
         "MonteCarloResult",
         "acceleration_km_s2",
@@ -48,6 +49,7 @@ def test_packages_import() -> None:
         "propagate_with_backend",
         "rk4_step",
         "run_initial_state_monte_carlo",
+        "screen_conjunction",
         "two_body_acceleration_km_s2",
     }
     expected_od_exports = {

@@ -122,6 +122,7 @@ astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit -
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
+astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --output conjunction_screening.json
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke
 astro dymos-smoke
@@ -224,6 +225,11 @@ size. The optional `covariance_process_noise_acceleration_km_s2` field adds a si
 white-acceleration process-noise term over each propagation sample interval. This is useful for
 product wiring and first-order sensitivity screening; analytic variational-equation covariance
 dynamics, drag/SRP variational equations, and production conjunction analysis remain future work.
+
+`astro screen-conjunction` compares two trajectory products at common sample epochs and writes a
+deterministic first-order screening result with time of closest approach, miss distance, relative
+speed, threshold status, and relative-state metadata. It is a sample-aligned screening product, not a
+probability-of-collision or production conjunction assessment.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage

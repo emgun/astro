@@ -27,6 +27,7 @@ from astro_core.errors import (
 from astro_core.io import load_scenario, load_trajectory
 from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario, Trajectory
 from astro_dynamics.backends import propagate_with_backend
+from astro_dynamics.conjunction import screen_conjunction
 from astro_dynamics.ephemeris import (
     dump_trajectory_ephemeris_csv,
     dump_trajectory_oem,
@@ -430,6 +431,26 @@ def import_trajectory(
 
     _write_text_or_exit(output, trajectory.model_dump_json(indent=2), "trajectory")
     typer.echo(f"wrote trajectory: {output}")
+
+
+@app.command("screen-conjunction")
+def screen_conjunction_command(
+    primary_trajectory_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    secondary_trajectory_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    threshold_km: Annotated[float, typer.Option()] = 1.0,
+) -> None:
+    """Screen two time-aligned trajectory products for closest approach."""
+    primary = _load_trajectory_or_exit(primary_trajectory_path)
+    secondary = _load_trajectory_or_exit(secondary_trajectory_path)
+    try:
+        result = screen_conjunction(primary, secondary, threshold_km=threshold_km)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "conjunction screening")
+    typer.echo(f"wrote conjunction screening: {output}")
 
 
 @app.command("monte-carlo")

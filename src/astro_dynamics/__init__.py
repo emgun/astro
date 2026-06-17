@@ -1,4 +1,5 @@
 from astro_dynamics.backends import propagate_with_backend
+from astro_dynamics.conjunction import ConjunctionScreeningResult, screen_conjunction
 from astro_dynamics.ephemeris import (
     dump_trajectory_ephemeris_csv,
     dump_trajectory_oem,
@@ -20,6 +21,7 @@ from astro_dynamics.monte_carlo import (
 )
 
 __all__ = [
+    "ConjunctionScreeningResult",
     "MonteCarloCase",
     "MonteCarloResult",
     "acceleration_km_s2",
@@ -33,5 +35,6 @@ __all__ = [
     "propagate_with_backend",
     "rk4_step",
     "run_initial_state_monte_carlo",
+    "screen_conjunction",
     "two_body_acceleration_km_s2",
 ]
