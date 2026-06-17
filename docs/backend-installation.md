@@ -66,11 +66,11 @@ optional `rocketpy` launch-scenario section. Live RocketPy simulation currently 
 configured solid rockets and can annotate multistage suite scenarios with stage events/samples
 reached by one configured RocketPy flight, with metadata for whether the RocketPy solution covered
 the full suite stage schedule. That multistage path is a composition adapter, not a validated
-multi-motor RocketPy staging solver. Live Dymos optimization currently supports a small
+multi-motor RocketPy staging solver. Live Dymos optimization currently supports a stage-aware
 vertical-ascent phase transcription wrapped in the suite launch-tuning product, with suite
-stage-plan metadata and a coverage flag showing whether the phase duration spans the full stage
-schedule. Full multistage Dymos optimization still requires a validated backend runner before it
-should be promoted beyond the adapter gate.
+stage-plan metadata and a coverage flag showing that the phase duration spans the configured burn
+schedule. Full pitch-program multistage Dymos optimization still requires a validated backend runner
+before it should be promoted beyond the adapter gate.
 
 ## Research Backends
 

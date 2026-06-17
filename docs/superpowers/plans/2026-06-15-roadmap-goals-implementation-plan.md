@@ -47,13 +47,14 @@ Implemented and protected:
   force-model adapters, and a live-gated native Orekit OD bridge for geodetic range/range-rate
   records.
 - Optional RocketPy and Dymos/OpenMDAO launch backend gates, including configured RocketPy direct
-  flight mapping and a small Dymos vertical-ascent phase transcription.
+  flight mapping and a stage-aware Dymos vertical-ascent phase transcription.
 
 Still roadmap-level:
 
 - Higher-fidelity variational covariance propagation for drag/SRP/third-body dynamics and
   torque-level attitude-control maneuver dynamics.
-- Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization.
+- Full native multi-motor RocketPy staging and full pitch-program multistage Dymos ascent
+  optimization.
 - Live Tudat cross-check environment/body construction.
 - Full precession-nutation reductions, DSN calibration products beyond the current configurable
   weather/frequency media primitives, and operational CCSDS support beyond current KVN TDM
@@ -261,7 +262,16 @@ Primary files:
 
 ### Goal 4: Launch External Backends and Optimization
 
-Status: first external-backend boundary implemented, first live RocketPy direct runner added, RocketPy multistage suite-stage composition added, and first live Dymos/OpenMDAO phase transcription added. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured launch examples, configured solid RocketPy direct simulation, multistage suite stage-event/sample annotation around one configured RocketPy flight, stage-schedule completeness metadata, a neutral `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics, Dymos vertical-ascent phase transcription, Dymos suite stage-plan metadata, and Dymos adapter optimization diagnostics are implemented. Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization remain gated on validated backend runners.
+Status: first external-backend boundary implemented, first live RocketPy direct runner added,
+RocketPy multistage suite-stage composition added, and first live stage-aware Dymos/OpenMDAO phase
+transcription added. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch
+backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured
+launch examples, configured solid RocketPy direct simulation, multistage suite stage-event/sample
+annotation around one configured RocketPy flight, stage-schedule completeness metadata, a neutral
+`optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics,
+Dymos stage-aware vertical-ascent phase transcription, Dymos suite stage-plan metadata, and Dymos
+adapter optimization diagnostics are implemented. Full native multi-motor RocketPy staging and full
+pitch-program multistage Dymos ascent optimization remain gated on validated backend runners.
 
 Implemented slice:
 
@@ -282,9 +292,9 @@ Implemented slice:
   configured RocketPy flight, with metadata identifying the composition tradeoff and whether the
   RocketPy solution covered the full suite stage schedule.
 - `astro optimize-launch --backend local` runs the existing pitch-program tuner through a neutral optimization entry point.
-- `astro optimize-launch --backend dymos` runs a small Dymos/OpenMDAO vertical-ascent phase
-  transcription, then returns the existing suite launch-tuning product with explicit Dymos phase
-  diagnostics.
+- `astro optimize-launch --backend dymos` runs a stage-aware Dymos/OpenMDAO vertical-ascent phase
+  transcription that spans the configured burn schedule, then returns the existing suite
+  launch-tuning product with explicit Dymos phase diagnostics.
 - Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
   iteration count, candidate count, path-constraint summary, best score, target insertion
   residuals, Dymos version, OpenMDAO version, phase duration, final altitude, final velocity, and
@@ -299,11 +309,11 @@ Definition of done:
 - RocketPy adapter returns the existing `LaunchTrajectory` schema, not RocketPy-native objects.
 - RocketPy multistage suite composition reports reached stage ignition, burnout, separation, sample
   stage names, and stage-schedule completeness without claiming native RocketPy multi-motor staging.
-- `astro optimize-launch --backend dymos` solves a small ascent optimization example through a
-  bounded vertical-ascent Dymos phase model.
+- `astro optimize-launch --backend dymos` solves a stage-aware ascent optimization example through
+  a bounded vertical-ascent Dymos phase model.
 - Dymos/OpenMDAO adapter reports path constraints, optimizer status, convergence diagnostics, and target insertion residuals.
-- Dymos/OpenMDAO adapter reports the suite multistage plan without claiming the current
-  vertical-phase model is a full multistage ascent optimizer.
+- Dymos/OpenMDAO adapter reports the suite multistage plan and configured-burn coverage without
+  claiming the current vertical-phase model is a full pitch-program multistage ascent optimizer.
 - Launch validation includes deterministic direct-simulation cases and one small optimization case.
 - Launch-to-orbit handoff still produces a normal orbital `Scenario`.
 

@@ -17,10 +17,13 @@ DymosOptimizerRunner = Callable[[LaunchScenario, DymosRuntime], LaunchPitchTunin
 
 @dataclass(frozen=True)
 class DymosPhaseSummary:
+    phase_model: str
     transcription: str
     num_segments: int
     order: int
     duration_s: float
+    stage_count: int
+    total_burn_duration_s: float
     final_altitude_km: float
     final_velocity_km_s: float
     optimizer_success: bool
@@ -96,31 +99,67 @@ def _dymos_phase_duration_s(result: LaunchPitchTuningResult) -> float | None:
     return float(duration_s)
 
 
-def _thrust_acceleration_m_s2(scenario: LaunchScenario) -> float:
-    first_stage = scenario.vehicle.stages[0]
-    return max(first_stage.engine.thrust_n / scenario.vehicle.initial_mass_kg - 9.80665, 1.0e-6)
+def _stage_acceleration_schedule(
+    scenario: LaunchScenario,
+) -> list[dict[str, float | str]]:
+    schedule: list[dict[str, float | str]] = []
+    start_s = 0.0
+    mass_at_stage_start_kg = scenario.vehicle.initial_mass_kg
+    for stage in scenario.vehicle.stages:
+        burnout_s = start_s + stage.burn_duration_s
+        acceleration_m_s2 = max(
+            stage.engine.thrust_n / mass_at_stage_start_kg - 9.80665,
+            1.0e-6,
+        )
+        schedule.append(
+            {
+                "name": stage.name,
+                "start_s": start_s,
+                "burnout_s": burnout_s,
+                "acceleration_m_s2": acceleration_m_s2,
+            }
+        )
+        mass_at_stage_start_kg -= stage.dry_mass_kg + stage.propellant_mass_kg
+        start_s = burnout_s
+    return schedule
 
 
-def _vertical_ascent_ode_class(runtime: DymosRuntime) -> type[Any]:
+def _total_burn_duration_s(scenario: LaunchScenario) -> float:
+    return sum(stage.burn_duration_s for stage in scenario.vehicle.stages)
+
+
+def _vertical_ascent_ode_class(
+    runtime: DymosRuntime,
+    acceleration_schedule: list[dict[str, float | str]],
+) -> type[Any]:
     openmdao = runtime.openmdao_module
     explicit_component = openmdao.ExplicitComponent
 
     class VerticalAscentODE(explicit_component):  # type: ignore[misc, valid-type]
         def initialize(self) -> None:
             self.options.declare("num_nodes", types=int)
-            self.options.declare("acceleration_m_s2", types=float)
 
         def setup(self) -> None:
             num_nodes = self.options["num_nodes"]
+            self.add_input("t", val=np.zeros(num_nodes), units="s")
             self.add_input("v", val=np.zeros(num_nodes), units="m/s")
             self.add_output("h_dot", val=np.zeros(num_nodes), units="m/s")
             self.add_output("v_dot", val=np.zeros(num_nodes), units="m/s**2")
             rows = np.arange(num_nodes)
             self.declare_partials("h_dot", "v", rows=rows, cols=rows, val=1.0)
+            self.declare_partials("v_dot", "t", method="fd")
 
         def compute(self, inputs: Any, outputs: Any) -> None:
+            time_s = np.asarray(inputs["t"])
+            acceleration_m_s2 = np.full_like(time_s, -9.80665, dtype=np.float64)
+            for stage in acceleration_schedule:
+                start_s = float(stage["start_s"])
+                burnout_s = float(stage["burnout_s"])
+                stage_acceleration_m_s2 = float(stage["acceleration_m_s2"])
+                active = (time_s >= start_s) & (time_s <= burnout_s)
+                acceleration_m_s2 = np.where(active, stage_acceleration_m_s2, acceleration_m_s2)
             outputs["h_dot"] = inputs["v"]
-            outputs["v_dot"] = self.options["acceleration_m_s2"]
+            outputs["v_dot"] = acceleration_m_s2
 
     return VerticalAscentODE
 
@@ -137,11 +176,15 @@ def _solve_dymos_vertical_phase(
     runtime: DymosRuntime,
 ) -> DymosPhaseSummary:
     openmdao = runtime.openmdao_module
-    num_segments = 3
+    stage_schedule = _stage_acceleration_schedule(scenario)
+    total_burn_duration_s = _total_burn_duration_s(scenario)
+    num_segments = max(3, len(stage_schedule) * 2)
     order = 3
-    duration_upper_s = max(1.0, min(float(scenario.propagation.duration_s), 300.0))
-    duration_guess_s = max(1.0, duration_upper_s / 2.0)
-    acceleration_m_s2 = _thrust_acceleration_m_s2(scenario)
+    duration_upper_s = max(
+        total_burn_duration_s,
+        min(float(scenario.propagation.duration_s), 300.0),
+    )
+    duration_guess_s = max(total_burn_duration_s, duration_upper_s / 2.0)
 
     problem = runtime.problem(model=openmdao.Group(), reports=False)
     problem.driver = openmdao.ScipyOptimizeDriver()
@@ -150,15 +193,15 @@ def _solve_dymos_vertical_phase(
 
     trajectory = problem.model.add_subsystem("traj", runtime.trajectory())
     phase = runtime.phase(
-        ode_class=_vertical_ascent_ode_class(runtime),
-        ode_init_kwargs={"acceleration_m_s2": acceleration_m_s2},
+        ode_class=_vertical_ascent_ode_class(runtime, stage_schedule),
         transcription=runtime.transcription(num_segments=num_segments, order=order),
     )
     trajectory.add_phase("phase0", phase)
 
     phase.set_time_options(
         fix_initial=True,
-        duration_bounds=(1.0, duration_upper_s),
+        duration_bounds=(total_burn_duration_s, duration_upper_s),
+        targets=["t"],
         units="s",
     )
     phase.add_state(
@@ -186,10 +229,10 @@ def _solve_dymos_vertical_phase(
     phase.set_time_val(initial=0.0, duration=duration_guess_s, units="s")
     phase.set_state_val(
         "h",
-        [0.0, 0.5 * acceleration_m_s2 * duration_guess_s**2],
+        [0.0, 0.5 * duration_guess_s**2],
         units="m",
     )
-    phase.set_state_val("v", [0.0, acceleration_m_s2 * duration_guess_s], units="m/s")
+    phase.set_state_val("v", [0.0, duration_guess_s], units="m/s")
     problem.run_driver()
 
     times_s = np.ravel(problem.get_val("traj.phase0.timeseries.time", units="s"))
@@ -197,10 +240,13 @@ def _solve_dymos_vertical_phase(
     velocities_m_s = np.ravel(problem.get_val("traj.phase0.timeseries.v", units="m/s"))
     success, message = _driver_success_and_message(problem)
     return DymosPhaseSummary(
+        phase_model="stage_aware_vertical_ascent",
         transcription="GaussLobatto",
         num_segments=num_segments,
         order=order,
         duration_s=float(times_s[-1]),
+        stage_count=len(stage_schedule),
+        total_burn_duration_s=total_burn_duration_s,
         final_altitude_km=float(altitudes_m[-1] / 1000.0),
         final_velocity_km_s=float(velocities_m_s[-1] / 1000.0),
         optimizer_success=success,

@@ -29,8 +29,8 @@ The current implementation slice covers:
 
 Launch/ascent includes deliberately simple local vertical and pitch-program baselines plus a
 RocketPy direct-simulation path for explicitly configured single-stage solid rockets. Dymos/OpenMDAO
-is recognized as an optimization adapter boundary, but live Dymos phase transcription still requires
-backend-specific modeling beyond the aggregate local launch schema.
+is recognized as an optimization adapter boundary; its live phase transcription is currently a
+stage-aware vertical-ascent model rather than a full multistage optimal-control ascent solver.
 
 ## Setup
 
@@ -77,10 +77,10 @@ launch scenario, runs configured solid-rocket flights through RocketPy, preserve
 events/samples reached by a single configured RocketPy flight, including metadata for whether the
 RocketPy solution covered the full suite stage schedule. That multistage path is an adapter
 composition layer, not a validated multi-motor RocketPy staging solver. The `dymos` launch
-optimization path runs a small Dymos/OpenMDAO vertical-ascent phase transcription and returns the existing
-`LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan metadata, and a
-flag showing whether the Dymos phase duration covers the full stage schedule; full multistage Dymos
-ascent optimization remains future work.
+optimization path runs a stage-aware Dymos/OpenMDAO vertical-ascent phase transcription and returns
+the existing `LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan
+metadata, and a flag showing that the Dymos phase duration covers the configured burn schedule;
+full pitch-program multistage Dymos ascent optimization remains future work.
 
 Optional research backend smoke checks:
 
