@@ -29,6 +29,7 @@ from astro_core.models import CartesianState, ForceModelName, GroundStation, Sce
 from astro_dynamics.backends import propagate_with_backend
 from astro_dynamics.conjunction import screen_conjunction
 from astro_dynamics.ephemeris import (
+    dump_trajectory_aem,
     dump_trajectory_ephemeris_csv,
     dump_trajectory_oem,
     load_trajectory_oem,
@@ -382,7 +383,7 @@ def export_trajectory(
     output: Annotated[Path, typer.Option()],
     trajectory_format: Annotated[
         str,
-        typer.Option("--format", help="Output trajectory format: csv or oem."),
+        typer.Option("--format", help="Output trajectory format: csv, oem, or aem."),
     ] = "csv",
 ) -> None:
     """Export a trajectory product to an ephemeris table."""
@@ -392,6 +393,12 @@ def export_trajectory(
         payload = dump_trajectory_ephemeris_csv(trajectory)
     elif normalized_format == "oem":
         payload = dump_trajectory_oem(trajectory)
+    elif normalized_format == "aem":
+        try:
+            payload = dump_trajectory_aem(trajectory)
+        except ValueError as exc:
+            typer.echo(f"invalid AEM trajectory {trajectory_path}: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
     else:
         typer.echo(f"unsupported trajectory export format: {trajectory_format}", err=True)
         raise typer.Exit(code=2)

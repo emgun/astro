@@ -21,6 +21,8 @@ Use this checklist before tagging or publishing a release candidate.
 - [ ] `astro propagate examples/scenarios/leo_variational_covariance.yaml --backend local --output /tmp/astro-variational-covariance.json`
 - [ ] `astro propagate examples/scenarios/leo_j2_variational_covariance.yaml --backend local --output /tmp/astro-j2-variational-covariance.json`
 - [ ] `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv`
+- [ ] `astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output /tmp/astro-velocity-aligned-burn.json`
+- [ ] `astro export-trajectory /tmp/astro-velocity-aligned-burn.json --format aem --output /tmp/astro-attitude.aem`
 - [ ] `astro screen-conjunction /tmp/astro-covariance.json /tmp/astro-covariance.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output /tmp/astro-conjunction-screening.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output /tmp/astro-measurements.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_doppler.yaml --backend local --output /tmp/astro-doppler-measurements.json`

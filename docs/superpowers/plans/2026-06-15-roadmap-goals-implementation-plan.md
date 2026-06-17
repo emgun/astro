@@ -31,8 +31,8 @@ Implemented and protected:
   estimate products, plus IERS finals/finals2000A-style Earth-orientation ingest for UT1-UTC and
   polar motion samples.
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
-- `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV export and CCSDS
-  OEM ephemeris export/import,
+- `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV export, CCSDS
+  OEM ephemeris export/import, and CCSDS AEM quaternion attitude export,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
   propagation, plus finite-difference and opt-in two-body/J2 variational local covariance
   propagation with optional acceleration process noise, explicit per-sample
@@ -59,7 +59,8 @@ Still roadmap-level:
   runner.
 - Full precession-nutation reductions, DSN calibration products beyond the current configurable
   weather/frequency media primitives, and operational CCSDS support beyond current KVN TDM
-  measurement families, suite multi-leg radiometric TDM extension, and OEM ephemeris interchange.
+  measurement families, suite multi-leg radiometric TDM extension, OEM ephemeris interchange, and
+  AEM quaternion attitude export.
 - Richer JAX high-fidelity force models and full differentiable OD estimator workflows.
 
 ## Goal Ledger
@@ -218,8 +219,8 @@ Primary files:
 ### Goal 3: Operational Flight Dynamics Products
 
 Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
-finite burns, local thrust-vector finite burns with mass depletion, CSV export and CCSDS OEM
-ephemeris export/import, finite-difference local covariance propagation, opt-in local two-body
+finite burns, local thrust-vector finite burns with mass depletion, CSV export, CCSDS OEM
+ephemeris export/import, CCSDS AEM quaternion attitude export, finite-difference local covariance propagation, opt-in local two-body
 and J2 variational covariance propagation with analytic two-body and finite-difference J2
 acceleration Jacobians, optional white-acceleration process noise, explicit per-sample and
 accumulated state-transition matrices, per-sample process-noise covariance matrices, Orekit
@@ -239,9 +240,9 @@ and torque-level attitude-control maneuver dynamics remain deferred.
 Definition of done:
 
 - Orbital `Trajectory` supports event and maneuver records without breaking launch products.
-- Ephemeris export/import supports JSON plus CSV export and CCSDS OEM KVN interchange selected for
-  the suite's current maturity. OEM import requires scenario context because OEM does not encode
-  the suite force model.
+- Ephemeris export/import supports JSON plus CSV export, CCSDS OEM KVN interchange, and CCSDS AEM
+  KVN quaternion attitude export selected for the suite's current maturity. OEM import requires
+  scenario context because OEM does not encode the suite force model.
 - Maneuver products cover impulsive delta-v, local finite burns with constant inertial
   acceleration, local thrust-vector finite burns with mass-flow depletion, and velocity-aligned,
   radial-outward, and radial-inward thrust directions for commanded attitude-coupled burn modes.

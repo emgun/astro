@@ -20,6 +20,10 @@ def _format_oem_float(value: float) -> str:
     return repr(float(value))
 
 
+def _format_aem_float(value: float) -> str:
+    return repr(float(value))
+
+
 def _parse_oem_epoch(raw_epoch: str) -> datetime:
     try:
         return datetime.fromisoformat(raw_epoch.replace("Z", "+00:00")).astimezone(UTC)
@@ -90,6 +94,47 @@ def dump_trajectory_oem(trajectory: Trajectory, *, originator: str = "ASTRO_SUIT
             *(_format_oem_float(component) for component in velocity),
         ]
         lines.append(" ".join(values))
+    return "\n".join(lines)
+
+
+def dump_trajectory_aem(trajectory: Trajectory, *, originator: str = "ASTRO_SUITE") -> str:
+    attitude_samples = [sample for sample in trajectory.samples if sample.attitude is not None]
+    if not attitude_samples:
+        raise ValueError("AEM export requires at least one trajectory sample with attitude samples")
+
+    start_epoch = attitude_samples[0].epoch
+    stop_epoch = attitude_samples[-1].epoch
+    lines = [
+        "CCSDS_AEM_VERS = 2.0",
+        f"CREATION_DATE = {_format_oem_epoch(start_epoch)}",
+        f"ORIGINATOR = {originator}",
+        f"COMMENT scenario_id = {trajectory.scenario_id}",
+        f"COMMENT backend = {trajectory.backend}",
+        "COMMENT quaternion_order = QC Q1 Q2 Q3",
+        "META_START",
+        f"OBJECT_NAME = {trajectory.scenario_id}",
+        f"OBJECT_ID = {trajectory.scenario_id}",
+        "CENTER_NAME = EARTH",
+        "REF_FRAME_A = EME2000",
+        "REF_FRAME_B = SC_BODY_1",
+        "TIME_SYSTEM = UTC",
+        f"START_TIME = {_format_oem_epoch(start_epoch)}",
+        f"USEABLE_START_TIME = {_format_oem_epoch(start_epoch)}",
+        f"USEABLE_STOP_TIME = {_format_oem_epoch(stop_epoch)}",
+        f"STOP_TIME = {_format_oem_epoch(stop_epoch)}",
+        "ATTITUDE_TYPE = QUATERNION",
+        "META_STOP",
+        "DATA_START",
+    ]
+    for sample in attitude_samples:
+        assert sample.attitude is not None
+        quaternion = sample.attitude.body_to_inertial_quaternion
+        values = [
+            _format_oem_epoch(sample.epoch),
+            *(_format_aem_float(component) for component in quaternion),
+        ]
+        lines.append(" ".join(values))
+    lines.append("DATA_STOP")
     return "\n".join(lines)
 
 

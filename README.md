@@ -13,8 +13,8 @@ The current implementation slice covers:
 - Flight-dynamics trajectory product fields for events, impulsive and finite-burn maneuvers, and
   covariance history, plus local commanded-attitude samples for maneuvered trajectories, local
   finite-difference covariance propagation with optional acceleration process noise, per-sample
-  state-transition/process-noise products, CSV and CCSDS OEM ephemeris export, and seeded
-  initial-state Monte Carlo propagation.
+  state-transition/process-noise products, CSV and CCSDS OEM ephemeris export/import, CCSDS AEM
+  attitude export, and seeded initial-state Monte Carlo propagation.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
@@ -129,6 +129,7 @@ astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --ba
 astro propagate examples/scenarios/leo_two_body.yaml --backend tudat --output tudat_two_body_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
+astro export-trajectory attitude_trajectory.json --format aem --output attitude_trajectory.aem
 astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
 astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output conjunction_screening.json
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
@@ -188,11 +189,12 @@ data context. Orekit covariance extraction can be singular on short or weakly ob
 that happens the suite returns a zero covariance fallback with `covariance_status = "unavailable"`
 and the backend error recorded in metadata instead of treating the fallback as a valid covariance.
 
-`astro export-trajectory` converts suite trajectory JSON into either a CSV ephemeris table or a
-CCSDS OEM KVN text product containing UTC epochs plus Cartesian position and velocity samples in km
-and km/s. `astro import-trajectory --format oem` converts a CCSDS OEM KVN text product back into a
-suite `Trajectory`; it requires `--scenario` because OEM does not encode the suite force model.
-The importer is intentionally strict: UTC time system, EME2000 reference frame, and Earth center are
+`astro export-trajectory` converts suite trajectory JSON into a CSV ephemeris table, a CCSDS OEM
+KVN text product containing UTC epochs plus Cartesian position and velocity samples in km and km/s,
+or a CCSDS AEM KVN quaternion attitude product for trajectories with commanded attitude samples.
+`astro import-trajectory --format oem` converts a CCSDS OEM KVN text product back into a suite
+`Trajectory`; it requires `--scenario` because OEM does not encode the suite force model. The
+importer is intentionally strict: UTC time system, EME2000 reference frame, and Earth center are
 required. `astro monte-carlo` runs a seeded initial-state ensemble by perturbing the scenario's
 Cartesian state and propagating each case through the selected backend. This is a repeatable product
 workflow for uncertainty screening; it is not yet production conjunction analysis.

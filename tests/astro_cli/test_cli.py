@@ -391,6 +391,33 @@ def test_export_trajectory_command_writes_oem(tmp_path: Path) -> None:
     assert "2026-01-01T00:00:00.000000Z 7000.0 0.0 0.0 0.0 7.5 1.0" in payload
 
 
+def test_export_trajectory_command_writes_aem(tmp_path: Path) -> None:
+    trajectory_path = tmp_path / "trajectory.json"
+    output = tmp_path / "trajectory.aem"
+    scenario = load_scenario(Path("examples/scenarios/leo_velocity_aligned_burn.yaml"))
+    trajectory = propagate_local(scenario)
+    trajectory_path.write_text(trajectory.model_dump_json(indent=2), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "export-trajectory",
+            str(trajectory_path),
+            "--format",
+            "aem",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote trajectory" in result.stdout
+    payload = output.read_text(encoding="utf-8")
+    assert payload.startswith("CCSDS_AEM_VERS = 2.0")
+    assert "ATTITUDE_TYPE = QUATERNION" in payload
+    assert "COMMENT quaternion_order = QC Q1 Q2 Q3" in payload
+
+
 def test_import_trajectory_command_reads_oem_with_scenario_context(tmp_path: Path) -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     trajectory = propagate_local(scenario)

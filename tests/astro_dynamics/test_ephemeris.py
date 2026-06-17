@@ -2,6 +2,7 @@ from pathlib import Path
 
 from astro_core.io import load_scenario
 from astro_dynamics.ephemeris import (
+    dump_trajectory_aem,
     dump_trajectory_ephemeris_csv,
     dump_trajectory_oem,
     load_trajectory_oem,
@@ -48,6 +49,47 @@ def test_dump_trajectory_oem_writes_ccsds_oem_kvn_product() -> None:
             if line.startswith("2026-01-01T")
         ]
     ) == len(trajectory.samples)
+
+
+def test_dump_trajectory_aem_writes_ccsds_quaternion_product() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_velocity_aligned_burn.yaml"))
+    trajectory = propagate_local(scenario)
+
+    payload = dump_trajectory_aem(trajectory)
+
+    lines = payload.splitlines()
+    attitude_sample_count = sum(sample.attitude is not None for sample in trajectory.samples)
+    assert lines[0] == "CCSDS_AEM_VERS = 2.0"
+    assert "ORIGINATOR = ASTRO_SUITE" in lines
+    assert "META_START" in lines
+    assert "OBJECT_NAME = leo-velocity-aligned-burn" in lines
+    assert "CENTER_NAME = EARTH" in lines
+    assert "REF_FRAME_A = EME2000" in lines
+    assert "REF_FRAME_B = SC_BODY_1" in lines
+    assert "TIME_SYSTEM = UTC" in lines
+    assert "ATTITUDE_TYPE = QUATERNION" in lines
+    assert "COMMENT quaternion_order = QC Q1 Q2 Q3" in lines
+    assert "DATA_START" in lines
+    assert "DATA_STOP" in lines
+    assert len(
+        [
+            line
+            for line in lines
+            if line.startswith("2026-01-01T")
+        ]
+    ) == attitude_sample_count
+
+
+def test_dump_trajectory_aem_rejects_trajectory_without_attitude_samples() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    trajectory = propagate_local(scenario)
+
+    try:
+        dump_trajectory_aem(trajectory)
+    except ValueError as exc:
+        assert "attitude samples" in str(exc)
+    else:
+        raise AssertionError("expected AEM export to require attitude samples")
 
 
 def test_load_trajectory_oem_round_trips_export_with_scenario_force_model() -> None:
