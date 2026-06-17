@@ -174,7 +174,19 @@ def test_propagate_local_applies_velocity_aligned_thrust_vector_burn() -> None:
     assert velocity_delta[2] > 0.0
     assert trajectory.metadata["attitude_coupled_burn_count"] == 1
     assert trajectory.metadata["thrust_direction_modes"] == ["velocity_aligned"]
+    assert trajectory.metadata["attitude_model"] == "local_commanded_body_x_axis"
     assert trajectory.events[0].metadata["thrust_direction_mode"] == "velocity_aligned"
+    active_sample = trajectory.samples[1]
+    assert active_sample.attitude is not None
+    assert active_sample.attitude.mode == "velocity_aligned"
+    assert active_sample.attitude.metadata["target_axis_body"] == "+X"
+    target_direction = np.array(active_sample.attitude.metadata["target_direction_eci_unit"])
+    velocity_direction = np.array(active_sample.state.velocity_km_s)
+    velocity_direction = velocity_direction / np.linalg.norm(velocity_direction)
+    np.testing.assert_allclose(target_direction, velocity_direction, rtol=1e-12, atol=1e-12)
+    assert np.linalg.norm(active_sample.attitude.body_to_inertial_quaternion) == pytest.approx(
+        1.0
+    )
 
 
 @pytest.mark.parametrize(

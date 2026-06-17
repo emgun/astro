@@ -36,7 +36,8 @@ Implemented and protected:
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
   propagation, plus finite-difference and opt-in two-body variational local covariance propagation
   with optional acceleration process noise, explicit per-sample state-transition/process-noise
-  covariance products, and velocity-aligned/radial attitude-coupled thrust-vector burn modes.
+  covariance products, commanded-attitude trajectory samples, and velocity-aligned/radial
+  attitude-coupled thrust-vector burn modes.
 - `astro_od` synthetic range/range-rate/one-way Doppler/iterative linearized two-way and three-way
   range/range-rate/right-ascension/declination/azimuth/elevation generation, measurement JSON/CSV
   ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy batch least-squares OD.
@@ -50,8 +51,8 @@ Implemented and protected:
 
 Still roadmap-level:
 
-- Higher-fidelity variational covariance propagation beyond two-body and full attitude-control
-  maneuver dynamics.
+- Higher-fidelity variational covariance propagation beyond two-body and torque-level
+  attitude-control maneuver dynamics.
 - Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization.
 - Live Tudat cross-check environment/body construction.
 - Full precession-nutation reductions, DSN calibration products beyond the current configurable
@@ -217,10 +218,11 @@ ephemeris export/import, finite-difference local covariance propagation, opt-in 
 variational covariance propagation with an analytic acceleration Jacobian, optional
 white-acceleration process noise, explicit per-sample and accumulated state-transition matrices,
 per-sample process-noise covariance matrices, Orekit finite-difference covariance propagation
-through the selected Orekit force model, and seeded initial-state Monte Carlo. The
-attitude-coupled finite-burn modes rotate thrust along instantaneous velocity or local radial
-directions; higher-fidelity variational-equation covariance dynamics and full attitude-control
-maneuver dynamics remain deferred.
+through the selected Orekit force model, seeded initial-state Monte Carlo, and commanded-attitude
+trajectory samples for maneuvered local propagation. The attitude-coupled finite-burn modes rotate
+thrust along instantaneous velocity or local radial directions and record body-to-inertial unit
+quaternion samples for the commanded body +X axis; higher-fidelity variational-equation covariance
+dynamics and torque-level attitude-control maneuver dynamics remain deferred.
 
 Definition of done:
 
@@ -231,6 +233,8 @@ Definition of done:
 - Maneuver products cover impulsive delta-v, local finite burns with constant inertial
   acceleration, local thrust-vector finite burns with mass-flow depletion, and velocity-aligned,
   radial-outward, and radial-inward thrust directions for commanded attitude-coupled burn modes.
+- Maneuvered local trajectories include `AttitudeState` samples with body-to-inertial unit
+  quaternions and target-direction metadata for the commanded body +X axis.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported. Local propagation can populate them from a
   scenario initial covariance using finite-difference state transitions or, for two-body scenarios

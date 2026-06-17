@@ -4,13 +4,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from math import ceil
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 from numpy.typing import NDArray
 
 from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
 from astro_core.models import (
+    AttitudeState,
     CartesianState,
     CovarianceSample,
     ForceModelConfig,
@@ -24,6 +25,7 @@ from astro_core.models import (
 )
 
 FloatArray = NDArray[np.float64]
+AttitudeMode = Literal["inertial", "velocity_aligned", "radial_outward", "radial_inward"]
 _SUPPORTED_LOCAL_FORCE_MODELS = {ForceModelName.TWO_BODY, ForceModelName.J2}
 _MAX_RK4_INTERNAL_STEP_S = 30.0
 _MANEUVER_TIME_TOLERANCE_S = 1.0e-9
@@ -91,6 +93,33 @@ def j2_acceleration_km_s2(position_km: FloatArray) -> FloatArray:
 
 def _vector3_from_array(values: FloatArray) -> Vector3:
     return (float(values[0]), float(values[1]), float(values[2]))
+
+
+def _vector4_from_array(values: FloatArray) -> tuple[float, float, float, float]:
+    return (float(values[0]), float(values[1]), float(values[2]), float(values[3]))
+
+
+def _unit_vector(values: FloatArray, label: str) -> FloatArray:
+    norm = float(np.linalg.norm(values))
+    if norm == 0.0:
+        raise ValueError(f"{label} requires nonzero vector")
+    return cast(FloatArray, values / norm)
+
+
+def _body_x_to_inertial_quaternion(
+    target_direction: FloatArray,
+) -> tuple[float, float, float, float]:
+    body_x = np.array([1.0, 0.0, 0.0], dtype=np.float64)
+    direction = _unit_vector(target_direction, "Attitude target direction")
+    dot = float(np.dot(body_x, direction))
+    if dot > 1.0 - 1.0e-12:
+        return (1.0, 0.0, 0.0, 0.0)
+    if dot < -1.0 + 1.0e-12:
+        return (0.0, 0.0, 0.0, 1.0)
+
+    axis = np.cross(body_x, direction)
+    quaternion = np.concatenate([np.array([1.0 + dot], dtype=np.float64), axis])
+    return _vector4_from_array(_unit_vector(cast(FloatArray, quaternion), "Attitude quaternion"))
 
 
 def acceleration_km_s2(position_km: FloatArray, force_model: ForceModelName) -> FloatArray:
@@ -240,6 +269,76 @@ def _finite_burn_mass_flow_kg_s(
             thrust_n = float(np.linalg.norm(np.array(maneuver.thrust_vector_n, dtype=np.float64)))
             mass_flow_kg_s += thrust_n / (maneuver.specific_impulse_s * _STANDARD_GRAVITY_M_S2)
     return mass_flow_kg_s
+
+
+def _active_thrust_vector_attitude(
+    schedule: list[_ScheduledManeuver],
+    elapsed_s: float,
+    position_km: FloatArray,
+    velocity_km_s: FloatArray,
+) -> tuple[AttitudeMode, FloatArray] | None:
+    for scheduled in schedule:
+        maneuver = scheduled.maneuver
+        if maneuver.duration_s <= 0.0 or maneuver.thrust_vector_n is None:
+            continue
+        if not (
+            scheduled.start_s - _MANEUVER_TIME_TOLERANCE_S
+            <= elapsed_s
+            < scheduled.end_s - _MANEUVER_TIME_TOLERANCE_S
+        ):
+            continue
+
+        thrust_vector_n = np.array(maneuver.thrust_vector_n, dtype=np.float64)
+        if maneuver.thrust_direction_mode == "velocity_aligned":
+            return maneuver.thrust_direction_mode, _unit_vector(
+                velocity_km_s,
+                "velocity-aligned attitude",
+            )
+        if maneuver.thrust_direction_mode in {"radial_outward", "radial_inward"}:
+            direction_sign = 1.0 if maneuver.thrust_direction_mode == "radial_outward" else -1.0
+            return maneuver.thrust_direction_mode, _unit_vector(
+                cast(FloatArray, direction_sign * position_km),
+                "radial attitude",
+            )
+        return maneuver.thrust_direction_mode, _unit_vector(
+            thrust_vector_n,
+            "inertial thrust attitude",
+        )
+    return None
+
+
+def _attitude_state(
+    schedule: list[_ScheduledManeuver],
+    elapsed_s: float,
+    scenario: Scenario,
+    state: FloatArray,
+) -> AttitudeState | None:
+    if not schedule:
+        return None
+
+    active_attitude = _active_thrust_vector_attitude(
+        schedule,
+        elapsed_s,
+        state[:3],
+        state[3:],
+    )
+    if active_attitude is None:
+        mode: AttitudeMode = "inertial"
+        target_direction = np.array([1.0, 0.0, 0.0], dtype=np.float64)
+    else:
+        mode, target_direction = active_attitude
+
+    target_direction_unit = _unit_vector(target_direction, "Attitude target direction")
+    return AttitudeState(
+        mode=mode,
+        frame=scenario.initial_state.frame,
+        body_to_inertial_quaternion=_body_x_to_inertial_quaternion(target_direction_unit),
+        metadata={
+            "attitude_model": "local_commanded_body_x_axis",
+            "target_axis_body": "+X",
+            "target_direction_eci_unit": _vector3_from_array(target_direction_unit),
+        },
+    )
 
 
 def _derivative_with_maneuvers(
@@ -468,6 +567,16 @@ def _maneuver_metadata(schedule: list[_ScheduledManeuver]) -> dict[str, Any]:
         "thrust_vector_burn_count": thrust_vector_burn_count,
         "attitude_coupled_burn_count": attitude_coupled_burn_count,
         "thrust_direction_modes": thrust_direction_modes,
+    }
+
+
+def _attitude_metadata(schedule: list[_ScheduledManeuver], sample_count: int) -> dict[str, Any]:
+    if not schedule:
+        return {}
+    return {
+        "attitude_model": "local_commanded_body_x_axis",
+        "attitude_target_axis_body": "+X",
+        "attitude_sample_count": sample_count,
     }
 
 
@@ -738,6 +847,12 @@ def propagate_local(scenario: Scenario) -> Trajectory:
                     velocity_km_s=_vector3_from_array(state[3:]),
                 ),
                 mass_kg=mass_kg,
+                attitude=_attitude_state(
+                    maneuver_schedule,
+                    step_index * scenario.propagation.step_s,
+                    scenario,
+                    state,
+                ),
             )
         )
         if covariance_matrix is not None:
@@ -843,6 +958,7 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         }
         | mass_metadata
         | _maneuver_metadata(maneuver_schedule)
+        | _attitude_metadata(maneuver_schedule, len(samples))
         | _covariance_metadata(scenario, covariance_matrix, covariance_transition_model)
     )
 

@@ -7,6 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from astro_core.models import (
+    AttitudeState,
     Body,
     CartesianState,
     CovarianceSample,
@@ -514,6 +515,28 @@ def test_trajectory_sample_accepts_optional_mass_history() -> None:
     sample = make_trajectory_sample(epoch).model_copy(update={"mass_kg": 118.5})
 
     assert sample.mass_kg == 118.5
+
+
+def test_trajectory_sample_accepts_optional_attitude_state() -> None:
+    epoch = datetime(2026, 1, 1, tzinfo=UTC)
+    attitude = AttitudeState(
+        mode="velocity_aligned",
+        frame=Frame.EME2000,
+        body_to_inertial_quaternion=(1.0, 0.0, 0.0, 0.0),
+        metadata={"target_axis_body": "+X"},
+    )
+    sample = make_trajectory_sample(epoch).model_copy(update={"attitude": attitude})
+
+    assert sample.attitude == attitude
+
+
+def test_attitude_state_rejects_non_unit_quaternion() -> None:
+    with pytest.raises(ValidationError, match="unit quaternion"):
+        AttitudeState(
+            mode="inertial",
+            frame=Frame.EME2000,
+            body_to_inertial_quaternion=(2.0, 0.0, 0.0, 0.0),
+        )
 
 
 def test_maneuver_accepts_thrust_vector_mass_flow_fields() -> None:

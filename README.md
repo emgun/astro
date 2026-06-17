@@ -11,9 +11,10 @@ The current implementation slice covers:
 - Pydantic scenario validation from YAML.
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
 - Flight-dynamics trajectory product fields for events, impulsive and finite-burn maneuvers, and
-  covariance history, plus local finite-difference covariance propagation with optional
-  acceleration process noise, per-sample state-transition/process-noise products, CSV and CCSDS OEM
-  ephemeris export, and seeded initial-state Monte Carlo propagation.
+  covariance history, plus local commanded-attitude samples for maneuvered trajectories, local
+  finite-difference covariance propagation with optional acceleration process noise, per-sample
+  state-transition/process-noise products, CSV and CCSDS OEM ephemeris export, and seeded
+  initial-state Monte Carlo propagation.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
@@ -199,8 +200,10 @@ depletion. Trajectory samples include `mass_kg`, and maneuver start/end events p
 metadata. Thrust-vector finite burns default to inertial direction; setting
 `thrust_direction_mode` to `velocity_aligned` rotates the thrust magnitude along the instantaneous
 velocity direction. `radial_outward` and `radial_inward` rotate the thrust magnitude along the
-instantaneous local radial direction. These are commanded-direction models, not full attitude
-control simulations.
+instantaneous local radial direction. Maneuvered local trajectories also include per-sample
+`AttitudeState` products with a body-to-inertial unit quaternion that points the spacecraft body +X
+axis along the commanded thrust direction during active thrust-vector burns. These are commanded
+pointing products, not full torque-level attitude-control simulations.
 
 Local and Orekit propagation also accept an optional `initial_covariance` 6x6 matrix. When present,
 the backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference

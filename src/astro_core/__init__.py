@@ -9,6 +9,7 @@ from astro_core.errors import (
 )
 from astro_core.io import load_scenario, load_trajectory
 from astro_core.models import (
+    AttitudeState,
     Body,
     CartesianState,
     CovarianceSample,
@@ -38,6 +39,7 @@ from astro_core.models import (
 
 __all__ = [
     "AstroError",
+    "AttitudeState",
     "Body",
     "CartesianState",
     "CovarianceSample",

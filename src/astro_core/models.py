@@ -13,6 +13,7 @@ from numpy.typing import NDArray
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, field_validator, model_validator
 
 Vector3 = tuple[float, float, float]
+Quaternion4 = tuple[float, float, float, float]
 WGS84_EQUATORIAL_RADIUS_KM = 6378.137
 WGS84_FLATTENING = 1.0 / 298.257223563
 SECONDS_PER_DAY = 86400.0
@@ -765,10 +766,38 @@ class CovarianceSample(AstroModel):
         return value
 
 
+class AttitudeState(AstroModel):
+    mode: Literal[
+        "inertial",
+        "velocity_aligned",
+        "radial_outward",
+        "radial_inward",
+    ] = "inertial"
+    frame: Frame
+    body_to_inertial_quaternion: Quaternion4
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("body_to_inertial_quaternion", mode="before")
+    @classmethod
+    def quaternion_input_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_sequence_input_must_be_numbers(value, "AttitudeState quaternion")
+
+    @field_validator("body_to_inertial_quaternion")
+    @classmethod
+    def quaternion_must_be_unit_and_finite(cls, value: Quaternion4) -> Quaternion4:
+        if not all(isfinite(component) for component in value):
+            raise ValueError("AttitudeState quaternion values must be finite")
+        norm = sqrt(sum(component * component for component in value))
+        if abs(norm - 1.0) > 1.0e-9:
+            raise ValueError("AttitudeState quaternion must be a unit quaternion")
+        return value
+
+
 class TrajectorySample(AstroModel):
     epoch: datetime
     state: CartesianState
     mass_kg: FiniteFloat | None = Field(default=None, gt=0.0)
+    attitude: AttitudeState | None = None
 
     @field_validator("epoch", mode="before")
     @classmethod
