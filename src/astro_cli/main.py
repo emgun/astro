@@ -45,7 +45,10 @@ from astro_launch.reporting import (
     generate_tuned_launch_report_batch,
 )
 from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
-from astro_od.calibration import generate_dsn_calibration_product
+from astro_od.calibration import (
+    generate_dsn_calibration_product,
+    generate_dsn_calibration_product_from_measurements,
+)
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import (
     dump_measurements_csv,
@@ -1042,13 +1045,43 @@ def dsn_calibration(
     scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
     output: Annotated[Path, typer.Option()],
     backend: Annotated[str, typer.Option()] = "local",
+    measurements_path: Annotated[
+        Path | None,
+        typer.Option("--measurements", exists=True, readable=True),
+    ] = None,
+    measurement_format: Annotated[
+        str,
+        typer.Option("--format", help="Input measurement format: auto, json, csv, or tdm."),
+    ] = "auto",
 ) -> None:
     """Generate a DSN-style radiometric media calibration summary product."""
     scenario = _load_scenario_or_exit(scenario_path)
     try:
-        trajectory = propagate_with_backend(scenario, backend)
-        product = generate_dsn_calibration_product(scenario, trajectory)
-    except (UnsupportedBackendError, ValueError) as exc:
+        if measurements_path is None:
+            trajectory = propagate_with_backend(scenario, backend)
+            product = generate_dsn_calibration_product(scenario, trajectory)
+        else:
+            measurement_format_name = resolve_measurement_format(
+                measurements_path,
+                measurement_format,
+            )
+            measurements = load_measurements(
+                measurements_path,
+                expected_scenario_id=scenario.scenario_id,
+                measurement_format=measurement_format_name,
+            )
+            product = generate_dsn_calibration_product_from_measurements(
+                scenario.scenario_id,
+                measurements,
+                station_count=len(scenario.ground_stations),
+                metadata={
+                    "measurement_file": str(measurements_path),
+                    "measurement_format": measurement_format_name,
+                    "spacecraft": scenario.spacecraft.name,
+                    "ground_stations": [station.name for station in scenario.ground_stations],
+                },
+            )
+    except (InvalidMeasurementFileError, UnsupportedBackendError, ValueError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
 

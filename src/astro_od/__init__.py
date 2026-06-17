@@ -2,6 +2,7 @@ from astro_od.calibration import (
     DsnCalibrationProduct,
     DsnCalibrationSample,
     generate_dsn_calibration_product,
+    generate_dsn_calibration_product_from_measurements,
 )
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import load_measurements
@@ -32,6 +33,7 @@ __all__ = [
     "elevation_deg",
     "estimate_initial_state",
     "generate_dsn_calibration_product",
+    "generate_dsn_calibration_product_from_measurements",
     "generate_synthetic_measurements",
     "light_time_s",
     "load_measurements",

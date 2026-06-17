@@ -3,8 +3,14 @@ from pathlib import Path
 import pytest
 
 from astro_core.io import load_scenario
+from astro_core.models import MeasurementRecord
 from astro_dynamics.local import propagate_local
-from astro_od.calibration import generate_dsn_calibration_product
+from astro_od.calibration import (
+    generate_dsn_calibration_product,
+    generate_dsn_calibration_product_from_measurements,
+)
+from astro_od.io import dump_measurements_tdm, load_measurements
+from astro_od.measurements import generate_synthetic_measurements
 
 
 def test_generate_dsn_calibration_product_summarizes_weather_frequency_media() -> None:
@@ -48,3 +54,40 @@ def test_generate_dsn_calibration_product_rejects_scenarios_without_radiometric_
 
     with pytest.raises(ValueError, match="radiometric media"):
         generate_dsn_calibration_product(scenario, trajectory)
+
+
+def test_generate_dsn_calibration_product_from_tdm_measurements(tmp_path: Path) -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_radiometric_weather_frequency.yaml"))
+    trajectory = propagate_local(scenario)
+    records = generate_synthetic_measurements(scenario, trajectory)
+    exported = dump_measurements_tdm(scenario.scenario_id, records)
+
+    path = tmp_path / "radiometric-weather-frequency.tdm"
+    loaded = load_measurements_from_text(
+        exported,
+        path,
+        expected_scenario_id=scenario.scenario_id,
+    )
+    product = generate_dsn_calibration_product_from_measurements(
+        scenario.scenario_id,
+        loaded,
+        station_count=len(scenario.ground_stations),
+    )
+
+    assert "ASTRO_TOTAL_MEDIA_DELAY_KM" in exported
+    assert product.scenario_id == scenario.scenario_id
+    assert product.calibration_model == "weather_frequency_range_delay"
+    assert product.sample_count == 66
+    assert product.metadata["source_measurement_count"] == len(loaded)
+    assert product.metadata["source_format"] == "measurement_records"
+    assert product.metadata["media_frequency_hz"] == 8.4e9
+
+
+def load_measurements_from_text(
+    payload: str,
+    path: Path,
+    *,
+    expected_scenario_id: str,
+) -> list[MeasurementRecord]:
+    path.write_text(payload, encoding="utf-8")
+    return load_measurements(path, expected_scenario_id=expected_scenario_id)

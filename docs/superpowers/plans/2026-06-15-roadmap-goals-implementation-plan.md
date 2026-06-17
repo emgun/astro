@@ -185,8 +185,10 @@ Implemented slice:
   `weather_frequency` model with surface pressure, temperature, relative humidity, zenith TEC,
   carrier frequency, and per-leg elevation mapping. `astro dsn-calibration` now summarizes those
   generated radiometric media records into a DSN-style calibration product with per-record leg
-  delays, elevation diagnostics, model/source provenance, and aggregate delay statistics. This is
-  not yet full DSN ODF/TNF ingest or station-calibration processing.
+  delays, elevation diagnostics, model/source provenance, and aggregate delay statistics. The same
+  command can also build the calibration product from loaded JSON/CSV/TDM measurement files, and
+  the suite TDM extension preserves the `ASTRO_*` media-correction metadata required for that
+  summary. This is not yet full DSN ODF/TNF ingest or station-calibration processing.
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
   checked-in iterative two-way/three-way radiometric synthesis fixture. `leo_radiometric_media.yaml`

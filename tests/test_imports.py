@@ -62,6 +62,7 @@ def test_packages_import() -> None:
         "elevation_deg",
         "estimate_initial_state",
         "generate_dsn_calibration_product",
+        "generate_dsn_calibration_product_from_measurements",
         "generate_synthetic_measurements",
         "light_time_s",
         "load_measurements",

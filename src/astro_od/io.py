@@ -98,6 +98,34 @@ TDM_RADIOMETRIC_MEASUREMENT_TYPE_BY_LINK_AND_KEYWORD = {
     ("three_way", "DOPPLER_INTEGRATED"): MeasurementType.THREE_WAY_RANGE_RATE,
 }
 
+TDM_SUITE_METADATA_KEYS = (
+    ("participant_path", "ASTRO_PARTICIPANT_PATH"),
+    ("media_corrections_model", "ASTRO_MEDIA_CORRECTIONS_MODEL"),
+    ("media_corrections_source", "ASTRO_MEDIA_CORRECTIONS_SOURCE"),
+    ("uplink_media_delay_km", "ASTRO_UPLINK_MEDIA_DELAY_KM"),
+    ("downlink_media_delay_km", "ASTRO_DOWNLINK_MEDIA_DELAY_KM"),
+    ("total_media_delay_km", "ASTRO_TOTAL_MEDIA_DELAY_KM"),
+    ("uplink_media_elevation_deg", "ASTRO_UPLINK_MEDIA_ELEVATION_DEG"),
+    ("downlink_media_elevation_deg", "ASTRO_DOWNLINK_MEDIA_ELEVATION_DEG"),
+    ("uplink_troposphere_delay_km", "ASTRO_UPLINK_TROPOSPHERE_DELAY_KM"),
+    ("downlink_troposphere_delay_km", "ASTRO_DOWNLINK_TROPOSPHERE_DELAY_KM"),
+    ("uplink_ionosphere_delay_km", "ASTRO_UPLINK_IONOSPHERE_DELAY_KM"),
+    ("downlink_ionosphere_delay_km", "ASTRO_DOWNLINK_IONOSPHERE_DELAY_KM"),
+    ("configured_uplink_media_delay_km", "ASTRO_CONFIGURED_UPLINK_MEDIA_DELAY_KM"),
+    ("configured_downlink_media_delay_km", "ASTRO_CONFIGURED_DOWNLINK_MEDIA_DELAY_KM"),
+    ("media_frequency_hz", "ASTRO_MEDIA_FREQUENCY_HZ"),
+    ("zenith_total_electron_content_tecu", "ASTRO_ZENITH_TOTAL_ELECTRON_CONTENT_TECU"),
+    ("weather_pressure_hpa", "ASTRO_WEATHER_PRESSURE_HPA"),
+    ("weather_temperature_k", "ASTRO_WEATHER_TEMPERATURE_K"),
+    ("weather_relative_humidity", "ASTRO_WEATHER_RELATIVE_HUMIDITY"),
+    ("media_min_elevation_deg", "ASTRO_MEDIA_MIN_ELEVATION_DEG"),
+    ("troposphere_model", "ASTRO_TROPOSPHERE_MODEL"),
+    ("ionosphere_model", "ASTRO_IONOSPHERE_MODEL"),
+)
+TDM_RECORD_METADATA_BY_SUITE_KEY = {
+    tdm_key: record_key for record_key, tdm_key in TDM_SUITE_METADATA_KEYS
+}
+
 CSV_REQUIRED_COLUMNS = frozenset(
     {
         "scenario_id",
@@ -128,7 +156,8 @@ class MeasurementProduct:
     measurements: list[MeasurementRecord]
 
 
-TdmSegmentKey = tuple[str, str, str | None, str | None, str | None]
+TdmMetadataSignature = tuple[tuple[str, str], ...]
+TdmSegmentKey = tuple[str, str, str | None, str | None, str | None, TdmMetadataSignature]
 
 
 def load_measurements(
@@ -244,6 +273,7 @@ def dump_measurements_tdm(
         angle_type,
         link_type,
         transmitter,
+        suite_metadata,
     ), segment_records in _measurement_segments(measurements).items():
         lines.extend(["META_START", f"SCENARIO_ID = {scenario_id}", "TIME_SYSTEM = UTC"])
         lines.append("MODE = SEQUENTIAL")
@@ -305,6 +335,7 @@ def dump_measurements_tdm(
             angle_sigma = _common_sigma_for_types(segment_records, ANGLE_MEASUREMENT_TYPES)
             if angle_sigma is not None:
                 lines.append(f"ANGLE_SIGMA_DEG = {_format_float(angle_sigma)}")
+        lines.extend(f"{key} = {value}" for key, value in suite_metadata)
 
         lines.extend(["META_STOP", "DATA_START"])
         for record in segment_records:
@@ -557,6 +588,7 @@ def _measurement_segments(
             TDM_ANGLE_TYPE_BY_MEASUREMENT_TYPE.get(record.measurement_type),
             link_type,
             transmitter,
+            _tdm_suite_metadata_signature(record),
         )
         segments.setdefault(key, []).append(record)
     return segments
@@ -585,6 +617,24 @@ def _tdm_transmitter(record: MeasurementRecord) -> str:
             "TDM three-way measurements require metadata transmitter"
         )
     return transmitter.strip()
+
+
+def _tdm_suite_metadata_signature(record: MeasurementRecord) -> TdmMetadataSignature:
+    signature: list[tuple[str, str]] = []
+    for record_key, tdm_key in TDM_SUITE_METADATA_KEYS:
+        if record_key not in record.metadata:
+            continue
+        value = record.metadata[record_key]
+        if isinstance(value, bool | list | dict | tuple):
+            continue
+        signature.append((tdm_key, _format_tdm_metadata_value(value)))
+    return tuple(signature)
+
+
+def _format_tdm_metadata_value(value: object) -> str:
+    if isinstance(value, int | float):
+        return _format_float(float(value))
+    return str(value)
 
 
 def _common_sigma(
@@ -874,7 +924,7 @@ def _tdm_record_from_data_line(
         "tdm_mode": metadata.get("MODE"),
         "tdm_path": metadata.get("PATH"),
         "tdm_originator": header.get("ORIGINATOR"),
-    } | participant_metadata
+    } | participant_metadata | _tdm_suite_record_metadata(metadata)
     if link_type is not None:
         record_metadata["astro_measurement_type"] = link_type
     if angle_type is not None:
@@ -897,6 +947,19 @@ def _tdm_record_from_data_line(
         raise InvalidMeasurementFileError(
             f"TDM file {measurement_path} line {line_number} is invalid: {exc}"
         ) from exc
+
+
+def _tdm_suite_record_metadata(metadata: dict[str, str]) -> dict[str, str | float]:
+    record_metadata: dict[str, str | float] = {}
+    for tdm_key, record_key in TDM_RECORD_METADATA_BY_SUITE_KEY.items():
+        if tdm_key not in metadata:
+            continue
+        value = metadata[tdm_key]
+        if record_key.endswith(("_km", "_deg", "_hz", "_hpa", "_k", "_tecu", "_humidity")):
+            record_metadata[record_key] = float(value)
+        else:
+            record_metadata[record_key] = value
+    return record_metadata
 
 
 def _tdm_angle_measurement_type(
@@ -1051,10 +1114,20 @@ def _tdm_observer_and_object(
             observed_index = 2
             observer_index = 3
         try:
+            participant_path = ",".join(
+                (
+                    participants[transmitter_index],
+                    participants[observed_index],
+                    participants[observer_index],
+                )
+            )
             return (
                 participants[observer_index],
                 participants[observed_index],
-                {"transmitter": participants[transmitter_index]},
+                {
+                    "transmitter": participants[transmitter_index],
+                    "participant_path": participant_path,
+                },
             )
         except KeyError as exc:
             raise InvalidMeasurementFileError(
@@ -1070,7 +1143,12 @@ def _tdm_observer_and_object(
         observed_index = 2
 
     try:
-        return participants[observer_index], participants[observed_index], {}
+        observer = participants[observer_index]
+        observed_object = participants[observed_index]
+        participant_path = ",".join(
+            participants[index] for index in path
+        ) if path else f"{observer},{observed_object}"
+        return observer, observed_object, {"participant_path": participant_path}
     except KeyError as exc:
         raise InvalidMeasurementFileError(
             f"TDM file {measurement_path} line {line_number} is missing PARTICIPANT "

@@ -48,6 +48,26 @@ def generate_dsn_calibration_product(
 ) -> DsnCalibrationProduct:
     """Summarize generated radiometric media corrections into an audit product."""
     measurement_records = generate_synthetic_measurements(scenario, trajectory)
+    return generate_dsn_calibration_product_from_measurements(
+        scenario.scenario_id,
+        measurement_records,
+        station_count=len(scenario.ground_stations),
+        measurement_types=tuple(
+            measurement_type.value for measurement_type in scenario.measurements.types
+        ),
+        metadata=_scenario_calibration_metadata(scenario),
+    )
+
+
+def generate_dsn_calibration_product_from_measurements(
+    scenario_id: str,
+    measurement_records: list[MeasurementRecord],
+    *,
+    station_count: int | None = None,
+    measurement_types: tuple[str, ...] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> DsnCalibrationProduct:
+    """Summarize radiometric media corrections carried by measurement records."""
     samples = tuple(
         _dsn_calibration_sample(record)
         for record in measurement_records
@@ -65,21 +85,27 @@ def generate_dsn_calibration_product(
     media_sources = tuple(dict.fromkeys(sample.media_source for sample in samples))
 
     return DsnCalibrationProduct(
-        scenario_id=scenario.scenario_id,
+        scenario_id=scenario_id,
         calibration_model=calibration_models[0] if len(calibration_models) == 1 else "mixed",
         media_source=media_sources[0] if len(media_sources) == 1 else "mixed",
         sample_count=len(samples),
-        station_count=len(scenario.ground_stations),
-        measurement_types=tuple(
-            measurement_type.value for measurement_type in scenario.measurements.types
-        ),
+        station_count=station_count
+        if station_count is not None
+        else _derived_station_count(samples),
+        measurement_types=measurement_types
+        if measurement_types is not None
+        else tuple(dict.fromkeys(sample.measurement_type for sample in samples)),
         total_media_delay_km_min=min(total_delays_km),
         total_media_delay_km_mean=fmean(total_delays_km),
         total_media_delay_km_max=max(total_delays_km),
         uplink_media_delay_km_mean=fmean(uplink_delays_km),
         downlink_media_delay_km_mean=fmean(downlink_delays_km),
         samples=samples,
-        metadata=_dsn_calibration_metadata(scenario, samples),
+        metadata=_dsn_calibration_metadata(
+            samples,
+            source_measurement_count=len(measurement_records),
+            metadata=metadata,
+        ),
     )
 
 
@@ -116,23 +142,18 @@ def _dsn_calibration_sample(record: MeasurementRecord) -> DsnCalibrationSample:
 
 
 def _dsn_calibration_metadata(
-    scenario: Scenario,
     samples: tuple[DsnCalibrationSample, ...],
+    *,
+    source_measurement_count: int,
+    metadata: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    measurement_config = scenario.measurements
-    metadata: dict[str, Any] = {
+    product_metadata: dict[str, Any] = {
         "workflow": "dsn_calibration_summary",
-        "spacecraft": scenario.spacecraft.name,
-        "ground_stations": [station.name for station in scenario.ground_stations],
-        "configured_media_model": measurement_config.radiometric_media_model,
-        "configured_uplink_media_delay_km": float(
-            measurement_config.radiometric_media_uplink_delay_km
-        ),
-        "configured_downlink_media_delay_km": float(
-            measurement_config.radiometric_media_downlink_delay_km
-        ),
-        "media_min_elevation_deg": float(measurement_config.radiometric_media_min_elevation_deg),
+        "source_format": "measurement_records",
+        "source_measurement_count": source_measurement_count,
     }
+    if metadata:
+        product_metadata |= metadata
     first_sample_metadata = samples[0].metadata
     for key in (
         "media_frequency_hz",
@@ -144,8 +165,25 @@ def _dsn_calibration_metadata(
         "ionosphere_model",
     ):
         if key in first_sample_metadata:
-            metadata[key] = first_sample_metadata[key]
-    return metadata
+            product_metadata[key] = first_sample_metadata[key]
+    return product_metadata
+
+
+def _scenario_calibration_metadata(scenario: Scenario) -> dict[str, Any]:
+    measurement_config = scenario.measurements
+    return {
+        "source_format": "generated_measurements",
+        "spacecraft": scenario.spacecraft.name,
+        "ground_stations": [station.name for station in scenario.ground_stations],
+        "configured_media_model": measurement_config.radiometric_media_model,
+        "configured_uplink_media_delay_km": float(
+            measurement_config.radiometric_media_uplink_delay_km
+        ),
+        "configured_downlink_media_delay_km": float(
+            measurement_config.radiometric_media_downlink_delay_km
+        ),
+        "media_min_elevation_deg": float(measurement_config.radiometric_media_min_elevation_deg),
+    }
 
 
 def _sample_metadata(record_metadata: dict[str, Any]) -> dict[str, Any]:
@@ -178,3 +216,14 @@ def _optional_metadata_float(metadata: dict[str, Any], key: str) -> float | None
     if key not in metadata:
         return None
     return _metadata_float(metadata, key)
+
+
+def _derived_station_count(samples: tuple[DsnCalibrationSample, ...]) -> int:
+    station_names: set[str] = set()
+    for sample in samples:
+        station_names.add(sample.observer)
+        participants = [participant.strip() for participant in sample.participant_path.split(",")]
+        for participant in participants:
+            if participant and participant != sample.observed_object:
+                station_names.add(participant)
+    return max(1, len(station_names))

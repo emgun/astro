@@ -401,6 +401,14 @@ metadata for weather/frequency-dependent media corrections.
 astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml \
   --backend local \
   --output /tmp/astro-dsn-calibration.json
+
+astro export-measurements /tmp/astro-radiometric-weather-frequency.json \
+  --format tdm \
+  --output /tmp/astro-radiometric-weather-frequency.tdm
+astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml \
+  --measurements /tmp/astro-radiometric-weather-frequency.tdm \
+  --format tdm \
+  --output /tmp/astro-dsn-calibration-from-tdm.json
 ```
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,

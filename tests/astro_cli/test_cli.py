@@ -24,7 +24,7 @@ from astro_launch.models import LaunchScenario, LaunchTrajectory
 from astro_launch.reporting import generate_tuned_launch_report
 from astro_launch.targeting import tune_pitch_program
 from astro_od.estimation import estimate_initial_state
-from astro_od.io import load_measurements
+from astro_od.io import dump_measurements_tdm, load_measurements
 from astro_od.measurements import generate_synthetic_measurements
 from tests.astro_launch.helpers import make_launch_scenario, make_pitch_program_launch_scenario
 
@@ -1231,6 +1231,39 @@ def test_dsn_calibration_command_writes_json(tmp_path: Path) -> None:
     assert payload["sample_count"] > 0
     assert payload["metadata"]["media_frequency_hz"] == 8.4e9
     assert "wrote DSN calibration" in result.stdout
+
+
+def test_dsn_calibration_command_accepts_tdm_measurements(tmp_path: Path) -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_radiometric_weather_frequency.yaml"))
+    records = generate_synthetic_measurements(scenario, propagate_local(scenario))
+    measurements_path = tmp_path / "radiometric-weather-frequency.tdm"
+    measurements_path.write_text(
+        dump_measurements_tdm(scenario.scenario_id, records),
+        encoding="utf-8",
+    )
+    output = tmp_path / "dsn-calibration.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "dsn-calibration",
+            "examples/scenarios/leo_radiometric_weather_frequency.yaml",
+            "--measurements",
+            str(measurements_path),
+            "--format",
+            "tdm",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "leo-radiometric-weather-frequency"
+    assert payload["calibration_model"] == "weather_frequency_range_delay"
+    assert payload["sample_count"] == 66
+    assert payload["metadata"]["measurement_file"] == str(measurements_path)
+    assert payload["metadata"]["measurement_format"] == "tdm"
 
 
 def test_synth_measurements_command_accepts_orekit_backend(
