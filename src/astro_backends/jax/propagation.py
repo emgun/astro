@@ -44,6 +44,7 @@ _SUPPORTED_JAX_GRAVITY_MODELS = {
     ForceModelName.J2,
     ForceModelName.OREKIT_HIGH_FIDELITY,
 }
+_GAUSS_NEWTON_STEP_SCALES = (1.0, 0.5, 0.25, 0.125, 0.0625, 0.03125, 0.015625, 0.0078125)
 _EXPONENTIAL_ATMOSPHERE_REFERENCE_DENSITY_KG_M3 = 4.0e-13
 _EXPONENTIAL_ATMOSPHERE_REFERENCE_ALTITUDE_M = 400_000.0
 _EXPONENTIAL_ATMOSPHERE_SCALE_HEIGHT_M = 60_000.0
@@ -726,6 +727,8 @@ def research_estimate_jax(
     measurement_specs: list[tuple[MeasurementType, int, FloatArray, float, float]] = []
     converged = False
     iterations = 0
+    accepted_step_scales: list[float] = []
+    line_search_backtrack_count = 0
 
     for iteration in range(1, max_iterations + 1):
         residuals, jacobian, measurement_specs = _jax_od_residuals_and_jacobian(
@@ -734,19 +737,65 @@ def research_estimate_jax(
             runtime,
             state_vector,
         )
-        correction = np.linalg.lstsq(jacobian, -residuals, rcond=None)[0]
-        state_vector = cast(FloatArray, state_vector + correction)
-        iterations = iteration
-        correction_norm = float(np.linalg.norm(correction))
+        current_rms = float(np.sqrt(np.mean(residuals * residuals)))
+        if current_rms <= residual_tolerance:
+            converged = True
+            break
 
-        residuals, jacobian, measurement_specs = _jax_od_residuals_and_jacobian(
-            scenario,
-            measurements,
-            runtime,
+        correction = np.linalg.lstsq(jacobian, -residuals, rcond=None)[0]
+        correction_norm = float(np.linalg.norm(correction))
+        if correction_norm <= correction_tolerance:
+            converged = True
+            break
+
+        accepted_candidate: tuple[
+            float,
+            float,
+            FloatArray,
+            FloatArray,
+            FloatArray,
+            list[tuple[MeasurementType, int, FloatArray, float, float]],
+        ] | None = None
+        for backtrack_count, step_scale in enumerate(_GAUSS_NEWTON_STEP_SCALES):
+            candidate_state_vector = cast(FloatArray, state_vector + step_scale * correction)
+            candidate_residuals, candidate_jacobian, candidate_measurement_specs = (
+                _jax_od_residuals_and_jacobian(
+                    scenario,
+                    measurements,
+                    runtime,
+                    candidate_state_vector,
+                )
+            )
+            candidate_rms = float(
+                np.sqrt(np.mean(candidate_residuals * candidate_residuals))
+            )
+            if candidate_rms < current_rms:
+                accepted_candidate = (
+                    candidate_rms,
+                    step_scale,
+                    candidate_state_vector,
+                    candidate_residuals,
+                    candidate_jacobian,
+                    candidate_measurement_specs,
+                )
+                line_search_backtrack_count += backtrack_count
+                break
+
+        if accepted_candidate is None:
+            break
+
+        (
+            rms,
+            accepted_step_scale,
             state_vector,
-        )
-        rms = float(np.sqrt(np.mean(residuals * residuals)))
-        if correction_norm <= correction_tolerance or rms <= residual_tolerance:
+            residuals,
+            jacobian,
+            measurement_specs,
+        ) = accepted_candidate
+        accepted_step_scales.append(accepted_step_scale)
+        iterations = iteration
+        scaled_correction_norm = float(np.linalg.norm(accepted_step_scale * correction))
+        if scaled_correction_norm <= correction_tolerance or rms <= residual_tolerance:
             converged = True
             break
 
@@ -796,6 +845,10 @@ def research_estimate_jax(
             "max_iterations": max_iterations,
             "correction_tolerance": correction_tolerance,
             "residual_tolerance": residual_tolerance,
+            "step_strategy": "backtracking_gauss_newton",
+            "step_scale_history": accepted_step_scales,
+            "line_search_backtrack_count": line_search_backtrack_count,
+            "line_search_step_scales": list(_GAUSS_NEWTON_STEP_SCALES),
             "covariance_status": covariance_status,
             "covariance_convention": "inverse_normal_matrix_of_normalized_residuals",
             **_research_force_metadata(scenario),

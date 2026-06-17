@@ -100,13 +100,14 @@ Cowell translational propagation, then maps the state history back into the suit
 product. Tudat trajectories with an initial covariance can populate suite finite-difference
 covariance-history products by propagating perturbed Tudat states through the selected Tudat force
 model. Tudat higher-order gravity models, native Tudat variational equations, and live calibrated
-force-model comparisons remain future work. JAX research
-propagation returns suite `MonteCarloResult` products, can optionally include a final-state
-transition sensitivity matrix, and supports
-differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag, solar
-radiation pressure, and analytic circular Sun/Moon third-body gravity flags. Those JAX force flags
-are explicitly research products, not operational ephemerides; ephemeris-backed third-body gravity
-remains an Orekit/Tudat-grade integration task.
+force-model comparisons remain future work. JAX research propagation returns suite
+`MonteCarloResult` products, can optionally include a final-state transition sensitivity matrix,
+and supports differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag,
+solar radiation pressure, and analytic circular Sun/Moon third-body gravity flags. Its research OD
+estimator uses backtracking Gauss-Newton corrections over normalized residual/Jacobian products so
+range/range-rate, inertial angle, and topocentric azimuth/elevation workflows can share the same
+product boundary. Those JAX force flags are explicitly research products, not operational
+ephemerides; ephemeris-backed third-body gravity remains an Orekit/Tudat-grade integration task.
 
 ## Commands
 
@@ -180,6 +181,7 @@ astro research-od-sensitivity examples/scenarios/leo_two_station_od.yaml measure
 astro research-od-sensitivity examples/scenarios/leo_two_station_angles.yaml angle_measurements.json --backend jax --output angle_od_sensitivity.json
 astro research-od-sensitivity examples/scenarios/leo_two_station_topocentric.yaml topocentric_measurements.json --backend jax --output topocentric_od_sensitivity.json
 astro research-estimate examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --max-iterations 5 --output research_estimate.json
+astro research-estimate examples/scenarios/leo_two_station_topocentric.yaml topocentric_measurements.json --backend jax --max-iterations 8 --output topocentric_research_estimate.json
 astro orekit-smoke
 ```
 

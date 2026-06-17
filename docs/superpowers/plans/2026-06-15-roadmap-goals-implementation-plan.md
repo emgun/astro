@@ -367,7 +367,9 @@ radiation pressure, and analytic circular Sun/Moon third-body gravity, opt-in JA
 transition sensitivities, JAX range/range-rate, inertial RA/Dec, and local-horizon az/el OD
 residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
 Nyx/ANISE evaluation gate are
-implemented. Tudat high-order gravity, native Tudat variational equations, and calibrated live
+implemented. The JAX research estimator now uses backtracking Gauss-Newton step acceptance for
+range/range-rate and topocentric azimuth/elevation OD products. Tudat high-order gravity, native
+Tudat variational equations, and calibrated live
 comparisons beyond the current two-body/J2/drag/SRP/third-body runner, JAX
 ephemeris-backed third-body force models, and operational-grade
 differentiable OD estimator workflows remain gated on validated runner implementations.
@@ -398,9 +400,9 @@ Implemented slice:
 - `astro research-od-sensitivity --backend jax` records normalized range/range-rate, inertial
   right-ascension/declination, and local-horizon azimuth/elevation residuals plus a residual
   Jacobian with respect to the initial Cartesian state in an `OdSensitivityResult`.
-- `astro research-estimate --backend jax` runs a research Gauss-Newton correction loop over the
-  same normalized residual/Jacobian model and returns the suite `EstimateResult` product with
-  explicit research-backend metadata.
+- `astro research-estimate --backend jax` runs a research backtracking Gauss-Newton correction loop
+  over the same normalized residual/Jacobian model and returns the suite `EstimateResult` product
+  with explicit research-backend metadata, including accepted step scales for angular OD damping.
 - `docs/research/nyx-evaluation.md` records the current Nyx/ANISE decision as evaluation-only.
 
 Definition of done:
@@ -415,7 +417,7 @@ Definition of done:
   without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and
   `astro research-estimate --backend jax` provide the first differentiable OD residual/Jacobian and
   research correction-loop primitives for range/range-rate, inertial RA/Dec, and local-horizon
-  az/el sensitivity. Ephemeris-backed third-body force models and
+  az/el sensitivity and topocentric az/el estimation. Ephemeris-backed third-body force models and
   operational-grade differentiable OD estimators still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.
 - Batch acceleration and Monte Carlo workflows preserve deterministic seeds and validation tolerances.
