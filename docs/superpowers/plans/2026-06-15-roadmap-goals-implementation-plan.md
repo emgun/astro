@@ -344,8 +344,9 @@ and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke comman
 dispatch, built-in JAX two-body and J2 research propagation runners, `orekit_high_fidelity`
 screening through the JAX J2 baseline, JAX research approximations for atmospheric drag, solar
 radiation pressure, and analytic circular Sun/Moon third-body gravity, opt-in JAX final-state
-transition sensitivities, JAX range/range-rate and inertial RA/Dec OD residual Jacobian products, a
-first JAX research Gauss-Newton OD estimate workflow, and a Nyx/ANISE evaluation gate are
+transition sensitivities, JAX range/range-rate, inertial RA/Dec, and local-horizon az/el OD
+residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
+Nyx/ANISE evaluation gate are
 implemented. Live Tudat
 environment construction, JAX ephemeris-backed third-body force models, and operational-grade
 differentiable OD estimator workflows remain gated on validated runner implementations.
@@ -367,9 +368,9 @@ Implemented slice:
   distinguishable from operational ephemeris-backed Orekit/Tudat propagation.
 - `astro research-propagate --backend jax --include-sensitivities` records a nominal final-state
   transition matrix in `MonteCarloResult.metadata` using JAX autodiff.
-- `astro research-od-sensitivity --backend jax` records normalized range/range-rate and inertial
-  right-ascension/declination residuals plus a residual Jacobian with respect to the initial
-  Cartesian state in an `OdSensitivityResult`.
+- `astro research-od-sensitivity --backend jax` records normalized range/range-rate, inertial
+  right-ascension/declination, and local-horizon azimuth/elevation residuals plus a residual
+  Jacobian with respect to the initial Cartesian state in an `OdSensitivityResult`.
 - `astro research-estimate --backend jax` runs a research Gauss-Newton correction loop over the
   same normalized residual/Jacobian model and returns the suite `EstimateResult` product with
   explicit research-backend metadata.
@@ -382,8 +383,8 @@ Definition of done:
   screening-only `orekit_high_fidelity`, drag, SRP, and analytic Sun/Moon third-body force flags
   without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and
   `astro research-estimate --backend jax` provide the first differentiable OD residual/Jacobian and
-  research correction-loop primitives for range/range-rate plus inertial RA/Dec sensitivity.
-  Ephemeris-backed third-body force models and
+  research correction-loop primitives for range/range-rate, inertial RA/Dec, and local-horizon
+  az/el sensitivity. Ephemeris-backed third-body force models and
   operational-grade differentiable OD estimators still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.
 - Batch acceleration and Monte Carlo workflows preserve deterministic seeds and validation tolerances.

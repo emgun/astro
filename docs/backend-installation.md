@@ -84,9 +84,11 @@ current JAX research runner supports vectorized two-body and J2 RK4 ensembles an
 final-state transition sensitivity matrix via `astro research-propagate --backend jax
 --include-sensitivities`. JAX is not the operational frame/time authority; compare research results
 against local/Orekit references. `astro research-od-sensitivity --backend jax` writes an
-`OdSensitivityResult` with normalized range/range-rate or inertial right-ascension/declination
-residuals and a JAX-derived residual Jacobian with respect to the initial Cartesian state for
-differentiable OD research workflows.
+`OdSensitivityResult` with normalized range/range-rate, inertial right-ascension/declination, or
+local-horizon azimuth/elevation residuals and a JAX-derived residual Jacobian with respect to the
+initial Cartesian state for differentiable OD research workflows. Topocentric angular sensitivity
+products record a horizontal-norm regularization floor for exact zenith/nadir geometry, where
+azimuth and elevation derivatives are singular.
 
 TudatPy is intentionally not listed as a pip extra because it may not be available from PyPI for this
 environment. Install TudatPy through its supported distribution channel for your platform, then run:

@@ -30,11 +30,14 @@ JaxResearchRunner = Callable[[Scenario, JaxRuntime, int, float, float, int], Mon
 FloatArray = NDArray[np.float64]
 _MAX_RK4_INTERNAL_STEP_S = 30.0
 _STATE_DIMENSION = 6
+_TOPOCENTRIC_ANGLE_HORIZONTAL_NORM_FLOOR = 1.0e-12
 _SUPPORTED_JAX_OD_MEASUREMENTS = {
     MeasurementType.RANGE,
     MeasurementType.RANGE_RATE,
     MeasurementType.RIGHT_ASCENSION,
     MeasurementType.DECLINATION,
+    MeasurementType.AZIMUTH,
+    MeasurementType.ELEVATION,
 }
 _SUPPORTED_JAX_GRAVITY_MODELS = {
     ForceModelName.TWO_BODY,
@@ -478,7 +481,7 @@ def _jax_od_measurement_specs(
         if record.measurement_type not in _SUPPORTED_JAX_OD_MEASUREMENTS:
             raise UnsupportedBackendError(
                 "JAX OD sensitivity currently supports only range, range_rate, "
-                "right_ascension, and declination measurements; "
+                "right_ascension, declination, azimuth, and elevation measurements; "
                 f"unsupported measurement type: {record.measurement_type}"
             )
         if record.observed_object != scenario.spacecraft.name:
@@ -516,6 +519,8 @@ def _jax_od_residual_vector(
 ) -> Any:
     state_history = _jax_state_history(jnp, scenario, state_vector)
     residuals = []
+    north_pole = jnp.asarray((0.0, 0.0, 1.0))
+    y_axis = jnp.asarray((0.0, 1.0, 0.0))
     for measurement_type, sample_index, station_position, value, sigma in measurement_specs:
         sample_state = state_history[sample_index]
         position = sample_state[:3]
@@ -536,12 +541,60 @@ def _jax_od_residual_vector(
                 predicted = jnp.arctan2(line_of_sight[1], line_of_sight[0]) * 180.0 / np.pi
                 predicted = predicted % 360.0
                 residual = ((predicted - value + 180.0) % 360.0 - 180.0) / sigma
-            else:
+            elif measurement_type is MeasurementType.DECLINATION:
                 clipped_z = jnp.clip(line_of_sight[2], -1.0, 1.0)
                 predicted = jnp.arcsin(clipped_z) * 180.0 / np.pi
                 residual = (predicted - value) / sigma
+            else:
+                up = station / jnp.linalg.norm(station)
+                east = jnp.cross(north_pole, up)
+                east_norm = jnp.linalg.norm(east)
+                fallback_east = jnp.cross(y_axis, up)
+                east = jnp.where(east_norm == 0.0, fallback_east, east)
+                east = east / jnp.linalg.norm(east)
+                topocentric_north = jnp.cross(up, east)
+                east_component = jnp.dot(line_of_sight, east)
+                north_component = jnp.dot(line_of_sight, topocentric_north)
+                horizontal_norm_squared = (
+                    east_component * east_component + north_component * north_component
+                )
+                horizontal_norm_floor_squared = (
+                    _TOPOCENTRIC_ANGLE_HORIZONTAL_NORM_FLOOR
+                    * _TOPOCENTRIC_ANGLE_HORIZONTAL_NORM_FLOOR
+                )
+                is_horizontal_singular = horizontal_norm_squared < horizontal_norm_floor_squared
+                if measurement_type is MeasurementType.AZIMUTH:
+                    safe_east_component = jnp.where(is_horizontal_singular, 0.0, east_component)
+                    safe_north_component = jnp.where(
+                        is_horizontal_singular,
+                        _TOPOCENTRIC_ANGLE_HORIZONTAL_NORM_FLOOR,
+                        north_component,
+                    )
+                    predicted = (
+                        jnp.arctan2(safe_east_component, safe_north_component)
+                        * 180.0
+                        / np.pi
+                    )
+                    predicted = predicted % 360.0
+                    residual = ((predicted - value + 180.0) % 360.0 - 180.0) / sigma
+                else:
+                    up_component = jnp.clip(jnp.dot(line_of_sight, up), -1.0, 1.0)
+                    horizontal_norm = jnp.sqrt(
+                        jnp.maximum(horizontal_norm_squared, horizontal_norm_floor_squared)
+                    )
+                    predicted = jnp.arctan2(up_component, horizontal_norm) * 180.0 / np.pi
+                    residual = (predicted - value) / sigma
         residuals.append(residual)
     return jnp.stack(residuals)
+
+
+def _uses_topocentric_angle_measurements(
+    measurement_specs: list[tuple[MeasurementType, int, FloatArray, float, float]],
+) -> bool:
+    return any(
+        measurement_type in {MeasurementType.AZIMUTH, MeasurementType.ELEVATION}
+        for measurement_type, _sample_index, _station_position, _value, _sigma in measurement_specs
+    )
 
 
 def _unique_measurement_type_values(measurements: list[MeasurementRecord]) -> list[str]:
@@ -616,12 +669,30 @@ def research_od_sensitivity_jax(
     _validate_jax_force_model(scenario)
     runtime = runtime_loader()
     initial = _initial_state_vector(scenario)
-    residuals, jacobian, _measurement_specs = _jax_od_residuals_and_jacobian(
+    residuals, jacobian, measurement_specs = _jax_od_residuals_and_jacobian(
         scenario,
         measurements,
         runtime,
         initial,
     )
+    metadata: dict[str, object] = {
+        "adapter": "jax",
+        "jax_version": runtime.jax_version,
+        "jaxlib_version": runtime.jaxlib_version,
+        "sensitivity_model": "jax_jacfwd_od_residuals",
+        "force_model": scenario.force_model.gravity.value,
+        "research_force_models": _research_force_model_names(scenario),
+        "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
+        "measurement_types": _unique_measurement_type_values(measurements),
+        "residual_convention": "(predicted - observed) / sigma",
+        "angle_residual_convention": "wrapped_degrees",
+        **_research_force_metadata(scenario),
+    }
+    if _uses_topocentric_angle_measurements(measurement_specs):
+        metadata["topocentric_angle_sensitivity_regularization"] = "horizontal_norm_floor"
+        metadata["topocentric_angle_horizontal_norm_floor"] = (
+            _TOPOCENTRIC_ANGLE_HORIZONTAL_NORM_FLOOR
+        )
     return OdSensitivityResult(
         scenario_id=scenario.scenario_id,
         backend="jax",
@@ -629,19 +700,7 @@ def research_od_sensitivity_jax(
         state_dimension=_STATE_DIMENSION,
         residuals=[float(value) for value in residuals],
         jacobian=[[float(component) for component in row] for row in jacobian],
-        metadata={
-            "adapter": "jax",
-            "jax_version": runtime.jax_version,
-            "jaxlib_version": runtime.jaxlib_version,
-            "sensitivity_model": "jax_jacfwd_od_residuals",
-            "force_model": scenario.force_model.gravity.value,
-            "research_force_models": _research_force_model_names(scenario),
-            "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
-            "measurement_types": _unique_measurement_type_values(measurements),
-            "residual_convention": "(predicted - observed) / sigma",
-            "angle_residual_convention": "wrapped_degrees",
-            **_research_force_metadata(scenario),
-        },
+        metadata=metadata,
     )
 
 

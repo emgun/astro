@@ -159,6 +159,7 @@ astro research-propagate examples/scenarios/leo_orekit_srp.yaml --backend jax --
 astro research-propagate examples/scenarios/leo_jax_third_body_research.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_third_body_research.json
 astro research-od-sensitivity examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --output od_sensitivity.json
 astro research-od-sensitivity examples/scenarios/leo_two_station_angles.yaml angle_measurements.json --backend jax --output angle_od_sensitivity.json
+astro research-od-sensitivity examples/scenarios/leo_two_station_topocentric.yaml topocentric_measurements.json --backend jax --output topocentric_od_sensitivity.json
 astro research-estimate examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --max-iterations 5 --output research_estimate.json
 astro orekit-smoke
 ```
@@ -316,10 +317,13 @@ screening approximation for operational ephemeris-backed Orekit/Tudat semantics.
 
 `astro research-od-sensitivity --backend jax` loads an explicit measurement file and writes an
 `OdSensitivityResult` containing normalized OD residuals and the residual Jacobian with respect to
-the initial Cartesian state. This is the first differentiable OD primitive for range/range-rate and
-inertial right-ascension/declination workflows; it currently supports two-body/J2 force models and
-measurement epochs aligned with propagation samples. Right ascension residuals use wrapped degrees
-so 0/360 degree crossings stay continuous. `astro research-estimate --backend jax` runs a research Gauss-Newton
+the initial Cartesian state. This is the first differentiable OD primitive for range/range-rate,
+inertial right-ascension/declination, and local-horizon azimuth/elevation workflows; it currently
+supports two-body/J2 force models and measurement epochs aligned with propagation samples. Right
+ascension and azimuth residuals use wrapped degrees so 0/360 degree crossings stay continuous.
+Topocentric angular sensitivity metadata records a horizontal-norm floor because azimuth is
+geometrically undefined and elevation derivatives are singular at exact zenith/nadir passes.
+`astro research-estimate --backend jax` runs a research Gauss-Newton
 correction loop over the same JAX residual/Jacobian model and writes the suite `EstimateResult`
 product with normalized-residual metadata. It is a differentiable OD workflow for screening and
 method development, not a replacement for the deterministic local estimator or native Orekit OD.
