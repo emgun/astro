@@ -11,6 +11,7 @@ Use this checklist before tagging or publishing a release candidate.
 - [ ] `python -m mypy`
 - [ ] `astro validate examples/scenarios/leo_two_body.yaml`
 - [ ] `astro propagate examples/scenarios/leo_two_body.yaml --backend local --output /tmp/astro-local-trajectory.json`
+- [ ] `astro propagate examples/scenarios/leo_eccentric_two_body.yaml --backend local --output /tmp/astro-eccentric-trajectory.json`
 - [ ] `astro propagate examples/scenarios/meo_two_body.yaml --backend local --output /tmp/astro-meo.json`
 - [ ] `astro propagate examples/scenarios/geo_two_body.yaml --backend local --output /tmp/astro-geo.json`
 - [ ] `astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output /tmp/astro-finite-burn.json`

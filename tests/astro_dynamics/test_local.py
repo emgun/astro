@@ -119,8 +119,37 @@ def test_propagate_local_annotates_sampled_apsis_events() -> None:
     assert apsis_events[0].metadata["sample_index"] == 0
     assert apsis_events[0].metadata["radius_km"] == pytest.approx(7000.0)
     assert apsis_events[1].metadata["radius_km"] > apsis_events[0].metadata["radius_km"]
-    assert trajectory.metadata["event_detection"] == "sampled_radius_extrema"
+    assert trajectory.metadata["event_detection"] == "radial_velocity_root"
     assert trajectory.metadata["apsis_event_count"] >= 2
+
+
+def test_propagate_local_root_locates_interior_apsis_events() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    eccentric_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": scenario.initial_state.cartesian.model_copy(
+                update={"velocity_km_s": (0.0, 8.0, 0.0)}
+            )
+        }
+    )
+    eccentric_scenario = scenario.model_copy(
+        update={
+            "initial_state": eccentric_state,
+            "propagation": scenario.propagation.model_copy(
+                update={"duration_s": 7200.0, "step_s": 60.0}
+            ),
+        }
+    )
+
+    trajectory = propagate_local(eccentric_scenario)
+
+    apoapsis = next(event for event in trajectory.events if event.event_type == "apoapsis")
+    assert apoapsis.metadata["event_detection"] == "radial_velocity_root"
+    assert apoapsis.metadata["bracket_elapsed_s"] == (3540.0, 3600.0)
+    assert 3540.0 < apoapsis.metadata["elapsed_s"] < 3600.0
+    assert apoapsis.metadata["sample_index"] is None
+    assert abs(apoapsis.metadata["radial_velocity_km_s"]) < 1.0e-8
+    assert trajectory.metadata["event_detection"] == "radial_velocity_root"
 
 
 def test_propagate_local_applies_finite_burn_schedule() -> None:

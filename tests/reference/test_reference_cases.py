@@ -86,7 +86,7 @@ def test_local_reference_metadata_discloses_internal_integration_cadence() -> No
         "internal_max_step_s": 30.0,
         "internal_substeps_per_sample": 2,
         "internal_step_s": 30.0,
-        "event_detection": "sampled_radius_extrema",
+        "event_detection": "radial_velocity_root",
         "apsis_event_count": 1,
     }
 

@@ -156,6 +156,18 @@ def test_load_orekit_third_body_example_scenario() -> None:
     assert scenario.force_model.enabled_high_fidelity_flags() == ("third_body_gravity",)
 
 
+def test_load_eccentric_two_body_example_scenario_has_interior_apsis_root() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_eccentric_two_body.yaml"))
+
+    trajectory = propagate_local(scenario)
+    apoapsis = next(event for event in trajectory.events if event.event_type == "apoapsis")
+
+    assert scenario.scenario_id == "leo-eccentric-two-body"
+    assert scenario.force_model.gravity is ForceModelName.TWO_BODY
+    assert apoapsis.metadata["event_detection"] == "radial_velocity_root"
+    assert 3540.0 < apoapsis.metadata["elapsed_s"] < 3600.0
+
+
 @pytest.mark.parametrize(
     ("scenario_path", "scenario_id", "minimum_radius_km"),
     [

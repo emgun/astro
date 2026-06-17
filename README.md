@@ -104,6 +104,7 @@ remains an Orekit/Tudat-grade integration task.
 ```bash
 astro validate examples/scenarios/leo_two_body.yaml
 astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
+astro propagate examples/scenarios/leo_eccentric_two_body.yaml --backend local --output eccentric_trajectory.json
 astro propagate examples/scenarios/meo_two_body.yaml --backend local --output meo_trajectory.json
 astro propagate examples/scenarios/geo_two_body.yaml --backend local --output geo_trajectory.json
 astro propagate examples/scenarios/leo_j2.yaml --backend local --output j2_trajectory.json
@@ -210,9 +211,10 @@ instantaneous local radial direction. Maneuvered local trajectories also include
 `AttitudeState` products with a body-to-inertial unit quaternion that points the spacecraft body +X
 axis along the commanded thrust direction during active thrust-vector burns. These are commanded
 pointing products, not full torque-level attitude-control simulations. Local orbital propagation
-also annotates sampled periapsis/apoapsis radius extrema as `TrajectoryEvent` records with sample
-index, elapsed time, radius, and radial velocity metadata. These are sample-level mission-analysis
-events, not sub-step root-solved event times.
+also annotates periapsis/apoapsis `TrajectoryEvent` records. For no-maneuver trajectories, apsides
+are root-located between propagation samples through radial-velocity bisection and include bracket,
+elapsed time, radius, and radial-velocity metadata. Maneuvered trajectories keep sample-safe apsis
+annotation because thrust discontinuities need maneuver-aware event isolation.
 
 Local and Orekit propagation also accept an optional `initial_covariance` 6x6 matrix. When present,
 the backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference

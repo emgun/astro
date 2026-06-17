@@ -224,11 +224,13 @@ initial-state Monte Carlo, time-aligned conjunction screening, and commanded-att
 samples for maneuvered local propagation. The attitude-coupled finite-burn modes rotate thrust
 along instantaneous velocity or
 local radial directions and record body-to-inertial unit quaternion samples for the commanded body
-+X axis. Local orbital propagation annotates sampled periapsis/apoapsis radius extrema as
-`TrajectoryEvent` records for deterministic mission-analysis products; drag/SRP/third-body
-variational-equation covariance dynamics, sub-step root-solved event location,
-probability-of-collision analysis, and torque-level attitude-control maneuver dynamics remain
-deferred.
++X axis. Local orbital propagation annotates periapsis/apoapsis `TrajectoryEvent` records for
+deterministic mission-analysis products, using radial-velocity root location for no-maneuver local
+trajectories and sample-safe extrema annotation for maneuvered trajectories. The
+`examples/scenarios/leo_eccentric_two_body.yaml` scenario exercises an interior apoapsis root
+through the public CLI; drag/SRP/third-body
+variational-equation covariance dynamics, probability-of-collision analysis, and torque-level
+attitude-control maneuver dynamics remain deferred.
 
 Definition of done:
 

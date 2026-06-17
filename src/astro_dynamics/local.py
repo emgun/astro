@@ -33,6 +33,7 @@ _COVARIANCE_FD_REL_STEP = 1.0e-6
 _COVARIANCE_FD_ABS_STEP = 1.0e-8
 _STANDARD_GRAVITY_M_S2 = 9.80665
 _APSIS_RADIAL_VELOCITY_TOLERANCE_KM_S = 1.0e-9
+_APSIS_ROOT_TIME_TOLERANCE_S = 1.0e-6
 
 
 @dataclass(frozen=True)
@@ -609,6 +610,170 @@ def _sampled_apsis_events(
     return events
 
 
+def _state_from_sample(sample: TrajectorySample) -> FloatArray:
+    return cast(
+        FloatArray,
+        np.concatenate(
+            [
+                np.array(sample.state.position_km, dtype=np.float64),
+                np.array(sample.state.velocity_km_s, dtype=np.float64),
+            ]
+        ),
+    )
+
+
+def _radial_velocity_from_state(state: FloatArray) -> float:
+    position = state[:3]
+    velocity = state[3:]
+    radius = float(np.linalg.norm(position))
+    if radius == 0.0:
+        return 0.0
+    return float(np.dot(position, velocity) / radius)
+
+
+def _radius_from_state(state: FloatArray) -> float:
+    return float(np.linalg.norm(state[:3]))
+
+
+def _root_located_boundary_apsis_event(
+    samples: list[TrajectorySample],
+    scenario: Scenario,
+    *,
+    index: int,
+) -> TrajectoryEvent | None:
+    event_type = _apsis_event_type(
+        [_sample_radius_km(sample) for sample in samples],
+        [_sample_radial_velocity_km_s(sample) for sample in samples],
+        index,
+    )
+    if event_type is None:
+        return None
+
+    sample = samples[index]
+    state = _state_from_sample(sample)
+    elapsed_s = (sample.epoch - scenario.initial_state.epoch).total_seconds()
+    return TrajectoryEvent(
+        event_type=event_type,
+        epoch=sample.epoch,
+        description=f"Root-located local {event_type} radial-velocity boundary.",
+        metadata={
+            "event_detection": "radial_velocity_root",
+            "sample_index": index,
+            "elapsed_s": elapsed_s,
+            "bracket_elapsed_s": (elapsed_s, elapsed_s),
+            "radius_km": _radius_from_state(state),
+            "radial_velocity_km_s": _radial_velocity_from_state(state),
+        },
+    )
+
+
+def _root_located_interior_apsis_event(
+    samples: list[TrajectorySample],
+    scenario: Scenario,
+    *,
+    force_model: ForceModelName,
+    left_index: int,
+) -> TrajectoryEvent | None:
+    left_sample = samples[left_index]
+    right_sample = samples[left_index + 1]
+    left_state = _state_from_sample(left_sample)
+    left_elapsed_s = (left_sample.epoch - scenario.initial_state.epoch).total_seconds()
+    right_elapsed_s = (right_sample.epoch - scenario.initial_state.epoch).total_seconds()
+    left_radial_velocity = _radial_velocity_from_state(left_state)
+    right_radial_velocity = _sample_radial_velocity_km_s(right_sample)
+
+    if left_radial_velocity > 0.0 > right_radial_velocity:
+        event_type = "apoapsis"
+    elif left_radial_velocity < 0.0 < right_radial_velocity:
+        event_type = "periapsis"
+    else:
+        return None
+
+    low_s = 0.0
+    high_s = right_elapsed_s - left_elapsed_s
+    low_radial_velocity = left_radial_velocity
+    root_state = left_state
+    root_offset_s = low_s
+    for _ in range(80):
+        mid_s = 0.5 * (low_s + high_s)
+        root_state = rk4_step(left_state, mid_s, force_model)
+        mid_radial_velocity = _radial_velocity_from_state(root_state)
+        root_offset_s = mid_s
+        if abs(mid_radial_velocity) <= _APSIS_RADIAL_VELOCITY_TOLERANCE_KM_S:
+            break
+        if abs(high_s - low_s) <= _APSIS_ROOT_TIME_TOLERANCE_S:
+            break
+        if low_radial_velocity * mid_radial_velocity <= 0.0:
+            high_s = mid_s
+        else:
+            low_s = mid_s
+            low_radial_velocity = mid_radial_velocity
+
+    elapsed_s = left_elapsed_s + root_offset_s
+    epoch = scenario.initial_state.epoch + timedelta(seconds=elapsed_s)
+    return TrajectoryEvent(
+        event_type=event_type,
+        epoch=epoch,
+        description=f"Root-located local {event_type} radial-velocity crossing.",
+        metadata={
+            "event_detection": "radial_velocity_root",
+            "sample_index": None,
+            "elapsed_s": elapsed_s,
+            "bracket_elapsed_s": (left_elapsed_s, right_elapsed_s),
+            "radius_km": _radius_from_state(root_state),
+            "radial_velocity_km_s": _radial_velocity_from_state(root_state),
+            "root_time_tolerance_s": _APSIS_ROOT_TIME_TOLERANCE_S,
+        },
+    )
+
+
+def _root_located_apsis_events(
+    samples: list[TrajectorySample],
+    scenario: Scenario,
+    *,
+    force_model: ForceModelName,
+) -> list[TrajectoryEvent]:
+    events: list[TrajectoryEvent] = []
+    if not samples:
+        return events
+
+    first_event = _root_located_boundary_apsis_event(samples, scenario, index=0)
+    if first_event is not None:
+        events.append(first_event)
+
+    for left_index in range(len(samples) - 1):
+        event = _root_located_interior_apsis_event(
+            samples,
+            scenario,
+            force_model=force_model,
+            left_index=left_index,
+        )
+        if event is not None:
+            events.append(event)
+
+    if len(samples) > 1:
+        final_event = _root_located_boundary_apsis_event(
+            samples,
+            scenario,
+            index=len(samples) - 1,
+        )
+        if final_event is not None:
+            events.append(final_event)
+    return events
+
+
+def _apsis_events(
+    samples: list[TrajectorySample],
+    scenario: Scenario,
+    *,
+    force_model: ForceModelName,
+    maneuver_schedule: list[_ScheduledManeuver],
+) -> list[TrajectoryEvent]:
+    if maneuver_schedule:
+        return _sampled_apsis_events(samples, scenario)
+    return _root_located_apsis_events(samples, scenario, force_model=force_model)
+
+
 def _maneuver_metadata(schedule: list[_ScheduledManeuver]) -> dict[str, Any]:
     if not schedule:
         return {}
@@ -658,8 +823,11 @@ def _attitude_metadata(schedule: list[_ScheduledManeuver], sample_count: int) ->
 
 
 def _event_metadata(apsis_events: list[TrajectoryEvent]) -> dict[str, Any]:
+    event_detection = (
+        apsis_events[0].metadata.get("event_detection", "none") if apsis_events else "none"
+    )
     return {
-        "event_detection": "sampled_radius_extrema",
+        "event_detection": event_detection,
         "apsis_event_count": len(apsis_events),
     }
 
@@ -1108,7 +1276,12 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         if maneuver_schedule
         else {}
     )
-    apsis_events = _sampled_apsis_events(samples, scenario)
+    apsis_events = _apsis_events(
+        samples,
+        scenario,
+        force_model=force_model,
+        maneuver_schedule=maneuver_schedule,
+    )
     metadata = (
         {
             "integrator": "rk4",
