@@ -324,9 +324,10 @@ and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke comman
 dispatch, built-in JAX two-body and J2 research propagation runners, `orekit_high_fidelity`
 screening through the JAX J2 baseline, JAX research approximations for atmospheric drag and solar
 radiation pressure, opt-in JAX final-state transition sensitivities, JAX range/range-rate OD
-residual Jacobian products, and a Nyx/ANISE evaluation gate are implemented. Live Tudat environment
-construction, JAX third-body ephemeris-backed force models, and full differentiable OD estimator
-workflows remain gated on validated runner implementations.
+residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
+Nyx/ANISE evaluation gate are implemented. Live Tudat environment construction, JAX third-body
+ephemeris-backed force models, and operational-grade differentiable OD estimator workflows remain
+gated on validated runner implementations.
 
 Implemented slice:
 
@@ -343,6 +344,9 @@ Implemented slice:
   transition matrix in `MonteCarloResult.metadata` using JAX autodiff.
 - `astro research-od-sensitivity --backend jax` records normalized range/range-rate residuals and
   a residual Jacobian with respect to the initial Cartesian state in an `OdSensitivityResult`.
+- `astro research-estimate --backend jax` runs a research Gauss-Newton correction loop over the
+  same normalized residual/Jacobian model and returns the suite `EstimateResult` product with
+  explicit research-backend metadata.
 - `docs/research/nyx-evaluation.md` records the current Nyx/ANISE decision as evaluation-only.
 
 Definition of done:
@@ -350,9 +354,10 @@ Definition of done:
 - `astro propagate --backend tudat` supports at least one cross-check scenario and records Tudat provenance once a validated Tudat runner is supplied.
 - `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
   screening-only `orekit_high_fidelity`, drag, and SRP force flags without replacing operational
-  Orekit semantics; `astro research-od-sensitivity --backend jax` provides the first
-  differentiable OD residual/Jacobian primitive. Third-body force flags and full differentiable OD
-  estimators still require validated JAX runners.
+  Orekit semantics; `astro research-od-sensitivity --backend jax` and
+  `astro research-estimate --backend jax` provide the first differentiable OD residual/Jacobian and
+  research correction-loop primitives. Third-body force flags and operational-grade differentiable
+  OD estimators still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.
 - Batch acceleration and Monte Carlo workflows preserve deterministic seeds and validation tolerances.
 

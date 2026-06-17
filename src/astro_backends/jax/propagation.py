@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import timedelta
 from math import ceil, isfinite
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -13,6 +13,7 @@ from astro_core.constants import J2_EARTH, MU_EARTH_KM3_S2, R_EARTH_KM
 from astro_core.errors import UnsupportedBackendError
 from astro_core.models import (
     CartesianState,
+    EstimateResult,
     ForceModelName,
     MeasurementRecord,
     MeasurementType,
@@ -430,6 +431,38 @@ def _unique_measurement_type_values(measurements: list[MeasurementRecord]) -> li
     return values
 
 
+def _jax_od_residuals_and_jacobian(
+    scenario: Scenario,
+    measurements: list[MeasurementRecord],
+    runtime: JaxRuntime,
+    state_vector: FloatArray,
+) -> tuple[FloatArray, FloatArray, list[tuple[MeasurementType, int, FloatArray, float, float]]]:
+    jacfwd = getattr(runtime.jax_module, "jacfwd", None)
+    if jacfwd is None:
+        raise UnsupportedBackendError(
+            "JAX OD sensitivity requires jax.jacfwd; install a complete "
+            "astro-suite[research] JAX runtime."
+        )
+
+    jnp = runtime.jnp_module
+    measurement_specs = _jax_od_measurement_specs(scenario, measurements)
+
+    def residual_function(candidate_state_vector: Any) -> Any:
+        return _jax_od_residual_vector(
+            jnp,
+            scenario,
+            measurement_specs,
+            candidate_state_vector,
+        )
+
+    residuals = np.asarray(residual_function(jnp.asarray(state_vector)), dtype=np.float64)
+    jacobian = np.asarray(
+        jacfwd(residual_function)(jnp.asarray(state_vector)),
+        dtype=np.float64,
+    )
+    return residuals, jacobian, measurement_specs
+
+
 def _final_state_transition_matrix(
     scenario: Scenario,
     runtime: JaxRuntime,
@@ -460,27 +493,13 @@ def research_od_sensitivity_jax(
 ) -> OdSensitivityResult:
     _validate_jax_force_model(scenario)
     runtime = runtime_loader()
-    jacfwd = getattr(runtime.jax_module, "jacfwd", None)
-    if jacfwd is None:
-        raise UnsupportedBackendError(
-            "JAX OD sensitivity requires jax.jacfwd; install a complete "
-            "astro-suite[research] JAX runtime."
-        )
-
-    jnp = runtime.jnp_module
-    measurement_specs = _jax_od_measurement_specs(scenario, measurements)
     initial = _initial_state_vector(scenario)
-
-    def residual_function(state_vector: Any) -> Any:
-        return _jax_od_residual_vector(
-            jnp,
-            scenario,
-            measurement_specs,
-            state_vector,
-        )
-
-    residuals = np.asarray(residual_function(jnp.asarray(initial)), dtype=np.float64)
-    jacobian = np.asarray(jacfwd(residual_function)(jnp.asarray(initial)), dtype=np.float64)
+    residuals, jacobian, _measurement_specs = _jax_od_residuals_and_jacobian(
+        scenario,
+        measurements,
+        runtime,
+        initial,
+    )
     return OdSensitivityResult(
         scenario_id=scenario.scenario_id,
         backend="jax",
@@ -498,6 +517,103 @@ def research_od_sensitivity_jax(
             "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
             "measurement_types": _unique_measurement_type_values(measurements),
             "residual_convention": "(predicted - observed) / sigma",
+        },
+    )
+
+
+def research_estimate_jax(
+    scenario: Scenario,
+    measurements: list[MeasurementRecord],
+    *,
+    runtime_loader: JaxRuntimeLoader = load_jax_runtime,
+    max_iterations: int = 5,
+    correction_tolerance: float = 1.0e-9,
+    residual_tolerance: float = 1.0e-6,
+) -> EstimateResult:
+    if isinstance(max_iterations, bool) or max_iterations <= 0:
+        raise ValueError("max_iterations must be positive")
+    if correction_tolerance <= 0.0 or residual_tolerance <= 0.0:
+        raise ValueError("estimator tolerances must be positive")
+
+    _validate_jax_force_model(scenario)
+    runtime = runtime_loader()
+    state_vector = _initial_state_vector(scenario)
+    residuals: FloatArray | None = None
+    jacobian: FloatArray | None = None
+    measurement_specs: list[tuple[MeasurementType, int, FloatArray, float, float]] = []
+    converged = False
+    iterations = 0
+
+    for iteration in range(1, max_iterations + 1):
+        residuals, jacobian, measurement_specs = _jax_od_residuals_and_jacobian(
+            scenario,
+            measurements,
+            runtime,
+            state_vector,
+        )
+        correction = np.linalg.lstsq(jacobian, -residuals, rcond=None)[0]
+        state_vector = cast(FloatArray, state_vector + correction)
+        iterations = iteration
+        correction_norm = float(np.linalg.norm(correction))
+
+        residuals, jacobian, measurement_specs = _jax_od_residuals_and_jacobian(
+            scenario,
+            measurements,
+            runtime,
+            state_vector,
+        )
+        rms = float(np.sqrt(np.mean(residuals * residuals)))
+        if correction_norm <= correction_tolerance or rms <= residual_tolerance:
+            converged = True
+            break
+
+    if residuals is None or jacobian is None:
+        raise UnsupportedBackendError("JAX research estimator did not evaluate residuals")
+
+    normal_matrix = jacobian.T @ jacobian
+    covariance_status = "available"
+    try:
+        covariance_matrix = np.linalg.inv(normal_matrix)
+    except np.linalg.LinAlgError:
+        covariance_matrix = np.linalg.pinv(normal_matrix)
+        covariance_status = "pseudo_inverse"
+    covariance_matrix = cast(FloatArray, 0.5 * (covariance_matrix + covariance_matrix.T))
+    rms = float(np.sqrt(np.mean(residuals * residuals)))
+    estimated_cartesian = scenario.initial_state.cartesian.model_copy(
+        update={
+            "position_km": _tuple3(state_vector[:3]),
+            "velocity_km_s": _tuple3(state_vector[3:]),
+        }
+    )
+    estimated_state = scenario.initial_state.model_copy(
+        update={"cartesian": estimated_cartesian}
+    )
+
+    return EstimateResult(
+        estimated_state=estimated_state,
+        residuals=[float(value) for value in residuals],
+        covariance=[[float(component) for component in row] for row in covariance_matrix],
+        rms=rms,
+        iterations=iterations,
+        converged=converged,
+        metadata={
+            "adapter": "jax",
+            "backend": "jax_research_estimator",
+            "estimator": "jax_research_gauss_newton",
+            "jax_version": runtime.jax_version,
+            "jaxlib_version": runtime.jaxlib_version,
+            "sensitivity_model": "jax_jacfwd_od_residuals",
+            "force_model": scenario.force_model.gravity.value,
+            "research_force_models": _research_force_model_names(scenario),
+            "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
+            "measurement_types": _unique_measurement_type_values(measurements),
+            "measurement_count": len(measurement_specs),
+            "residual_convention": "(predicted - observed) / sigma",
+            "max_iterations": max_iterations,
+            "correction_tolerance": correction_tolerance,
+            "residual_tolerance": residual_tolerance,
+            "covariance_status": covariance_status,
+            "covariance_convention": "inverse_normal_matrix_of_normalized_residuals",
         },
     )
 

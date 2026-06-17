@@ -154,6 +154,7 @@ astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --
 astro research-propagate examples/scenarios/leo_orekit_drag.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_drag_research.json
 astro research-propagate examples/scenarios/leo_orekit_srp.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_srp_research.json
 astro research-od-sensitivity examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --output od_sensitivity.json
+astro research-estimate examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --max-iterations 5 --output research_estimate.json
 astro orekit-smoke
 ```
 
@@ -304,7 +305,10 @@ third-body/high-fidelity force-model combinations.
 `OdSensitivityResult` containing normalized OD residuals and the residual Jacobian with respect to
 the initial Cartesian state. This is the first differentiable OD primitive for range/range-rate
 workflows; it currently supports two-body/J2 force models and measurement epochs aligned with
-propagation samples.
+propagation samples. `astro research-estimate --backend jax` runs a research Gauss-Newton
+correction loop over the same JAX residual/Jacobian model and writes the suite `EstimateResult`
+product with normalized-residual metadata. It is a differentiable OD workflow for screening and
+method development, not a replacement for the deterministic local estimator or native Orekit OD.
 
 CSV inputs use one row per measurement with these required columns:
 

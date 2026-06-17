@@ -474,6 +474,67 @@ def test_research_od_sensitivity_command_accepts_jax_backend(
     assert payload["metadata"]["workflow"] == "research_od_sensitivity"
 
 
+def test_research_estimate_command_accepts_jax_backend(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    truth_scenario = _observable_scenario()
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+    scenario_path = tmp_path / "estimate_scenario.yaml"
+    measurements_path = tmp_path / "measurements.json"
+    output = tmp_path / "research_estimate.json"
+    _write_scenario(scenario_path, estimate_scenario)
+    _write_measurements(measurements_path, truth_scenario)
+    seen: dict[str, object] = {}
+
+    def fake_research_estimator(
+        candidate: Scenario,
+        measurements: list[MeasurementRecord],
+        *,
+        max_iterations: int,
+    ) -> object:
+        seen["scenario_id"] = candidate.scenario_id
+        seen["measurement_count"] = len(measurements)
+        seen["max_iterations"] = max_iterations
+        result = estimate_initial_state(candidate, measurements)
+        return result.model_copy(
+            update={
+                "metadata": {
+                    **result.metadata,
+                    "backend": "jax_research_estimator",
+                    "estimator": "jax_research_gauss_newton",
+                }
+            }
+        )
+
+    monkeypatch.setattr("astro_cli.main.research_estimate_jax", fake_research_estimator)
+
+    result = runner.invoke(
+        app,
+        [
+            "research-estimate",
+            str(scenario_path),
+            str(measurements_path),
+            "--backend",
+            "jax",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert seen == {
+        "scenario_id": estimate_scenario.scenario_id,
+        "measurement_count": 44,
+        "max_iterations": 5,
+    }
+    assert payload["converged"] is True
+    assert payload["metadata"]["workflow"] == "research_estimate"
+    assert payload["metadata"]["estimator_mode"] == "jax"
+    assert payload["metadata"]["backend"] == "jax_research_estimator"
+
+
 def test_launch_command_writes_json(tmp_path: Path) -> None:
     scenario_path = tmp_path / "launch.yaml"
     output = tmp_path / "launch.json"

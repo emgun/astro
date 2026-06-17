@@ -3,7 +3,11 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
-from astro_backends.jax.propagation import research_od_sensitivity_jax, research_propagate_jax
+from astro_backends.jax.propagation import (
+    research_estimate_jax,
+    research_od_sensitivity_jax,
+    research_propagate_jax,
+)
 from astro_backends.jax.runtime import JaxRuntime
 from astro_core.errors import UnsupportedBackendError
 from astro_core.io import load_scenario
@@ -157,6 +161,60 @@ def test_research_od_sensitivity_jax_returns_residual_jacobian_product() -> None
     assert jacobian.shape == (len(truth_measurements), 6)
     assert np.all(np.isfinite(jacobian))
     assert np.linalg.matrix_rank(jacobian) >= 6
+
+
+def test_research_estimate_jax_runs_gauss_newton_correction() -> None:
+    truth_scenario = load_scenario("examples/scenarios/leo_two_station_od.yaml")
+    truth_measurements = [
+        record.model_copy(update={"value": record.metadata["truth"]})
+        for record in generate_synthetic_measurements(
+            truth_scenario,
+            propagate_local(truth_scenario),
+        )
+    ]
+    truth_state = truth_scenario.initial_state.cartesian
+    initial_guess = truth_scenario.initial_state.model_copy(
+        update={
+            "cartesian": truth_state.model_copy(
+                update={
+                    "position_km": (
+                        truth_state.position_km[0] + 1.0,
+                        truth_state.position_km[1] - 0.8,
+                        truth_state.position_km[2] + 0.6,
+                    ),
+                    "velocity_km_s": (
+                        truth_state.velocity_km_s[0] + 0.0005,
+                        truth_state.velocity_km_s[1] - 0.001,
+                        truth_state.velocity_km_s[2] + 0.0008,
+                    ),
+                }
+            )
+        }
+    )
+    scenario = truth_scenario.model_copy(update={"initial_state": initial_guess})
+
+    result = research_estimate_jax(
+        scenario,
+        truth_measurements,
+        runtime_loader=_fake_autodiff_runtime,
+        max_iterations=4,
+    )
+
+    initial_error = np.linalg.norm(
+        np.array(initial_guess.cartesian.position_km)
+        - np.array(truth_state.position_km)
+    )
+    estimated_error = np.linalg.norm(
+        np.array(result.estimated_state.cartesian.position_km)
+        - np.array(truth_state.position_km)
+    )
+    assert result.converged is True
+    assert result.iterations <= 4
+    assert result.rms < 1.0e-3
+    assert estimated_error < initial_error
+    assert result.metadata["estimator"] == "jax_research_gauss_newton"
+    assert result.metadata["sensitivity_model"] == "jax_jacfwd_od_residuals"
+    assert result.metadata["measurement_types"] == ["range", "range_rate"]
 
 
 def test_research_od_sensitivity_jax_rejects_unsupported_measurement_type() -> None:
