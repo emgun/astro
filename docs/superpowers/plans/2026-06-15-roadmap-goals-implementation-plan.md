@@ -64,8 +64,9 @@ Still roadmap-level:
   deterministic bounded quaternion-error PD primitive.
 - Full native multi-motor RocketPy staging and full pitch-program multistage Dymos ascent
   optimization.
-- Native Tudat variational-equation covariance propagation remains deferred; current Tudat
-  covariance uses the suite finite-difference transition product.
+- Native Tudat variational-equation covariance propagation has an explicit opt-in runner contract;
+  live TudatPy variational-equation construction remains gated on validated API wiring. Default
+  Tudat covariance continues to use the suite finite-difference transition product.
 - Full standards-grade precession-nutation reductions beyond the current compact
   `iau_2006_2000a_simplified` geodetic-station option, native standards-grade DSN ODF/TNF parsing
   beyond the normalized CSV and suite-owned ASTRODSN1 binary tracking bridges plus truth-tagged
@@ -386,7 +387,8 @@ and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke comman
 two-body, J2, configured high-order Earth spherical harmonic, drag, SRP, and Sun/Moon point-mass
 third-body cross-check propagation runners, built-in JAX two-body and J2 research propagation
 runners, suite finite-difference covariance-history propagation through selected Tudat force
-models, a Tudat-vs-reference calibrated comparison product, `orekit_high_fidelity`
+models, a Tudat-vs-reference calibrated comparison product, an opt-in Tudat native variational
+covariance runner contract, `orekit_high_fidelity`
 screening through the JAX J2 baseline, configured degree/order high-order gravity screening through
 the same J2 baseline with explicit provenance, JAX research approximations for atmospheric drag, solar
 radiation pressure, and analytic circular Sun/Moon third-body gravity, opt-in JAX final-state
@@ -394,8 +396,8 @@ transition sensitivities, JAX range/range-rate, inertial RA/Dec, and local-horiz
 residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
 Nyx/ANISE evaluation gate are
 implemented. The JAX research estimator now uses backtracking Gauss-Newton step acceptance for
-range/range-rate and topocentric azimuth/elevation OD products. Native Tudat variational equations
-and broader calibrated live comparison campaigns beyond the current
+range/range-rate and topocentric azimuth/elevation OD products. Live TudatPy variational equation
+construction and broader calibrated live comparison campaigns beyond the current
 two-body/J2/high-order-gravity/drag/SRP/third-body runner and Tudat-vs-reference comparison product,
 JAX ephemeris-backed third-body force models, and operational-grade differentiable OD estimator
 workflows remain gated on validated runner implementations.
@@ -444,7 +446,9 @@ Definition of done:
 - `astro propagate --backend tudat` supports checked-in two-body, J2, configured high-order
   gravity, drag, SRP, and third-body cross-check scenarios and records Tudat provenance through the
   native runners. Initial-covariance scenarios produce finite-difference covariance-history products
-  through the selected Tudat force model. `astro compare-tudat-reference` and
+  through the selected Tudat force model by default, and `tudat_variational` provides an explicit
+  native variational runner contract that refuses silent finite-difference downgrade.
+  `astro compare-tudat-reference` and
   `astro compare-tudat-campaign` write calibrated reference-delta products for single-scenario and
   multi-scenario live Tudat validation. Native Tudat variational equations remain gated on validated
   body and acceleration-model construction.

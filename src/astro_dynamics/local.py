@@ -1041,6 +1041,8 @@ def _covariance_transition_model(
         )
     if model == "j2_variational" and force_model is not ForceModelName.J2:
         raise ValueError("j2_variational covariance propagation requires j2 gravity")
+    if model == "tudat_variational":
+        raise ValueError("tudat_variational covariance propagation requires Tudat backend")
     if maneuver_schedule:
         raise ValueError(f"{model} covariance propagation does not support maneuvers")
     return model

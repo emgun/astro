@@ -8,7 +8,13 @@ from astro_backends.tudat.propagation import propagate_tudat
 from astro_backends.tudat.runtime import TudatRuntime
 from astro_core.errors import UnsupportedBackendError
 from astro_core.io import load_scenario
-from astro_core.models import ForceModelConfig, ForceModelName, Scenario, Trajectory
+from astro_core.models import (
+    CovarianceSample,
+    ForceModelConfig,
+    ForceModelName,
+    Scenario,
+    Trajectory,
+)
 from astro_dynamics.local import propagate_local
 
 
@@ -266,6 +272,86 @@ def test_propagate_tudat_populates_covariance_history_with_fake_tudat_modules(
     assert final_transition.shape == (6, 6)
     assert not np.allclose(final_transition, np.eye(6))
     assert final_process_noise[0, 0] > 0.0
+
+
+def test_propagate_tudat_requires_native_variational_runner_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_scenario = load_scenario("examples/scenarios/leo_orekit_high_fidelity_covariance.yaml")
+    scenario = Scenario.model_validate(
+        {
+            **base_scenario.model_dump(mode="json"),
+            "covariance_state_transition_model": "tudat_variational",
+        }
+    )
+    fake_modules = _FakeTudatModules()
+    monkeypatch.setattr(
+        "astro_backends.tudat.propagation.import_module",
+        fake_modules.import_module,
+    )
+
+    with pytest.raises(UnsupportedBackendError, match="native Tudat variational"):
+        propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+
+def test_propagate_tudat_uses_native_variational_runner_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_scenario = load_scenario("examples/scenarios/leo_orekit_high_fidelity_covariance.yaml")
+    scenario = Scenario.model_validate(
+        {
+            **base_scenario.model_dump(mode="json"),
+            "covariance_state_transition_model": "tudat_variational",
+            "propagation": {
+                **base_scenario.propagation.model_dump(mode="json"),
+                "duration_s": 120.0,
+            },
+        }
+    )
+    fake_modules = _FakeTudatModules()
+    monkeypatch.setattr(
+        "astro_backends.tudat.propagation.import_module",
+        fake_modules.import_module,
+    )
+
+    def fake_variational_runner(
+        candidate: Scenario,
+        runtime: TudatRuntime,
+        trajectory: Trajectory,
+    ) -> tuple[list[CovarianceSample], dict[str, object]]:
+        assert candidate is scenario
+        assert runtime.package_version == "1.0.0"
+        covariance_history = []
+        for sample_index, sample in enumerate(trajectory.samples):
+            transition = np.eye(6) + sample_index * 0.01 * np.eye(6)
+            covariance_history.append(
+                CovarianceSample(
+                    epoch=sample.epoch,
+                    covariance=(transition @ np.eye(6) @ transition.T).tolist(),
+                    state_transition_matrix=transition.tolist(),
+                    accumulated_state_transition_matrix=transition.tolist(),
+                    process_noise_covariance=np.zeros((6, 6)).tolist(),
+                    metadata={
+                        "state_transition_model": (
+                            "identity" if sample_index == 0 else "tudat_native_variational"
+                        ),
+                    },
+                )
+            )
+        return covariance_history, {"native_variational_parameter_set": "initial_cartesian_state"}
+
+    trajectory = propagate_tudat(
+        scenario,
+        runtime_loader=_fake_runtime,
+        tudat_variational_runner=fake_variational_runner,
+    )
+
+    assert trajectory.metadata["covariance_model"] == "tudat_native_variational_equations"
+    assert trajectory.metadata["covariance_native_variational_runner"] == "provided"
+    assert trajectory.metadata["native_variational_parameter_set"] == "initial_cartesian_state"
+    assert trajectory.covariance_history[1].metadata["state_transition_model"] == (
+        "tudat_native_variational"
+    )
 
 
 def test_propagate_tudat_returns_suite_product_with_fake_runner() -> None:

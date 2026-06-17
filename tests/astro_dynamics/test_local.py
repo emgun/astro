@@ -430,6 +430,17 @@ def test_j2_variational_covariance_requires_j2_gravity() -> None:
         propagate_local(variational_scenario)
 
 
+def test_tudat_variational_covariance_requires_tudat_backend() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+    variational_scenario = Scenario.model_validate(
+        scenario.model_dump(mode="json")
+        | {"covariance_state_transition_model": "tudat_variational"}
+    )
+
+    with pytest.raises(ValueError, match="requires Tudat backend"):
+        propagate_local(variational_scenario)
+
+
 def test_propagate_local_adds_acceleration_process_noise_to_covariance() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     initial_covariance = [[0.0 for _column in range(6)] for _row in range(6)]

@@ -21,6 +21,10 @@ from astro_core.models import (
 
 TudatRuntimeLoader = Callable[[], TudatRuntime]
 TudatPropagationRunner = Callable[[Scenario, TudatRuntime], Trajectory]
+TudatVariationalRunner = Callable[
+    [Scenario, TudatRuntime, Trajectory],
+    tuple[list[CovarianceSample], dict[str, object]],
+]
 FloatArray = NDArray[np.float64]
 _SPACECRAFT_NAME = "AstroSuiteSpacecraft"
 _COVARIANCE_FD_REL_STEP = 1.0e-6
@@ -441,10 +445,46 @@ def _trajectory_with_covariance_history(
     scenario: Scenario,
     runtime: TudatRuntime,
     trajectory: Trajectory,
+    *,
+    tudat_variational_runner: TudatVariationalRunner | None = None,
 ) -> Trajectory:
     covariance_matrix = _initial_covariance_matrix(scenario)
     if covariance_matrix is None:
         return trajectory
+    if scenario.covariance_state_transition_model == "tudat_variational":
+        if tudat_variational_runner is None:
+            raise UnsupportedBackendError(
+                "native Tudat variational covariance propagation requires a native "
+                "Tudat variational runner"
+            )
+        native_covariance_history, native_metadata = tudat_variational_runner(
+            scenario,
+            runtime,
+            trajectory,
+        )
+        return trajectory.model_copy(
+            update={
+                "covariance_history": native_covariance_history,
+                "metadata": {
+                    **trajectory.metadata,
+                    "covariance_model": "tudat_native_variational_equations",
+                    "covariance_state_transition_storage": "per_sample_and_accumulated",
+                    "covariance_process_noise": _covariance_process_noise_model(
+                        scenario.covariance_process_noise_acceleration_km_s2
+                    ),
+                    "covariance_process_noise_acceleration_km_s2": (
+                        scenario.covariance_process_noise_acceleration_km_s2
+                    ),
+                    "covariance_process_noise_storage": "per_sample_matrix",
+                    "covariance_native_variational_runner": "provided",
+                    **_covariance_transition_metadata(
+                        trajectory.metadata,
+                        prefix="covariance_transition_",
+                    ),
+                    **native_metadata,
+                },
+            }
+        )
 
     process_noise = _process_noise_covariance(
         scenario.covariance_process_noise_acceleration_km_s2,
@@ -648,12 +688,18 @@ def propagate_tudat(
     *,
     runtime_loader: TudatRuntimeLoader = load_tudat_runtime,
     tudat_runner: TudatPropagationRunner | None = None,
+    tudat_variational_runner: TudatVariationalRunner | None = None,
 ) -> Trajectory:
     runtime = runtime_loader()
     if tudat_runner is None:
         trajectory = _propagate_tudat_default(scenario, runtime)
         return _with_tudat_provenance(
-            _trajectory_with_covariance_history(scenario, runtime, trajectory),
+            _trajectory_with_covariance_history(
+                scenario,
+                runtime,
+                trajectory,
+                tudat_variational_runner=tudat_variational_runner,
+            ),
             runtime,
         )
 
