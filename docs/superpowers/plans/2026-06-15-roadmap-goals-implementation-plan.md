@@ -325,12 +325,12 @@ Tradeoff:
 Status: high-fidelity/research backend slices implemented for runtime gates, product boundaries,
 and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke commands, Tudat propagation
 dispatch, built-in JAX two-body and J2 research propagation runners, `orekit_high_fidelity`
-screening through the JAX J2 baseline, JAX research approximations for atmospheric drag and solar
-radiation pressure, opt-in JAX final-state transition sensitivities, JAX range/range-rate OD
-residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
-Nyx/ANISE evaluation gate are implemented. Live Tudat environment construction, JAX third-body
-ephemeris-backed force models, and operational-grade differentiable OD estimator workflows remain
-gated on validated runner implementations.
+screening through the JAX J2 baseline, JAX research approximations for atmospheric drag, solar
+radiation pressure, and analytic circular Sun/Moon third-body gravity, opt-in JAX final-state
+transition sensitivities, JAX range/range-rate OD residual Jacobian products, a first JAX research
+Gauss-Newton OD estimate workflow, and a Nyx/ANISE evaluation gate are implemented. Live Tudat
+environment construction, JAX ephemeris-backed third-body force models, and operational-grade
+differentiable OD estimator workflows remain gated on validated runner implementations.
 
 Implemented slice:
 
@@ -343,6 +343,10 @@ Implemented slice:
 - `astro research-propagate --backend jax` accepts `orekit_high_fidelity` as a research screening
   baseline backed by J2, plus explicit atmospheric-drag and solar-radiation-pressure force flags
   with metadata marking the product as screening-only rather than an operational ephemeris.
+- `astro research-propagate --backend jax` accepts `third_body_gravity: true` through an analytic
+  circular Sun/Moon point-mass approximation and records
+  `third_body_ephemeris_model = "analytic_circular_sun_moon_screening"` so the product remains
+  distinguishable from operational ephemeris-backed Orekit/Tudat propagation.
 - `astro research-propagate --backend jax --include-sensitivities` records a nominal final-state
   transition matrix in `MonteCarloResult.metadata` using JAX autodiff.
 - `astro research-od-sensitivity --backend jax` records normalized range/range-rate residuals and
@@ -356,11 +360,11 @@ Definition of done:
 
 - `astro propagate --backend tudat` supports at least one cross-check scenario and records Tudat provenance once a validated Tudat runner is supplied.
 - `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
-  screening-only `orekit_high_fidelity`, drag, and SRP force flags without replacing operational
-  Orekit semantics; `astro research-od-sensitivity --backend jax` and
+  screening-only `orekit_high_fidelity`, drag, SRP, and analytic Sun/Moon third-body force flags
+  without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and
   `astro research-estimate --backend jax` provide the first differentiable OD residual/Jacobian and
-  research correction-loop primitives. Third-body force flags and operational-grade differentiable
-  OD estimators still require validated JAX runners.
+  research correction-loop primitives. Ephemeris-backed third-body force models and
+  operational-grade differentiable OD estimators still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.
 - Batch acceleration and Monte Carlo workflows preserve deterministic seeds and validation tolerances.
 

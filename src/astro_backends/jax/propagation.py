@@ -41,6 +41,16 @@ _EXPONENTIAL_ATMOSPHERE_REFERENCE_ALTITUDE_M = 400_000.0
 _EXPONENTIAL_ATMOSPHERE_SCALE_HEIGHT_M = 60_000.0
 _SOLAR_RADIATION_PRESSURE_N_M2 = 4.56e-6
 _RESEARCH_FORCE_MODEL_POLICY = "screening_only_not_operational_ephemeris"
+_THIRD_BODY_EPHEMERIS_MODEL = "analytic_circular_sun_moon_screening"
+_J2000_UNIX_TIMESTAMP_S = 946728000.0
+_SECONDS_PER_DAY = 86400.0
+_SUN_MU_KM3_S2 = 132_712_440_018.0
+_MOON_MU_KM3_S2 = 4_902.800066
+_ASTRONOMICAL_UNIT_KM = 149_597_870.7
+_SUN_ORBIT_PERIOD_DAYS = 365.256363004
+_MOON_MEAN_DISTANCE_KM = 384_400.0
+_MOON_ORBIT_PERIOD_DAYS = 27.321661
+_MOON_ORBIT_INCLINATION_RAD = np.deg2rad(5.145)
 
 
 def _validate_research_inputs(
@@ -96,7 +106,19 @@ def _research_force_model_names(scenario: Scenario) -> list[str]:
         force_models.append("exponential_atmospheric_drag")
     if scenario.force_model.solar_radiation_pressure:
         force_models.append("constant_direction_solar_radiation_pressure")
+    if scenario.force_model.third_body_gravity:
+        force_models.append("analytic_sun_moon_third_body")
     return force_models
+
+
+def _research_force_metadata(scenario: Scenario) -> dict[str, Any]:
+    if not scenario.force_model.third_body_gravity:
+        return {}
+    return {
+        "third_body_ephemeris_model": _THIRD_BODY_EPHEMERIS_MODEL,
+        "third_body_bodies": ["sun", "moon"],
+        "third_body_force_policy": _RESEARCH_FORCE_MODEL_POLICY,
+    }
 
 
 def _uses_j2_baseline(force_model: ForceModelName) -> bool:
@@ -134,7 +156,75 @@ def _solar_radiation_pressure_acceleration(jnp: Any, position: Any, scenario: Sc
     return acceleration_km_s2 * jnp.broadcast_to(direction, position.shape)
 
 
-def _acceleration(jnp: Any, position: Any, velocity: Any, scenario: Scenario) -> Any:
+def _days_since_j2000(scenario: Scenario, elapsed_s: float) -> float:
+    return float(
+        (scenario.initial_state.epoch.timestamp() + elapsed_s - _J2000_UNIX_TIMESTAMP_S)
+        / _SECONDS_PER_DAY
+    )
+
+
+def _analytic_sun_position_km(jnp: Any, days_since_j2000: float) -> Any:
+    phase = 2.0 * np.pi * days_since_j2000 / _SUN_ORBIT_PERIOD_DAYS
+    return _ASTRONOMICAL_UNIT_KM * jnp.asarray(
+        (jnp.cos(phase), jnp.sin(phase), 0.0),
+    )
+
+
+def _analytic_moon_position_km(jnp: Any, days_since_j2000: float) -> Any:
+    phase = 2.0 * np.pi * days_since_j2000 / _MOON_ORBIT_PERIOD_DAYS
+    return _MOON_MEAN_DISTANCE_KM * jnp.asarray(
+        (
+            jnp.cos(phase),
+            jnp.sin(phase) * jnp.cos(_MOON_ORBIT_INCLINATION_RAD),
+            jnp.sin(phase) * jnp.sin(_MOON_ORBIT_INCLINATION_RAD),
+        ),
+    )
+
+
+def _point_mass_third_body_acceleration(
+    jnp: Any,
+    position: Any,
+    body_position_km: Any,
+    body_mu_km3_s2: float,
+) -> Any:
+    relative_body_position = body_position_km - position
+    relative_norm = jnp.linalg.norm(relative_body_position, axis=1)
+    body_norm = jnp.linalg.norm(body_position_km)
+    return body_mu_km3_s2 * (
+        relative_body_position / (relative_norm[:, None] ** 3)
+        - body_position_km / body_norm**3
+    )
+
+
+def _third_body_acceleration(
+    jnp: Any,
+    position: Any,
+    scenario: Scenario,
+    elapsed_s: float,
+) -> Any:
+    days_since_j2000 = _days_since_j2000(scenario, elapsed_s)
+    sun_position_km = _analytic_sun_position_km(jnp, days_since_j2000)
+    moon_position_km = _analytic_moon_position_km(jnp, days_since_j2000)
+    return _point_mass_third_body_acceleration(
+        jnp,
+        position,
+        sun_position_km,
+        _SUN_MU_KM3_S2,
+    ) + _point_mass_third_body_acceleration(
+        jnp,
+        position,
+        moon_position_km,
+        _MOON_MU_KM3_S2,
+    )
+
+
+def _acceleration(
+    jnp: Any,
+    position: Any,
+    velocity: Any,
+    scenario: Scenario,
+    elapsed_s: float,
+) -> Any:
     acceleration = _two_body_acceleration(jnp, position)
     if _uses_j2_baseline(scenario.force_model.gravity):
         acceleration = acceleration + _j2_acceleration(jnp, position)
@@ -144,13 +234,23 @@ def _acceleration(jnp: Any, position: Any, velocity: Any, scenario: Scenario) ->
         acceleration = acceleration + _solar_radiation_pressure_acceleration(
             jnp, position, scenario
         )
+    if scenario.force_model.third_body_gravity:
+        acceleration = acceleration + _third_body_acceleration(
+            jnp,
+            position,
+            scenario,
+            elapsed_s,
+        )
     return acceleration
 
 
-def _derivative(jnp: Any, state: Any, scenario: Scenario) -> Any:
+def _derivative(jnp: Any, state: Any, scenario: Scenario, elapsed_s: float) -> Any:
     position = state[:, :3]
     velocity = state[:, 3:]
-    return jnp.concatenate((velocity, _acceleration(jnp, position, velocity, scenario)), axis=1)
+    return jnp.concatenate(
+        (velocity, _acceleration(jnp, position, velocity, scenario, elapsed_s)),
+        axis=1,
+    )
 
 
 def _rk4_step_once(
@@ -158,11 +258,12 @@ def _rk4_step_once(
     state: Any,
     step_s: float,
     scenario: Scenario,
+    elapsed_s: float,
 ) -> Any:
-    k1 = _derivative(jnp, state, scenario)
-    k2 = _derivative(jnp, state + 0.5 * step_s * k1, scenario)
-    k3 = _derivative(jnp, state + 0.5 * step_s * k2, scenario)
-    k4 = _derivative(jnp, state + step_s * k3, scenario)
+    k1 = _derivative(jnp, state, scenario, elapsed_s)
+    k2 = _derivative(jnp, state + 0.5 * step_s * k1, scenario, elapsed_s + 0.5 * step_s)
+    k3 = _derivative(jnp, state + 0.5 * step_s * k2, scenario, elapsed_s + 0.5 * step_s)
+    k4 = _derivative(jnp, state + step_s * k3, scenario, elapsed_s + step_s)
     return state + (step_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
 
@@ -171,20 +272,18 @@ def _rk4_step(
     state: Any,
     step_s: float,
     scenario: Scenario,
+    start_elapsed_s: float = 0.0,
 ) -> Any:
     substep_count, substep_s = _internal_step_schedule(step_s)
     next_state = state
+    elapsed_s = start_elapsed_s
     for _ in range(substep_count):
-        next_state = _rk4_step_once(jnp, next_state, substep_s, scenario)
+        next_state = _rk4_step_once(jnp, next_state, substep_s, scenario, elapsed_s)
+        elapsed_s += substep_s
     return next_state
 
 
 def _validate_jax_force_model(scenario: Scenario) -> None:
-    if scenario.force_model.third_body_gravity:
-        raise UnsupportedBackendError(
-            "JAX research propagation does not support third_body_gravity; "
-            "validated Sun/Moon ephemerides remain an Orekit/Tudat integration boundary."
-        )
     if scenario.force_model.gravity not in _SUPPORTED_JAX_GRAVITY_MODELS:
         raise UnsupportedBackendError(
             "JAX research propagation currently supports only two_body, j2, and "
@@ -230,6 +329,7 @@ def _default_jax_two_body_runner(
                 state,
                 scenario.propagation.step_s,
                 scenario,
+                start_elapsed_s=sample_index * scenario.propagation.step_s,
             )
 
     sample_array = np.asarray(jnp.stack(sample_states, axis=1), dtype=np.float64)
@@ -272,6 +372,7 @@ def _default_jax_two_body_runner(
                 "runner": f"jax_vectorized_{scenario.force_model.gravity.value}_rk4",
                 "research_force_models": _research_force_model_names(scenario),
                 "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
+                **_research_force_metadata(scenario),
             },
         )
         monte_carlo_cases.append(
@@ -298,6 +399,7 @@ def _default_jax_two_body_runner(
             "research_force_models": _research_force_model_names(scenario),
             "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
             "case_count": cases,
+            **_research_force_metadata(scenario),
         },
     )
 
@@ -308,12 +410,13 @@ def _propagate_nominal_final_state(
     state_vector: Any,
 ) -> Any:
     state = jnp.reshape(state_vector, (1, 6))
-    for _sample_index in range(scenario.propagation.sample_count - 1):
+    for sample_index in range(scenario.propagation.sample_count - 1):
         state = _rk4_step(
             jnp,
             state,
             scenario.propagation.step_s,
             scenario,
+            start_elapsed_s=sample_index * scenario.propagation.step_s,
         )
     return state[0]
 
@@ -338,6 +441,7 @@ def _jax_state_history(jnp: Any, scenario: Scenario, state_vector: Any) -> Any:
                 state,
                 scenario.propagation.step_s,
                 scenario,
+                start_elapsed_s=sample_index * scenario.propagation.step_s,
             )
     return jnp.stack(samples, axis=0)
 
@@ -517,6 +621,7 @@ def research_od_sensitivity_jax(
             "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
             "measurement_types": _unique_measurement_type_values(measurements),
             "residual_convention": "(predicted - observed) / sigma",
+            **_research_force_metadata(scenario),
         },
     )
 
@@ -614,6 +719,7 @@ def research_estimate_jax(
             "residual_tolerance": residual_tolerance,
             "covariance_status": covariance_status,
             "covariance_convention": "inverse_normal_matrix_of_normalized_residuals",
+            **_research_force_metadata(scenario),
         },
     )
 

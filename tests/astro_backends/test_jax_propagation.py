@@ -285,7 +285,7 @@ def test_research_propagate_jax_runs_research_drag_and_srp_force_flags() -> None
     assert np.all(np.isfinite(np.asarray(final_state.velocity_km_s)))
 
 
-def test_research_propagate_jax_rejects_third_body_force_flag() -> None:
+def test_research_propagate_jax_runs_research_third_body_force_flag() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml").model_copy(
         update={
             "force_model": ForceModelConfig(
@@ -295,15 +295,28 @@ def test_research_propagate_jax_rejects_third_body_force_flag() -> None:
         }
     )
 
-    with pytest.raises(UnsupportedBackendError, match="third_body_gravity"):
-        research_propagate_jax(
-            scenario,
-            cases=1,
-            position_sigma_km=0.0,
-            velocity_sigma_km_s=0.0,
-            seed=7,
-            runtime_loader=_fake_runtime,
-        )
+    result = research_propagate_jax(
+        scenario,
+        cases=1,
+        position_sigma_km=0.0,
+        velocity_sigma_km_s=0.0,
+        seed=7,
+        runtime_loader=_fake_runtime,
+    )
+
+    final_state = result.cases[0].trajectory.samples[-1].state
+    assert result.metadata["research_force_models"] == [
+        "J2",
+        "analytic_sun_moon_third_body",
+    ]
+    assert result.metadata["third_body_ephemeris_model"] == (
+        "analytic_circular_sun_moon_screening"
+    )
+    assert result.cases[0].trajectory.metadata["third_body_ephemeris_model"] == (
+        "analytic_circular_sun_moon_screening"
+    )
+    assert np.all(np.isfinite(np.asarray(final_state.position_km)))
+    assert np.all(np.isfinite(np.asarray(final_state.velocity_km_s)))
 
 
 def test_research_propagate_jax_returns_monte_carlo_product_with_fake_runner() -> None:

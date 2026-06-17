@@ -93,9 +93,10 @@ Tudat and JAX are optional research/cross-check boundaries. TudatPy is not curre
 available from PyPI on every platform, so its smoke command reports installation state without
 promising a pip-only install path. JAX research propagation returns suite `MonteCarloResult`
 products, can optionally include a final-state transition sensitivity matrix, and supports
-differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag, and solar
-radiation pressure flags. Those JAX force flags are explicitly research products, not operational
-ephemerides; third-body gravity remains an Orekit/Tudat-grade ephemeris integration task.
+differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag, solar
+radiation pressure, and analytic circular Sun/Moon third-body gravity flags. Those JAX force flags
+are explicitly research products, not operational ephemerides; ephemeris-backed third-body gravity
+remains an Orekit/Tudat-grade integration task.
 
 ## Commands
 
@@ -153,6 +154,7 @@ astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measureme
 astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output research_propagation.json
 astro research-propagate examples/scenarios/leo_orekit_drag.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_drag_research.json
 astro research-propagate examples/scenarios/leo_orekit_srp.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_srp_research.json
+astro research-propagate examples/scenarios/leo_jax_third_body_research.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_third_body_research.json
 astro research-od-sensitivity examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --output od_sensitivity.json
 astro research-estimate examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --max-iterations 5 --output research_estimate.json
 astro orekit-smoke
@@ -299,10 +301,11 @@ range/range-rate ingest/export formats.
 With `--backend local`, it runs the deterministic Monte Carlo workflow. With `--backend jax`, it
 loads the optional JAX runtime and runs vectorized RK4 ensembles for two-body, J2, and
 screening-only `orekit_high_fidelity` scenarios, including research approximations for atmospheric
-drag and solar radiation pressure. With `--include-sensitivities`, the JAX path adds a nominal
-final-state transition matrix computed through JAX autodiff to the `MonteCarloResult` metadata. JAX
-remains a research backend, not a replacement for operational Orekit semantics or validated
-third-body/high-fidelity force-model combinations.
+drag, solar radiation pressure, and analytic circular Sun/Moon third-body gravity. With
+`--include-sensitivities`, the JAX path adds a nominal final-state transition matrix computed
+through JAX autodiff to the `MonteCarloResult` metadata. Third-body JAX products record
+`third_body_ephemeris_model = "analytic_circular_sun_moon_screening"` so callers do not mistake the
+screening approximation for operational ephemeris-backed Orekit/Tudat semantics.
 
 `astro research-od-sensitivity --backend jax` loads an explicit measurement file and writes an
 `OdSensitivityResult` containing normalized OD residuals and the residual Jacobian with respect to
