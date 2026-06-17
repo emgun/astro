@@ -37,6 +37,52 @@ class TorqueCommand(AstroModel):
         return self
 
 
+class AttitudeControlConfig(AstroModel):
+    target_body_to_inertial_quaternion: Quaternion4
+    target_angular_rate_rad_s: Vector3 = (0.0, 0.0, 0.0)
+    proportional_gain_n_m_per_rad: Vector3
+    derivative_gain_n_m_per_rad_s: Vector3
+    max_torque_n_m: Vector3
+
+    @field_validator(
+        "target_body_to_inertial_quaternion",
+        mode="before",
+    )
+    @classmethod
+    def quaternion_input_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_sequence_input_must_be_numbers(value, "Attitude control quaternion")
+
+    @field_validator(
+        "target_angular_rate_rad_s",
+        "proportional_gain_n_m_per_rad",
+        "derivative_gain_n_m_per_rad_s",
+        "max_torque_n_m",
+        mode="before",
+    )
+    @classmethod
+    def vector_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_sequence_input_must_be_numbers(value, "Attitude control vector")
+
+    @field_validator("target_body_to_inertial_quaternion")
+    @classmethod
+    def target_quaternion_must_be_unit(cls, value: Quaternion4) -> Quaternion4:
+        norm = sqrt(sum(component * component for component in value))
+        if not isfinite(norm) or abs(norm - 1.0) > 1.0e-9:
+            raise ValueError("Target attitude quaternion must be a unit quaternion")
+        return value
+
+    @field_validator(
+        "proportional_gain_n_m_per_rad",
+        "derivative_gain_n_m_per_rad_s",
+        "max_torque_n_m",
+    )
+    @classmethod
+    def control_vectors_must_be_nonnegative(cls, value: Vector3) -> Vector3:
+        if not all(isfinite(component) and component >= 0.0 for component in value):
+            raise ValueError("Attitude control gains and torque limits must be nonnegative")
+        return value
+
+
 class RigidBodyAttitudeConfig(AstroModel):
     duration_s: FiniteFloat = Field(gt=0.0)
     step_s: FiniteFloat = Field(gt=0.0)
@@ -44,6 +90,7 @@ class RigidBodyAttitudeConfig(AstroModel):
     initial_body_to_inertial_quaternion: Quaternion4 = (1.0, 0.0, 0.0, 0.0)
     initial_angular_rate_rad_s: Vector3 = (0.0, 0.0, 0.0)
     torque_commands: tuple[TorqueCommand, ...] = ()
+    control: AttitudeControlConfig | None = None
 
     @field_validator("duration_s", "step_s", mode="before")
     @classmethod
@@ -92,6 +139,7 @@ class AttitudeDynamicsSample(AstroModel):
     body_to_inertial_quaternion: Quaternion4
     angular_rate_rad_s: Vector3
     applied_torque_n_m: Vector3
+    control_torque_n_m: Vector3 | None = None
 
 
 class AttitudeDynamicsResult(AstroModel):
@@ -109,13 +157,22 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
 
     for step_index in range(step_count + 1):
         elapsed_s = step_index * config.step_s
-        torque = _active_torque(config, elapsed_s)
+        feedforward_torque = _active_torque(config, elapsed_s)
+        control_torque = _closed_loop_control_torque(
+            config.control,
+            quaternion,
+            angular_rate,
+        )
+        torque = feedforward_torque + control_torque
         samples.append(
             AttitudeDynamicsSample(
                 elapsed_s=elapsed_s,
                 body_to_inertial_quaternion=_quaternion_tuple(quaternion),
                 angular_rate_rad_s=_vector_tuple(angular_rate),
                 applied_torque_n_m=_vector_tuple(torque),
+                control_torque_n_m=(
+                    _vector_tuple(control_torque) if config.control is not None else None
+                ),
             )
         )
         if step_index == step_count:
@@ -131,14 +188,30 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
         )
         angular_rate = angular_rate + angular_acceleration * config.step_s
 
+    metadata = {
+        "attitude_dynamics_model": "diagonal_rigid_body_torque",
+        "integration_model": "piecewise_constant_torque_average_rate_quaternion",
+        "torque_command_count": len(config.torque_commands),
+    }
+    if config.control is not None:
+        metadata.update(
+            {
+                "attitude_dynamics_model": "diagonal_rigid_body_closed_loop_pd",
+                "control_model": "quaternion_error_pd",
+                "control_saturation_enabled": True,
+                "target_body_to_inertial_quaternion": list(
+                    config.control.target_body_to_inertial_quaternion
+                ),
+                "target_angular_rate_rad_s": list(
+                    config.control.target_angular_rate_rad_s
+                ),
+            }
+        )
+
     return AttitudeDynamicsResult(
         sample_count=len(samples),
         samples=tuple(samples),
-        metadata={
-            "attitude_dynamics_model": "diagonal_rigid_body_torque",
-            "integration_model": "piecewise_constant_torque_average_rate_quaternion",
-            "torque_command_count": len(config.torque_commands),
-        },
+        metadata=metadata,
     )
 
 
@@ -148,6 +221,41 @@ def _active_torque(config: RigidBodyAttitudeConfig, elapsed_s: float) -> np.ndar
         if command.start_s <= elapsed_s < command.end_s:
             torque += np.array(command.torque_n_m, dtype=np.float64)
     return torque
+
+
+def _closed_loop_control_torque(
+    control: AttitudeControlConfig | None,
+    body_to_inertial_quaternion: np.ndarray[Any, Any],
+    angular_rate_rad_s: np.ndarray[Any, Any],
+) -> np.ndarray[Any, Any]:
+    if control is None:
+        return np.zeros(3, dtype=np.float64)
+
+    target_quaternion = np.array(
+        control.target_body_to_inertial_quaternion,
+        dtype=np.float64,
+    )
+    target_rate = np.array(control.target_angular_rate_rad_s, dtype=np.float64)
+    proportional_gain = np.array(control.proportional_gain_n_m_per_rad, dtype=np.float64)
+    derivative_gain = np.array(control.derivative_gain_n_m_per_rad_s, dtype=np.float64)
+    max_torque = np.array(control.max_torque_n_m, dtype=np.float64)
+    quaternion_error = _quaternion_multiply(
+        target_quaternion,
+        _quaternion_conjugate(body_to_inertial_quaternion),
+    )
+    quaternion_error = _normalize_quaternion(quaternion_error)
+    if quaternion_error[0] < 0.0:
+        quaternion_error = -quaternion_error
+    error_vector_rad = 2.0 * quaternion_error[1:]
+    rate_error = target_rate - angular_rate_rad_s
+    unsaturated_torque = proportional_gain * error_vector_rad + derivative_gain * rate_error
+    return np.array(
+        [
+            min(max(float(torque), -float(limit)), float(limit))
+            for torque, limit in zip(unsaturated_torque, max_torque, strict=True)
+        ],
+        dtype=np.float64,
+    )
 
 
 def _delta_quaternion(rotation_vector_rad: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
@@ -175,6 +283,13 @@ def _quaternion_multiply(
             lw * ry - lx * rz + ly * rw + lz * rx,
             lw * rz + lx * ry - ly * rx + lz * rw,
         ],
+        dtype=np.float64,
+    )
+
+
+def _quaternion_conjugate(quaternion: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:
+    return np.array(
+        [quaternion[0], -quaternion[1], -quaternion[2], -quaternion[3]],
         dtype=np.float64,
     )
 

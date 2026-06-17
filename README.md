@@ -12,7 +12,7 @@ The current implementation slice covers:
 - Local two-body and J2 reference propagation with deterministic provenance metadata.
 - Flight-dynamics trajectory product fields for events, impulsive and finite-burn maneuvers, and
   covariance history, plus local commanded-attitude samples for maneuvered trajectories, local
-  rigid-body torque attitude propagation,
+  rigid-body torque and closed-loop PD attitude-control propagation,
   finite-difference covariance propagation with optional acceleration process noise, per-sample
   state-transition/process-noise products, CSV and CCSDS OEM ephemeris export/import, CCSDS AEM
   attitude export, and seeded initial-state Monte Carlo propagation.
@@ -153,6 +153,7 @@ astro import-trajectory trajectory.oem --format oem --scenario examples/scenario
 astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output conjunction_screening.json
 astro assess-conjunction conjunction_screening.json --output conjunction_assessment.json
 astro propagate-attitude examples/attitude/rigid_body_torque.yaml --output attitude_dynamics.json
+astro propagate-attitude examples/attitude/closed_loop_pd.yaml --output attitude_control.json
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke
 astro dymos-smoke
@@ -244,8 +245,9 @@ instantaneous local radial direction. Maneuvered local trajectories also include
 `AttitudeState` products with a body-to-inertial unit quaternion that points the spacecraft body +X
 axis along the commanded thrust direction during active thrust-vector burns. These are commanded
 pointing products. `astro propagate-attitude` separately propagates a diagonal rigid-body attitude
-state from scheduled torque commands and writes quaternion/rate history; it is a torque-dynamics
-primitive, not a full closed-loop ACS simulation. Local orbital propagation
+state from scheduled torque commands or a bounded quaternion-error PD control law and writes
+quaternion/rate/control-torque history. The closed-loop mode is a deterministic ACS validation
+primitive, not a validated spacecraft actuator/sensor simulation. Local orbital propagation
 also annotates periapsis/apoapsis `TrajectoryEvent` records. For no-maneuver trajectories, apsides
 are root-located between propagation samples through radial-velocity bisection and include bracket,
 elapsed time, radius, and radial-velocity metadata. Maneuvered trajectories keep sample-safe apsis

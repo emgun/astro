@@ -1,0 +1,11 @@
+duration_s: 8.0
+step_s: 0.5
+inertia_kg_m2: [8.0, 8.0, 4.0]
+initial_body_to_inertial_quaternion: [1.0, 0.0, 0.0, 0.0]
+initial_angular_rate_rad_s: [0.0, 0.0, 0.0]
+control:
+  target_body_to_inertial_quaternion: [0.96592582629, 0.0, 0.0, 0.2588190451]
+  target_angular_rate_rad_s: [0.0, 0.0, 0.0]
+  proportional_gain_n_m_per_rad: [0.0, 0.0, 0.45]
+  derivative_gain_n_m_per_rad_s: [0.0, 0.0, 2.4]
+  max_torque_n_m: [0.0, 0.0, 0.35]

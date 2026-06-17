@@ -457,6 +457,33 @@ def test_propagate_attitude_command_writes_json(tmp_path: Path) -> None:
     assert payload["metadata"]["attitude_dynamics_model"] == "diagonal_rigid_body_torque"
 
 
+def test_propagate_attitude_command_writes_closed_loop_control_json(tmp_path: Path) -> None:
+    output = tmp_path / "attitude-control.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "propagate-attitude",
+            "examples/attitude/closed_loop_pd.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["sample_count"] == 17
+    assert payload["samples"][0]["control_torque_n_m"] == pytest.approx(
+        [0.0, 0.0, 0.23293714059]
+    )
+    assert abs(payload["samples"][-1]["control_torque_n_m"][2]) <= 0.35
+    assert (
+        payload["metadata"]["attitude_dynamics_model"]
+        == "diagonal_rigid_body_closed_loop_pd"
+    )
+    assert payload["metadata"]["control_model"] == "quaternion_error_pd"
+
+
 def test_export_trajectory_command_writes_aem(tmp_path: Path) -> None:
     trajectory_path = tmp_path / "trajectory.json"
     output = tmp_path / "trajectory.aem"

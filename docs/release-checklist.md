@@ -24,6 +24,7 @@ Use this checklist before tagging or publishing a release candidate.
 - [ ] `astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output /tmp/astro-velocity-aligned-burn.json`
 - [ ] `astro export-trajectory /tmp/astro-velocity-aligned-burn.json --format aem --output /tmp/astro-attitude.aem`
 - [ ] `astro propagate-attitude examples/attitude/rigid_body_torque.yaml --output /tmp/astro-attitude-dynamics.json`
+- [ ] `astro propagate-attitude examples/attitude/closed_loop_pd.yaml --output /tmp/astro-attitude-control.json`
 - [ ] `astro screen-conjunction /tmp/astro-covariance.json /tmp/astro-covariance.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output /tmp/astro-conjunction-screening.json`
 - [ ] `astro assess-conjunction /tmp/astro-conjunction-screening.json --output /tmp/astro-conjunction-assessment.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output /tmp/astro-measurements.json`

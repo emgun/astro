@@ -39,7 +39,8 @@ Implemented and protected:
   propagation with optional acceleration process noise, explicit per-sample
   state-transition/process-noise covariance products, commanded-attitude trajectory samples,
   velocity-aligned/radial attitude-coupled thrust-vector burn modes, time-aligned conjunction
-  screening assessment reports, and diagonal rigid-body torque attitude propagation products.
+  screening assessment reports, and diagonal rigid-body torque plus bounded quaternion-error PD
+  attitude-control propagation products.
 - `astro_od` synthetic range/range-rate/one-way Doppler/iterative linearized two-way and three-way
   range/range-rate/right-ascension/declination/azimuth/elevation generation, measurement JSON/CSV
   ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy batch least-squares OD.
@@ -59,7 +60,8 @@ Implemented and protected:
 Still roadmap-level:
 
 - Higher-fidelity variational covariance propagation for drag/SRP/third-body dynamics and
-  closed-loop attitude-control system dynamics.
+  validated production actuator/sensor attitude-control system models beyond the current
+  deterministic bounded quaternion-error PD primitive.
 - Full native multi-motor RocketPy staging and full pitch-program multistage Dymos ascent
   optimization.
 - Native Tudat variational-equation covariance propagation remains deferred; current Tudat
@@ -245,8 +247,8 @@ finite-difference covariance propagation through the selected Orekit force model
 initial-state Monte Carlo, time-aligned conjunction screening with covariance-aware encounter-plane
 probability methods, including a numerical 2D Gaussian hard-body disk integral, conservative
 conjunction screening assessment reports, and commanded-attitude
-trajectory samples for maneuvered local propagation, plus a diagonal rigid-body torque attitude
-propagation product. The attitude-coupled finite-burn modes rotate thrust along instantaneous velocity or
+trajectory samples for maneuvered local propagation, plus diagonal rigid-body torque and bounded
+quaternion-error PD attitude-control propagation products. The attitude-coupled finite-burn modes rotate thrust along instantaneous velocity or
 local radial directions and record body-to-inertial unit quaternion samples for the commanded body
 +X axis. Local orbital propagation annotates periapsis/apoapsis `TrajectoryEvent` records for
 deterministic mission-analysis products, using radial-velocity root location for no-maneuver local
@@ -254,7 +256,7 @@ trajectories and sample-safe extrema annotation for maneuvered trajectories. The
 `examples/scenarios/leo_eccentric_two_body.yaml` scenario exercises an interior apoapsis root
 through the public CLI; drag/SRP/third-body
 variational-equation covariance dynamics, externally validated production conjunction services, and
-closed-loop attitude-control system dynamics remain deferred.
+validated production actuator/sensor ACS models remain deferred.
 
 Definition of done:
 
@@ -267,6 +269,8 @@ Definition of done:
   radial-outward, and radial-inward thrust directions for commanded attitude-coupled burn modes.
 - Maneuvered local trajectories include `AttitudeState` samples with body-to-inertial unit
   quaternions and target-direction metadata for the commanded body +X axis.
+- `astro propagate-attitude` supports scheduled open-loop body torques and a bounded
+  quaternion-error PD closed-loop control primitive with per-sample control-torque provenance.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported. Local propagation can populate them from a
   scenario initial covariance using finite-difference state transitions, for two-body scenarios

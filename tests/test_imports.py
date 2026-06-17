@@ -36,6 +36,7 @@ def test_packages_import() -> None:
         "parse_iers_finals_eop",
     }
     expected_dynamics_exports = {
+        "AttitudeControlConfig",
         "AttitudeDynamicsResult",
         "AttitudeDynamicsSample",
         "ConjunctionAssessmentCheck",
