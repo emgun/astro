@@ -97,8 +97,10 @@ promising a pip-only install path. When TudatPy is installed, `astro propagate -
 runs native two-body Earth point-mass, J2 spherical-harmonic, atmospheric drag, cannonball SRP, and
 Sun/Moon point-mass third-body cross-checks using Tudat environment/body setup, fixed-step RK4, and
 Cowell translational propagation, then maps the state history back into the suite `Trajectory`
-product. Tudat higher-order gravity models and live calibrated force-model comparisons remain
-future work. JAX research
+product. Tudat trajectories with an initial covariance can populate suite finite-difference
+covariance-history products by propagating perturbed Tudat states through the selected Tudat force
+model. Tudat higher-order gravity models, native Tudat variational equations, and live calibrated
+force-model comparisons remain future work. JAX research
 propagation returns suite `MonteCarloResult` products, can optionally include a final-state
 transition sensitivity matrix, and supports
 differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag, solar
@@ -133,6 +135,7 @@ astro propagate examples/scenarios/leo_j2.yaml --backend tudat --output tudat_j2
 astro propagate examples/scenarios/leo_orekit_drag.yaml --backend tudat --output tudat_drag_trajectory.json
 astro propagate examples/scenarios/leo_orekit_srp.yaml --backend tudat --output tudat_srp_trajectory.json
 astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend tudat --output tudat_third_body_trajectory.json
+astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend tudat --output tudat_high_fidelity_covariance.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro export-trajectory attitude_trajectory.json --format aem --output attitude_trajectory.aem

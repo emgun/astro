@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from typing import Any
 
+import numpy as np
 import pytest
 
 from astro_backends.tudat.propagation import propagate_tudat
@@ -177,6 +178,50 @@ def test_propagate_tudat_runs_srp_with_fake_tudat_modules(
         "Earth spherical harmonic gravity 2x0",
         "Sun cannonball solar radiation pressure",
     ]
+
+
+def test_propagate_tudat_populates_covariance_history_with_fake_tudat_modules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_scenario = load_scenario("examples/scenarios/leo_orekit_high_fidelity_covariance.yaml")
+    scenario = base_scenario.model_copy(
+        update={"propagation": base_scenario.propagation.model_copy(update={"duration_s": 120.0})}
+    )
+    fake_modules = _FakeTudatModules()
+    monkeypatch.setattr(
+        "astro_backends.tudat.propagation.import_module",
+        fake_modules.import_module,
+    )
+
+    trajectory = propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.backend == "tudat"
+    assert len(trajectory.covariance_history) == scenario.propagation.sample_count
+    assert trajectory.metadata["covariance_model"] == "tudat_finite_difference_state_transition"
+    assert trajectory.metadata["covariance_transition_force_models"] == [
+        "Earth spherical harmonic gravity 2x0",
+        "Earth aerodynamic drag",
+        "Sun cannonball solar radiation pressure",
+        "Sun point-mass third-body gravity",
+        "Moon point-mass third-body gravity",
+    ]
+    assert trajectory.covariance_history[0].metadata["state_transition_model"] == "identity"
+    assert trajectory.covariance_history[1].metadata["state_transition_model"] == (
+        "tudat_finite_difference"
+    )
+    assert trajectory.covariance_history[1].metadata["transition_step_s"] == (
+        scenario.propagation.step_s
+    )
+    assert trajectory.covariance_history[1].metadata["transition_force_models"] == (
+        trajectory.metadata["covariance_transition_force_models"]
+    )
+    final_covariance = np.array(trajectory.covariance_history[-1].covariance)
+    final_transition = np.array(trajectory.covariance_history[-1].state_transition_matrix)
+    final_process_noise = np.array(trajectory.covariance_history[-1].process_noise_covariance)
+    np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-10)
+    assert final_transition.shape == (6, 6)
+    assert not np.allclose(final_transition, np.eye(6))
+    assert final_process_noise[0, 0] > 0.0
 
 
 def test_propagate_tudat_returns_suite_product_with_fake_runner() -> None:

@@ -3,15 +3,28 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from importlib import import_module
-from typing import Any
+from typing import Any, cast
+
+import numpy as np
+from numpy.typing import NDArray
 
 from astro_backends.tudat.runtime import TudatRuntime, load_tudat_runtime
 from astro_core.errors import UnsupportedBackendError
-from astro_core.models import CartesianState, ForceModelName, Scenario, Trajectory, TrajectorySample
+from astro_core.models import (
+    CartesianState,
+    CovarianceSample,
+    ForceModelName,
+    Scenario,
+    Trajectory,
+    TrajectorySample,
+)
 
 TudatRuntimeLoader = Callable[[], TudatRuntime]
 TudatPropagationRunner = Callable[[Scenario, TudatRuntime], Trajectory]
+FloatArray = NDArray[np.float64]
 _SPACECRAFT_NAME = "AstroSuiteSpacecraft"
+_COVARIANCE_FD_REL_STEP = 1.0e-6
+_COVARIANCE_FD_ABS_STEP = 1.0e-6
 _SUPPORTED_DEFAULT_TUDAT_FORCE_MODELS = (
     ForceModelName.TWO_BODY,
     ForceModelName.J2,
@@ -174,6 +187,34 @@ def _initial_state_si(scenario: Scenario) -> list[float]:
     ]
 
 
+def _state_vector_from_sample(sample: TrajectorySample) -> FloatArray:
+    return cast(
+        FloatArray,
+        np.array(
+            [
+                *sample.state.position_km,
+                *sample.state.velocity_km_s,
+            ],
+            dtype=np.float64,
+        ),
+    )
+
+
+def _cartesian_from_state_vector(state_vector: FloatArray) -> CartesianState:
+    return CartesianState(
+        position_km=(
+            float(state_vector[0]),
+            float(state_vector[1]),
+            float(state_vector[2]),
+        ),
+        velocity_km_s=(
+            float(state_vector[3]),
+            float(state_vector[4]),
+            float(state_vector[5]),
+        ),
+    )
+
+
 def _trajectory_samples_from_tudat_history(
     scenario: Scenario,
     state_history: dict[float, list[float]],
@@ -209,6 +250,279 @@ def _trajectory_samples_from_tudat_history(
             )
         )
     return samples
+
+
+def _matrix_to_nested_list(matrix: FloatArray) -> list[list[float]]:
+    return [[float(value) for value in row] for row in matrix.tolist()]
+
+
+def _initial_covariance_matrix(scenario: Scenario) -> FloatArray | None:
+    if scenario.initial_covariance is None:
+        return None
+    return cast(FloatArray, np.array(scenario.initial_covariance, dtype=np.float64))
+
+
+def _finite_difference_state_transition(
+    state_vector: FloatArray,
+    advance_state: Callable[[FloatArray], FloatArray],
+) -> FloatArray:
+    transition = np.zeros((6, 6), dtype=np.float64)
+    for column in range(6):
+        step = max(
+            abs(float(state_vector[column])) * _COVARIANCE_FD_REL_STEP,
+            _COVARIANCE_FD_ABS_STEP,
+        )
+        perturbation = np.zeros(6, dtype=np.float64)
+        perturbation[column] = step
+        plus = advance_state(state_vector + perturbation)
+        minus = advance_state(state_vector - perturbation)
+        transition[:, column] = (plus - minus) / (2.0 * step)
+    return cast(FloatArray, transition)
+
+
+def _covariance_process_noise_model(acceleration_sigma_km_s2: float) -> str:
+    return "white_acceleration" if acceleration_sigma_km_s2 > 0.0 else "none"
+
+
+def _process_noise_covariance(acceleration_sigma_km_s2: float, step_s: float) -> FloatArray:
+    process_noise = np.zeros((6, 6), dtype=np.float64)
+    if acceleration_sigma_km_s2 == 0.0:
+        return cast(FloatArray, process_noise)
+
+    acceleration_variance = acceleration_sigma_km_s2**2
+    position_variance = 0.25 * acceleration_variance * step_s**4
+    position_velocity_covariance = 0.5 * acceleration_variance * step_s**3
+    velocity_variance = acceleration_variance * step_s**2
+    for axis in range(3):
+        velocity_axis = axis + 3
+        process_noise[axis, axis] = position_variance
+        process_noise[axis, velocity_axis] = position_velocity_covariance
+        process_noise[velocity_axis, axis] = position_velocity_covariance
+        process_noise[velocity_axis, velocity_axis] = velocity_variance
+    return cast(FloatArray, process_noise)
+
+
+def _propagate_covariance(
+    covariance: FloatArray,
+    transition: FloatArray,
+    process_noise: FloatArray,
+) -> FloatArray:
+    propagated = transition @ covariance @ transition.T + process_noise
+    return cast(FloatArray, 0.5 * (propagated + propagated.T))
+
+
+def _covariance_sample(
+    epoch: datetime,
+    covariance: FloatArray,
+    *,
+    state_transition_matrix: FloatArray,
+    accumulated_state_transition_matrix: FloatArray,
+    process_noise_covariance: FloatArray,
+    metadata: dict[str, object],
+) -> CovarianceSample:
+    return CovarianceSample(
+        epoch=epoch,
+        covariance=_matrix_to_nested_list(covariance),
+        state_transition_matrix=_matrix_to_nested_list(state_transition_matrix),
+        accumulated_state_transition_matrix=_matrix_to_nested_list(
+            accumulated_state_transition_matrix
+        ),
+        process_noise_covariance=_matrix_to_nested_list(process_noise_covariance),
+        metadata=metadata,
+    )
+
+
+def _covariance_transition_metadata(
+    propagator_metadata: dict[str, object],
+    *,
+    prefix: str = "",
+) -> dict[str, object]:
+    metadata: dict[str, object] = {}
+    if "tudat_runner" in propagator_metadata:
+        metadata[f"{prefix}runner"] = propagator_metadata["tudat_runner"]
+    if "tudat_force_models" in propagator_metadata:
+        force_models = propagator_metadata["tudat_force_models"]
+        metadata[f"{prefix}force_models"] = (
+            list(force_models) if isinstance(force_models, list) else force_models
+        )
+    if "tudat_acceleration_models" in propagator_metadata:
+        metadata[f"{prefix}acceleration_models"] = propagator_metadata[
+            "tudat_acceleration_models"
+        ]
+    return metadata
+
+
+def _covariance_metadata(
+    scenario: Scenario,
+    covariance: FloatArray | None,
+    propagator_metadata: dict[str, object],
+) -> dict[str, object]:
+    if covariance is None:
+        return {}
+    process_noise_acceleration = scenario.covariance_process_noise_acceleration_km_s2
+    return {
+        "covariance_model": "tudat_finite_difference_state_transition",
+        "covariance_state_transition_storage": "per_sample_and_accumulated",
+        "covariance_process_noise": _covariance_process_noise_model(process_noise_acceleration),
+        "covariance_process_noise_acceleration_km_s2": process_noise_acceleration,
+        "covariance_process_noise_storage": "per_sample_matrix",
+        "covariance_finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
+        "covariance_finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
+        **_covariance_transition_metadata(
+            propagator_metadata,
+            prefix="covariance_transition_",
+        ),
+    }
+
+
+def _scenario_for_tudat_step(
+    scenario: Scenario,
+    *,
+    start_epoch: datetime,
+    state_vector: FloatArray,
+    step_s: float,
+) -> Scenario:
+    initial_state = scenario.initial_state.model_copy(
+        update={
+            "epoch": start_epoch,
+            "cartesian": _cartesian_from_state_vector(state_vector),
+        }
+    )
+    propagation = scenario.propagation.model_copy(
+        update={
+            "duration_s": step_s,
+            "step_s": step_s,
+        }
+    )
+    return scenario.model_copy(
+        update={
+            "initial_state": initial_state,
+            "propagation": propagation,
+            "initial_covariance": None,
+        }
+    )
+
+
+def _propagate_tudat_state_vector(
+    scenario: Scenario,
+    runtime: TudatRuntime,
+    *,
+    start_epoch: datetime,
+    target_epoch: datetime,
+    state_vector: FloatArray,
+) -> FloatArray:
+    step_s = (target_epoch - start_epoch).total_seconds()
+    trial_scenario = _scenario_for_tudat_step(
+        scenario,
+        start_epoch=start_epoch,
+        state_vector=state_vector,
+        step_s=step_s,
+    )
+    return _state_vector_from_sample(_propagate_tudat_default(trial_scenario, runtime).samples[-1])
+
+
+def _trajectory_with_covariance_history(
+    scenario: Scenario,
+    runtime: TudatRuntime,
+    trajectory: Trajectory,
+) -> Trajectory:
+    covariance_matrix = _initial_covariance_matrix(scenario)
+    if covariance_matrix is None:
+        return trajectory
+
+    process_noise = _process_noise_covariance(
+        scenario.covariance_process_noise_acceleration_km_s2,
+        scenario.propagation.step_s,
+    )
+    zero_process_noise = np.zeros((6, 6), dtype=np.float64)
+    identity_transition = np.eye(6, dtype=np.float64)
+    accumulated_transition = identity_transition.copy()
+    previous_transition = identity_transition.copy()
+    previous_process_noise = zero_process_noise
+    previous_transition_step_s = 0.0
+    covariance_history: list[CovarianceSample] = []
+
+    for step_index, sample in enumerate(trajectory.samples):
+        covariance_history.append(
+            _covariance_sample(
+                sample.epoch,
+                covariance_matrix,
+                state_transition_matrix=previous_transition,
+                accumulated_state_transition_matrix=accumulated_transition,
+                process_noise_covariance=previous_process_noise,
+                metadata={
+                    "covariance_sample_role": (
+                        "initial" if step_index == 0 else "propagated"
+                    ),
+                    "covariance_model": "tudat_finite_difference_state_transition",
+                    "state_transition_model": (
+                        "identity" if step_index == 0 else "tudat_finite_difference"
+                    ),
+                    "transition_step_s": previous_transition_step_s,
+                    "process_noise_model": (
+                        "none"
+                        if step_index == 0
+                        else _covariance_process_noise_model(
+                            scenario.covariance_process_noise_acceleration_km_s2
+                        )
+                    ),
+                    "process_noise_acceleration_km_s2": (
+                        0.0
+                        if step_index == 0
+                        else scenario.covariance_process_noise_acceleration_km_s2
+                    ),
+                    "finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
+                    "finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
+                    **_covariance_transition_metadata(
+                        trajectory.metadata,
+                        prefix="transition_",
+                    ),
+                },
+            )
+        )
+
+        if step_index < len(trajectory.samples) - 1:
+            next_epoch = trajectory.samples[step_index + 1].epoch
+            state_vector = _state_vector_from_sample(sample)
+
+            def advance_trial(
+                trial_state: FloatArray,
+                *,
+                start_epoch: datetime = sample.epoch,
+                target_epoch: datetime = next_epoch,
+            ) -> FloatArray:
+                return _propagate_tudat_state_vector(
+                    scenario,
+                    runtime,
+                    start_epoch=start_epoch,
+                    target_epoch=target_epoch,
+                    state_vector=trial_state,
+                )
+
+            transition = _finite_difference_state_transition(state_vector, advance_trial)
+            covariance_matrix = _propagate_covariance(
+                covariance_matrix,
+                transition,
+                process_noise,
+            )
+            accumulated_transition = cast(FloatArray, transition @ accumulated_transition)
+            previous_transition = transition
+            previous_process_noise = process_noise
+            previous_transition_step_s = scenario.propagation.step_s
+
+    return trajectory.model_copy(
+        update={
+            "covariance_history": covariance_history,
+            "metadata": {
+                **trajectory.metadata,
+                **_covariance_metadata(
+                    scenario,
+                    _initial_covariance_matrix(scenario),
+                    trajectory.metadata,
+                ),
+            },
+        }
+    )
 
 
 def _propagate_tudat_default(scenario: Scenario, runtime: TudatRuntime) -> Trajectory:
@@ -312,7 +626,11 @@ def propagate_tudat(
 ) -> Trajectory:
     runtime = runtime_loader()
     if tudat_runner is None:
-        return _with_tudat_provenance(_propagate_tudat_default(scenario, runtime), runtime)
+        trajectory = _propagate_tudat_default(scenario, runtime)
+        return _with_tudat_provenance(
+            _trajectory_with_covariance_history(scenario, runtime, trajectory),
+            runtime,
+        )
 
     trajectory = tudat_runner(scenario, runtime)
     return _with_tudat_provenance(trajectory, runtime)

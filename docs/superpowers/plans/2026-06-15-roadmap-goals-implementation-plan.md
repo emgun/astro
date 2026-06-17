@@ -49,7 +49,8 @@ Implemented and protected:
 - Optional RocketPy and Dymos/OpenMDAO launch backend gates, including configured RocketPy direct
   flight mapping and a stage-aware Dymos vertical-ascent phase transcription.
 - Optional Tudat native two-body, J2 spherical-harmonic, atmospheric drag, cannonball SRP, and
-  Sun/Moon point-mass third-body propagation cross-check runners.
+  Sun/Moon point-mass third-body propagation cross-check runners, plus suite finite-difference
+  covariance-history products through the selected Tudat force model.
 
 Still roadmap-level:
 
@@ -58,7 +59,9 @@ Still roadmap-level:
 - Full native multi-motor RocketPy staging and full pitch-program multistage Dymos ascent
   optimization.
 - Tudat high-order gravity and calibrated live force-model comparisons beyond the current native
-  two-body, J2, drag, SRP, and Sun/Moon point-mass third-body cross-check runners.
+  two-body, J2, drag, SRP, and Sun/Moon point-mass third-body cross-check runners. Native Tudat
+  variational-equation covariance propagation remains deferred; current Tudat covariance uses the
+  suite finite-difference transition product.
 - Full precession-nutation reductions, DSN calibration products beyond the current configurable
   weather/frequency media primitives, and operational CCSDS support beyond current KVN TDM
   measurement families, suite multi-leg radiometric TDM extension, OEM ephemeris interchange, and
@@ -357,14 +360,15 @@ Tradeoff:
 Status: high-fidelity/research backend slices implemented for runtime gates, product boundaries,
 and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke commands, native Tudat
 two-body, J2, drag, SRP, and Sun/Moon point-mass third-body cross-check propagation runners, built-in JAX two-body and J2 research propagation runners,
+suite finite-difference covariance-history propagation through selected Tudat force models,
 `orekit_high_fidelity`
 screening through the JAX J2 baseline, JAX research approximations for atmospheric drag, solar
 radiation pressure, and analytic circular Sun/Moon third-body gravity, opt-in JAX final-state
 transition sensitivities, JAX range/range-rate, inertial RA/Dec, and local-horizon az/el OD
 residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
 Nyx/ANISE evaluation gate are
-implemented. Tudat high-order gravity and calibrated live comparisons beyond the current
-two-body/J2/drag/SRP/third-body runner, JAX
+implemented. Tudat high-order gravity, native Tudat variational equations, and calibrated live
+comparisons beyond the current two-body/J2/drag/SRP/third-body runner, JAX
 ephemeris-backed third-body force models, and operational-grade
 differentiable OD estimator workflows remain gated on validated runner implementations.
 
@@ -375,6 +379,10 @@ Implemented slice:
   spherical-harmonic, atmospheric drag, cannonball SRP, and Sun/Moon point-mass third-body
   cross-checks when TudatPy is installed, using Tudat environment/body setup, fixed-step RK4
   integration, Cowell translational propagation settings, and suite `Trajectory` product mapping.
+- `astro propagate --backend tudat` populates suite covariance-history products when an initial
+  covariance is supplied by finite-differencing one-step Tudat state propagations through the
+  selected Tudat force model. This is an adapter-level cross-check product, not native Tudat
+  variational-equation propagation.
 - `astro research-propagate --backend local` runs seeded local ensembles.
 - `astro research-propagate --backend jax` runs vectorized two-body and J2 RK4 seeded ensembles and
   returns suite `MonteCarloResult` products.
@@ -398,9 +406,10 @@ Implemented slice:
 Definition of done:
 
 - `astro propagate --backend tudat` supports checked-in two-body, J2, drag, SRP, and third-body
-  cross-check scenarios and records Tudat provenance through the native runners. Tudat higher-order
-  gravity and calibrated live force-model comparisons remain gated on validated body and
-  acceleration-model construction.
+  cross-check scenarios and records Tudat provenance through the native runners. Initial-covariance
+  scenarios produce finite-difference covariance-history products through the selected Tudat force
+  model. Tudat higher-order gravity, native variational equations, and calibrated live force-model
+  comparisons remain gated on validated body and acceleration-model construction.
 - `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
   screening-only `orekit_high_fidelity`, drag, SRP, and analytic Sun/Moon third-body force flags
   without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and
