@@ -91,9 +91,11 @@ astro jax-smoke
 
 Tudat and JAX are optional research/cross-check boundaries. TudatPy is not currently assumed to be
 available from PyPI on every platform, so its smoke command reports installation state without
-promising a pip-only install path. JAX research propagation returns suite `MonteCarloResult` products
-and can optionally include a final-state transition sensitivity matrix. It remains separate from
-operational Orekit semantics.
+promising a pip-only install path. JAX research propagation returns suite `MonteCarloResult`
+products, can optionally include a final-state transition sensitivity matrix, and supports
+differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag, and solar
+radiation pressure flags. Those JAX force flags are explicitly research products, not operational
+ephemerides; third-body gravity remains an Orekit/Tudat-grade ephemeris integration task.
 
 ## Commands
 
@@ -147,6 +149,8 @@ astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measureme
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend orekit --output orekit_estimate.json
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --estimator orekit-native --output orekit_native_estimate.json
 astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output research_propagation.json
+astro research-propagate examples/scenarios/leo_orekit_drag.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_drag_research.json
+astro research-propagate examples/scenarios/leo_orekit_srp.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_srp_research.json
 astro research-od-sensitivity examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --output od_sensitivity.json
 astro orekit-smoke
 ```

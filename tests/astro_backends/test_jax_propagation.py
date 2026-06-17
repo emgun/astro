@@ -171,33 +171,73 @@ def test_research_od_sensitivity_jax_rejects_unsupported_measurement_type() -> N
         )
 
 
-def test_research_propagate_jax_rejects_unsupported_force_model() -> None:
+def test_research_propagate_jax_maps_orekit_high_fidelity_to_research_j2_baseline() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml").model_copy(
         update={"force_model": ForceModelConfig(gravity=ForceModelName.OREKIT_HIGH_FIDELITY)}
     )
 
-    with pytest.raises(UnsupportedBackendError, match="supports only two_body"):
-        research_propagate_jax(
-            scenario,
-            cases=1,
-            position_sigma_km=0.0,
-            velocity_sigma_km_s=0.0,
-            seed=7,
-            runtime_loader=_fake_runtime,
-        )
+    result = research_propagate_jax(
+        scenario,
+        cases=1,
+        position_sigma_km=0.0,
+        velocity_sigma_km_s=0.0,
+        seed=7,
+        runtime_loader=_fake_runtime,
+    )
+
+    assert result.metadata["force_model"] == "orekit_high_fidelity"
+    assert result.metadata["research_force_models"] == ["J2"]
+    assert result.metadata["research_force_model_policy"] == (
+        "screening_only_not_operational_ephemeris"
+    )
 
 
-def test_research_propagate_jax_rejects_high_fidelity_flags() -> None:
+def test_research_propagate_jax_runs_research_drag_and_srp_force_flags() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml").model_copy(
         update={
             "force_model": ForceModelConfig(
-                gravity=ForceModelName.TWO_BODY,
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+                atmospheric_drag=True,
                 solar_radiation_pressure=True,
             )
         }
     )
 
-    with pytest.raises(UnsupportedBackendError, match="solar_radiation_pressure"):
+    result = research_propagate_jax(
+        scenario,
+        cases=1,
+        position_sigma_km=0.0,
+        velocity_sigma_km_s=0.0,
+        seed=7,
+        runtime_loader=_fake_runtime,
+    )
+
+    final_state = result.cases[0].trajectory.samples[-1].state
+    assert result.backend == "jax"
+    assert result.metadata["runner"] == "jax_vectorized_orekit_high_fidelity_rk4"
+    assert result.metadata["research_force_models"] == [
+        "J2",
+        "exponential_atmospheric_drag",
+        "constant_direction_solar_radiation_pressure",
+    ]
+    assert result.cases[0].trajectory.metadata["research_force_model_policy"] == (
+        "screening_only_not_operational_ephemeris"
+    )
+    assert np.all(np.isfinite(np.asarray(final_state.position_km)))
+    assert np.all(np.isfinite(np.asarray(final_state.velocity_km_s)))
+
+
+def test_research_propagate_jax_rejects_third_body_force_flag() -> None:
+    scenario = load_scenario("examples/scenarios/leo_two_body.yaml").model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+                third_body_gravity=True,
+            )
+        }
+    )
+
+    with pytest.raises(UnsupportedBackendError, match="third_body_gravity"):
         research_propagate_jax(
             scenario,
             cases=1,

@@ -299,11 +299,12 @@ Tradeoff:
 
 Status: high-fidelity/research backend slices implemented for runtime gates, product boundaries,
 and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke commands, Tudat propagation
-dispatch, built-in JAX two-body and J2 research propagation runners, opt-in JAX final-state
-transition sensitivities, JAX range/range-rate OD residual Jacobian products, and a Nyx/ANISE
-evaluation gate are implemented. Live Tudat environment construction, JAX high-fidelity force
-flags, and full differentiable OD estimator workflows remain gated on validated runner
-implementations.
+dispatch, built-in JAX two-body and J2 research propagation runners, `orekit_high_fidelity`
+screening through the JAX J2 baseline, JAX research approximations for atmospheric drag and solar
+radiation pressure, opt-in JAX final-state transition sensitivities, JAX range/range-rate OD
+residual Jacobian products, and a Nyx/ANISE evaluation gate are implemented. Live Tudat environment
+construction, JAX third-body ephemeris-backed force models, and full differentiable OD estimator
+workflows remain gated on validated runner implementations.
 
 Implemented slice:
 
@@ -313,6 +314,9 @@ Implemented slice:
 - `astro research-propagate --backend local` runs seeded local ensembles.
 - `astro research-propagate --backend jax` runs vectorized two-body and J2 RK4 seeded ensembles and
   returns suite `MonteCarloResult` products.
+- `astro research-propagate --backend jax` accepts `orekit_high_fidelity` as a research screening
+  baseline backed by J2, plus explicit atmospheric-drag and solar-radiation-pressure force flags
+  with metadata marking the product as screening-only rather than an operational ephemeris.
 - `astro research-propagate --backend jax --include-sensitivities` records a nominal final-state
   transition matrix in `MonteCarloResult.metadata` using JAX autodiff.
 - `astro research-od-sensitivity --backend jax` records normalized range/range-rate residuals and
@@ -322,10 +326,11 @@ Implemented slice:
 Definition of done:
 
 - `astro propagate --backend tudat` supports at least one cross-check scenario and records Tudat provenance once a validated Tudat runner is supplied.
-- `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation without
-  replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` provides
-  the first differentiable OD residual/Jacobian primitive. High-fidelity force flags and full
-  differentiable OD estimators still require validated JAX runners.
+- `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
+  screening-only `orekit_high_fidelity`, drag, and SRP force flags without replacing operational
+  Orekit semantics; `astro research-od-sensitivity --backend jax` provides the first
+  differentiable OD residual/Jacobian primitive. Third-body force flags and full differentiable OD
+  estimators still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.
 - Batch acceleration and Monte Carlo workflows preserve deterministic seeds and validation tolerances.
 

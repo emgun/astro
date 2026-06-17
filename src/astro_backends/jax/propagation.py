@@ -28,6 +28,16 @@ JaxResearchRunner = Callable[[Scenario, JaxRuntime, int, float, float, int], Mon
 _MAX_RK4_INTERNAL_STEP_S = 30.0
 _STATE_DIMENSION = 6
 _SUPPORTED_JAX_OD_MEASUREMENTS = {MeasurementType.RANGE, MeasurementType.RANGE_RATE}
+_SUPPORTED_JAX_GRAVITY_MODELS = {
+    ForceModelName.TWO_BODY,
+    ForceModelName.J2,
+    ForceModelName.OREKIT_HIGH_FIDELITY,
+}
+_EXPONENTIAL_ATMOSPHERE_REFERENCE_DENSITY_KG_M3 = 4.0e-13
+_EXPONENTIAL_ATMOSPHERE_REFERENCE_ALTITUDE_M = 400_000.0
+_EXPONENTIAL_ATMOSPHERE_SCALE_HEIGHT_M = 60_000.0
+_SOLAR_RADIATION_PRESSURE_N_M2 = 4.56e-6
+_RESEARCH_FORCE_MODEL_POLICY = "screening_only_not_operational_ephemeris"
 
 
 def _validate_research_inputs(
@@ -54,9 +64,6 @@ def _internal_step_schedule(step_s: float) -> tuple[int, float]:
     return substep_count, step_s / substep_count
 
 
-_SUPPORTED_JAX_GRAVITY_MODELS = {ForceModelName.TWO_BODY, ForceModelName.J2}
-
-
 def _two_body_acceleration(jnp: Any, position: Any) -> Any:
     radius = jnp.linalg.norm(position, axis=1)
     return -MU_EARTH_KM3_S2 * position / (radius[:, None] ** 3)
@@ -80,29 +87,79 @@ def _j2_acceleration(jnp: Any, position: Any) -> Any:
     )
 
 
-def _acceleration(jnp: Any, position: Any, force_model: ForceModelName) -> Any:
+def _research_force_model_names(scenario: Scenario) -> list[str]:
+    force_models = ["J2" if _uses_j2_baseline(scenario.force_model.gravity) else "two_body"]
+    if scenario.force_model.atmospheric_drag:
+        force_models.append("exponential_atmospheric_drag")
+    if scenario.force_model.solar_radiation_pressure:
+        force_models.append("constant_direction_solar_radiation_pressure")
+    return force_models
+
+
+def _uses_j2_baseline(force_model: ForceModelName) -> bool:
+    return force_model in {ForceModelName.J2, ForceModelName.OREKIT_HIGH_FIDELITY}
+
+
+def _drag_acceleration(jnp: Any, position: Any, velocity: Any, scenario: Scenario) -> Any:
+    radius_km = jnp.linalg.norm(position, axis=1)
+    altitude_m = (radius_km - R_EARTH_KM) * 1000.0
+    density_kg_m3 = _EXPONENTIAL_ATMOSPHERE_REFERENCE_DENSITY_KG_M3 * jnp.exp(
+        -(altitude_m - _EXPONENTIAL_ATMOSPHERE_REFERENCE_ALTITUDE_M)
+        / _EXPONENTIAL_ATMOSPHERE_SCALE_HEIGHT_M
+    )
+    velocity_m_s = velocity * 1000.0
+    speed_m_s = jnp.linalg.norm(velocity_m_s, axis=1)
+    coefficient = (
+        0.5
+        * density_kg_m3
+        * scenario.spacecraft.drag_coefficient
+        * scenario.spacecraft.area_m2
+        / scenario.spacecraft.mass_kg
+    )
+    return -(coefficient * speed_m_s)[:, None] * velocity_m_s / 1000.0
+
+
+def _solar_radiation_pressure_acceleration(jnp: Any, position: Any, scenario: Scenario) -> Any:
+    acceleration_km_s2 = (
+        _SOLAR_RADIATION_PRESSURE_N_M2
+        * scenario.spacecraft.reflectivity_coefficient
+        * scenario.spacecraft.area_m2
+        / scenario.spacecraft.mass_kg
+        / 1000.0
+    )
+    direction = jnp.asarray((1.0, 0.0, 0.0))
+    return acceleration_km_s2 * jnp.broadcast_to(direction, position.shape)
+
+
+def _acceleration(jnp: Any, position: Any, velocity: Any, scenario: Scenario) -> Any:
     acceleration = _two_body_acceleration(jnp, position)
-    if force_model is ForceModelName.J2:
+    if _uses_j2_baseline(scenario.force_model.gravity):
         acceleration = acceleration + _j2_acceleration(jnp, position)
+    if scenario.force_model.atmospheric_drag:
+        acceleration = acceleration + _drag_acceleration(jnp, position, velocity, scenario)
+    if scenario.force_model.solar_radiation_pressure:
+        acceleration = acceleration + _solar_radiation_pressure_acceleration(
+            jnp, position, scenario
+        )
     return acceleration
 
 
-def _derivative(jnp: Any, state: Any, force_model: ForceModelName) -> Any:
+def _derivative(jnp: Any, state: Any, scenario: Scenario) -> Any:
     position = state[:, :3]
     velocity = state[:, 3:]
-    return jnp.concatenate((velocity, _acceleration(jnp, position, force_model)), axis=1)
+    return jnp.concatenate((velocity, _acceleration(jnp, position, velocity, scenario)), axis=1)
 
 
 def _rk4_step_once(
     jnp: Any,
     state: Any,
     step_s: float,
-    force_model: ForceModelName,
+    scenario: Scenario,
 ) -> Any:
-    k1 = _derivative(jnp, state, force_model)
-    k2 = _derivative(jnp, state + 0.5 * step_s * k1, force_model)
-    k3 = _derivative(jnp, state + 0.5 * step_s * k2, force_model)
-    k4 = _derivative(jnp, state + step_s * k3, force_model)
+    k1 = _derivative(jnp, state, scenario)
+    k2 = _derivative(jnp, state + 0.5 * step_s * k1, scenario)
+    k3 = _derivative(jnp, state + 0.5 * step_s * k2, scenario)
+    k4 = _derivative(jnp, state + step_s * k3, scenario)
     return state + (step_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
 
@@ -110,25 +167,25 @@ def _rk4_step(
     jnp: Any,
     state: Any,
     step_s: float,
-    force_model: ForceModelName,
+    scenario: Scenario,
 ) -> Any:
     substep_count, substep_s = _internal_step_schedule(step_s)
     next_state = state
     for _ in range(substep_count):
-        next_state = _rk4_step_once(jnp, next_state, substep_s, force_model)
+        next_state = _rk4_step_once(jnp, next_state, substep_s, scenario)
     return next_state
 
 
 def _validate_jax_force_model(scenario: Scenario) -> None:
-    enabled_flags = scenario.force_model.enabled_high_fidelity_flags()
-    if enabled_flags:
+    if scenario.force_model.third_body_gravity:
         raise UnsupportedBackendError(
-            "JAX research propagation does not support high-fidelity force model flags: "
-            f"{', '.join(enabled_flags)}"
+            "JAX research propagation does not support third_body_gravity; "
+            "validated Sun/Moon ephemerides remain an Orekit/Tudat integration boundary."
         )
     if scenario.force_model.gravity not in _SUPPORTED_JAX_GRAVITY_MODELS:
         raise UnsupportedBackendError(
-            "JAX research propagation currently supports only two_body and j2 force models"
+            "JAX research propagation currently supports only two_body, j2, and "
+            "orekit_high_fidelity screening force models"
         )
 
 
@@ -169,7 +226,7 @@ def _default_jax_two_body_runner(
                 jnp,
                 state,
                 scenario.propagation.step_s,
-                scenario.force_model.gravity,
+                scenario,
             )
 
     sample_array = np.asarray(jnp.stack(sample_states, axis=1), dtype=np.float64)
@@ -210,6 +267,8 @@ def _default_jax_two_body_runner(
                 "internal_substeps_per_sample": internal_substeps_per_sample,
                 "internal_step_s": internal_step_s,
                 "runner": f"jax_vectorized_{scenario.force_model.gravity.value}_rk4",
+                "research_force_models": _research_force_model_names(scenario),
+                "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
             },
         )
         monte_carlo_cases.append(
@@ -233,6 +292,8 @@ def _default_jax_two_body_runner(
             "runner": f"jax_vectorized_{scenario.force_model.gravity.value}_rk4",
             "perturbation_rng": "numpy.default_rng",
             "force_model": scenario.force_model.gravity.value,
+            "research_force_models": _research_force_model_names(scenario),
+            "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
             "case_count": cases,
         },
     )
@@ -249,7 +310,7 @@ def _propagate_nominal_final_state(
             jnp,
             state,
             scenario.propagation.step_s,
-            scenario.force_model.gravity,
+            scenario,
         )
     return state[0]
 
@@ -273,7 +334,7 @@ def _jax_state_history(jnp: Any, scenario: Scenario, state_vector: Any) -> Any:
                 jnp,
                 state,
                 scenario.propagation.step_s,
-                scenario.force_model.gravity,
+                scenario,
             )
     return jnp.stack(samples, axis=0)
 
@@ -431,6 +492,8 @@ def research_od_sensitivity_jax(
             "jaxlib_version": runtime.jaxlib_version,
             "sensitivity_model": "jax_jacfwd_od_residuals",
             "force_model": scenario.force_model.gravity.value,
+            "research_force_models": _research_force_model_names(scenario),
+            "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
             "measurement_types": _unique_measurement_type_values(measurements),
             "residual_convention": "(predicted - observed) / sigma",
         },

@@ -44,6 +44,8 @@ Run when the matching runtime is expected to be present:
 - [ ] `ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product -q`
 - [ ] `astro tudat-smoke`
 - [ ] `astro jax-smoke`
+- [ ] `astro research-propagate examples/scenarios/leo_orekit_drag.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output /tmp/astro-jax-drag-research.json`
+- [ ] `astro research-propagate examples/scenarios/leo_orekit_srp.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output /tmp/astro-jax-srp-research.json`
 
 If an optional runtime is intentionally absent, capture the structured unavailable JSON and confirm
 the message is actionable.
