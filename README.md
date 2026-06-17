@@ -144,6 +144,7 @@ astro estimate examples/scenarios/leo_two_body.yaml --backend local --output est
 astro estimate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_estimate.json
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend local --output estimate.json
 astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend orekit --output orekit_estimate.json
+astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --estimator orekit-native --output orekit_native_estimate.json
 astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output research_propagation.json
 astro orekit-smoke
 ```
@@ -156,8 +157,10 @@ With `--backend orekit`, the suite estimator uses Orekit-backed propagation when
 runtime is installed. The Orekit backend also includes a native OD construction bridge that maps
 suite geodetic range/range-rate records into Orekit `Range`/`RangeRate` measurements and a
 `BatchLSEstimator` object. The bridge can execute the native estimator and map the estimated state,
-residuals, RMS, covariance, and iteration diagnostics into the suite `EstimateResult` model; public
-CLI exposure still waits on live Java/Orekit estimator validation.
+residuals, RMS, covariance, and iteration diagnostics into the suite `EstimateResult` model. Use
+`astro estimate-measurements --estimator orekit-native` to select that bridge explicitly. It remains
+limited to geodetic range/range-rate records and still depends on a live Java/Orekit runtime and
+data context.
 
 `astro export-trajectory` converts suite trajectory JSON into either a CSV ephemeris table or a
 CCSDS OEM KVN text product containing UTC epochs plus Cartesian position and velocity samples in km

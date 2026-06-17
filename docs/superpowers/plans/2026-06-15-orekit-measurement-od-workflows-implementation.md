@@ -124,6 +124,8 @@ Later roadmap slices added the first native Orekit OD construction boundary:
 - `estimate_orekit_native` executes the native estimator through the runtime abstraction and maps
   the estimated state, residual vector, RMS, covariance, iteration count, evaluation count, and
   Orekit wrapper provenance into the suite `EstimateResult` product.
+- `astro estimate-measurements --estimator orekit-native` exposes this bridge as an explicit public
+  CLI workflow while keeping the suite SciPy estimator as the default.
 
-The native Orekit estimator is still not exposed as a public CLI workflow because live Java/Orekit
-estimator execution remains unvalidated on checked-in geodetic range/range-rate fixtures.
+Live Java/Orekit estimator execution still needs validation on checked-in geodetic range/range-rate
+fixtures before it should be treated as operationally mature.

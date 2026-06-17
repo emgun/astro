@@ -14,7 +14,7 @@ from astro_backends.tudat import TudatSmokeResult
 from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
-from astro_core.models import CartesianState, MeasurementType, Scenario
+from astro_core.models import CartesianState, MeasurementRecord, MeasurementType, Scenario
 from astro_dynamics.ephemeris import dump_trajectory_oem
 from astro_dynamics.local import propagate_local
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
@@ -23,6 +23,7 @@ from astro_launch.local import propagate_launch_local
 from astro_launch.models import LaunchScenario, LaunchTrajectory
 from astro_launch.reporting import generate_tuned_launch_report
 from astro_launch.targeting import tune_pitch_program
+from astro_od.estimation import estimate_initial_state
 from astro_od.io import load_measurements
 from astro_od.measurements import generate_synthetic_measurements
 from tests.astro_launch.helpers import make_launch_scenario, make_pitch_program_launch_scenario
@@ -1147,6 +1148,54 @@ def test_estimate_measurements_command_accepts_tdm(tmp_path: Path) -> None:
     assert payload["metadata"]["workflow"] == "local_measurement_file"
     assert payload["metadata"]["measurement_format"] == "tdm"
     assert payload["metadata"]["measurement_count"] == 44
+
+
+def test_estimate_measurements_command_can_use_native_orekit_estimator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    truth_scenario = _observable_scenario()
+    estimate_scenario = _perturbed_scenario(truth_scenario)
+    scenario_path = tmp_path / "estimate_scenario.yaml"
+    measurements_path = tmp_path / "measurements.json"
+    output = tmp_path / "estimate.json"
+    _write_scenario(scenario_path, estimate_scenario)
+    _write_measurements(measurements_path, truth_scenario)
+    seen: dict[str, object] = {}
+
+    def fake_native_estimator(
+        scenario: Scenario,
+        measurements: list[MeasurementRecord],
+    ) -> object:
+        seen["scenario_id"] = scenario.scenario_id
+        seen["measurement_count"] = len(measurements)
+        result = estimate_initial_state(scenario, measurements)
+        return result.model_copy(
+            update={"metadata": {**result.metadata, "backend": "orekit_batch_ls_estimator"}}
+        )
+
+    monkeypatch.setattr("astro_cli.main.estimate_orekit_native", fake_native_estimator)
+
+    result = runner.invoke(
+        app,
+        [
+            "estimate-measurements",
+            str(scenario_path),
+            str(measurements_path),
+            "--estimator",
+            "orekit-native",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert seen == {"scenario_id": estimate_scenario.scenario_id, "measurement_count": 44}
+    assert payload["converged"] is True
+    assert payload["metadata"]["workflow"] == "orekit_native_measurement_file"
+    assert payload["metadata"]["estimator_mode"] == "orekit-native"
+    assert payload["metadata"]["backend"] == "orekit_batch_ls_estimator"
 
 
 def test_export_measurements_command_writes_csv(tmp_path: Path) -> None:

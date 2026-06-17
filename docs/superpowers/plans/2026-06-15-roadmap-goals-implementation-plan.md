@@ -45,7 +45,7 @@ Implemented and protected:
 
 Still roadmap-level:
 
-- Native Orekit batch/sequential OD execution and suite result mapping.
+- Live Java/Orekit validation of native Orekit batch OD execution and suite result mapping.
 - Backend-native high-fidelity covariance propagation and full attitude-control maneuver dynamics.
 - Live RocketPy launch simulation mapping for backend-specific motor/rocket geometry.
 - Live Dymos/OpenMDAO ascent phase transcription and optimization.
@@ -105,8 +105,9 @@ Status: suite-level Orekit-backed measurement/OD, Orekit J2 numerical propagatio
 Sun/Moon third-body gravity are implemented. Native Orekit OD now has a measurement-object and
 `BatchLSEstimator` construction/execution bridge for WGS-84 geodetic range/range-rate records. It
 maps estimated state, residuals, RMS, covariance, and iteration diagnostics into the suite
-`EstimateResult` model through the runtime abstraction; public CLI exposure and live Java/Orekit
-estimator validation remain future integration work.
+`EstimateResult` model through the runtime abstraction. Public CLI exposure is available through
+`astro estimate-measurements --estimator orekit-native`; live Java/Orekit estimator validation
+remains future integration work.
 
 Implemented slice:
 
@@ -144,6 +145,8 @@ Implemented slice:
 - `estimate_orekit_native` executes the native Orekit `BatchLSEstimator` through the runtime
   abstraction and maps the resulting propagated state, residual vector, RMS, covariance, iteration
   count, evaluation count, and Orekit wrapper provenance into `EstimateResult`.
+- `astro estimate-measurements --estimator orekit-native` exposes the native Orekit estimator
+  bridge explicitly while preserving the suite SciPy estimator as the default.
 - The shared measurement surface supports range, range-rate, one-way Doppler in Hz, first-order
   two-way and three-way range/range-rate with explicit participant-path metadata, inertial right
   ascension, declination, and local-horizon azimuth/elevation records; wrapped angle residuals
@@ -169,7 +172,7 @@ Implemented slice:
 Future native Orekit estimator scope:
 
 - Add live Java/Orekit validation for native estimator execution against checked-in geodetic
-  range/range-rate fixtures before exposing the native estimator as a public CLI workflow.
+  range/range-rate fixtures.
 - Extend native Orekit OD beyond geodetic range/range-rate records as Orekit measurement families
   are validated.
 - Keep the current suite-level SciPy estimator as the deterministic always-on OD reference while

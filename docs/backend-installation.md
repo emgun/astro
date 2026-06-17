@@ -43,8 +43,9 @@ The Orekit propagation adapter currently supports suite `two_body` scenarios thr
 propagation expansion path. Atmospheric drag is implemented with Orekit `DragForce`,
 `SimpleExponentialAtmosphere`, and `IsotropicDrag`. Solar radiation pressure is implemented with
 Orekit `SolarRadiationPressure` and `IsotropicRadiationSingleCoefficient`. Third-body gravity is
-implemented with Orekit `ThirdBodyAttraction` for the Sun and Moon. Native Orekit OD remains a
-separate roadmap item.
+implemented with Orekit `ThirdBodyAttraction` for the Sun and Moon. Native Orekit OD is available
+through `astro estimate-measurements --estimator orekit-native` for validated geodetic
+range/range-rate records when the live Java/Orekit runtime and data context are installed.
 
 ## Launch Backends
 

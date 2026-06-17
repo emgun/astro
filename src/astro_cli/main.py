@@ -9,7 +9,7 @@ import yaml
 
 from astro_backends.dymos import optimize_launch_dymos, run_dymos_smoke
 from astro_backends.jax import research_propagate_jax, run_jax_smoke
-from astro_backends.orekit import run_orekit_smoke
+from astro_backends.orekit import estimate_orekit_native, run_orekit_smoke
 from astro_backends.rocketpy import run_rocketpy_smoke
 from astro_backends.tudat import run_tudat_smoke
 from astro_core.errors import (
@@ -241,10 +241,17 @@ def _with_measurement_file_metadata(
     measurement_file: Path,
     measurement_format: str,
     measurement_count: int,
+    estimator_mode: str = "suite",
 ) -> dict[str, object]:
+    workflow = (
+        "orekit_native_measurement_file"
+        if estimator_mode == "orekit-native"
+        else "local_measurement_file"
+    )
     return {
         **result_metadata,
-        "workflow": "local_measurement_file",
+        "workflow": workflow,
+        "estimator_mode": estimator_mode,
         "source_scenario_id": scenario.scenario_id,
         "measurement_file": str(measurement_file),
         "measurement_format": measurement_format,
@@ -905,10 +912,19 @@ def estimate_measurements(
         typer.Option("--format", help="Measurement file format: auto, json, csv, or tdm."),
     ] = "auto",
     backend: Annotated[str, typer.Option()] = "local",
+    estimator: Annotated[
+        str,
+        typer.Option("--estimator", help="Estimator mode: suite or orekit-native."),
+    ] = "suite",
 ) -> None:
     """Run batch OD from an explicit measurement file."""
     scenario = _load_scenario_or_exit(scenario_path)
     try:
+        estimator_mode = estimator.lower()
+        if estimator_mode not in {"suite", "orekit-native"}:
+            raise UnsupportedBackendError(
+                f"Unsupported estimator mode {estimator!r}; use suite or orekit-native"
+            )
         resolved_measurement_format = resolve_measurement_format(
             measurements_path,
             measurement_format,
@@ -918,7 +934,10 @@ def estimate_measurements(
             expected_scenario_id=scenario.scenario_id,
             measurement_format=resolved_measurement_format,
         )
-        result = estimate_initial_state(scenario, measurements, backend=backend)
+        if estimator_mode == "orekit-native":
+            result = estimate_orekit_native(scenario, measurements)
+        else:
+            result = estimate_initial_state(scenario, measurements, backend=backend)
     except (InvalidMeasurementFileError, NumericalConvergenceError, UnsupportedBackendError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
@@ -931,6 +950,7 @@ def estimate_measurements(
                 measurement_file=measurements_path,
                 measurement_format=resolved_measurement_format,
                 measurement_count=len(measurements),
+                estimator_mode=estimator_mode,
             )
         }
     )
