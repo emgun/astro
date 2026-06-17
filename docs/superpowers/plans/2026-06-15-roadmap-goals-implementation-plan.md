@@ -242,7 +242,8 @@ finite-difference covariance propagation through the selected Orekit force model
 initial-state Monte Carlo, time-aligned conjunction screening with covariance-aware encounter-plane
 probability methods, including a numerical 2D Gaussian hard-body disk integral, conservative
 conjunction screening assessment reports, and commanded-attitude
-trajectory samples for maneuvered local propagation. The attitude-coupled finite-burn modes rotate thrust along instantaneous velocity or
+trajectory samples for maneuvered local propagation, plus a diagonal rigid-body torque attitude
+propagation product. The attitude-coupled finite-burn modes rotate thrust along instantaneous velocity or
 local radial directions and record body-to-inertial unit quaternion samples for the commanded body
 +X axis. Local orbital propagation annotates periapsis/apoapsis `TrajectoryEvent` records for
 deterministic mission-analysis products, using radial-velocity root location for no-maneuver local
@@ -250,7 +251,7 @@ trajectories and sample-safe extrema annotation for maneuvered trajectories. The
 `examples/scenarios/leo_eccentric_two_body.yaml` scenario exercises an interior apoapsis root
 through the public CLI; drag/SRP/third-body
 variational-equation covariance dynamics, externally validated production conjunction services, and
-torque-level attitude-control maneuver dynamics remain deferred.
+closed-loop attitude-control system dynamics remain deferred.
 
 Definition of done:
 

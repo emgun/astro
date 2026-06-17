@@ -36,11 +36,15 @@ def test_packages_import() -> None:
         "parse_iers_finals_eop",
     }
     expected_dynamics_exports = {
+        "AttitudeDynamicsResult",
+        "AttitudeDynamicsSample",
         "ConjunctionAssessmentCheck",
         "ConjunctionAssessmentReport",
         "ConjunctionScreeningResult",
         "MonteCarloCase",
         "MonteCarloResult",
+        "RigidBodyAttitudeConfig",
+        "TorqueCommand",
         "acceleration_km_s2",
         "apply_impulsive_maneuver",
         "assess_conjunction_screening",
@@ -50,6 +54,7 @@ def test_packages_import() -> None:
         "j2_acceleration_km_s2",
         "load_trajectory_oem",
         "propagate_local",
+        "propagate_rigid_body_attitude",
         "propagate_with_backend",
         "rk4_step",
         "run_initial_state_monte_carlo",

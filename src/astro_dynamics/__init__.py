@@ -1,3 +1,10 @@
+from astro_dynamics.attitude import (
+    AttitudeDynamicsResult,
+    AttitudeDynamicsSample,
+    RigidBodyAttitudeConfig,
+    TorqueCommand,
+    propagate_rigid_body_attitude,
+)
 from astro_dynamics.backends import propagate_with_backend
 from astro_dynamics.conjunction import (
     ConjunctionAssessmentCheck,
@@ -27,11 +34,15 @@ from astro_dynamics.monte_carlo import (
 )
 
 __all__ = [
-    "ConjunctionScreeningResult",
+    "AttitudeDynamicsResult",
+    "AttitudeDynamicsSample",
     "ConjunctionAssessmentCheck",
     "ConjunctionAssessmentReport",
+    "ConjunctionScreeningResult",
     "MonteCarloCase",
     "MonteCarloResult",
+    "RigidBodyAttitudeConfig",
+    "TorqueCommand",
     "acceleration_km_s2",
     "apply_impulsive_maneuver",
     "assess_conjunction_screening",
@@ -41,6 +52,7 @@ __all__ = [
     "j2_acceleration_km_s2",
     "load_trajectory_oem",
     "propagate_local",
+    "propagate_rigid_body_attitude",
     "propagate_with_backend",
     "rk4_step",
     "run_initial_state_monte_carlo",

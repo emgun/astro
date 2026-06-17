@@ -26,6 +26,7 @@ from astro_core.errors import (
 )
 from astro_core.io import load_scenario, load_trajectory
 from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario, Trajectory
+from astro_dynamics.attitude import RigidBodyAttitudeConfig, propagate_rigid_body_attitude
 from astro_dynamics.backends import propagate_with_backend
 from astro_dynamics.conjunction import (
     ConjunctionScreeningResult,
@@ -554,6 +555,27 @@ def assess_conjunction_command(
 
     _write_text_or_exit(output, report.model_dump_json(indent=2), "conjunction assessment")
     typer.echo(f"wrote conjunction assessment: {output}")
+
+
+@app.command("propagate-attitude")
+def propagate_attitude_command(
+    config_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+) -> None:
+    """Propagate a diagonal rigid-body attitude torque profile."""
+    try:
+        config_payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        config = RigidBodyAttitudeConfig.model_validate(config_payload)
+        result = propagate_rigid_body_attitude(config)
+    except OSError as exc:
+        typer.echo(f"could not read attitude config {config_path}: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    except (TypeError, ValueError, yaml.YAMLError) as exc:
+        typer.echo(f"invalid attitude config {config_path}: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "attitude dynamics")
+    typer.echo(f"wrote attitude dynamics: {output}")
 
 
 @app.command("monte-carlo")

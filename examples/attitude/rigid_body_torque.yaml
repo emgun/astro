@@ -1,0 +1,9 @@
+duration_s: 2.0
+step_s: 1.0
+inertia_kg_m2: [2.0, 3.0, 4.0]
+initial_body_to_inertial_quaternion: [1.0, 0.0, 0.0, 0.0]
+initial_angular_rate_rad_s: [0.0, 0.0, 0.0]
+torque_commands:
+  - start_s: 0.0
+    end_s: 2.1
+    torque_n_m: [0.0, 0.0, 2.0]

@@ -436,6 +436,27 @@ def test_export_trajectory_command_writes_oem(tmp_path: Path) -> None:
     assert "2026-01-01T00:00:00.000000Z 7000.0 0.0 0.0 0.0 7.5 1.0" in payload
 
 
+def test_propagate_attitude_command_writes_json(tmp_path: Path) -> None:
+    output = tmp_path / "attitude.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "propagate-attitude",
+            "examples/attitude/rigid_body_torque.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote attitude dynamics" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["sample_count"] == 3
+    assert payload["samples"][-1]["angular_rate_rad_s"] == [0.0, 0.0, 1.0]
+    assert payload["metadata"]["attitude_dynamics_model"] == "diagonal_rigid_body_torque"
+
+
 def test_export_trajectory_command_writes_aem(tmp_path: Path) -> None:
     trajectory_path = tmp_path / "trajectory.json"
     output = tmp_path / "trajectory.aem"
