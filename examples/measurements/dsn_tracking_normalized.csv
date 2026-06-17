@@ -1,0 +1,3 @@
+scenario_id,tracking_format,observable,epoch,station,spacecraft,value,sigma,units,participant_path,transmitter,media_source
+dsn-normalized-demo,odf,two_way_range,2026-01-01T00:00:00+00:00,DSS-14,demo-sat,12345.6,0.01,km,"DSS-14,demo-sat,DSS-14",,calibrated-media-example
+dsn-normalized-demo,tnf,three_way_range_rate,2026-01-01T00:01:00+00:00,DSS-43,demo-sat,-0.012,0.00001,km/s,"DSS-14,demo-sat,DSS-43",DSS-14,calibrated-media-example

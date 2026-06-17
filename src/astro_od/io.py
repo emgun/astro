@@ -154,6 +154,7 @@ SUPPORTED_TDM_DATA_KEYWORDS = frozenset(
 class MeasurementProduct:
     scenario_id: str
     measurements: list[MeasurementRecord]
+    metadata: dict[str, Any] | None = None
 
 
 TdmMetadataSignature = tuple[tuple[str, str], ...]

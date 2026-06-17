@@ -73,6 +73,7 @@ def test_packages_import() -> None:
         "generate_dsn_calibration_product_from_measurements",
         "generate_synthetic_measurements",
         "light_time_s",
+        "load_dsn_tracking_measurements",
         "load_measurements",
         "range_km",
         "range_rate_km_s",

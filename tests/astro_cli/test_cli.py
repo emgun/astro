@@ -1630,6 +1630,38 @@ def test_export_measurements_command_writes_csv(tmp_path: Path) -> None:
     )
 
 
+def test_import_dsn_tracking_command_writes_measurement_json(tmp_path: Path) -> None:
+    input_path = tmp_path / "dsn_tracking.csv"
+    output_path = tmp_path / "dsn_measurements.json"
+    input_path.write_text(
+        "\n".join(
+            [
+                "scenario_id,tracking_format,observable,epoch,station,spacecraft,value,sigma,units,participant_path",
+                "dsn-demo,odf,two_way_range,2026-01-01T00:00:00+00:00,DSS-14,demo-sat,12345.6,0.01,km,\"DSS-14,demo-sat,DSS-14\"",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "import-dsn-tracking",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote measurements" in result.stdout
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "dsn-demo"
+    assert payload["metadata"]["source_format"] == "normalized_dsn_tracking_csv"
+    assert payload["measurements"][0]["measurement_type"] == "two_way_range"
+    assert payload["measurements"][0]["metadata"]["dsn_tracking_format"] == "odf"
+
+
 def test_export_measurements_command_writes_tdm(tmp_path: Path) -> None:
     scenario = _observable_scenario()
     input_path = tmp_path / "measurements.json"

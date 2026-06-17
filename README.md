@@ -343,7 +343,9 @@ delay plus first-order TEC/frequency ionosphere group delay with per-leg elevati
 `astro dsn-calibration` turns those generated radiometric records into an auditable DSN-style media
 calibration summary product with per-record leg delays, elevation diagnostics, and aggregate delay
 statistics. This is a calibration product over the suite's supported radiometric primitives, not a
-full DSN ODF/TNF ingest or station-calibration pipeline. Angle records use degrees.
+full binary DSN ODF/TNF or station-calibration pipeline. `astro import-dsn-tracking` ingests a
+normalized CSV bridge for ODF/TNF-style DSN tracking rows into normal suite measurement JSON with
+format provenance. Angle records use degrees.
 Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
@@ -421,6 +423,9 @@ astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml 
   --measurements /tmp/astro-radiometric-weather-frequency.tdm \
   --format tdm \
   --output /tmp/astro-dsn-calibration-from-tdm.json
+
+astro import-dsn-tracking examples/measurements/dsn_tracking_normalized.csv \
+  --output /tmp/astro-dsn-tracking-measurements.json
 ```
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,

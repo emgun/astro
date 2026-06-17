@@ -34,6 +34,7 @@ Use this checklist before tagging or publishing a release candidate.
 - [ ] `astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml --backend local --output /tmp/astro-dsn-calibration.json`
 - [ ] `astro export-measurements /tmp/astro-radiometric-weather-frequency.json --format tdm --output /tmp/astro-radiometric-weather-frequency.tdm`
 - [ ] `astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml --measurements /tmp/astro-radiometric-weather-frequency.tdm --format tdm --output /tmp/astro-dsn-calibration-from-tdm.json`
+- [ ] `astro import-dsn-tracking examples/measurements/dsn_tracking_normalized.csv --output /tmp/astro-dsn-tracking-measurements.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output /tmp/astro-topocentric-measurements.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml --backend local --output /tmp/astro-geodetic-precession-nutation-measurements.json`

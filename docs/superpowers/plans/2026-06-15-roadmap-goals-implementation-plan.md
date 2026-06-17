@@ -188,7 +188,10 @@ Implemented slice:
   delays, elevation diagnostics, model/source provenance, and aggregate delay statistics. The same
   command can also build the calibration product from loaded JSON/CSV/TDM measurement files, and
   the suite TDM extension preserves the `ASTRO_*` media-correction metadata required for that
-  summary. This is not yet full DSN ODF/TNF ingest or station-calibration processing.
+  summary. `astro import-dsn-tracking` ingests normalized ODF/TNF-style DSN tracking CSV rows into
+  suite measurement JSON with source-format, tracking-format, participant-path, and transmitter
+  provenance. Native binary ODF/TNF parsing and station-calibration processing remain deeper
+  standards work.
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
   checked-in iterative two-way/three-way radiometric synthesis fixture. `leo_radiometric_media.yaml`
