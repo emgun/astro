@@ -308,6 +308,58 @@ def test_propagate_local_supports_two_body_variational_covariance_model() -> Non
     np.testing.assert_allclose(final_covariance, reference_covariance, rtol=2.0e-3, atol=1.0e-6)
 
 
+def test_propagate_local_supports_j2_variational_covariance_model() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_j2.yaml"))
+    initial_covariance = [
+        [1.0 if row == column else 0.0 for column in range(6)] for row in range(6)
+    ]
+    finite_difference_scenario = Scenario.model_validate(
+        scenario.model_dump(mode="json") | {"initial_covariance": initial_covariance}
+    )
+    variational_scenario = Scenario.model_validate(
+        scenario.model_dump(mode="json")
+        | {
+            "initial_covariance": initial_covariance,
+            "covariance_state_transition_model": "j2_variational",
+        }
+    )
+
+    finite_difference = propagate_local(finite_difference_scenario)
+    variational = propagate_local(variational_scenario)
+
+    final_transition = np.array(variational.covariance_history[-1].state_transition_matrix)
+    final_covariance = np.array(variational.covariance_history[-1].covariance)
+    reference_covariance = np.array(finite_difference.covariance_history[-1].covariance)
+    assert variational.metadata["covariance_model"] == "j2_variational"
+    assert variational.covariance_history[-1].metadata["state_transition_model"] == (
+        "j2_variational"
+    )
+    assert variational.covariance_history[-1].metadata["variational_dynamics"] == (
+        "finite_difference_j2_acceleration_jacobian"
+    )
+    assert "finite_difference_relative_step" not in variational.covariance_history[-1].metadata
+    assert not np.allclose(final_transition, np.eye(6))
+    np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-10)
+    np.testing.assert_allclose(final_covariance, reference_covariance, rtol=5.0e-3, atol=1.0e-6)
+
+
+def test_j2_variational_covariance_requires_j2_gravity() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    initial_covariance = [
+        [1.0 if row == column else 0.0 for column in range(6)] for row in range(6)
+    ]
+    variational_scenario = Scenario.model_validate(
+        scenario.model_dump(mode="json")
+        | {
+            "initial_covariance": initial_covariance,
+            "covariance_state_transition_model": "j2_variational",
+        }
+    )
+
+    with pytest.raises(ValueError, match="j2_variational covariance propagation requires j2"):
+        propagate_local(variational_scenario)
+
+
 def test_propagate_local_adds_acceleration_process_noise_to_covariance() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     initial_covariance = [[0.0 for _column in range(6)] for _row in range(6)]

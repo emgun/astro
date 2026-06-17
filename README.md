@@ -112,6 +112,7 @@ astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend loca
 astro propagate examples/scenarios/leo_radial_burn.yaml --backend local --output radial_burn_trajectory.json
 astro propagate examples/scenarios/leo_covariance.yaml --backend local --output covariance_trajectory.json
 astro propagate examples/scenarios/leo_variational_covariance.yaml --backend local --output variational_covariance_trajectory.json
+astro propagate examples/scenarios/leo_j2_variational_covariance.yaml --backend local --output j2_variational_covariance_trajectory.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
 astro propagate examples/scenarios/leo_j2.yaml --backend orekit --output orekit_j2_trajectory.json
 astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend orekit --output orekit_high_fidelity_trajectory.json
@@ -189,8 +190,10 @@ Local covariance propagation accepts an optional `initial_covariance` and
 `covariance_process_noise_acceleration_km_s2`. The default `covariance_state_transition_model` is
 `finite_difference`, preserving the existing force-model and maneuver compatibility. Two-body
 scenarios without maneuvers may opt into `two_body_variational`, which integrates the state
-transition matrix with the analytic two-body acceleration Jacobian and stores per-step plus
-accumulated state-transition matrices in the trajectory product.
+transition matrix with the analytic two-body acceleration Jacobian. J2 scenarios without maneuvers
+may opt into `j2_variational`, which integrates the state transition matrix with a finite-difference
+J2 acceleration Jacobian. Both variational paths store per-step plus accumulated state-transition
+matrices in the trajectory product.
 
 Local orbital propagation accepts an optional `maneuvers` schedule on `Scenario`. Impulsive
 maneuvers apply their full `delta_v_km_s` at the maneuver epoch; finite burns apply the configured
@@ -215,7 +218,7 @@ epoch, the `process_noise_covariance` applied for that step, and metadata naming
 size. The optional `covariance_process_noise_acceleration_km_s2` field adds a simple per-axis
 white-acceleration process-noise term over each propagation sample interval. This is useful for
 product wiring and first-order sensitivity screening; analytic variational-equation covariance
-dynamics and production conjunction analysis remain future work.
+dynamics, drag/SRP variational equations, and production conjunction analysis remain future work.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage

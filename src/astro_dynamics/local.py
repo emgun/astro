@@ -642,38 +642,95 @@ def two_body_acceleration_jacobian(position_km: FloatArray) -> FloatArray:
     )
 
 
-def _two_body_variational_derivative(augmented_state: FloatArray) -> FloatArray:
+def _finite_difference_acceleration_jacobian(
+    position_km: FloatArray,
+    force_model: ForceModelName,
+) -> FloatArray:
+    jacobian = np.zeros((3, 3), dtype=np.float64)
+    for column in range(3):
+        step = max(
+            abs(float(position_km[column])) * _COVARIANCE_FD_REL_STEP,
+            _COVARIANCE_FD_ABS_STEP,
+        )
+        perturbation = np.zeros(3, dtype=np.float64)
+        perturbation[column] = step
+        plus = acceleration_km_s2(position_km + perturbation, force_model)
+        minus = acceleration_km_s2(position_km - perturbation, force_model)
+        jacobian[:, column] = (plus - minus) / (2.0 * step)
+    return cast(FloatArray, jacobian)
+
+
+def _variational_acceleration_jacobian(
+    position_km: FloatArray,
+    covariance_transition_model: str,
+) -> FloatArray:
+    if covariance_transition_model == "two_body_variational":
+        return two_body_acceleration_jacobian(position_km)
+    if covariance_transition_model == "j2_variational":
+        return _finite_difference_acceleration_jacobian(position_km, ForceModelName.J2)
+    raise ValueError(f"Unsupported variational covariance model: {covariance_transition_model}")
+
+
+def _variational_force_model(covariance_transition_model: str) -> ForceModelName:
+    if covariance_transition_model == "two_body_variational":
+        return ForceModelName.TWO_BODY
+    if covariance_transition_model == "j2_variational":
+        return ForceModelName.J2
+    raise ValueError(f"Unsupported variational covariance model: {covariance_transition_model}")
+
+
+def _variational_derivative(
+    augmented_state: FloatArray,
+    covariance_transition_model: str,
+) -> FloatArray:
     state = augmented_state[:6]
     transition = augmented_state[6:].reshape((6, 6))
     dynamics_jacobian = np.zeros((6, 6), dtype=np.float64)
     dynamics_jacobian[:3, 3:] = np.eye(3, dtype=np.float64)
-    dynamics_jacobian[3:, :3] = two_body_acceleration_jacobian(state[:3])
+    dynamics_jacobian[3:, :3] = _variational_acceleration_jacobian(
+        state[:3],
+        covariance_transition_model,
+    )
     transition_derivative = dynamics_jacobian @ transition
     return cast(
         FloatArray,
         np.concatenate(
             [
-                derivative(state, ForceModelName.TWO_BODY),
+                derivative(state, _variational_force_model(covariance_transition_model)),
                 transition_derivative.reshape(36),
             ]
         ),
     )
 
 
-def _rk4_variational_step_once(augmented_state: FloatArray, step_s: float) -> FloatArray:
-    k1 = _two_body_variational_derivative(augmented_state)
-    k2 = _two_body_variational_derivative(augmented_state + 0.5 * step_s * k1)
-    k3 = _two_body_variational_derivative(augmented_state + 0.5 * step_s * k2)
-    k4 = _two_body_variational_derivative(augmented_state + step_s * k3)
+def _rk4_variational_step_once(
+    augmented_state: FloatArray,
+    step_s: float,
+    covariance_transition_model: str,
+) -> FloatArray:
+    k1 = _variational_derivative(augmented_state, covariance_transition_model)
+    k2 = _variational_derivative(
+        augmented_state + 0.5 * step_s * k1,
+        covariance_transition_model,
+    )
+    k3 = _variational_derivative(
+        augmented_state + 0.5 * step_s * k2,
+        covariance_transition_model,
+    )
+    k4 = _variational_derivative(
+        augmented_state + step_s * k3,
+        covariance_transition_model,
+    )
     return cast(
         FloatArray,
         augmented_state + (step_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4),
     )
 
 
-def _two_body_variational_step(
+def _variational_step(
     state: FloatArray,
     step_s: float,
+    covariance_transition_model: str,
 ) -> tuple[FloatArray, FloatArray]:
     substep_count, substep_s = _internal_step_schedule(step_s)
     augmented_state = cast(
@@ -681,7 +738,11 @@ def _two_body_variational_step(
         np.concatenate([state, np.eye(6, dtype=np.float64).reshape(36)]),
     )
     for _ in range(substep_count):
-        augmented_state = _rk4_variational_step_once(augmented_state, substep_s)
+        augmented_state = _rk4_variational_step_once(
+            augmented_state,
+            substep_s,
+            covariance_transition_model,
+        )
     return augmented_state[:6], cast(FloatArray, augmented_state[6:].reshape((6, 6)))
 
 
@@ -722,14 +783,14 @@ def _covariance_transition_model(
     model = scenario.covariance_state_transition_model
     if covariance is None or model == "finite_difference":
         return model
-    if force_model is not ForceModelName.TWO_BODY:
+    if model == "two_body_variational" and force_model is not ForceModelName.TWO_BODY:
         raise ValueError(
             "two_body_variational covariance propagation requires two_body gravity"
         )
+    if model == "j2_variational" and force_model is not ForceModelName.J2:
+        raise ValueError("j2_variational covariance propagation requires j2 gravity")
     if maneuver_schedule:
-        raise ValueError(
-            "two_body_variational covariance propagation does not support maneuvers"
-        )
+        raise ValueError(f"{model} covariance propagation does not support maneuvers")
     return model
 
 
@@ -737,6 +798,14 @@ def _covariance_product_model(covariance_transition_model: str) -> str:
     if covariance_transition_model == "finite_difference":
         return "finite_difference_state_transition"
     return covariance_transition_model
+
+
+def _covariance_variational_dynamics(covariance_transition_model: str) -> str:
+    if covariance_transition_model == "two_body_variational":
+        return "two_body_acceleration_jacobian"
+    if covariance_transition_model == "j2_variational":
+        return "finite_difference_j2_acceleration_jacobian"
+    raise ValueError(f"Unsupported variational covariance model: {covariance_transition_model}")
 
 
 def _covariance_metadata(
@@ -761,7 +830,9 @@ def _covariance_metadata(
         }
     else:
         metadata |= {
-            "covariance_variational_dynamics": "two_body_acceleration_jacobian",
+            "covariance_variational_dynamics": _covariance_variational_dynamics(
+                covariance_transition_model
+            ),
         }
     return metadata
 
@@ -798,7 +869,9 @@ def _covariance_sample_metadata(
         }
     else:
         metadata |= {
-            "variational_dynamics": "two_body_acceleration_jacobian",
+            "variational_dynamics": _covariance_variational_dynamics(
+                covariance_transition_model
+            ),
         }
     return metadata
 
@@ -910,10 +983,14 @@ def propagate_local(scenario: Scenario) -> Trajectory:
                 )
             else:
                 if covariance_matrix is not None:
-                    if covariance_transition_model == "two_body_variational":
-                        state, transition = _two_body_variational_step(
+                    if covariance_transition_model in {
+                        "two_body_variational",
+                        "j2_variational",
+                    }:
+                        state, transition = _variational_step(
                             state,
                             scenario.propagation.step_s,
+                            covariance_transition_model,
                         )
                     else:
                         transition = _finite_difference_state_transition(

@@ -954,6 +954,7 @@ class Scenario(AstroModel):
     covariance_state_transition_model: Literal[
         "finite_difference",
         "two_body_variational",
+        "j2_variational",
     ] = "finite_difference"
     ground_stations: list[GroundStation] = Field(default_factory=list)
     measurements: MeasurementConfig = Field(default_factory=MeasurementConfig)
