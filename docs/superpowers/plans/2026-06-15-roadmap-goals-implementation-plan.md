@@ -37,39 +37,39 @@ Implemented and protected:
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
   propagation, plus finite-difference and opt-in two-body/J2 variational local covariance
   propagation with optional acceleration process noise, explicit per-sample
-  state-transition/process-noise covariance products, commanded-attitude trajectory samples, and
-  velocity-aligned/radial attitude-coupled thrust-vector burn modes.
+  state-transition/process-noise covariance products, commanded-attitude trajectory samples,
+  velocity-aligned/radial attitude-coupled thrust-vector burn modes, time-aligned conjunction
+  screening assessment reports, and diagonal rigid-body torque attitude propagation products.
 - `astro_od` synthetic range/range-rate/one-way Doppler/iterative linearized two-way and three-way
   range/range-rate/right-ascension/declination/azimuth/elevation generation, measurement JSON/CSV
   ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy batch least-squares OD.
 - `astro_launch` local vertical and pitch-program ascent baselines, launch-to-orbit handoff, pitch sweep, two-knot tuning, tuned launch reports, batch ranking, and report comparison.
 - `astro_backends.orekit` optional `orekit_jpype` smoke gate, two-body Orekit propagation adapter,
-  J2 numerical propagation through `J2OnlyPerturbation`, Orekit drag/SRP/Sun-Moon third-body
-  force-model adapters, and a live-gated native Orekit OD bridge for geodetic range/range-rate
-  records.
+  J2 numerical propagation through `J2OnlyPerturbation`, configured high-order gravity through
+  `HolmesFeatherstoneAttractionModel`, Orekit drag/SRP/Sun-Moon third-body force-model adapters,
+  and a live-gated native Orekit OD bridge for geodetic range/range-rate records.
 - Optional RocketPy and Dymos/OpenMDAO launch backend gates, including configured RocketPy direct
   flight mapping and a stage-aware Dymos vertical-ascent phase transcription.
 - Optional Tudat native two-body, J2 spherical-harmonic, configured high-order Earth spherical
   harmonic, atmospheric drag, cannonball SRP, and Sun/Moon point-mass third-body propagation
   cross-check runners, plus suite finite-difference covariance-history products through the
-  selected Tudat force model and a Tudat-vs-reference calibrated comparison product.
+  selected Tudat force model, a Tudat-vs-reference calibrated comparison product, and
+  multi-scenario Tudat comparison campaigns.
 
 Still roadmap-level:
 
 - Higher-fidelity variational covariance propagation for drag/SRP/third-body dynamics and
-  torque-level attitude-control maneuver dynamics.
+  closed-loop attitude-control system dynamics.
 - Full native multi-motor RocketPy staging and full pitch-program multistage Dymos ascent
   optimization.
-- Broader Tudat calibrated live force-model comparison campaigns beyond the current
-  Tudat-vs-reference comparison product and native two-body, J2, configured high-order gravity,
-  drag, SRP, and Sun/Moon point-mass third-body cross-check runners. Native Tudat
-  variational-equation covariance propagation remains deferred; current Tudat covariance uses the
-  suite finite-difference transition product.
+- Native Tudat variational-equation covariance propagation remains deferred; current Tudat
+  covariance uses the suite finite-difference transition product.
 - Full standards-grade precession-nutation reductions beyond the current compact
-  `iau_2006_2000a_simplified` geodetic-station option, DSN calibration products beyond the current
-  configurable weather/frequency media primitives, and operational CCSDS support beyond current KVN
-  TDM measurement families, suite multi-leg radiometric TDM extension, OEM ephemeris interchange,
-  and AEM quaternion attitude export.
+  `iau_2006_2000a_simplified` geodetic-station option, native binary DSN ODF/TNF parsing beyond
+  the normalized tracking ingest bridge, station-calibration processing beyond the current
+  calibration summary product, and operational CCSDS support beyond current KVN TDM measurement
+  families, suite multi-leg radiometric TDM extension, OEM ephemeris interchange, and AEM
+  quaternion attitude export.
 - Richer JAX high-fidelity force models and full differentiable OD estimator workflows.
 
 ## Goal Ledger

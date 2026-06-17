@@ -129,6 +129,14 @@ def test_load_orekit_high_fidelity_covariance_example() -> None:
     assert scenario.covariance_process_noise_acceleration_km_s2 > 0.0
 
 
+def test_load_orekit_high_order_gravity_example() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_orekit_high_order_gravity.yaml"))
+
+    assert scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+    assert scenario.force_model.gravity_degree == 8
+    assert scenario.force_model.gravity_order == 8
+
+
 def test_propagate_orekit_j2_uses_numerical_force_model_with_fake_runtime() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
         update={"force_model": ForceModelConfig(gravity=ForceModelName.J2)}
@@ -180,7 +188,7 @@ def test_propagate_orekit_high_fidelity_uses_numerical_force_model_with_fake_run
     assert trajectory.metadata["unsupported_force_model_flags"] == []
 
 
-def test_propagate_orekit_rejects_high_order_gravity_shape() -> None:
+def test_propagate_orekit_high_order_gravity_uses_spherical_harmonics() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
         update={
             "force_model": ForceModelConfig(
@@ -191,8 +199,13 @@ def test_propagate_orekit_rejects_high_order_gravity_shape() -> None:
         }
     )
 
-    with pytest.raises(UnsupportedBackendError, match="high-order gravity"):
-        propagate_orekit(scenario, runtime_loader=_fake_runtime)
+    trajectory = propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.metadata["force_models"] == ["HolmesFeatherstoneAttractionModel(8x8)"]
+    assert trajectory.metadata["gravity_model"] == "orekit_high_fidelity"
+    assert trajectory.metadata["gravity_provider"] == "GravityFieldFactory.getNormalizedProvider"
+    assert trajectory.metadata["gravity_degree"] == 8
+    assert trajectory.metadata["gravity_order"] == 8
 
 
 def test_propagate_orekit_high_fidelity_drag_adds_drag_force_with_fake_runtime() -> None:
@@ -482,6 +495,24 @@ class _FakeJ2OnlyPerturbation:
         self.radius = radius
         self.j2 = j2
         self.frame = frame
+
+
+class _FakeHolmesFeatherstoneAttractionModel:
+    def __init__(self, frame: str, provider: "_FakeNormalizedGravityProvider") -> None:
+        self.frame = frame
+        self.provider = provider
+
+
+class _FakeNormalizedGravityProvider:
+    def __init__(self, degree: int, order: int) -> None:
+        self.degree = degree
+        self.order = order
+
+
+class _FakeGravityFieldFactory:
+    @staticmethod
+    def getNormalizedProvider(degree: int, order: int) -> _FakeNormalizedGravityProvider:
+        return _FakeNormalizedGravityProvider(degree, order)
 
 
 class _FakeOneAxisEllipsoid:
@@ -793,6 +824,8 @@ def _fake_runtime() -> OrekitRuntime:
         dormand_prince_853_integrator=_FakeDormandPrince853Integrator,
         dormand_prince_853_integrator_builder=_FakeDormandPrince853IntegratorBuilder,
         j2_only_perturbation=_FakeJ2OnlyPerturbation,
+        holmes_featherstone_attraction_model=_FakeHolmesFeatherstoneAttractionModel,
+        gravity_field_factory=_FakeGravityFieldFactory,
         third_body_attraction=_FakeThirdBodyAttraction,
         one_axis_ellipsoid=_FakeOneAxisEllipsoid,
         geodetic_point=_FakeGeodeticPoint,

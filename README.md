@@ -135,6 +135,7 @@ astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend oreki
 astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --output orekit_drag_trajectory.json
 astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output orekit_srp_trajectory.json
 astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output orekit_third_body_trajectory.json
+astro propagate examples/scenarios/leo_orekit_high_order_gravity.yaml --backend orekit --output orekit_high_order_gravity.json
 astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend orekit --output orekit_high_fidelity_covariance.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend tudat --output tudat_two_body_trajectory.json
 astro propagate examples/scenarios/leo_j2.yaml --backend tudat --output tudat_j2_trajectory.json

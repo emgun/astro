@@ -57,7 +57,10 @@ def _fake_runtime_modules(
     conversion_module.DormandPrince853IntegratorBuilder = object()
     gravity_module = ModuleType("org.orekit.forces.gravity")
     gravity_module.J2OnlyPerturbation = object()
+    gravity_module.HolmesFeatherstoneAttractionModel = object()
     gravity_module.ThirdBodyAttraction = object()
+    gravity_potential_module = ModuleType("org.orekit.forces.gravity.potential")
+    gravity_potential_module.GravityFieldFactory = object()
     bodies_module = ModuleType("org.orekit.bodies")
     bodies_module.OneAxisEllipsoid = object()
     bodies_module.CelestialBodyFactory = object()
@@ -96,6 +99,7 @@ def _fake_runtime_modules(
         "org.orekit.propagation.numerical": numerical_module,
         "org.orekit.propagation.conversion": conversion_module,
         "org.orekit.forces.gravity": gravity_module,
+        "org.orekit.forces.gravity.potential": gravity_potential_module,
         "org.orekit.bodies": bodies_module,
         "org.orekit.models.earth.atmosphere": atmosphere_module,
         "org.orekit.forces.drag": drag_module,

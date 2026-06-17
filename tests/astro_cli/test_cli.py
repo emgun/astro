@@ -1816,6 +1816,47 @@ def test_propagate_command_writes_orekit_json(
     assert payload["backend"] == "orekit"
 
 
+def test_propagate_command_accepts_orekit_high_order_gravity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "orekit-high-order.json"
+
+    def fake_backend(scenario: Scenario, backend: str) -> object:
+        assert backend == "orekit"
+        assert scenario.force_model.gravity_degree == 8
+        assert scenario.force_model.gravity_order == 8
+        trajectory = propagate_local(load_scenario(Path("examples/scenarios/leo_two_body.yaml")))
+        return trajectory.model_copy(
+            update={
+                "backend": "orekit",
+                "metadata": {
+                    **trajectory.metadata,
+                    "force_models": ["HolmesFeatherstoneAttractionModel(8x8)"],
+                },
+            }
+        )
+
+    monkeypatch.setattr("astro_cli.main.propagate_with_backend", fake_backend)
+
+    result = runner.invoke(
+        app,
+        [
+            "propagate",
+            "examples/scenarios/leo_orekit_high_order_gravity.yaml",
+            "--backend",
+            "orekit",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["backend"] == "orekit"
+    assert payload["metadata"]["force_models"] == ["HolmesFeatherstoneAttractionModel(8x8)"]
+
+
 def test_propagate_command_accepts_tudat_backend(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

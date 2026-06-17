@@ -61,14 +61,6 @@ def _validate_orekit_scenario(scenario: Scenario) -> None:
         raise UnsupportedBackendError(
             "Orekit propagation supports two_body, j2, and orekit_high_fidelity gravity"
         )
-    if (
-        scenario.force_model.gravity_degree is not None
-        or scenario.force_model.gravity_order is not None
-    ) and scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY:
-        raise UnsupportedBackendError(
-            "Orekit propagation does not yet support configured high-order gravity; "
-            "use the Tudat backend for spherical harmonic degree/order propagation"
-        )
 
 
 def _initial_orbit(scenario: Scenario, runtime: OrekitRuntime, frame: Any) -> Any:
@@ -152,16 +144,42 @@ def _build_j2_numerical_propagator(
 
     j2_frame = runtime.frames_factory.getITRF(runtime.iers_conventions.IERS_2010, True)
     earth_shape = build_earth_shape(runtime, j2_frame)
-    force_model_names = ["J2OnlyPerturbation"]
+    force_model_names: list[str] = []
     force_model_metadata: dict[str, object] = {}
-    propagator.addForceModel(
-        runtime.j2_only_perturbation(
-            MU_EARTH_M3_S2,
-            R_EARTH_M,
-            J2_EARTH,
-            j2_frame,
+    if (
+        scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+        and scenario.force_model.gravity_degree is not None
+        and scenario.force_model.gravity_order is not None
+    ):
+        gravity_provider = runtime.gravity_field_factory.getNormalizedProvider(
+            scenario.force_model.gravity_degree,
+            scenario.force_model.gravity_order,
         )
-    )
+        propagator.addForceModel(
+            runtime.holmes_featherstone_attraction_model(j2_frame, gravity_provider)
+        )
+        force_model_names.append(
+            "HolmesFeatherstoneAttractionModel"
+            f"({scenario.force_model.gravity_degree}x{scenario.force_model.gravity_order})"
+        )
+        force_model_metadata.update(
+            {
+                "gravity_model": "orekit_high_fidelity",
+                "gravity_provider": "GravityFieldFactory.getNormalizedProvider",
+                "gravity_degree": scenario.force_model.gravity_degree,
+                "gravity_order": scenario.force_model.gravity_order,
+            }
+        )
+    else:
+        propagator.addForceModel(
+            runtime.j2_only_perturbation(
+                MU_EARTH_M3_S2,
+                R_EARTH_M,
+                J2_EARTH,
+                j2_frame,
+            )
+        )
+        force_model_names.append("J2OnlyPerturbation")
     if scenario.force_model.atmospheric_drag:
         drag_force_model = build_atmospheric_drag_force_model(scenario, runtime, earth_shape)
         propagator.addForceModel(drag_force_model.model)

@@ -41,6 +41,8 @@ class OrekitRuntime:
     dormand_prince_853_integrator: Any
     dormand_prince_853_integrator_builder: Any
     j2_only_perturbation: Any
+    holmes_featherstone_attraction_model: Any
+    gravity_field_factory: Any
     third_body_attraction: Any
     one_axis_ellipsoid: Any
     geodetic_point: Any
@@ -134,6 +136,7 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
         numerical_module = import_module("org.orekit.propagation.numerical")
         conversion_module = import_module("org.orekit.propagation.conversion")
         gravity_module = import_module("org.orekit.forces.gravity")
+        gravity_potential_module = import_module("org.orekit.forces.gravity.potential")
         bodies_module = import_module("org.orekit.bodies")
         atmosphere_module = import_module("org.orekit.models.earth.atmosphere")
         drag_module = import_module("org.orekit.forces.drag")
@@ -171,6 +174,10 @@ def load_orekit_runtime(*, strict: bool = False) -> OrekitRuntime:
             conversion_module.DormandPrince853IntegratorBuilder
         ),
         j2_only_perturbation=gravity_module.J2OnlyPerturbation,
+        holmes_featherstone_attraction_model=(
+            gravity_module.HolmesFeatherstoneAttractionModel
+        ),
+        gravity_field_factory=gravity_potential_module.GravityFieldFactory,
         third_body_attraction=gravity_module.ThirdBodyAttraction,
         one_axis_ellipsoid=bodies_module.OneAxisEllipsoid,
         geodetic_point=bodies_module.GeodeticPoint,
