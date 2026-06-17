@@ -515,6 +515,34 @@ def test_generate_synthetic_measurements_applies_scenario_earth_orientation() ->
     assert oriented_scenario.earth_orientation.source == "unit-test-eop"
 
 
+def test_generate_synthetic_measurements_applies_precession_nutation_reduction() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    geodetic_station = GroundStation(
+        name="equator-geodetic",
+        latitude_deg=0.0,
+        longitude_deg=0.0,
+        altitude_km=0.0,
+        frame=Frame.EME2000,
+        elevation_mask_deg=0.0,
+    )
+    geodetic_scenario = scenario.model_copy(update={"ground_stations": [geodetic_station]})
+    reduced_scenario = geodetic_scenario.model_copy(
+        update={
+            "earth_orientation": EarthOrientationConfig(
+                precession_nutation_model="iau_2006_2000a_simplified",
+                source="unit-test-precession-nutation",
+            )
+        }
+    )
+    trajectory = propagate_local(geodetic_scenario)
+
+    default_records = generate_synthetic_measurements(geodetic_scenario, trajectory)
+    reduced_records = generate_synthetic_measurements(reduced_scenario, trajectory)
+
+    assert default_records[0].metadata["truth"] != reduced_records[0].metadata["truth"]
+    assert reduced_scenario.earth_orientation.source == "unit-test-precession-nutation"
+
+
 def test_generate_synthetic_measurements_interpolates_earth_orientation_table() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     geodetic_station = GroundStation(

@@ -288,6 +288,7 @@ class EarthOrientationConfig(AstroModel):
     ut1_minus_utc_s: FiniteFloat = 0.0
     polar_motion_x_arcsec: FiniteFloat = 0.0
     polar_motion_y_arcsec: FiniteFloat = 0.0
+    precession_nutation_model: Literal["none", "iau_2006_2000a_simplified"] = "none"
     source: str = "zero"
     samples: tuple[EarthOrientationSample, ...] = ()
 
@@ -346,6 +347,7 @@ class EarthOrientationConfig(AstroModel):
                         following.polar_motion_y_arcsec,
                         fraction,
                     ),
+                    precession_nutation_model=self.precession_nutation_model,
                     source=f"{self.source}:interpolated",
                 )
 
@@ -363,6 +365,7 @@ class EarthOrientationConfig(AstroModel):
             ut1_minus_utc_s=sample.ut1_minus_utc_s,
             polar_motion_x_arcsec=sample.polar_motion_x_arcsec,
             polar_motion_y_arcsec=sample.polar_motion_y_arcsec,
+            precession_nutation_model=self.precession_nutation_model,
             source=source,
         )
 
@@ -487,7 +490,7 @@ def _ecef_to_eci(
     cos_angle = cos(earth_rotation_angle_rad)
     sin_angle = sin(earth_rotation_angle_rad)
     x_km, y_km, z_km = polar_corrected_km
-    return np.array(
+    earth_rotated_km = np.array(
         (
             cos_angle * x_km - sin_angle * y_km,
             sin_angle * x_km + cos_angle * y_km,
@@ -495,6 +498,7 @@ def _ecef_to_eci(
         ),
         dtype=np.float64,
     )
+    return _apply_precession_nutation(earth_rotated_km, epoch, earth_orientation)
 
 
 def _apply_polar_motion(
@@ -529,11 +533,114 @@ def _apply_polar_motion(
     )
 
 
+def _apply_precession_nutation(
+    position_eci_km: NDArray[np.float64],
+    epoch: datetime,
+    earth_orientation: EarthOrientationConfig,
+) -> NDArray[np.float64]:
+    if earth_orientation.precession_nutation_model == "none":
+        return position_eci_km
+
+    julian_date = _earth_orientation_julian_date(
+        epoch,
+        ut1_minus_utc_s=earth_orientation.ut1_minus_utc_s,
+    )
+    centuries_since_j2000 = (julian_date - J2000_JULIAN_DATE) / 36525.0
+    precessed_km = _apply_simplified_precession(position_eci_km, centuries_since_j2000)
+    return _apply_simplified_nutation(precessed_km, centuries_since_j2000)
+
+
+def _apply_simplified_precession(
+    position_eci_km: NDArray[np.float64],
+    centuries_since_j2000: float,
+) -> NDArray[np.float64]:
+    arcsec_to_rad = radians(1.0 / 3600.0)
+    t = centuries_since_j2000
+    zeta_rad = (2306.2181 * t + 0.30188 * t**2 + 0.017998 * t**3) * arcsec_to_rad
+    theta_rad = (2004.3109 * t - 0.42665 * t**2 - 0.041833 * t**3) * arcsec_to_rad
+    z_rad = (2306.2181 * t + 1.09468 * t**2 + 0.018203 * t**3) * arcsec_to_rad
+    return _rotate_z(_rotate_y(_rotate_z(position_eci_km, zeta_rad), -theta_rad), z_rad)
+
+
+def _apply_simplified_nutation(
+    position_eci_km: NDArray[np.float64],
+    centuries_since_j2000: float,
+) -> NDArray[np.float64]:
+    arcsec_to_rad = radians(1.0 / 3600.0)
+    t = centuries_since_j2000
+    mean_sun_longitude_rad = radians((280.4665 + 36000.7698 * t) % 360.0)
+    mean_moon_longitude_rad = radians((218.3165 + 481267.8813 * t) % 360.0)
+    ascending_node_rad = radians((125.04452 - 1934.136261 * t) % 360.0)
+    delta_psi_rad = (
+        -17.20 * sin(ascending_node_rad)
+        - 1.32 * sin(2.0 * mean_sun_longitude_rad)
+        - 0.23 * sin(2.0 * mean_moon_longitude_rad)
+        + 0.21 * sin(2.0 * ascending_node_rad)
+    ) * arcsec_to_rad
+    delta_epsilon_rad = (
+        9.20 * cos(ascending_node_rad)
+        + 0.57 * cos(2.0 * mean_sun_longitude_rad)
+        + 0.10 * cos(2.0 * mean_moon_longitude_rad)
+        - 0.09 * cos(2.0 * ascending_node_rad)
+    ) * arcsec_to_rad
+    mean_obliquity_rad = (
+        84381.406
+        - 46.836769 * t
+        - 0.0001831 * t**2
+        + 0.00200340 * t**3
+        - 5.76e-7 * t**4
+        - 4.34e-8 * t**5
+    ) * arcsec_to_rad
+    return _rotate_x(
+        _rotate_z(_rotate_x(position_eci_km, mean_obliquity_rad), -delta_psi_rad),
+        -(mean_obliquity_rad + delta_epsilon_rad),
+    )
+
+
+def _rotate_x(position_km: NDArray[np.float64], angle_rad: float) -> NDArray[np.float64]:
+    x_km, y_km, z_km = position_km
+    cos_angle = cos(angle_rad)
+    sin_angle = sin(angle_rad)
+    return np.array(
+        (
+            x_km,
+            cos_angle * y_km - sin_angle * z_km,
+            sin_angle * y_km + cos_angle * z_km,
+        ),
+        dtype=np.float64,
+    )
+
+
+def _rotate_y(position_km: NDArray[np.float64], angle_rad: float) -> NDArray[np.float64]:
+    x_km, y_km, z_km = position_km
+    cos_angle = cos(angle_rad)
+    sin_angle = sin(angle_rad)
+    return np.array(
+        (
+            cos_angle * x_km + sin_angle * z_km,
+            y_km,
+            -sin_angle * x_km + cos_angle * z_km,
+        ),
+        dtype=np.float64,
+    )
+
+
+def _rotate_z(position_km: NDArray[np.float64], angle_rad: float) -> NDArray[np.float64]:
+    x_km, y_km, z_km = position_km
+    cos_angle = cos(angle_rad)
+    sin_angle = sin(angle_rad)
+    return np.array(
+        (
+            cos_angle * x_km - sin_angle * y_km,
+            sin_angle * x_km + cos_angle * y_km,
+            z_km,
+        ),
+        dtype=np.float64,
+    )
+
+
 def _greenwich_sidereal_angle_rad(epoch: datetime, *, ut1_minus_utc_s: float = 0.0) -> float:
-    epoch_utc = epoch.astimezone(UTC)
-    julian_date = (
-        epoch_utc.timestamp() + ut1_minus_utc_s
-    ) / SECONDS_PER_DAY + UNIX_EPOCH_JULIAN_DATE
+    julian_date = _earth_orientation_julian_date(epoch, ut1_minus_utc_s=ut1_minus_utc_s)
     centuries_since_j2000 = (julian_date - J2000_JULIAN_DATE) / 36525.0
     sidereal_degrees = (
         280.46061837
@@ -542,6 +649,11 @@ def _greenwich_sidereal_angle_rad(epoch: datetime, *, ut1_minus_utc_s: float = 0
         - centuries_since_j2000**3 / 38710000.0
     )
     return radians(sidereal_degrees % 360.0)
+
+
+def _earth_orientation_julian_date(epoch: datetime, *, ut1_minus_utc_s: float = 0.0) -> float:
+    epoch_utc = epoch.astimezone(UTC)
+    return (epoch_utc.timestamp() + ut1_minus_utc_s) / SECONDS_PER_DAY + UNIX_EPOCH_JULIAN_DATE
 
 
 class MeasurementNoise(AstroModel):

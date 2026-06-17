@@ -27,9 +27,10 @@ Implemented and protected:
 
 - Core package scaffold, CLI entrypoint, strict typing, linting, and tests.
 - `astro_core` scenario, state, spacecraft, force model, ECI and WGS-84 geodetic ground station,
-  fixed and tabulated-interpolation Earth-orientation correction, measurement, trajectory, and
-  estimate products, plus IERS finals/finals2000A-style Earth-orientation ingest for UT1-UTC and
-  polar motion samples.
+  fixed and tabulated-interpolation Earth-orientation correction, compact
+  `iau_2006_2000a_simplified` precession/nutation reduction for geodetic station transforms,
+  measurement, trajectory, and estimate products, plus IERS finals/finals2000A-style
+  Earth-orientation ingest for UT1-UTC and polar motion samples.
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV export, CCSDS
   OEM ephemeris export/import, and CCSDS AEM quaternion attitude export,
@@ -64,10 +65,11 @@ Still roadmap-level:
   drag, SRP, and Sun/Moon point-mass third-body cross-check runners. Native Tudat
   variational-equation covariance propagation remains deferred; current Tudat covariance uses the
   suite finite-difference transition product.
-- Full precession-nutation reductions, DSN calibration products beyond the current configurable
-  weather/frequency media primitives, and operational CCSDS support beyond current KVN TDM
-  measurement families, suite multi-leg radiometric TDM extension, OEM ephemeris interchange, and
-  AEM quaternion attitude export.
+- Full standards-grade precession-nutation reductions beyond the current compact
+  `iau_2006_2000a_simplified` geodetic-station option, DSN calibration products beyond the current
+  configurable weather/frequency media primitives, and operational CCSDS support beyond current KVN
+  TDM measurement families, suite multi-leg radiometric TDM extension, OEM ephemeris interchange,
+  and AEM quaternion attitude export.
 - Richer JAX high-fidelity force models and full differentiable OD estimator workflows.
 
 ## Goal Ledger
@@ -194,9 +196,10 @@ Implemented slice:
   `latitude_deg`/`longitude_deg`/`altitude_km` definitions, with geodetic stations rotated into
   inertial measurement geometry at each measurement epoch using a deterministic UTC sidereal-time
   model, scenario-provided fixed Earth-orientation corrections, or linearly interpolated tabulated
-  Earth-orientation samples for UT1-UTC and polar motion. `astro import-earth-orientation
-  --format iers-finals` converts IERS finals/finals2000A-style rows into suite
-  `EarthOrientationConfig` JSON for those tabulated samples.
+  Earth-orientation samples for UT1-UTC and polar motion. Scenarios can opt into compact
+  `iau_2006_2000a_simplified` precession/nutation for geodetic station reduction, and
+  `astro import-earth-orientation --format iers-finals` converts IERS finals/finals2000A-style rows
+  into suite `EarthOrientationConfig` JSON for tabulated samples.
 - OD metadata records the selected propagation backend, estimator settings, residual statistics,
   convergence diagnostics, validation trajectory backend, and Orekit wrapper/version/data/propagator
   provenance when Orekit propagation metadata is available.

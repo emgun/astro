@@ -170,6 +170,7 @@ astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --b
 astro synth-measurements examples/scenarios/leo_geodetic_topocentric.yaml --backend local --output geodetic_topocentric_measurements.json
 astro synth-measurements examples/scenarios/leo_geodetic_eop_topocentric.yaml --backend local --output geodetic_eop_topocentric_measurements.json
 astro synth-measurements examples/scenarios/leo_geodetic_eop_table_topocentric.yaml --backend local --output geodetic_eop_table_topocentric_measurements.json
+astro synth-measurements examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml --backend local --output geodetic_precession_nutation_measurements.json
 astro synth-measurements examples/scenarios/leo_doppler.yaml --backend local --output doppler_measurements.json
 astro export-measurements measurements.json --format csv --output measurements.csv
 astro export-measurements measurements.json --format tdm --output measurements.tdm
@@ -336,10 +337,12 @@ epoch using a deterministic UTC sidereal-time model by default. Scenarios may al
 `earth_orientation` values with `ut1_minus_utc_s`, `polar_motion_x_arcsec`,
 `polar_motion_y_arcsec`, and a `source` label, or a `samples` table with timestamped values that
 are linearly interpolated per measurement epoch. These values drive an approximate EOP-aware
-Earth-fixed to inertial correction for geodetic station pointing. This supports explicit fixed EOP
-values, simple tabulated interpolation, and `astro import-earth-orientation --format iers-finals`
-conversion from IERS finals/finals2000A-style rows into suite Earth-orientation JSON. It is not a
-full precession/nutation reduction. JSON inputs
+Earth-fixed to inertial correction for geodetic station pointing. Scenarios can also set
+`precession_nutation_model: iau_2006_2000a_simplified` for a compact deterministic
+precession/nutation correction in the geodetic station reduction. This supports explicit fixed EOP
+values, simple tabulated interpolation, compact precession/nutation, and
+`astro import-earth-orientation --format iers-finals` conversion from IERS finals/finals2000A-style
+rows into suite Earth-orientation JSON. It is not a full standards-grade IERS/IAU reduction. JSON inputs
 match the output of `astro synth-measurements`; CSV and TDM inputs are auto-detected by `.csv` and
 `.tdm` extensions or can be forced with `--format csv` / `--format tdm`.
 

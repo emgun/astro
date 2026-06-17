@@ -42,6 +42,18 @@ def test_load_geodetic_eop_table_example_scenario() -> None:
     assert len(scenario.earth_orientation.samples) == 2
 
 
+def test_load_geodetic_precession_nutation_example_scenario() -> None:
+    scenario = load_scenario(
+        Path("examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml")
+    )
+
+    assert scenario.scenario_id == "leo-geodetic-precession-nutation-topocentric"
+    assert scenario.earth_orientation.source == "example-precession-nutation"
+    assert scenario.earth_orientation.precession_nutation_model == (
+        "iau_2006_2000a_simplified"
+    )
+
+
 def test_load_doppler_example_scenario() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_doppler.yaml"))
 
