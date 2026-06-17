@@ -402,6 +402,9 @@ Implemented slice:
 - `astro compare-tudat-reference` runs Tudat and a reference backend on the same scenario, then
   writes max/RMS/final position and velocity deltas, tolerance pass/fail status, and Tudat
   runner/force-model provenance.
+- `astro compare-tudat-campaign` runs the same calibrated Tudat-vs-reference comparison across
+  multiple scenarios and writes a suite campaign product with scenario pass/fail counts, worst-case
+  position/velocity deltas, per-scenario comparison records, and campaign provenance.
 - `astro research-propagate --backend local` runs seeded local ensembles.
 - `astro research-propagate --backend jax` runs vectorized two-body and J2 RK4 seeded ensembles and
   returns suite `MonteCarloResult` products.
@@ -427,10 +430,10 @@ Definition of done:
 - `astro propagate --backend tudat` supports checked-in two-body, J2, configured high-order
   gravity, drag, SRP, and third-body cross-check scenarios and records Tudat provenance through the
   native runners. Initial-covariance scenarios produce finite-difference covariance-history products
-  through the selected Tudat force model. `astro compare-tudat-reference` writes calibrated
-  reference-delta products for live Tudat validation. Native Tudat variational equations and broader
-  calibrated force-model comparison campaigns remain gated on validated body and acceleration-model
-  construction.
+  through the selected Tudat force model. `astro compare-tudat-reference` and
+  `astro compare-tudat-campaign` write calibrated reference-delta products for single-scenario and
+  multi-scenario live Tudat validation. Native Tudat variational equations remain gated on validated
+  body and acceleration-model construction.
 - `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
   screening-only `orekit_high_fidelity`, drag, SRP, and analytic Sun/Moon third-body force flags
   without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and

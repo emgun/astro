@@ -1,6 +1,6 @@
 import pytest
 
-from astro_backends.tudat.comparison import compare_tudat_to_reference
+from astro_backends.tudat.comparison import compare_tudat_campaign, compare_tudat_to_reference
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, Scenario, Trajectory, TrajectorySample
 from astro_dynamics.local import propagate_local
@@ -120,3 +120,34 @@ def test_compare_tudat_to_reference_requires_time_aligned_samples() -> None:
             ),
             reference_runner=short_reference,
         )
+
+
+def test_compare_tudat_campaign_aggregates_scenario_results() -> None:
+    first = _short_scenario()
+    second = first.model_copy(update={"scenario_id": "leo-two-body-campaign-second"})
+
+    result = compare_tudat_campaign(
+        [first, second],
+        reference_backend="local",
+        position_tolerance_km=0.2,
+        velocity_tolerance_km_s=0.002,
+        tudat_runner=lambda candidate: _offset_trajectory(
+            candidate,
+            position_offset_km=0.1 if candidate.scenario_id == first.scenario_id else 0.25,
+            velocity_offset_km_s=0.001,
+        ),
+        reference_runner=propagate_local,
+    )
+
+    assert result.campaign_id == "tudat-reference-campaign"
+    assert result.scenario_count == 2
+    assert result.passed_count == 1
+    assert result.failed_count == 1
+    assert result.passed is False
+    assert result.max_position_delta_km == pytest.approx(0.25)
+    assert result.max_velocity_delta_km_s == pytest.approx(0.001)
+    assert [comparison.scenario_id for comparison in result.comparisons] == [
+        first.scenario_id,
+        second.scenario_id,
+    ]
+    assert result.metadata["workflow"] == "tudat_reference_comparison_campaign"

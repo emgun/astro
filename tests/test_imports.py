@@ -131,9 +131,11 @@ def test_packages_import() -> None:
     }
     expected_tudat_exports = {
         "TudatReferenceComparison",
+        "TudatReferenceComparisonCampaign",
         "TudatRuntime",
         "TudatRuntimeUnavailable",
         "TudatSmokeResult",
+        "compare_tudat_campaign",
         "compare_tudat_to_reference",
         "load_tudat_runtime",
         "propagate_tudat",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import numpy as np
@@ -10,7 +10,6 @@ from pydantic import Field
 from astro_backends.tudat.propagation import propagate_tudat
 from astro_core.errors import UnsupportedBackendError
 from astro_core.models import AstroModel, Scenario, Trajectory
-from astro_dynamics.local import propagate_local
 
 TrajectoryRunner = Callable[[Scenario], Trajectory]
 FloatArray = NDArray[np.float64]
@@ -33,8 +32,23 @@ class TudatReferenceComparison(AstroModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class TudatReferenceComparisonCampaign(AstroModel):
+    campaign_id: str = Field(min_length=1)
+    reference_backend: str = Field(min_length=1)
+    scenario_count: int = Field(gt=0)
+    passed_count: int = Field(ge=0)
+    failed_count: int = Field(ge=0)
+    passed: bool
+    max_position_delta_km: float = Field(ge=0.0)
+    max_velocity_delta_km_s: float = Field(ge=0.0)
+    comparisons: tuple[TudatReferenceComparison, ...] = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 def _reference_runner_for_backend(reference_backend: str) -> TrajectoryRunner:
     if reference_backend == "local":
+        from astro_dynamics.local import propagate_local
+
         return propagate_local
     if reference_backend == "orekit":
         from astro_backends.orekit import propagate_orekit
@@ -122,5 +136,53 @@ def compare_tudat_to_reference(
             "tudat_runner": candidate.metadata.get("tudat_runner"),
             "tudat_force_models": candidate.metadata.get("tudat_force_models"),
             "reference_trajectory_backend": reference.backend,
+        },
+    )
+
+
+def compare_tudat_campaign(
+    scenarios: Sequence[Scenario],
+    *,
+    reference_backend: str = "local",
+    position_tolerance_km: float = 1.0e-3,
+    velocity_tolerance_km_s: float = 1.0e-6,
+    tudat_runner: TrajectoryRunner = propagate_tudat,
+    reference_runner: TrajectoryRunner | None = None,
+) -> TudatReferenceComparisonCampaign:
+    if not scenarios:
+        raise ValueError("Tudat comparison campaign requires at least one scenario")
+
+    comparisons = tuple(
+        compare_tudat_to_reference(
+            scenario,
+            reference_backend=reference_backend,
+            position_tolerance_km=position_tolerance_km,
+            velocity_tolerance_km_s=velocity_tolerance_km_s,
+            tudat_runner=tudat_runner,
+            reference_runner=reference_runner,
+        )
+        for scenario in scenarios
+    )
+    passed_count = sum(1 for comparison in comparisons if comparison.passed)
+    failed_count = len(comparisons) - passed_count
+    return TudatReferenceComparisonCampaign(
+        campaign_id="tudat-reference-campaign",
+        reference_backend=reference_backend,
+        scenario_count=len(comparisons),
+        passed_count=passed_count,
+        failed_count=failed_count,
+        passed=failed_count == 0,
+        max_position_delta_km=max(
+            comparison.max_position_delta_km for comparison in comparisons
+        ),
+        max_velocity_delta_km_s=max(
+            comparison.max_velocity_delta_km_s for comparison in comparisons
+        ),
+        comparisons=comparisons,
+        metadata={
+            "workflow": "tudat_reference_comparison_campaign",
+            "scenario_ids": [scenario.scenario_id for scenario in scenarios],
+            "position_tolerance_km": position_tolerance_km,
+            "velocity_tolerance_km_s": velocity_tolerance_km_s,
         },
     )

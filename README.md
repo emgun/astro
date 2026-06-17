@@ -102,8 +102,9 @@ product. Tudat can also consume configured Earth spherical harmonic degree/order
 finite-difference covariance-history products by propagating perturbed Tudat states through the
 selected Tudat force model. `astro compare-tudat-reference` writes calibrated position/velocity
 tolerance metrics against a reference backend so live Tudat force-model runs can be promoted only
-when their deltas are explicit. Native Tudat variational equations and broader calibrated
-force-model comparison campaigns remain future work. JAX research propagation returns suite
+when their deltas are explicit. `astro compare-tudat-campaign` aggregates multiple calibrated
+Tudat-vs-reference scenario comparisons into one pass/fail campaign product for release gates.
+Native Tudat variational equations remain future work. JAX research propagation returns suite
 `MonteCarloResult` products, can optionally include a final-state transition sensitivity matrix,
 and supports differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag,
 solar radiation pressure, and analytic circular Sun/Moon third-body gravity flags. Its research OD
@@ -142,6 +143,7 @@ astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend tudat --
 astro propagate examples/scenarios/leo_tudat_high_order_gravity.yaml --backend tudat --output tudat_high_order_gravity.json
 astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend tudat --output tudat_high_fidelity_covariance.json
 astro compare-tudat-reference examples/scenarios/leo_two_body.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output tudat_reference_comparison.json
+astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output tudat_reference_campaign.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro export-trajectory attitude_trajectory.json --format aem --output attitude_trajectory.aem

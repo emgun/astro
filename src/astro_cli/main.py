@@ -16,7 +16,7 @@ from astro_backends.jax import (
 )
 from astro_backends.orekit import estimate_orekit_native, run_orekit_smoke
 from astro_backends.rocketpy import run_rocketpy_smoke
-from astro_backends.tudat import compare_tudat_to_reference, run_tudat_smoke
+from astro_backends.tudat import compare_tudat_campaign, compare_tudat_to_reference, run_tudat_smoke
 from astro_core.eop import load_iers_finals_eop
 from astro_core.errors import (
     InvalidMeasurementFileError,
@@ -408,6 +408,35 @@ def compare_tudat_reference(
         "Tudat reference comparison",
     )
     typer.echo(f"wrote Tudat reference comparison: {output}")
+
+
+@app.command("compare-tudat-campaign")
+def compare_tudat_reference_campaign(
+    scenario_paths: Annotated[list[Path], typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    reference_backend: Annotated[str, typer.Option()] = "local",
+    position_tolerance_km: Annotated[float, typer.Option()] = 1.0e-3,
+    velocity_tolerance_km_s: Annotated[float, typer.Option()] = 1.0e-6,
+) -> None:
+    """Run a calibrated Tudat comparison campaign across multiple scenarios."""
+    scenarios = [_load_scenario_or_exit(scenario_path) for scenario_path in scenario_paths]
+    try:
+        campaign = compare_tudat_campaign(
+            scenarios,
+            reference_backend=reference_backend,
+            position_tolerance_km=position_tolerance_km,
+            velocity_tolerance_km_s=velocity_tolerance_km_s,
+        )
+    except (UnsupportedBackendError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(
+        output,
+        campaign.model_dump_json(indent=2),
+        "Tudat comparison campaign",
+    )
+    typer.echo(f"wrote Tudat comparison campaign: {output}")
 
 
 @app.command("export-trajectory")

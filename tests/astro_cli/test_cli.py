@@ -10,7 +10,11 @@ from astro_backends.dymos import DymosSmokeResult
 from astro_backends.jax import JaxSmokeResult
 from astro_backends.orekit import OrekitSmokeResult
 from astro_backends.rocketpy import RocketPySmokeResult
-from astro_backends.tudat import TudatReferenceComparison, TudatSmokeResult
+from astro_backends.tudat import (
+    TudatReferenceComparison,
+    TudatReferenceComparisonCampaign,
+    TudatSmokeResult,
+)
 from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
@@ -2196,6 +2200,91 @@ def test_compare_tudat_reference_command_writes_json(
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["scenario_id"] == scenario.scenario_id
     assert payload["candidate_backend"] == "tudat"
+
+
+def test_compare_tudat_campaign_command_writes_json(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    first_path = tmp_path / "scenario-a.yaml"
+    second_path = tmp_path / "scenario-b.yaml"
+    output = tmp_path / "campaign.json"
+    first = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    second = first.model_copy(update={"scenario_id": "leo-two-body-campaign-second"})
+    _write_scenario(first_path, first)
+    _write_scenario(second_path, second)
+
+    def fake_campaign(
+        candidates: list[Scenario],
+        *,
+        reference_backend: str,
+        position_tolerance_km: float,
+        velocity_tolerance_km_s: float,
+    ) -> TudatReferenceComparisonCampaign:
+        assert [candidate.scenario_id for candidate in candidates] == [
+            first.scenario_id,
+            second.scenario_id,
+        ]
+        comparison = TudatReferenceComparison(
+            scenario_id=first.scenario_id,
+            candidate_backend="tudat",
+            reference_backend=reference_backend,
+            sample_count=11,
+            position_tolerance_km=position_tolerance_km,
+            velocity_tolerance_km_s=velocity_tolerance_km_s,
+            max_position_delta_km=0.1,
+            rms_position_delta_km=0.08,
+            final_position_delta_km=0.07,
+            max_velocity_delta_km_s=0.001,
+            rms_velocity_delta_km_s=0.0008,
+            final_velocity_delta_km_s=0.0007,
+            passed=True,
+            metadata={},
+        )
+        return TudatReferenceComparisonCampaign(
+            campaign_id="tudat-reference-campaign",
+            reference_backend=reference_backend,
+            scenario_count=2,
+            passed_count=2,
+            failed_count=0,
+            passed=True,
+            max_position_delta_km=0.1,
+            max_velocity_delta_km_s=0.001,
+            comparisons=(
+                comparison,
+                comparison.model_copy(update={"scenario_id": second.scenario_id}),
+            ),
+            metadata={"workflow": "tudat_reference_comparison_campaign"},
+        )
+
+    monkeypatch.setattr("astro_cli.main.compare_tudat_campaign", fake_campaign)
+
+    result = runner.invoke(
+        app,
+        [
+            "compare-tudat-campaign",
+            str(first_path),
+            str(second_path),
+            "--reference-backend",
+            "local",
+            "--position-tolerance-km",
+            "0.25",
+            "--velocity-tolerance-km-s",
+            "0.002",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote Tudat comparison campaign" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_count"] == 2
+    assert payload["passed"] is True
+    assert [comparison["scenario_id"] for comparison in payload["comparisons"]] == [
+        first.scenario_id,
+        second.scenario_id,
+    ]
     assert payload["reference_backend"] == "local"
     assert payload["passed"] is True
 
