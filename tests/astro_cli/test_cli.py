@@ -1,6 +1,7 @@
 import csv
 import json
 from pathlib import Path
+from struct import pack
 
 import pytest
 import yaml
@@ -1782,6 +1783,75 @@ def test_import_dsn_tracking_command_writes_measurement_json(tmp_path: Path) -> 
     assert payload["metadata"]["source_format"] == "normalized_dsn_tracking_csv"
     assert payload["measurements"][0]["measurement_type"] == "two_way_range"
     assert payload["measurements"][0]["metadata"]["dsn_tracking_format"] == "odf"
+
+
+def test_import_dsn_binary_tracking_command_writes_measurement_json(tmp_path: Path) -> None:
+    input_path = tmp_path / "dsn_tracking.bin"
+    output_path = tmp_path / "dsn_measurements.json"
+    input_path.write_bytes(
+        b"ASTRODSN1"
+        + pack("<I", 1)
+        + _binary_dsn_tracking_record(
+            tracking_format=1,
+            observable=3,
+            epoch_unix_s=1767225600,
+            value=12345.6,
+            sigma=0.01,
+            units=1,
+            scenario_id="dsn-binary-demo",
+            station="DSS-14",
+            spacecraft="demo-sat",
+            participant_path="DSS-14,demo-sat,DSS-14",
+            transmitter="",
+            media_source="binary-media",
+        )
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "import-dsn-binary-tracking",
+            str(input_path),
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "dsn-binary-demo"
+    assert payload["metadata"]["source_format"] == "astro_dsn_binary_tracking"
+    assert payload["measurements"][0]["measurement_type"] == "two_way_range"
+    assert payload["measurements"][0]["metadata"]["binary_record_index"] == 0
+
+
+def _binary_dsn_tracking_record(
+    *,
+    tracking_format: int,
+    observable: int,
+    epoch_unix_s: int,
+    value: float,
+    sigma: float,
+    units: int,
+    scenario_id: str,
+    station: str,
+    spacecraft: str,
+    participant_path: str,
+    transmitter: str,
+    media_source: str,
+) -> bytes:
+    payload = pack("<BBqddB", tracking_format, observable, epoch_unix_s, value, sigma, units)
+    for field in (
+        scenario_id,
+        station,
+        spacecraft,
+        participant_path,
+        transmitter,
+        media_source,
+    ):
+        encoded = field.encode("utf-8")
+        payload += pack("<H", len(encoded)) + encoded
+    return payload
 
 
 def test_export_measurements_command_writes_tdm(tmp_path: Path) -> None:

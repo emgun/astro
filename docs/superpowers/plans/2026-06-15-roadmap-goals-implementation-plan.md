@@ -67,8 +67,9 @@ Still roadmap-level:
 - Native Tudat variational-equation covariance propagation remains deferred; current Tudat
   covariance uses the suite finite-difference transition product.
 - Full standards-grade precession-nutation reductions beyond the current compact
-  `iau_2006_2000a_simplified` geodetic-station option, native binary DSN ODF/TNF parsing beyond
-  the normalized tracking ingest bridge and truth-tagged station-bias calibration product, and
+  `iau_2006_2000a_simplified` geodetic-station option, native standards-grade DSN ODF/TNF parsing
+  beyond the normalized CSV and suite-owned ASTRODSN1 binary tracking bridges plus truth-tagged
+  station-bias calibration product, and
   operational CCSDS support beyond current KVN TDM measurement
   families, suite multi-leg radiometric TDM extension, OEM ephemeris interchange, and AEM
   quaternion attitude export.
@@ -192,9 +193,10 @@ Implemented slice:
   the suite TDM extension preserves the `ASTRO_*` media-correction metadata required for that
   summary. `astro import-dsn-tracking` ingests normalized ODF/TNF-style DSN tracking CSV rows into
   suite measurement JSON with source-format, tracking-format, participant-path, and transmitter
-  provenance. `astro station-calibration` estimates per-station/per-measurement-type bias products
-  from truth-tagged measurement records. Native binary ODF/TNF parsing and full DSN standards-grade
-  station calibration remain deeper standards work.
+  provenance, while `astro import-dsn-binary-tracking` ingests the suite-owned ASTRODSN1 fixed-record
+  binary bridge. `astro station-calibration` estimates per-station/per-measurement-type bias
+  products from truth-tagged measurement records. Native standards-grade ODF/TNF parsing and full
+  DSN station calibration remain deeper standards work.
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
   checked-in iterative two-way/three-way radiometric synthesis fixture. `leo_radiometric_media.yaml`

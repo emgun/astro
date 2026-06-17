@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import csv
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
+from struct import calcsize, unpack_from
 from typing import Any
 
 from pydantic import ValidationError
@@ -36,6 +38,20 @@ DSN_OBSERVABLE_TYPES = {
 }
 
 DSN_TRACKING_FORMATS = {"odf", "tnf"}
+DSN_BINARY_MAGIC = b"ASTRODSN1"
+DSN_BINARY_HEADER = "<BBqddB"
+DSN_BINARY_HEADER_SIZE = calcsize(DSN_BINARY_HEADER)
+DSN_BINARY_TRACKING_FORMATS = {1: "odf", 2: "tnf"}
+DSN_BINARY_OBSERVABLE_TYPES = {
+    1: ("range", MeasurementType.RANGE),
+    2: ("range_rate", MeasurementType.RANGE_RATE),
+    3: ("two_way_range", MeasurementType.TWO_WAY_RANGE),
+    4: ("two_way_range_rate", MeasurementType.TWO_WAY_RANGE_RATE),
+    5: ("three_way_range", MeasurementType.THREE_WAY_RANGE),
+    6: ("three_way_range_rate", MeasurementType.THREE_WAY_RANGE_RATE),
+    7: ("doppler", MeasurementType.DOPPLER),
+}
+DSN_BINARY_UNITS = {1: "km", 2: "km/s", 3: "Hz", 4: "deg"}
 
 
 def load_dsn_tracking_measurements(path: Path | str) -> MeasurementProduct:
@@ -73,6 +89,41 @@ def load_dsn_tracking_measurements(path: Path | str) -> MeasurementProduct:
         measurements=records,
         metadata={
             "source_format": "normalized_dsn_tracking_csv",
+            "tracking_formats": tracking_formats,
+            "measurement_count": len(records),
+        },
+    )
+
+
+def load_dsn_binary_tracking_measurements(path: Path | str) -> MeasurementProduct:
+    """Load suite-owned ASTRODSN1 binary tracking bridge records."""
+    measurement_path = Path(path)
+    try:
+        payload = measurement_path.read_bytes()
+    except OSError as exc:
+        raise InvalidMeasurementFileError(
+            f"could not read DSN binary tracking file {measurement_path}: {exc}"
+        ) from exc
+
+    records = _dsn_binary_tracking_records(measurement_path, payload)
+    if not records:
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} contains no rows"
+        )
+    scenario_ids = {record.metadata["dsn_scenario_id"] for record in records}
+    if len(scenario_ids) != 1:
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} must contain a single scenario_id"
+        )
+    tracking_formats = sorted(
+        {str(record.metadata["dsn_tracking_format"]) for record in records}
+    )
+    return MeasurementProduct(
+        scenario_id=str(next(iter(scenario_ids))),
+        measurements=records,
+        metadata={
+            "source_format": "astro_dsn_binary_tracking",
+            "binary_format": "ASTRODSN1",
             "tracking_formats": tracking_formats,
             "measurement_count": len(records),
         },
@@ -141,6 +192,164 @@ def _dsn_tracking_record(
         raise InvalidMeasurementFileError(
             f"DSN tracking file {measurement_path} row {row_number} is invalid: {exc}"
         ) from exc
+
+
+def _dsn_binary_tracking_records(
+    measurement_path: Path,
+    payload: bytes,
+) -> list[MeasurementRecord]:
+    if not payload.startswith(DSN_BINARY_MAGIC):
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} has invalid ASTRODSN1 magic"
+        )
+    offset = len(DSN_BINARY_MAGIC)
+    if len(payload) < offset + 4:
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} is missing record count"
+        )
+    record_count = unpack_from("<I", payload, offset)[0]
+    offset += 4
+    records: list[MeasurementRecord] = []
+    for record_index in range(record_count):
+        record, offset = _dsn_binary_tracking_record(
+            measurement_path,
+            record_index,
+            payload,
+            offset,
+        )
+        records.append(record)
+    if offset != len(payload):
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} has trailing bytes"
+        )
+    return records
+
+
+def _dsn_binary_tracking_record(
+    measurement_path: Path,
+    record_index: int,
+    payload: bytes,
+    offset: int,
+) -> tuple[MeasurementRecord, int]:
+    if len(payload) < offset + DSN_BINARY_HEADER_SIZE:
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} record {record_index} is truncated"
+        )
+    (
+        tracking_format_code,
+        observable_code,
+        epoch_unix_s,
+        value,
+        sigma,
+        units_code,
+    ) = unpack_from(DSN_BINARY_HEADER, payload, offset)
+    offset += DSN_BINARY_HEADER_SIZE
+    try:
+        tracking_format = DSN_BINARY_TRACKING_FORMATS[tracking_format_code]
+        observable, measurement_type = DSN_BINARY_OBSERVABLE_TYPES[observable_code]
+        units = DSN_BINARY_UNITS[units_code]
+    except KeyError as exc:
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} record {record_index} "
+            "uses an unsupported tracking, observable, or units code"
+        ) from exc
+
+    scenario_id, offset = _read_binary_text(
+        measurement_path, record_index, payload, offset, "scenario_id"
+    )
+    station, offset = _read_binary_text(
+        measurement_path, record_index, payload, offset, "station"
+    )
+    spacecraft, offset = _read_binary_text(
+        measurement_path, record_index, payload, offset, "spacecraft"
+    )
+    participant_path, offset = _read_binary_text(
+        measurement_path,
+        record_index,
+        payload,
+        offset,
+        "participant_path",
+        required=False,
+    )
+    transmitter, offset = _read_binary_text(
+        measurement_path,
+        record_index,
+        payload,
+        offset,
+        "transmitter",
+        required=False,
+    )
+    media_source, offset = _read_binary_text(
+        measurement_path,
+        record_index,
+        payload,
+        offset,
+        "media_source",
+        required=False,
+    )
+    metadata: dict[str, Any] = {
+        "source_format": "astro_dsn_binary_tracking",
+        "binary_format": "ASTRODSN1",
+        "binary_record_index": record_index,
+        "dsn_tracking_format": tracking_format,
+        "dsn_observable": observable,
+        "dsn_scenario_id": scenario_id,
+    }
+    if participant_path:
+        metadata["participant_path"] = participant_path
+    if transmitter:
+        metadata["transmitter"] = transmitter
+    if media_source:
+        metadata["media_corrections_source"] = media_source
+    try:
+        record = MeasurementRecord.model_validate(
+            {
+                "measurement_type": measurement_type,
+                "epoch": datetime.fromtimestamp(epoch_unix_s, UTC),
+                "observer": station,
+                "observed_object": spacecraft,
+                "value": value,
+                "sigma": sigma,
+                "units": units,
+                "metadata": metadata,
+            }
+        )
+    except ValidationError as exc:
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} record {record_index} is invalid: {exc}"
+        ) from exc
+    return record, offset
+
+
+def _read_binary_text(
+    measurement_path: Path,
+    record_index: int,
+    payload: bytes,
+    offset: int,
+    field_name: str,
+    *,
+    required: bool = True,
+) -> tuple[str, int]:
+    if len(payload) < offset + 2:
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} record {record_index} "
+            f"is missing {field_name} length"
+        )
+    field_length = unpack_from("<H", payload, offset)[0]
+    offset += 2
+    end_offset = offset + field_length
+    if len(payload) < end_offset:
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} record {record_index} "
+            f"has truncated {field_name}"
+        )
+    value = payload[offset:end_offset].decode("utf-8")
+    if required and not value:
+        raise InvalidMeasurementFileError(
+            f"DSN binary tracking file {measurement_path} record {record_index} "
+            f"is missing {field_name}"
+        )
+    return value, end_offset
 
 
 def _required_text(
