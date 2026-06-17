@@ -141,6 +141,74 @@ def test_optimize_launch_dymos_runs_default_phase_transcription(
         "pitch_program_optimization_scope": "suite_tuning_not_full_dymos_pitch_transcription",
     }
     assert result.metadata["dymos_tuned_pitch_point_indices"] == [2, 3]
+    assert result.metadata["dymos_pitch_program_transcription_contract"] == {
+        "execution_status": "not_executed",
+        "phase_coupling": "dymos_phase_plus_suite_pitch_tuning",
+        "control_name": "pitch_deg",
+        "control_units": "deg",
+        "control_bounds_deg": {"lower": 0.0, "upper": 90.0},
+        "control_point_count": 5,
+        "tuned_control_point_indices": [2, 3],
+        "control_schedule_covers_stage_plan": True,
+        "transcription": "GaussLobatto",
+        "stage_phase_count": 2,
+        "stage_phases": [
+            {
+                "name": "stage-1",
+                "start_s": 0.0,
+                "burnout_s": 70.0,
+                "control_point_indices": [0, 1, 2],
+            },
+            {
+                "name": "stage-2",
+                "start_s": 70.0,
+                "burnout_s": 120.0,
+                "control_point_indices": [2, 3, 4],
+            },
+        ],
+        "optimized_control_points": [
+            {
+                "index": 0,
+                "time_s": 0.0,
+                "baseline_pitch_deg": 90.0,
+                "pitch_deg": 90.0,
+                "tuned": False,
+                "source": "baseline",
+            },
+            {
+                "index": 1,
+                "time_s": 30.0,
+                "baseline_pitch_deg": 75.0,
+                "pitch_deg": 75.0,
+                "tuned": False,
+                "source": "baseline",
+            },
+            {
+                "index": 2,
+                "time_s": 70.0,
+                "baseline_pitch_deg": 45.0,
+                "pitch_deg": tuned_pitch_by_index[2],
+                "tuned": True,
+                "source": "suite_pitch_tuning",
+            },
+            {
+                "index": 3,
+                "time_s": 110.0,
+                "baseline_pitch_deg": 20.0,
+                "pitch_deg": tuned_pitch_by_index[3],
+                "tuned": True,
+                "source": "suite_pitch_tuning",
+            },
+            {
+                "index": 4,
+                "time_s": 140.0,
+                "baseline_pitch_deg": 5.0,
+                "pitch_deg": 5.0,
+                "tuned": False,
+                "source": "baseline",
+            },
+        ],
+    }
     assert result.metadata["stage_plan"]["total_burn_duration_s"] == 120.0
     assert result.metadata["dymos_phase_covers_stage_schedule"] is True
 
@@ -186,6 +254,12 @@ def test_optimize_launch_dymos_returns_suite_product_with_fake_runner() -> None:
         "pitch_deg": {"lower": 0.0, "upper": 90.0},
         "pitch_program_control_points": {"count": 5, "tuned_indices": [2, 3]},
     }
+    assert result.metadata["dymos_pitch_program_transcription_contract"][
+        "execution_status"
+    ] == "not_executed"
+    assert result.metadata["dymos_pitch_program_transcription_contract"][
+        "stage_phase_count"
+    ] == 2
 
 
 @pytest.mark.dymos_live
@@ -223,6 +297,12 @@ def test_live_dymos_optimization_returns_suite_product() -> None:
     assert dymos_phase["pitch_program_optimization_scope"] == (
         "suite_tuning_not_full_dymos_pitch_transcription"
     )
+    assert result.metadata["dymos_pitch_program_transcription_contract"][
+        "control_schedule_covers_stage_plan"
+    ] is True
+    assert result.metadata["dymos_pitch_program_transcription_contract"][
+        "stage_phase_count"
+    ] == 2
     assert dymos_phase["duration_s"] >= result.metadata["stage_plan"]["total_burn_duration_s"]
     assert dymos_phase["stage_count"] == result.metadata["stage_plan"]["stage_count"]
     assert dymos_phase["final_altitude_km"] > 0.0

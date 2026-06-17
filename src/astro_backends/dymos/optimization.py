@@ -73,6 +73,17 @@ def _with_dymos_provenance(
     }
     if dymos_phase is not None:
         metadata["dymos_phase"] = dymos_phase
+    pitch_program_transcription_contract = _pitch_program_transcription_contract(
+        result,
+        scenario,
+        stage_plan=stage_plan,
+        tuned_pitch_point_indices=tuned_pitch_point_indices,
+        dymos_phase=dymos_phase,
+    )
+    if pitch_program_transcription_contract is not None:
+        metadata["dymos_pitch_program_transcription_contract"] = (
+            pitch_program_transcription_contract
+        )
     return result.model_copy(update={"backend": "dymos", "metadata": metadata})
 
 
@@ -157,6 +168,94 @@ def _optimized_pitch_program_control_points(
         }
         for index, point in enumerate(scenario.guidance.pitch_program)
     ]
+
+
+def _pitch_program_stage_phases(
+    scenario: LaunchScenario,
+    stage_plan: dict[str, Any],
+) -> list[dict[str, Any]]:
+    stage_phases: list[dict[str, Any]] = []
+    pitch_program = tuple(scenario.guidance.pitch_program)
+    for stage in stage_plan["stages"]:
+        start_s = float(stage["start_s"])
+        burnout_s = float(stage["burnout_s"])
+        control_point_indices = [
+            index
+            for index, point in enumerate(pitch_program)
+            if start_s <= point.time_s <= burnout_s
+        ]
+        if control_point_indices:
+            last_index = control_point_indices[-1]
+            if (
+                pitch_program[last_index].time_s < burnout_s
+                and last_index + 1 < len(pitch_program)
+            ):
+                control_point_indices.append(last_index + 1)
+        stage_phases.append(
+            {
+                "name": str(stage["name"]),
+                "start_s": start_s,
+                "burnout_s": burnout_s,
+                "control_point_indices": control_point_indices,
+            }
+        )
+    return stage_phases
+
+
+def _pitch_program_control_schedule_covers_stage_plan(
+    scenario: LaunchScenario,
+    stage_plan: dict[str, Any],
+) -> bool:
+    pitch_program = tuple(scenario.guidance.pitch_program)
+    if not pitch_program:
+        return False
+    return (
+        pitch_program[0].time_s <= 0.0
+        and pitch_program[-1].time_s >= float(stage_plan["total_burn_duration_s"])
+    )
+
+
+def _pitch_program_transcription_contract(
+    result: LaunchPitchTuningResult,
+    scenario: LaunchScenario,
+    *,
+    stage_plan: dict[str, Any],
+    tuned_pitch_point_indices: list[int],
+    dymos_phase: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    if scenario.guidance.mode != "pitch_program":
+        return None
+
+    phase_coupling = "dymos_phase_plus_suite_pitch_tuning"
+    transcription = "not_executed"
+    if dymos_phase is not None:
+        phase_coupling = str(
+            dymos_phase.get("pitch_program_optimization_coupling", phase_coupling)
+        )
+        transcription = str(dymos_phase.get("transcription", transcription))
+
+    return {
+        "execution_status": str(
+            result.metadata.get("dymos_pitch_program_transcription_status", "not_executed")
+        ),
+        "phase_coupling": phase_coupling,
+        "control_name": "pitch_deg",
+        "control_units": "deg",
+        "control_bounds_deg": {"lower": 0.0, "upper": 90.0},
+        "control_point_count": len(scenario.guidance.pitch_program),
+        "tuned_control_point_indices": tuned_pitch_point_indices,
+        "control_schedule_covers_stage_plan": (
+            _pitch_program_control_schedule_covers_stage_plan(scenario, stage_plan)
+        ),
+        "transcription": transcription,
+        "stage_phase_count": int(stage_plan["stage_count"]),
+        "stage_phases": _pitch_program_stage_phases(scenario, stage_plan),
+        "optimized_control_points": _optimized_pitch_program_control_points(
+            result,
+            scenario,
+            tuned_pitch_point_indices=tuned_pitch_point_indices,
+        ),
+    }
 
 
 def _dymos_phase_metadata(

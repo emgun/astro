@@ -309,9 +309,10 @@ annotation around one configured RocketPy flight, stage-schedule completeness me
 `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics,
 Dymos stage-aware vertical-ascent phase transcription, Dymos suite stage-plan metadata,
 pitch-program control-point metadata, optimized pitch-program schedule metadata, tuned point
-indices, and Dymos adapter optimization diagnostics are implemented. Full native multi-motor
-RocketPy staging and full pitch-program multistage Dymos ascent optimization remain gated on
-validated backend runners.
+indices, a Dymos-ready pitch-program transcription contract with per-stage control coverage, and
+Dymos adapter optimization diagnostics are implemented. Full native multi-motor RocketPy staging
+and full pitch-program multistage Dymos ascent optimization remain gated on validated backend
+runners.
 
 Implemented slice:
 
@@ -340,6 +341,10 @@ Implemented slice:
   residuals, Dymos version, OpenMDAO version, phase duration, final altitude, final velocity,
   original and optimized pitch-program control-point schedules, tuned pitch point indices, explicit
   pitch-program optimization scope metadata, and optimizer message.
+- Dymos adapter results include a pitch-program transcription contract that records the pitch
+  control name, bounds, optimized control points, tuned control indices, per-stage phase/control
+  coverage, execution status, and transcription name so downstream launch tools can distinguish the
+  current hybrid phase-plus-suite-tuning product from a future native multistage pitch solve.
 - Dymos adapter provenance includes the suite stage plan, multistage flag, total burn duration, and
   whether the Dymos phase duration covers the full stage schedule.
 

@@ -310,8 +310,9 @@ a coarse-to-fine targeting analysis tool, not a production optimizer.
 uses the current pitch-program tuner and writes the same `LaunchPitchTuningResult` product. With
 `--backend dymos`, it loads the optional Dymos/OpenMDAO runtime, runs the current stage-aware
 vertical phase, preserves the suite pitch-program tuning product, and records pitch-program
-control-point metadata, the optimized pitch-program schedule, tuned indices, and explicit scope
-metadata showing the pitch tuning is suite-coupled rather than a full Dymos pitch transcription.
+control-point metadata, the optimized pitch-program schedule, tuned indices, path constraints, and
+a Dymos-ready pitch-program transcription contract with stage-phase control coverage. Scope metadata
+still shows the pitch tuning is suite-coupled rather than a full Dymos pitch transcription.
 The current suite still does not claim a full multistage pitch-program optimal-control solve from
 the local aggregate schema.
 
