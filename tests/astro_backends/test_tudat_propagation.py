@@ -66,11 +66,37 @@ def test_propagate_tudat_runs_default_two_body_with_fake_tudat_modules(
     assert trajectory.backend == "tudat"
     assert trajectory.metadata["adapter"] == "tudat"
     assert trajectory.metadata["source_backend"] == "tudat_native"
-    assert trajectory.metadata["tudat_acceleration_models"] == {"AstroSuiteSpacecraft": "Earth"}
+    assert trajectory.metadata["tudat_acceleration_models"] == {
+        "AstroSuiteSpacecraft": {"Earth": ["point_mass_gravity"]}
+    }
+    assert trajectory.metadata["tudat_force_models"] == ["Earth point-mass gravity"]
     assert trajectory.metadata["tudat_integrator"] == "runge_kutta_fixed_step_rk4"
     assert trajectory.metadata["tudat_propagator"] == "cowell"
     assert len(trajectory.samples) == scenario.propagation.sample_count
     assert trajectory.samples[0].state.position_km == pytest.approx((7000.0, 0.0, 0.0))
+    assert trajectory.samples[1].state.position_km == pytest.approx((7000.0, 450.0, 60.0))
+
+
+def test_propagate_tudat_runs_default_j2_with_fake_tudat_modules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = load_scenario("examples/scenarios/leo_j2.yaml")
+    fake_modules = _FakeTudatModules()
+    monkeypatch.setattr(
+        "astro_backends.tudat.propagation.import_module",
+        fake_modules.import_module,
+    )
+
+    trajectory = propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.backend == "tudat"
+    assert trajectory.force_model.gravity.value == "j2"
+    assert trajectory.metadata["tudat_runner"] == "native_j2"
+    assert trajectory.metadata["tudat_acceleration_models"] == {
+        "AstroSuiteSpacecraft": {"Earth": ["spherical_harmonic_gravity_degree_2_order_0"]}
+    }
+    assert trajectory.metadata["tudat_force_models"] == ["Earth spherical harmonic gravity 2x0"]
+    assert len(trajectory.samples) == scenario.propagation.sample_count
     assert trajectory.samples[1].state.position_km == pytest.approx((7000.0, 450.0, 60.0))
 
 
@@ -172,6 +198,10 @@ class _FakeAcceleration:
     @staticmethod
     def point_mass_gravity() -> str:
         return "point_mass_gravity"
+
+    @staticmethod
+    def spherical_harmonic_gravity(degree: int, order: int) -> str:
+        return f"spherical_harmonic_gravity_degree_{degree}_order_{order}"
 
 
 class _FakeIntegrator:
