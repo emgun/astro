@@ -42,6 +42,12 @@ def _with_dymos_provenance(
     converged = bool(result.metadata.get("converged", isfinite(float(result.best_case.score))))
     stage_plan = _stage_plan_metadata(scenario)
     phase_duration_s = _dymos_phase_duration_s(result)
+    tuned_pitch_point_indices = _tuned_pitch_point_indices(result)
+    dymos_phase = _dymos_phase_metadata(
+        result,
+        scenario,
+        tuned_pitch_point_indices=tuned_pitch_point_indices,
+    )
     metadata = {
         **result.metadata,
         "adapter": "dymos",
@@ -57,15 +63,16 @@ def _with_dymos_provenance(
         "target_insertion_residuals": result.best_case.target_miss,
         "stage_plan": stage_plan,
         "multistage": stage_plan["stage_count"] > 1,
+        "dymos_tuned_pitch_point_indices": tuned_pitch_point_indices,
         "dymos_phase_covers_stage_schedule": (
             None
             if phase_duration_s is None
             else phase_duration_s >= stage_plan["total_burn_duration_s"] - 1.0e-9
         ),
-        "path_constraints": {
-            "pitch_deg": {"lower": 0.0, "upper": 90.0},
-        },
+        "path_constraints": _path_constraints(scenario, tuned_pitch_point_indices),
     }
+    if dymos_phase is not None:
+        metadata["dymos_phase"] = dymos_phase
     return result.model_copy(update={"backend": "dymos", "metadata": metadata})
 
 
@@ -97,6 +104,63 @@ def _dymos_phase_duration_s(result: LaunchPitchTuningResult) -> float | None:
     if duration_s is None:
         return None
     return float(duration_s)
+
+
+def _tuned_pitch_point_indices(result: LaunchPitchTuningResult) -> list[int]:
+    return [int(point.point_index) for point in result.tuned_points]
+
+
+def _pitch_program_control_points(
+    scenario: LaunchScenario,
+    *,
+    tuned_pitch_point_indices: list[int],
+) -> list[dict[str, bool | float | int]]:
+    if scenario.guidance.mode != "pitch_program":
+        return []
+    tuned_indices = set(tuned_pitch_point_indices)
+    return [
+        {
+            "index": index,
+            "time_s": point.time_s,
+            "pitch_deg": point.pitch_deg,
+            "tuned": index in tuned_indices,
+        }
+        for index, point in enumerate(scenario.guidance.pitch_program)
+    ]
+
+
+def _dymos_phase_metadata(
+    result: LaunchPitchTuningResult,
+    scenario: LaunchScenario,
+    *,
+    tuned_pitch_point_indices: list[int],
+) -> dict[str, Any] | None:
+    phase_metadata = result.metadata.get("dymos_phase")
+    if not isinstance(phase_metadata, dict):
+        return None
+    return {
+        **phase_metadata,
+        "guidance_model": scenario.guidance.mode,
+        "pitch_program_control_points": _pitch_program_control_points(
+            scenario,
+            tuned_pitch_point_indices=tuned_pitch_point_indices,
+        ),
+    }
+
+
+def _path_constraints(
+    scenario: LaunchScenario,
+    tuned_pitch_point_indices: list[int],
+) -> dict[str, dict[str, Any]]:
+    constraints: dict[str, dict[str, Any]] = {
+        "pitch_deg": {"lower": 0.0, "upper": 90.0},
+    }
+    if scenario.guidance.mode == "pitch_program":
+        constraints["pitch_program_control_points"] = {
+            "count": len(scenario.guidance.pitch_program),
+            "tuned_indices": tuned_pitch_point_indices,
+        }
+    return constraints
 
 
 def _stage_acceleration_schedule(

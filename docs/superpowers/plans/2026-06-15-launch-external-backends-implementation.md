@@ -24,7 +24,8 @@ Out of scope for this slice:
 
 - Pretending the current aggregate launch schema is enough for high-fidelity RocketPy vehicle construction.
 - Full RocketPy motor/rocket geometry authoring UI.
-- Full Dymos trajectory transcription and path-constraint library.
+- Full Dymos trajectory transcription and path-constraint library beyond the current stage-aware
+  vertical phase, pitch-program control metadata, and pitch-bound constraints.
 
 ## File Map
 
@@ -135,7 +136,9 @@ def propagate_launch_with_backend(scenario: LaunchScenario, backend: str) -> Lau
 - [x] Add CLI test for `astro optimize-launch --backend local` using current pitch tuning.
 - [x] Add CLI test for `astro optimize-launch --backend dymos` dispatch by monkeypatching the Dymos optimizer.
 - [x] Implement local optimizer command using `tune_pitch_program`.
-- [x] Implement Dymos adapter boundary that records runtime availability and raises explicit configuration requirements until a Dymos phase model exists.
+- [x] Implement Dymos adapter boundary that records runtime availability, runs the current
+  stage-aware vertical phase model, and preserves suite pitch-program tuning products with
+  pitch-program control metadata.
 - [x] Run focused Dymos and CLI tests.
 - [x] Commit with `git commit -m "feat: add launch optimization command boundary"`.
 
@@ -167,7 +170,8 @@ astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend loc
 Spec coverage:
 
 - Covers Goal 4's package/runtime gates, launch backend dispatch, RocketPy boundary, Dymos boundary, CLI surfaces, and docs.
-- Does not fake full RocketPy geometry or Dymos transcription from an insufficient aggregate launch schema.
+- Does not fake full RocketPy geometry or a full Dymos pitch-program multistage transcription from
+  an insufficient aggregate launch schema.
 
 Placeholder scan:
 

@@ -79,8 +79,9 @@ RocketPy solution covered the full suite stage schedule. That multistage path is
 composition layer, not a validated multi-motor RocketPy staging solver. The `dymos` launch
 optimization path runs a stage-aware Dymos/OpenMDAO vertical-ascent phase transcription and returns
 the existing `LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan
-metadata, and a flag showing that the Dymos phase duration covers the configured burn schedule;
-full pitch-program multistage Dymos ascent optimization remains future work.
+metadata, pitch-program control-point metadata, tuned point indices, path constraints, and a flag
+showing that the Dymos phase duration covers the configured burn schedule; full pitch-program
+multistage Dymos ascent optimization remains future work.
 
 Optional research backend smoke checks:
 
@@ -265,8 +266,10 @@ a coarse-to-fine targeting analysis tool, not a production optimizer.
 
 `astro optimize-launch` is the neutral launch optimization entry point. With `--backend local`, it
 uses the current pitch-program tuner and writes the same `LaunchPitchTuningResult` product. With
-`--backend dymos`, it loads the optional Dymos/OpenMDAO runtime and requires a validated Dymos phase
-runner; the current suite does not fake an optimal-control solve from the local aggregate schema.
+`--backend dymos`, it loads the optional Dymos/OpenMDAO runtime, runs the current stage-aware
+vertical phase, preserves the suite pitch-program tuning product, and records pitch-program
+control-point metadata and tuned indices. The current suite still does not claim a full multistage
+pitch-program optimal-control solve from the local aggregate schema.
 
 `astro report-tuned-launch` runs the current local end-to-end launch analysis: tune two pitch knots,
 propagate the tuned ascent, hand off insertion to an orbit scenario, propagate a short orbital arc,

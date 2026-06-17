@@ -84,7 +84,16 @@ def test_optimize_launch_dymos_runs_default_phase_transcription(
         "final_velocity_km_s": 0.08,
         "optimizer_success": True,
         "optimizer_message": "Optimization terminated successfully",
+        "guidance_model": "pitch_program",
+        "pitch_program_control_points": [
+            {"index": 0, "time_s": 0.0, "pitch_deg": 90.0, "tuned": False},
+            {"index": 1, "time_s": 30.0, "pitch_deg": 75.0, "tuned": False},
+            {"index": 2, "time_s": 70.0, "pitch_deg": 45.0, "tuned": True},
+            {"index": 3, "time_s": 110.0, "pitch_deg": 20.0, "tuned": True},
+            {"index": 4, "time_s": 140.0, "pitch_deg": 5.0, "tuned": False},
+        ],
     }
+    assert result.metadata["dymos_tuned_pitch_point_indices"] == [2, 3]
     assert result.metadata["stage_plan"]["total_burn_duration_s"] == 120.0
     assert result.metadata["dymos_phase_covers_stage_schedule"] is True
 
@@ -128,6 +137,7 @@ def test_optimize_launch_dymos_returns_suite_product_with_fake_runner() -> None:
     assert result.metadata["dymos_phase_covers_stage_schedule"] is None
     assert result.metadata["path_constraints"] == {
         "pitch_deg": {"lower": 0.0, "upper": 90.0},
+        "pitch_program_control_points": {"count": 5, "tuned_indices": [2, 3]},
     }
 
 
@@ -151,10 +161,14 @@ def test_live_dymos_optimization_returns_suite_product() -> None:
     assert result.metadata["dymos_phase_covers_stage_schedule"] is True
     assert result.metadata["path_constraints"] == {
         "pitch_deg": {"lower": 0.0, "upper": 90.0},
+        "pitch_program_control_points": {"count": 5, "tuned_indices": [2, 3]},
     }
+    assert result.metadata["dymos_tuned_pitch_point_indices"] == [2, 3]
     dymos_phase = result.metadata["dymos_phase"]
     assert dymos_phase["phase_model"] == "stage_aware_vertical_ascent"
     assert dymos_phase["transcription"] == "GaussLobatto"
+    assert dymos_phase["guidance_model"] == "pitch_program"
+    assert len(dymos_phase["pitch_program_control_points"]) == 5
     assert dymos_phase["duration_s"] >= result.metadata["stage_plan"]["total_burn_duration_s"]
     assert dymos_phase["stage_count"] == result.metadata["stage_plan"]["stage_count"]
     assert dymos_phase["final_altitude_km"] > 0.0
