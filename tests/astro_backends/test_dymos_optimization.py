@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -5,6 +7,7 @@ import pytest
 from astro_backends.dymos.optimization import DymosPhaseSummary, optimize_launch_dymos
 from astro_backends.dymos.runtime import DymosRuntime
 from astro_core.errors import UnsupportedBackendError
+from astro_launch.io import load_launch_scenario
 from astro_launch.models import LaunchPitchTuningResult, LaunchScenario
 from astro_launch.targeting import tune_pitch_program
 from tests.astro_launch.helpers import make_pitch_program_launch_scenario
@@ -120,3 +123,32 @@ def test_optimize_launch_dymos_returns_suite_product_with_fake_runner() -> None:
     assert result.metadata["path_constraints"] == {
         "pitch_deg": {"lower": 0.0, "upper": 90.0},
     }
+
+
+@pytest.mark.dymos_live
+def test_live_dymos_optimization_returns_suite_product() -> None:
+    if os.environ.get("ASTRO_RUN_DYMOS_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_DYMOS_LIVE=1 to run live Dymos launch optimization")
+    pytest.importorskip("dymos")
+    pytest.importorskip("openmdao")
+
+    scenario = load_launch_scenario(Path("examples/launch/pitch_program_two_stage.yaml"))
+
+    result = optimize_launch_dymos(scenario)
+
+    assert result.backend == "dymos"
+    assert result.metadata["source_backend"] == "dymos_phase"
+    assert result.metadata["adapter"] == "dymos"
+    assert result.metadata["converged"] is True
+    assert result.metadata["stage_plan"]["stage_count"] == 2
+    assert result.metadata["multistage"] is True
+    assert result.metadata["dymos_phase_covers_stage_schedule"] is False
+    assert result.metadata["path_constraints"] == {
+        "pitch_deg": {"lower": 0.0, "upper": 90.0},
+    }
+    dymos_phase = result.metadata["dymos_phase"]
+    assert dymos_phase["transcription"] == "GaussLobatto"
+    assert dymos_phase["duration_s"] > 0.0
+    assert dymos_phase["final_altitude_km"] > 0.0
+    assert dymos_phase["final_velocity_km_s"] > 0.0
+    assert result.best_case.score >= 0.0

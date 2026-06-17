@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -6,6 +8,7 @@ import pytest
 from astro_backends.rocketpy.runtime import RocketPyRuntime
 from astro_backends.rocketpy.simulation import propagate_launch_rocketpy
 from astro_core.errors import UnsupportedBackendError
+from astro_launch.io import load_launch_scenario
 from astro_launch.local import propagate_launch_local
 from astro_launch.models import LaunchRocketPyConfig, LaunchScenario, LaunchTrajectory
 from tests.astro_launch.helpers import make_launch_scenario
@@ -282,3 +285,44 @@ def test_propagate_launch_rocketpy_stops_at_actual_solution_end() -> None:
     assert trajectory.events[-1].time_s == 25.0
     assert trajectory.metadata["rocketpy_solution_end_s"] == 25.0
     assert trajectory.metadata["rocketpy_stage_schedule_complete"] is False
+
+
+@pytest.mark.rocketpy_live
+def test_live_rocketpy_configured_launch_examples_return_suite_products() -> None:
+    if os.environ.get("ASTRO_RUN_ROCKETPY_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_ROCKETPY_LIVE=1 to run live RocketPy launch simulation")
+    pytest.importorskip("rocketpy")
+
+    single_stage = load_launch_scenario(
+        Path("examples/launch/rocketpy_configured_single_stage.yaml")
+    )
+    two_stage = load_launch_scenario(Path("examples/launch/rocketpy_configured_two_stage.yaml"))
+
+    single_stage_trajectory = propagate_launch_rocketpy(single_stage)
+    two_stage_trajectory = propagate_launch_rocketpy(two_stage)
+
+    assert single_stage_trajectory.backend == "rocketpy"
+    assert single_stage_trajectory.metadata["source_backend"] == "rocketpy_direct"
+    assert single_stage_trajectory.metadata["model"] == "rocketpy_single_stage_solid"
+    assert single_stage_trajectory.metadata["rocketpy_configured"] is True
+    assert single_stage_trajectory.metadata["rocketpy_stage_count"] == 1
+    assert len(single_stage_trajectory.samples) >= 2
+    assert single_stage_trajectory.insertion_state.epoch == (
+        single_stage_trajectory.samples[-1].epoch
+    )
+
+    assert two_stage_trajectory.backend == "rocketpy"
+    assert two_stage_trajectory.metadata["source_backend"] == "rocketpy_direct"
+    assert two_stage_trajectory.metadata["model"] == "rocketpy_configured_multistage_composition"
+    assert two_stage_trajectory.metadata["rocketpy_stage_count"] == 2
+    assert two_stage_trajectory.metadata["rocketpy_composition"] == (
+        "single_flight_suite_stage_schedule"
+    )
+    assert len(two_stage_trajectory.samples) >= 2
+    assert all(
+        sample.stage_name in {"stage-1", "stage-2", "payload"}
+        for sample in two_stage_trajectory.samples
+    )
+    assert two_stage_trajectory.insertion_state.epoch == (
+        two_stage_trajectory.samples[-1].epoch
+    )
