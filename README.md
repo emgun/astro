@@ -94,10 +94,11 @@ astro jax-smoke
 Tudat and JAX are optional research/cross-check boundaries. TudatPy is not currently assumed to be
 available from PyPI on every platform, so its smoke command reports installation state without
 promising a pip-only install path. When TudatPy is installed, `astro propagate --backend tudat`
-runs native two-body Earth point-mass, J2 spherical-harmonic, and Sun/Moon point-mass third-body
-cross-checks using Tudat environment/body setup, fixed-step RK4, and Cowell translational
-propagation, then maps the state history back into the suite `Trajectory` product. Tudat drag,
-SRP, and higher-order gravity models remain future work. JAX research
+runs native two-body Earth point-mass, J2 spherical-harmonic, atmospheric drag, cannonball SRP, and
+Sun/Moon point-mass third-body cross-checks using Tudat environment/body setup, fixed-step RK4, and
+Cowell translational propagation, then maps the state history back into the suite `Trajectory`
+product. Tudat higher-order gravity models and live calibrated force-model comparisons remain
+future work. JAX research
 propagation returns suite `MonteCarloResult` products, can optionally include a final-state
 transition sensitivity matrix, and supports
 differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag, solar
@@ -129,6 +130,8 @@ astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit -
 astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend orekit --output orekit_high_fidelity_covariance.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend tudat --output tudat_two_body_trajectory.json
 astro propagate examples/scenarios/leo_j2.yaml --backend tudat --output tudat_j2_trajectory.json
+astro propagate examples/scenarios/leo_orekit_drag.yaml --backend tudat --output tudat_drag_trajectory.json
+astro propagate examples/scenarios/leo_orekit_srp.yaml --backend tudat --output tudat_srp_trajectory.json
 astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend tudat --output tudat_third_body_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem

@@ -36,7 +36,7 @@ def test_propagate_tudat_reports_missing_propagation_api() -> None:
         propagate_tudat(scenario, runtime_loader=_fake_runtime)
 
 
-def test_propagate_tudat_default_runner_rejects_unsupported_force_model(
+def test_propagate_tudat_runs_drag_with_fake_tudat_modules(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scenario = load_scenario("examples/scenarios/leo_orekit_drag.yaml")
@@ -46,8 +46,24 @@ def test_propagate_tudat_default_runner_rejects_unsupported_force_model(
         fake_modules.import_module,
     )
 
-    with pytest.raises(UnsupportedBackendError, match="does not yet support high-fidelity"):
-        propagate_tudat(scenario, runtime_loader=_fake_runtime)
+    trajectory = propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+    assert fake_modules.environment_setup.aerodynamic_interfaces == {
+        "AstroSuiteSpacecraft": {
+            "reference_area": 2.5,
+            "constant_force_coefficient": [2.2, 0.0, 0.0],
+        }
+    }
+    assert trajectory.metadata["tudat_runner"] == "native_j2_drag"
+    assert trajectory.metadata["tudat_acceleration_models"] == {
+        "AstroSuiteSpacecraft": {
+            "Earth": ["spherical_harmonic_gravity_degree_2_order_0", "aerodynamic"]
+        }
+    }
+    assert trajectory.metadata["tudat_force_models"] == [
+        "Earth spherical harmonic gravity 2x0",
+        "Earth aerodynamic drag",
+    ]
 
 
 def test_propagate_tudat_runs_default_two_body_with_fake_tudat_modules(
@@ -130,6 +146,39 @@ def test_propagate_tudat_runs_third_body_with_fake_tudat_modules(
     assert len(trajectory.samples) == scenario.propagation.sample_count
 
 
+def test_propagate_tudat_runs_srp_with_fake_tudat_modules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = load_scenario("examples/scenarios/leo_orekit_srp.yaml")
+    fake_modules = _FakeTudatModules()
+    monkeypatch.setattr(
+        "astro_backends.tudat.propagation.import_module",
+        fake_modules.import_module,
+    )
+
+    trajectory = propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+    assert fake_modules.environment_setup.requested_bodies == ["Earth", "Sun"]
+    assert fake_modules.environment_setup.radiation_pressure_targets == {
+        "AstroSuiteSpacecraft": {
+            "reference_area": 2.5,
+            "radiation_pressure_coefficient": 1.3,
+            "per_source_occulting_bodies": {"Sun": ["Earth"]},
+        }
+    }
+    assert trajectory.metadata["tudat_runner"] == "native_j2_srp"
+    assert trajectory.metadata["tudat_acceleration_models"] == {
+        "AstroSuiteSpacecraft": {
+            "Earth": ["spherical_harmonic_gravity_degree_2_order_0"],
+            "Sun": ["radiation_pressure"],
+        }
+    }
+    assert trajectory.metadata["tudat_force_models"] == [
+        "Earth spherical harmonic gravity 2x0",
+        "Sun cannonball solar radiation pressure",
+    ]
+
+
 def test_propagate_tudat_returns_suite_product_with_fake_runner() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml")
     seen_runtime: list[TudatRuntime] = []
@@ -208,6 +257,34 @@ class _FakeBodies:
 
 class _FakeEnvironmentSetup:
     requested_bodies: list[str] = []
+    aerodynamic_interfaces: dict[str, object] = {}
+    radiation_pressure_targets: dict[str, object] = {}
+
+    class aerodynamic_coefficients:
+        @staticmethod
+        def constant(
+            *,
+            reference_area: float,
+            constant_force_coefficient: list[float],
+        ) -> dict[str, object]:
+            return {
+                "reference_area": reference_area,
+                "constant_force_coefficient": constant_force_coefficient,
+            }
+
+    class radiation_pressure:
+        @staticmethod
+        def cannonball_radiation_target(
+            *,
+            reference_area: float,
+            radiation_pressure_coefficient: float,
+            per_source_occulting_bodies: dict[str, list[str]],
+        ) -> dict[str, object]:
+            return {
+                "reference_area": reference_area,
+                "radiation_pressure_coefficient": radiation_pressure_coefficient,
+                "per_source_occulting_bodies": per_source_occulting_bodies,
+            }
 
     @classmethod
     def get_default_body_settings(
@@ -227,6 +304,24 @@ class _FakeEnvironmentSetup:
     def create_system_of_bodies(_body_settings: dict[str, object]) -> _FakeBodies:
         return _FakeBodies()
 
+    @classmethod
+    def add_aerodynamic_coefficient_interface(
+        cls,
+        _bodies: _FakeBodies,
+        body_name: str,
+        aero_coefficient_settings: object,
+    ) -> None:
+        cls.aerodynamic_interfaces[body_name] = aero_coefficient_settings
+
+    @classmethod
+    def add_radiation_pressure_target_model(
+        cls,
+        _bodies: _FakeBodies,
+        body_name: str,
+        radiation_pressure_settings: object,
+    ) -> None:
+        cls.radiation_pressure_targets[body_name] = radiation_pressure_settings
+
 
 class _FakeAcceleration:
     @staticmethod
@@ -236,6 +331,14 @@ class _FakeAcceleration:
     @staticmethod
     def spherical_harmonic_gravity(degree: int, order: int) -> str:
         return f"spherical_harmonic_gravity_degree_{degree}_order_{order}"
+
+    @staticmethod
+    def aerodynamic() -> str:
+        return "aerodynamic"
+
+    @staticmethod
+    def radiation_pressure() -> str:
+        return "radiation_pressure"
 
 
 class _FakeIntegrator:
@@ -332,6 +435,9 @@ class _FakeTudatModules:
     def __init__(self) -> None:
         self.spice = _FakeSpice()
         self.environment_setup = _FakeEnvironmentSetup
+        self.environment_setup.requested_bodies = []
+        self.environment_setup.aerodynamic_interfaces = {}
+        self.environment_setup.radiation_pressure_targets = {}
         self.modules: dict[str, Any] = {
             "tudatpy.interface.spice": self.spice,
             "tudatpy.dynamics.environment_setup": self.environment_setup,

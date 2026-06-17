@@ -17,7 +17,11 @@ _SUPPORTED_DEFAULT_TUDAT_FORCE_MODELS = (
     ForceModelName.J2,
     ForceModelName.OREKIT_HIGH_FIDELITY,
 )
-_SUPPORTED_TUDAT_HIGH_FIDELITY_FLAGS = {"third_body_gravity"}
+_SUPPORTED_TUDAT_HIGH_FIDELITY_FLAGS = {
+    "atmospheric_drag",
+    "solar_radiation_pressure",
+    "third_body_gravity",
+}
 
 
 def _load_tudat_propagation_api() -> dict[str, Any]:
@@ -55,17 +59,55 @@ def _validate_default_tudat_scenario(scenario: Scenario) -> None:
 
 def _tudat_body_names(scenario: Scenario) -> list[str]:
     body_names = ["Earth"]
+    if scenario.force_model.solar_radiation_pressure or scenario.force_model.third_body_gravity:
+        body_names.append("Sun")
     if scenario.force_model.third_body_gravity:
-        body_names.extend(["Sun", "Moon"])
+        body_names.append("Moon")
     return body_names
+
+
+def _configure_tudat_spacecraft_environment(
+    scenario: Scenario,
+    bodies: Any,
+    environment_setup: Any,
+) -> None:
+    if scenario.force_model.atmospheric_drag:
+        aero_coefficient_settings = environment_setup.aerodynamic_coefficients.constant(
+            reference_area=scenario.spacecraft.area_m2,
+            constant_force_coefficient=[scenario.spacecraft.drag_coefficient, 0.0, 0.0],
+        )
+        environment_setup.add_aerodynamic_coefficient_interface(
+            bodies,
+            _SPACECRAFT_NAME,
+            aero_coefficient_settings,
+        )
+    if scenario.force_model.solar_radiation_pressure:
+        radiation_pressure_settings = (
+            environment_setup.radiation_pressure.cannonball_radiation_target(
+                reference_area=scenario.spacecraft.area_m2,
+                radiation_pressure_coefficient=scenario.spacecraft.reflectivity_coefficient,
+                per_source_occulting_bodies={"Sun": ["Earth"]},
+            )
+        )
+        environment_setup.add_radiation_pressure_target_model(
+            bodies,
+            _SPACECRAFT_NAME,
+            radiation_pressure_settings,
+        )
 
 
 def _tudat_gravity_acceleration_settings(
     scenario: Scenario,
     propagation_setup: Any,
 ) -> tuple[dict[str, list[Any]], dict[str, dict[str, list[str]]], list[str], str]:
-    third_body_enabled = scenario.force_model.third_body_gravity
-    runner_suffix = "_third_body" if third_body_enabled else ""
+    enabled_suffixes: list[str] = []
+    if scenario.force_model.atmospheric_drag:
+        enabled_suffixes.append("drag")
+    if scenario.force_model.solar_radiation_pressure:
+        enabled_suffixes.append("srp")
+    if scenario.force_model.third_body_gravity:
+        enabled_suffixes.append("third_body")
+    runner_suffix = f"_{'_'.join(enabled_suffixes)}" if enabled_suffixes else ""
 
     if scenario.force_model.gravity is ForceModelName.TWO_BODY:
         spacecraft_accelerations = {"Earth": [propagation_setup.acceleration.point_mass_gravity()]}
@@ -86,12 +128,24 @@ def _tudat_gravity_acceleration_settings(
             f"Default Tudat propagation does not support {scenario.force_model.gravity.value}"
         )
 
-    if third_body_enabled:
+    if scenario.force_model.atmospheric_drag:
+        spacecraft_accelerations["Earth"].append(propagation_setup.acceleration.aerodynamic())
+        acceleration_metadata[_SPACECRAFT_NAME]["Earth"].append("aerodynamic")
+        force_model_metadata.append("Earth aerodynamic drag")
+
+    if scenario.force_model.solar_radiation_pressure:
+        spacecraft_accelerations["Sun"] = [propagation_setup.acceleration.radiation_pressure()]
+        acceleration_metadata[_SPACECRAFT_NAME]["Sun"] = ["radiation_pressure"]
+        force_model_metadata.append("Sun cannonball solar radiation pressure")
+
+    if scenario.force_model.third_body_gravity:
         for body_name in ("Sun", "Moon"):
-            spacecraft_accelerations[body_name] = [
+            spacecraft_accelerations.setdefault(body_name, []).append(
                 propagation_setup.acceleration.point_mass_gravity()
-            ]
-            acceleration_metadata[_SPACECRAFT_NAME][body_name] = ["point_mass_gravity"]
+            )
+            acceleration_metadata[_SPACECRAFT_NAME].setdefault(body_name, []).append(
+                "point_mass_gravity"
+            )
             force_model_metadata.append(f"{body_name} point-mass third-body gravity")
 
     return spacecraft_accelerations, acceleration_metadata, force_model_metadata, runner_name
@@ -177,6 +231,7 @@ def _propagate_tudat_default(scenario: Scenario, runtime: TudatRuntime) -> Traje
     bodies = environment_setup.create_system_of_bodies(body_settings)
     bodies.create_empty_body(_SPACECRAFT_NAME)
     bodies.get(_SPACECRAFT_NAME).mass = scenario.spacecraft.mass_kg
+    _configure_tudat_spacecraft_environment(scenario, bodies, environment_setup)
 
     bodies_to_propagate = [_SPACECRAFT_NAME]
     central_bodies = ["Earth"]
