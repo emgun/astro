@@ -94,6 +94,33 @@ def test_force_model_config_accepts_optional_high_fidelity_flags() -> None:
     assert force_model.third_body_gravity is True
 
 
+def test_force_model_config_accepts_high_order_gravity_shape() -> None:
+    force_model = ForceModelConfig(
+        gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+        gravity_degree=8,
+        gravity_order=8,
+    )
+
+    assert force_model.gravity_degree == 8
+    assert force_model.gravity_order == 8
+
+
+def test_force_model_config_rejects_invalid_high_order_gravity_shape() -> None:
+    with pytest.raises(ValidationError, match="gravity_order must be less than or equal"):
+        ForceModelConfig(
+            gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+            gravity_degree=4,
+            gravity_order=8,
+        )
+
+    with pytest.raises(ValidationError, match="two_body gravity cannot set"):
+        ForceModelConfig(
+            gravity=ForceModelName.TWO_BODY,
+            gravity_degree=8,
+            gravity_order=8,
+        )
+
+
 def make_measurement_record(**overrides: object) -> MeasurementRecord:
     payload = {
         "measurement_type": MeasurementType.RANGE,

@@ -184,6 +184,37 @@ class ForceModelConfig(AstroModel):
     atmospheric_drag: bool = False
     solar_radiation_pressure: bool = False
     third_body_gravity: bool = False
+    gravity_degree: int | None = Field(default=None, ge=0)
+    gravity_order: int | None = Field(default=None, ge=0)
+
+    @field_validator("gravity_degree", "gravity_order", mode="before")
+    @classmethod
+    def gravity_harmonic_inputs_must_be_int_or_none(cls, value: Any) -> Any:
+        if value is None:
+            return value
+        return _integer_input_must_be_int(value, "Gravity harmonic degree/order")
+
+    @model_validator(mode="after")
+    def validate_gravity_harmonic_shape(self) -> ForceModelConfig:
+        has_degree = self.gravity_degree is not None
+        has_order = self.gravity_order is not None
+        if has_degree != has_order:
+            raise ValueError("gravity_degree and gravity_order must be provided together")
+        if not has_degree:
+            return self
+        assert self.gravity_degree is not None
+        assert self.gravity_order is not None
+        if self.gravity_order > self.gravity_degree:
+            raise ValueError("gravity_order must be less than or equal to gravity_degree")
+        if self.gravity is ForceModelName.TWO_BODY:
+            raise ValueError("two_body gravity cannot set gravity_degree or gravity_order")
+        if self.gravity is ForceModelName.J2 and (
+            self.gravity_degree != 2 or self.gravity_order != 0
+        ):
+            raise ValueError("j2 gravity requires gravity_degree=2 and gravity_order=0")
+        if self.gravity is ForceModelName.OREKIT_HIGH_FIDELITY and self.gravity_degree < 2:
+            raise ValueError("orekit_high_fidelity gravity_degree must be at least 2")
+        return self
 
     def enabled_high_fidelity_flags(self) -> tuple[str, ...]:
         flags: list[str] = []

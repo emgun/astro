@@ -61,6 +61,14 @@ def _validate_orekit_scenario(scenario: Scenario) -> None:
         raise UnsupportedBackendError(
             "Orekit propagation supports two_body, j2, and orekit_high_fidelity gravity"
         )
+    if (
+        scenario.force_model.gravity_degree is not None
+        or scenario.force_model.gravity_order is not None
+    ) and scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY:
+        raise UnsupportedBackendError(
+            "Orekit propagation does not yet support configured high-order gravity; "
+            "use the Tudat backend for spherical harmonic degree/order propagation"
+        )
 
 
 def _initial_orbit(scenario: Scenario, runtime: OrekitRuntime, frame: Any) -> Any:

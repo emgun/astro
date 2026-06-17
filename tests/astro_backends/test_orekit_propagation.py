@@ -180,6 +180,21 @@ def test_propagate_orekit_high_fidelity_uses_numerical_force_model_with_fake_run
     assert trajectory.metadata["unsupported_force_model_flags"] == []
 
 
+def test_propagate_orekit_rejects_high_order_gravity_shape() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+                gravity_degree=8,
+                gravity_order=8,
+            )
+        }
+    )
+
+    with pytest.raises(UnsupportedBackendError, match="high-order gravity"):
+        propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+
 def test_propagate_orekit_high_fidelity_drag_adds_drag_force_with_fake_runtime() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
         update={

@@ -128,14 +128,21 @@ def _tudat_gravity_acceleration_settings(
         force_model_metadata = ["Earth point-mass gravity"]
         runner_name = f"native_two_body{runner_suffix}"
     elif scenario.force_model.gravity in {ForceModelName.J2, ForceModelName.OREKIT_HIGH_FIDELITY}:
+        degree, order = _tudat_spherical_harmonic_degree_order(scenario)
+        acceleration_name = f"spherical_harmonic_gravity_degree_{degree}_order_{order}"
         spacecraft_accelerations = {
-            "Earth": [propagation_setup.acceleration.spherical_harmonic_gravity(2, 0)]
+            "Earth": [propagation_setup.acceleration.spherical_harmonic_gravity(degree, order)]
         }
         acceleration_metadata = {
-            _SPACECRAFT_NAME: {"Earth": ["spherical_harmonic_gravity_degree_2_order_0"]}
+            _SPACECRAFT_NAME: {"Earth": [acceleration_name]}
         }
-        force_model_metadata = ["Earth spherical harmonic gravity 2x0"]
-        runner_name = f"native_j2{runner_suffix}"
+        force_model_metadata = [f"Earth spherical harmonic gravity {degree}x{order}"]
+        runner_base = (
+            "native_j2"
+            if (degree, order) == (2, 0)
+            else f"native_spherical_harmonic_{degree}x{order}"
+        )
+        runner_name = f"{runner_base}{runner_suffix}"
     else:
         raise UnsupportedBackendError(
             f"Default Tudat propagation does not support {scenario.force_model.gravity.value}"
@@ -162,6 +169,15 @@ def _tudat_gravity_acceleration_settings(
             force_model_metadata.append(f"{body_name} point-mass third-body gravity")
 
     return spacecraft_accelerations, acceleration_metadata, force_model_metadata, runner_name
+
+
+def _tudat_spherical_harmonic_degree_order(scenario: Scenario) -> tuple[int, int]:
+    if scenario.force_model.gravity is ForceModelName.J2:
+        return 2, 0
+    return (
+        2 if scenario.force_model.gravity_degree is None else scenario.force_model.gravity_degree,
+        0 if scenario.force_model.gravity_order is None else scenario.force_model.gravity_order,
+    )
 
 
 def _tudat_epoch(epoch: datetime, date_time: Any) -> float:
@@ -552,6 +568,7 @@ def _propagate_tudat_default(scenario: Scenario, runtime: TudatRuntime) -> Traje
     spacecraft_accelerations, acceleration_metadata, force_model_metadata, runner_name = (
         _tudat_gravity_acceleration_settings(scenario, propagation_setup)
     )
+    gravity_degree, gravity_order = _tudat_gravity_metadata_degree_order(scenario)
     acceleration_settings = {_SPACECRAFT_NAME: spacecraft_accelerations}
     acceleration_models = propagation_setup.create_acceleration_models(
         bodies,
@@ -597,12 +614,20 @@ def _propagate_tudat_default(scenario: Scenario, runtime: TudatRuntime) -> Traje
             "tudat_global_frame_orientation": global_frame_orientation,
             "tudat_acceleration_models": acceleration_metadata,
             "tudat_force_models": force_model_metadata,
+            "tudat_gravity_degree": gravity_degree,
+            "tudat_gravity_order": gravity_order,
             "tudat_integrator": "runge_kutta_fixed_step_rk4",
             "tudat_step_s": scenario.propagation.step_s,
             "tudat_propagator": "cowell",
             "units": "suite km/km_s converted to Tudat SI m/m_s",
         },
     )
+
+
+def _tudat_gravity_metadata_degree_order(scenario: Scenario) -> tuple[int | None, int | None]:
+    if scenario.force_model.gravity is ForceModelName.TWO_BODY:
+        return None, None
+    return _tudat_spherical_harmonic_degree_order(scenario)
 
 
 def _with_tudat_provenance(

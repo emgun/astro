@@ -8,7 +8,7 @@ from astro_backends.tudat.propagation import propagate_tudat
 from astro_backends.tudat.runtime import TudatRuntime
 from astro_core.errors import UnsupportedBackendError
 from astro_core.io import load_scenario
-from astro_core.models import Scenario, Trajectory
+from astro_core.models import ForceModelConfig, ForceModelName, Scenario, Trajectory
 from astro_dynamics.local import propagate_local
 
 
@@ -115,6 +115,50 @@ def test_propagate_tudat_runs_default_j2_with_fake_tudat_modules(
     assert trajectory.metadata["tudat_force_models"] == ["Earth spherical harmonic gravity 2x0"]
     assert len(trajectory.samples) == scenario.propagation.sample_count
     assert trajectory.samples[1].state.position_km == pytest.approx((7000.0, 450.0, 60.0))
+
+
+def test_load_tudat_high_order_gravity_example() -> None:
+    scenario = load_scenario("examples/scenarios/leo_tudat_high_order_gravity.yaml")
+
+    assert scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+    assert scenario.force_model.gravity_degree == 8
+    assert scenario.force_model.gravity_order == 8
+    assert scenario.force_model.atmospheric_drag is False
+    assert scenario.force_model.solar_radiation_pressure is False
+    assert scenario.force_model.third_body_gravity is False
+
+
+def test_propagate_tudat_runs_high_order_gravity_with_fake_tudat_modules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_scenario = load_scenario("examples/scenarios/leo_orekit_high_fidelity.yaml")
+    scenario = base_scenario.model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+                gravity_degree=8,
+                gravity_order=8,
+            )
+        }
+    )
+    fake_modules = _FakeTudatModules()
+    monkeypatch.setattr(
+        "astro_backends.tudat.propagation.import_module",
+        fake_modules.import_module,
+    )
+
+    trajectory = propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.backend == "tudat"
+    assert trajectory.metadata["tudat_runner"] == "native_spherical_harmonic_8x8"
+    assert trajectory.metadata["tudat_acceleration_models"] == {
+        "AstroSuiteSpacecraft": {"Earth": ["spherical_harmonic_gravity_degree_8_order_8"]}
+    }
+    assert trajectory.metadata["tudat_force_models"] == [
+        "Earth spherical harmonic gravity 8x8"
+    ]
+    assert trajectory.metadata["tudat_gravity_degree"] == 8
+    assert trajectory.metadata["tudat_gravity_order"] == 8
 
 
 def test_propagate_tudat_runs_third_body_with_fake_tudat_modules(
