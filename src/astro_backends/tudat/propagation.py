@@ -12,7 +12,12 @@ from astro_core.models import CartesianState, ForceModelName, Scenario, Trajecto
 TudatRuntimeLoader = Callable[[], TudatRuntime]
 TudatPropagationRunner = Callable[[Scenario, TudatRuntime], Trajectory]
 _SPACECRAFT_NAME = "AstroSuiteSpacecraft"
-_SUPPORTED_DEFAULT_TUDAT_FORCE_MODELS = (ForceModelName.TWO_BODY, ForceModelName.J2)
+_SUPPORTED_DEFAULT_TUDAT_FORCE_MODELS = (
+    ForceModelName.TWO_BODY,
+    ForceModelName.J2,
+    ForceModelName.OREKIT_HIGH_FIDELITY,
+)
+_SUPPORTED_TUDAT_HIGH_FIDELITY_FLAGS = {"third_body_gravity"}
 
 
 def _load_tudat_propagation_api() -> dict[str, Any]:
@@ -37,37 +42,59 @@ def _validate_default_tudat_scenario(scenario: Scenario) -> None:
             "Default Tudat propagation currently supports only "
             f"{supported}"
         )
-    enabled_flags = scenario.force_model.enabled_high_fidelity_flags()
-    if enabled_flags:
+    enabled_flags = set(scenario.force_model.enabled_high_fidelity_flags())
+    unsupported_flags = enabled_flags - _SUPPORTED_TUDAT_HIGH_FIDELITY_FLAGS
+    if unsupported_flags:
         raise UnsupportedBackendError(
             "Default Tudat propagation does not yet support high-fidelity force flags: "
-            f"{', '.join(enabled_flags)}"
+            f"{', '.join(sorted(unsupported_flags))}"
         )
     if scenario.maneuvers:
         raise UnsupportedBackendError("Default Tudat propagation does not yet support maneuvers")
+
+
+def _tudat_body_names(scenario: Scenario) -> list[str]:
+    body_names = ["Earth"]
+    if scenario.force_model.third_body_gravity:
+        body_names.extend(["Sun", "Moon"])
+    return body_names
 
 
 def _tudat_gravity_acceleration_settings(
     scenario: Scenario,
     propagation_setup: Any,
 ) -> tuple[dict[str, list[Any]], dict[str, dict[str, list[str]]], list[str], str]:
+    third_body_enabled = scenario.force_model.third_body_gravity
+    runner_suffix = "_third_body" if third_body_enabled else ""
+
     if scenario.force_model.gravity is ForceModelName.TWO_BODY:
-        return (
-            {"Earth": [propagation_setup.acceleration.point_mass_gravity()]},
-            {_SPACECRAFT_NAME: {"Earth": ["point_mass_gravity"]}},
-            ["Earth point-mass gravity"],
-            "native_two_body",
+        spacecraft_accelerations = {"Earth": [propagation_setup.acceleration.point_mass_gravity()]}
+        acceleration_metadata = {_SPACECRAFT_NAME: {"Earth": ["point_mass_gravity"]}}
+        force_model_metadata = ["Earth point-mass gravity"]
+        runner_name = f"native_two_body{runner_suffix}"
+    elif scenario.force_model.gravity in {ForceModelName.J2, ForceModelName.OREKIT_HIGH_FIDELITY}:
+        spacecraft_accelerations = {
+            "Earth": [propagation_setup.acceleration.spherical_harmonic_gravity(2, 0)]
+        }
+        acceleration_metadata = {
+            _SPACECRAFT_NAME: {"Earth": ["spherical_harmonic_gravity_degree_2_order_0"]}
+        }
+        force_model_metadata = ["Earth spherical harmonic gravity 2x0"]
+        runner_name = f"native_j2{runner_suffix}"
+    else:
+        raise UnsupportedBackendError(
+            f"Default Tudat propagation does not support {scenario.force_model.gravity.value}"
         )
-    if scenario.force_model.gravity is ForceModelName.J2:
-        return (
-            {"Earth": [propagation_setup.acceleration.spherical_harmonic_gravity(2, 0)]},
-            {_SPACECRAFT_NAME: {"Earth": ["spherical_harmonic_gravity_degree_2_order_0"]}},
-            ["Earth spherical harmonic gravity 2x0"],
-            "native_j2",
-        )
-    raise UnsupportedBackendError(
-        f"Default Tudat propagation does not support {scenario.force_model.gravity.value}"
-    )
+
+    if third_body_enabled:
+        for body_name in ("Sun", "Moon"):
+            spacecraft_accelerations[body_name] = [
+                propagation_setup.acceleration.point_mass_gravity()
+            ]
+            acceleration_metadata[_SPACECRAFT_NAME][body_name] = ["point_mass_gravity"]
+            force_model_metadata.append(f"{body_name} point-mass third-body gravity")
+
+    return spacecraft_accelerations, acceleration_metadata, force_model_metadata, runner_name
 
 
 def _tudat_epoch(epoch: datetime, date_time: Any) -> float:
@@ -143,7 +170,7 @@ def _propagate_tudat_default(scenario: Scenario, runtime: TudatRuntime) -> Traje
     global_frame_origin = "Earth"
     global_frame_orientation = "J2000"
     body_settings = environment_setup.get_default_body_settings(
-        ["Earth"],
+        _tudat_body_names(scenario),
         global_frame_origin,
         global_frame_orientation,
     )

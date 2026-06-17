@@ -48,7 +48,8 @@ Implemented and protected:
   records.
 - Optional RocketPy and Dymos/OpenMDAO launch backend gates, including configured RocketPy direct
   flight mapping and a stage-aware Dymos vertical-ascent phase transcription.
-- Optional Tudat native two-body and J2 spherical-harmonic propagation cross-check runners.
+- Optional Tudat native two-body, J2 spherical-harmonic, and Sun/Moon point-mass third-body
+  propagation cross-check runners.
 
 Still roadmap-level:
 
@@ -56,8 +57,8 @@ Still roadmap-level:
   torque-level attitude-control maneuver dynamics.
 - Full native multi-motor RocketPy staging and full pitch-program multistage Dymos ascent
   optimization.
-- Tudat high-fidelity force-model/body construction beyond the current native two-body and J2
-  cross-check runners.
+- Tudat high-fidelity force-model/body construction beyond the current native two-body, J2, and
+  Sun/Moon point-mass third-body cross-check runners.
 - Full precession-nutation reductions, DSN calibration products beyond the current configurable
   weather/frequency media primitives, and operational CCSDS support beyond current KVN TDM
   measurement families, suite multi-leg radiometric TDM extension, OEM ephemeris interchange, and
@@ -355,24 +356,24 @@ Tradeoff:
 
 Status: high-fidelity/research backend slices implemented for runtime gates, product boundaries,
 and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke commands, native Tudat
-two-body and J2 cross-check propagation runners, built-in JAX two-body and J2 research propagation runners,
+two-body, J2, and Sun/Moon point-mass third-body cross-check propagation runners, built-in JAX two-body and J2 research propagation runners,
 `orekit_high_fidelity`
 screening through the JAX J2 baseline, JAX research approximations for atmospheric drag, solar
 radiation pressure, and analytic circular Sun/Moon third-body gravity, opt-in JAX final-state
 transition sensitivities, JAX range/range-rate, inertial RA/Dec, and local-horizon az/el OD
 residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
 Nyx/ANISE evaluation gate are
-implemented. Tudat high-fidelity force models beyond the current two-body/J2 runner, JAX
+implemented. Tudat high-fidelity force models beyond the current two-body/J2/third-body runner, JAX
 ephemeris-backed third-body force models, and operational-grade
 differentiable OD estimator workflows remain gated on validated runner implementations.
 
 Implemented slice:
 
 - `astro tudat-smoke` and `astro jax-smoke` return structured availability diagnostics.
-- `astro propagate --backend tudat` runs native Tudat two-body Earth point-mass and J2
-  degree/order 2 spherical-harmonic cross-checks when TudatPy is installed, using Tudat
-  environment/body setup, fixed-step RK4 integration, Cowell translational propagation settings,
-  and suite `Trajectory` product mapping.
+- `astro propagate --backend tudat` runs native Tudat two-body Earth point-mass, J2 degree/order 2
+  spherical-harmonic, and Sun/Moon point-mass third-body cross-checks when TudatPy is installed,
+  using Tudat environment/body setup, fixed-step RK4 integration, Cowell translational propagation
+  settings, and suite `Trajectory` product mapping.
 - `astro research-propagate --backend local` runs seeded local ensembles.
 - `astro research-propagate --backend jax` runs vectorized two-body and J2 RK4 seeded ensembles and
   returns suite `MonteCarloResult` products.
@@ -395,9 +396,10 @@ Implemented slice:
 
 Definition of done:
 
-- `astro propagate --backend tudat` supports checked-in two-body and J2 cross-check scenarios and
-  records Tudat provenance through the native runners. Tudat drag, SRP, third-body, and higher-order
-  gravity force models remain gated on validated body and acceleration-model construction.
+- `astro propagate --backend tudat` supports checked-in two-body, J2, and third-body cross-check
+  scenarios and records Tudat provenance through the native runners. Tudat drag, SRP, and
+  higher-order gravity force models remain gated on validated body and acceleration-model
+  construction.
 - `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
   screening-only `orekit_high_fidelity`, drag, SRP, and analytic Sun/Moon third-body force flags
   without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and

@@ -46,7 +46,7 @@ def test_propagate_tudat_default_runner_rejects_unsupported_force_model(
         fake_modules.import_module,
     )
 
-    with pytest.raises(UnsupportedBackendError, match="supports only two_body"):
+    with pytest.raises(UnsupportedBackendError, match="does not yet support high-fidelity"):
         propagate_tudat(scenario, runtime_loader=_fake_runtime)
 
 
@@ -98,6 +98,36 @@ def test_propagate_tudat_runs_default_j2_with_fake_tudat_modules(
     assert trajectory.metadata["tudat_force_models"] == ["Earth spherical harmonic gravity 2x0"]
     assert len(trajectory.samples) == scenario.propagation.sample_count
     assert trajectory.samples[1].state.position_km == pytest.approx((7000.0, 450.0, 60.0))
+
+
+def test_propagate_tudat_runs_third_body_with_fake_tudat_modules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = load_scenario("examples/scenarios/leo_orekit_third_body.yaml")
+    fake_modules = _FakeTudatModules()
+    monkeypatch.setattr(
+        "astro_backends.tudat.propagation.import_module",
+        fake_modules.import_module,
+    )
+
+    trajectory = propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+    assert fake_modules.environment_setup.requested_bodies == ["Earth", "Sun", "Moon"]
+    assert trajectory.backend == "tudat"
+    assert trajectory.metadata["tudat_runner"] == "native_j2_third_body"
+    assert trajectory.metadata["tudat_acceleration_models"] == {
+        "AstroSuiteSpacecraft": {
+            "Earth": ["spherical_harmonic_gravity_degree_2_order_0"],
+            "Sun": ["point_mass_gravity"],
+            "Moon": ["point_mass_gravity"],
+        }
+    }
+    assert trajectory.metadata["tudat_force_models"] == [
+        "Earth spherical harmonic gravity 2x0",
+        "Sun point-mass third-body gravity",
+        "Moon point-mass third-body gravity",
+    ]
+    assert len(trajectory.samples) == scenario.propagation.sample_count
 
 
 def test_propagate_tudat_returns_suite_product_with_fake_runner() -> None:
@@ -177,12 +207,16 @@ class _FakeBodies:
 
 
 class _FakeEnvironmentSetup:
-    @staticmethod
+    requested_bodies: list[str] = []
+
+    @classmethod
     def get_default_body_settings(
+        cls,
         bodies_to_create: list[str],
         global_frame_origin: str,
         global_frame_orientation: str,
     ) -> dict[str, object]:
+        cls.requested_bodies = bodies_to_create
         return {
             "bodies_to_create": bodies_to_create,
             "global_frame_origin": global_frame_origin,
@@ -297,9 +331,10 @@ class _FakeSimulator:
 class _FakeTudatModules:
     def __init__(self) -> None:
         self.spice = _FakeSpice()
+        self.environment_setup = _FakeEnvironmentSetup
         self.modules: dict[str, Any] = {
             "tudatpy.interface.spice": self.spice,
-            "tudatpy.dynamics.environment_setup": _FakeEnvironmentSetup,
+            "tudatpy.dynamics.environment_setup": self.environment_setup,
             "tudatpy.dynamics.propagation_setup": _FakePropagationSetup,
             "tudatpy.dynamics.simulator": _FakeSimulator,
             "tudatpy.astro.time_representation": SimpleNamespace(DateTime=_FakeDateTime),
