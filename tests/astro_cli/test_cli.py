@@ -311,6 +311,8 @@ def test_screen_conjunction_command_writes_covariance_probability(tmp_path: Path
             "1.0",
             "--hard-body-radius-km",
             "0.02",
+            "--probability-method",
+            "density",
             "--output",
             str(output),
         ],
@@ -321,6 +323,47 @@ def test_screen_conjunction_command_writes_covariance_probability(tmp_path: Path
     assert payload["probability_of_collision"] > 0.0
     assert payload["hard_body_radius_km"] == 0.02
     assert payload["metadata"]["probability_model"] == "encounter_plane_gaussian_density"
+
+
+def test_screen_conjunction_command_writes_integrated_probability(tmp_path: Path) -> None:
+    primary_path = tmp_path / "primary.json"
+    secondary_path = tmp_path / "secondary.json"
+    output = tmp_path / "conjunction.json"
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+    primary = propagate_local(scenario)
+    secondary_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": scenario.initial_state.cartesian.model_copy(
+                update={"position_km": (7000.05, 0.0, 0.0)}
+            )
+        }
+    )
+    secondary = propagate_local(scenario.model_copy(update={"initial_state": secondary_state}))
+    primary_path.write_text(primary.model_dump_json(indent=2), encoding="utf-8")
+    secondary_path.write_text(secondary.model_dump_json(indent=2), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "screen-conjunction",
+            str(primary_path),
+            str(secondary_path),
+            "--threshold-km",
+            "1.0",
+            "--hard-body-radius-km",
+            "0.5",
+            "--probability-method",
+            "integrated",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["probability_of_collision"] > 0.0
+    assert payload["metadata"]["probability_model"] == "encounter_plane_gaussian_integral"
+    assert payload["metadata"]["probability_quadrature"] == "gauss_legendre_polar"
 
 
 def test_export_trajectory_command_writes_oem(tmp_path: Path) -> None:

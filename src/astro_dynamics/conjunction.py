@@ -17,6 +17,10 @@ from astro_core.models import (
     _numeric_sequence_input_must_be_numbers,
 )
 
+_PROBABILITY_METHODS: set[str] = {"density", "integrated"}
+_PROBABILITY_RADIAL_QUADRATURE_ORDER = 32
+_PROBABILITY_ANGULAR_QUADRATURE_ORDER = 64
+
 
 class ConjunctionScreeningResult(AstroModel):
     primary_scenario_id: str = Field(min_length=1)
@@ -128,6 +132,53 @@ def _probability_metadata_unavailable(reason: str) -> dict[str, Any]:
     }
 
 
+def _density_probability(
+    *,
+    projected_relative_position: np.ndarray[tuple[int], np.dtype[np.float64]],
+    inverse_covariance: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+    determinant: float,
+    hard_body_radius_km: float,
+) -> float:
+    mahalanobis_squared = float(
+        projected_relative_position @ inverse_covariance @ projected_relative_position
+    )
+    density_at_miss = float(
+        np.exp(-0.5 * mahalanobis_squared) / (2.0 * np.pi * determinant**0.5)
+    )
+    return min(1.0, max(0.0, density_at_miss * np.pi * hard_body_radius_km**2))
+
+
+def _integrated_probability(
+    *,
+    projected_relative_position: np.ndarray[tuple[int], np.dtype[np.float64]],
+    inverse_covariance: np.ndarray[tuple[int, int], np.dtype[np.float64]],
+    determinant: float,
+    hard_body_radius_km: float,
+) -> float:
+    radial_nodes, radial_weights = np.polynomial.legendre.leggauss(  # type: ignore[no-untyped-call]
+        _PROBABILITY_RADIAL_QUADRATURE_ORDER
+    )
+    angular_nodes, angular_weights = np.polynomial.legendre.leggauss(  # type: ignore[no-untyped-call]
+        _PROBABILITY_ANGULAR_QUADRATURE_ORDER
+    )
+    radii = 0.5 * hard_body_radius_km * (radial_nodes + 1.0)
+    radius_weights = 0.5 * hard_body_radius_km * radial_weights
+    angles = np.pi * (angular_nodes + 1.0)
+    angle_weights = np.pi * angular_weights
+    normalizer = 1.0 / (2.0 * np.pi * determinant**0.5)
+    integral = 0.0
+    for radius, radius_weight in zip(radii, radius_weights, strict=True):
+        for angle, angle_weight in zip(angles, angle_weights, strict=True):
+            point = np.array(
+                [radius * np.cos(angle), radius * np.sin(angle)],
+                dtype=np.float64,
+            )
+            delta = point - projected_relative_position
+            exponent = -0.5 * float(delta @ inverse_covariance @ delta)
+            integral += float(normalizer * np.exp(exponent) * radius * radius_weight * angle_weight)
+    return min(1.0, max(0.0, integral))
+
+
 def _covariance_probability_metadata(
     primary: Trajectory,
     secondary: Trajectory,
@@ -136,6 +187,7 @@ def _covariance_probability_metadata(
     relative_position: np.ndarray[tuple[int], np.dtype[np.float64]],
     relative_velocity: np.ndarray[tuple[int], np.dtype[np.float64]],
     hard_body_radius_km: float | None,
+    probability_method: str,
 ) -> tuple[float | None, dict[str, Any]]:
     if hard_body_radius_km is None:
         return None, {}
@@ -162,15 +214,31 @@ def _covariance_probability_metadata(
 
     projected_relative_position = encounter_plane @ relative_position
     inverse_covariance = np.linalg.inv(encounter_covariance)
-    mahalanobis_squared = float(
-        projected_relative_position @ inverse_covariance @ projected_relative_position
-    )
-    density_at_miss = float(
-        np.exp(-0.5 * mahalanobis_squared) / (2.0 * np.pi * determinant**0.5)
-    )
-    probability = min(1.0, max(0.0, density_at_miss * np.pi * hard_body_radius_km**2))
-    return probability, {
-        "probability_model": "encounter_plane_gaussian_density",
+    if probability_method == "density":
+        probability = _density_probability(
+            projected_relative_position=projected_relative_position,
+            inverse_covariance=inverse_covariance,
+            determinant=determinant,
+            hard_body_radius_km=hard_body_radius_km,
+        )
+        probability_metadata: dict[str, Any] = {
+            "probability_model": "encounter_plane_gaussian_density",
+            "probability_approximation": "local_gaussian_density_times_hard_body_area",
+        }
+    else:
+        probability = _integrated_probability(
+            projected_relative_position=projected_relative_position,
+            inverse_covariance=inverse_covariance,
+            determinant=determinant,
+            hard_body_radius_km=hard_body_radius_km,
+        )
+        probability_metadata = {
+            "probability_model": "encounter_plane_gaussian_integral",
+            "probability_quadrature": "gauss_legendre_polar",
+            "probability_radial_quadrature_order": _PROBABILITY_RADIAL_QUADRATURE_ORDER,
+            "probability_angular_quadrature_order": _PROBABILITY_ANGULAR_QUADRATURE_ORDER,
+        }
+    return probability, probability_metadata | {
         "covariance_source": "trajectory_covariance_history",
         "combined_position_covariance_km2": _matrix3_to_nested_list(
             combined_position_covariance
@@ -181,7 +249,6 @@ def _covariance_probability_metadata(
         "encounter_plane_relative_position_km": [
             float(component) for component in projected_relative_position
         ],
-        "probability_approximation": "local_gaussian_density_times_hard_body_area",
     }
 
 
@@ -191,9 +258,12 @@ def screen_conjunction(
     *,
     threshold_km: float,
     hard_body_radius_km: float | None = None,
+    probability_method: str = "integrated",
 ) -> ConjunctionScreeningResult:
     if not isfinite(threshold_km) or threshold_km <= 0.0:
         raise ValueError("threshold_km must be finite and positive")
+    if probability_method not in _PROBABILITY_METHODS:
+        raise ValueError("probability_method must be density or integrated")
 
     primary_by_epoch = _trajectory_samples_by_epoch(primary)
     secondary_by_epoch = _trajectory_samples_by_epoch(secondary)
@@ -235,6 +305,7 @@ def screen_conjunction(
         relative_position=relative_position,
         relative_velocity=relative_velocity,
         hard_body_radius_km=hard_body_radius_km,
+        probability_method=probability_method,
     )
 
     return ConjunctionScreeningResult(

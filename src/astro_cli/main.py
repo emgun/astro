@@ -440,6 +440,7 @@ def screen_conjunction_command(
     output: Annotated[Path, typer.Option()],
     threshold_km: Annotated[float, typer.Option()] = 1.0,
     hard_body_radius_km: Annotated[float | None, typer.Option()] = None,
+    probability_method: Annotated[str, typer.Option()] = "integrated",
 ) -> None:
     """Screen two time-aligned trajectory products for closest approach."""
     primary = _load_trajectory_or_exit(primary_trajectory_path)
@@ -450,6 +451,7 @@ def screen_conjunction_command(
             secondary,
             threshold_km=threshold_km,
             hard_body_radius_km=hard_body_radius_km,
+            probability_method=probability_method,
         )
     except ValueError as exc:
         typer.echo(str(exc), err=True)

@@ -123,7 +123,7 @@ astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit -
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
-astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --hard-body-radius-km 0.02 --output conjunction_screening.json
+astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output conjunction_screening.json
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke
 astro dymos-smoke
@@ -232,8 +232,10 @@ dynamics, drag/SRP variational equations, and production conjunction analysis re
 deterministic first-order screening result with time of closest approach, miss distance, relative
 speed, threshold status, and relative-state metadata. When both trajectories carry covariance
 history at TCA and `--hard-body-radius-km` is supplied, it also writes a bounded encounter-plane
-Gaussian density probability approximation. This is useful for covariance-aware screening, but it is
-not a full production conjunction assessment or validated high-fidelity probability integral.
+probability estimate. The default `integrated` method numerically integrates the 2D Gaussian over
+the hard-body disk with Gauss-Legendre polar quadrature; `--probability-method density` preserves the
+faster local-density-times-area screening approximation. This is useful for covariance-aware
+screening, but it is not a full production conjunction assessment.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage

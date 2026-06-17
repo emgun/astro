@@ -41,7 +41,13 @@ def test_screen_conjunction_estimates_probability_from_covariance_history() -> N
     )
     secondary = propagate_local(scenario.model_copy(update={"initial_state": secondary_state}))
 
-    result = screen_conjunction(primary, secondary, threshold_km=1.0, hard_body_radius_km=0.02)
+    result = screen_conjunction(
+        primary,
+        secondary,
+        threshold_km=1.0,
+        hard_body_radius_km=0.02,
+        probability_method="density",
+    )
 
     assert result.probability_of_collision is not None
     assert 0.0 < result.probability_of_collision < 1.0
@@ -53,6 +59,43 @@ def test_screen_conjunction_estimates_probability_from_covariance_history() -> N
         [0.0, 2.0, 0.0],
         [0.0, 0.0, 2.0],
     ]
+
+
+def test_screen_conjunction_integrates_encounter_plane_probability() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+    primary = propagate_local(scenario)
+    secondary_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": scenario.initial_state.cartesian.model_copy(
+                update={"position_km": (7000.05, 0.0, 0.0)}
+            )
+        }
+    )
+    secondary = propagate_local(scenario.model_copy(update={"initial_state": secondary_state}))
+
+    density_result = screen_conjunction(
+        primary,
+        secondary,
+        threshold_km=1.0,
+        hard_body_radius_km=0.5,
+        probability_method="density",
+    )
+    integrated_result = screen_conjunction(
+        primary,
+        secondary,
+        threshold_km=1.0,
+        hard_body_radius_km=0.5,
+        probability_method="integrated",
+    )
+
+    assert integrated_result.probability_of_collision is not None
+    assert density_result.probability_of_collision is not None
+    assert 0.0 < integrated_result.probability_of_collision < 1.0
+    assert integrated_result.probability_of_collision < density_result.probability_of_collision
+    assert integrated_result.metadata["probability_model"] == (
+        "encounter_plane_gaussian_integral"
+    )
+    assert integrated_result.metadata["probability_quadrature"] == "gauss_legendre_polar"
 
 
 def test_screen_conjunction_rejects_trajectories_without_common_epochs() -> None:
