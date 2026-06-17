@@ -373,6 +373,28 @@ def test_research_propagate_jax_maps_orekit_high_fidelity_to_research_j2_baselin
     )
 
 
+def test_research_propagate_jax_rejects_high_order_gravity_shape() -> None:
+    scenario = load_scenario("examples/scenarios/leo_two_body.yaml").model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+                gravity_degree=8,
+                gravity_order=8,
+            )
+        }
+    )
+
+    with pytest.raises(UnsupportedBackendError, match="high-order gravity"):
+        research_propagate_jax(
+            scenario,
+            cases=1,
+            position_sigma_km=0.0,
+            velocity_sigma_km_s=0.0,
+            seed=7,
+            runtime_loader=_fake_runtime,
+        )
+
+
 def test_research_propagate_jax_runs_research_drag_and_srp_force_flags() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml").model_copy(
         update={

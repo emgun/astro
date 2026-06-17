@@ -298,6 +298,14 @@ def _validate_jax_force_model(scenario: Scenario) -> None:
             "JAX research propagation currently supports only two_body, j2, and "
             "orekit_high_fidelity screening force models"
         )
+    if (
+        scenario.force_model.gravity_degree is not None
+        or scenario.force_model.gravity_order is not None
+    ):
+        raise UnsupportedBackendError(
+            "JAX research propagation does not yet support configured high-order gravity; "
+            "use the Tudat backend for spherical harmonic degree/order propagation"
+        )
 
 
 def _default_jax_two_body_runner(
