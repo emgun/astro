@@ -662,6 +662,75 @@ def test_research_propagate_command_accepts_jax_backend(
     assert payload["backend"] == "jax"
 
 
+def test_research_propagate_command_accepts_jax_high_order_gravity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "jax-high-order-research.json"
+
+    def fake_jax(
+        scenario: Scenario,
+        *,
+        cases: int,
+        position_sigma_km: float,
+        velocity_sigma_km_s: float,
+        seed: int,
+        include_sensitivities: bool,
+    ) -> object:
+        assert scenario.scenario_id == "leo-jax-high-order-gravity-research"
+        assert scenario.force_model.gravity_degree == 8
+        assert scenario.force_model.gravity_order == 8
+        assert include_sensitivities is False
+        result = run_initial_state_monte_carlo(
+            load_scenario(Path("examples/scenarios/leo_two_body.yaml")),
+            cases=cases,
+            position_sigma_km=position_sigma_km,
+            velocity_sigma_km_s=velocity_sigma_km_s,
+            seed=seed,
+            backend="local",
+        )
+        return result.model_copy(
+            update={
+                "backend": "jax",
+                "metadata": {
+                    **result.metadata,
+                    "gravity_harmonic_screening_model": (
+                        "j2_baseline_with_configured_degree_order_metadata"
+                    ),
+                },
+            }
+        )
+
+    monkeypatch.setattr("astro_cli.main.research_propagate_jax", fake_jax)
+
+    result = runner.invoke(
+        app,
+        [
+            "research-propagate",
+            "examples/scenarios/leo_jax_high_order_gravity_research.yaml",
+            "--backend",
+            "jax",
+            "--cases",
+            "1",
+            "--position-sigma-km",
+            "0",
+            "--velocity-sigma-km-s",
+            "0",
+            "--seed",
+            "7",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["backend"] == "jax"
+    assert payload["metadata"]["gravity_harmonic_screening_model"] == (
+        "j2_baseline_with_configured_degree_order_metadata"
+    )
+
+
 def test_research_od_sensitivity_command_accepts_jax_backend(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

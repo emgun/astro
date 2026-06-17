@@ -110,7 +110,11 @@ def _j2_acceleration(jnp: Any, position: Any) -> Any:
 
 
 def _research_force_model_names(scenario: Scenario) -> list[str]:
-    force_models = ["J2" if _uses_j2_baseline(scenario.force_model.gravity) else "two_body"]
+    if _uses_configured_gravity_screening_baseline(scenario):
+        gravity_model = "J2_high_order_screening_baseline"
+    else:
+        gravity_model = "J2" if _uses_j2_baseline(scenario.force_model.gravity) else "two_body"
+    force_models = [gravity_model]
     if scenario.force_model.atmospheric_drag:
         force_models.append("exponential_atmospheric_drag")
     if scenario.force_model.solar_radiation_pressure:
@@ -121,17 +125,38 @@ def _research_force_model_names(scenario: Scenario) -> list[str]:
 
 
 def _research_force_metadata(scenario: Scenario) -> dict[str, Any]:
-    if not scenario.force_model.third_body_gravity:
-        return {}
-    return {
-        "third_body_ephemeris_model": _THIRD_BODY_EPHEMERIS_MODEL,
-        "third_body_bodies": ["sun", "moon"],
-        "third_body_force_policy": _RESEARCH_FORCE_MODEL_POLICY,
-    }
+    metadata: dict[str, Any] = {}
+    if _uses_configured_gravity_screening_baseline(scenario):
+        metadata.update(
+            {
+                "gravity_degree": scenario.force_model.gravity_degree,
+                "gravity_order": scenario.force_model.gravity_order,
+                "gravity_harmonic_screening_model": (
+                    "j2_baseline_with_configured_degree_order_metadata"
+                ),
+            }
+        )
+    if scenario.force_model.third_body_gravity:
+        metadata.update(
+            {
+                "third_body_ephemeris_model": _THIRD_BODY_EPHEMERIS_MODEL,
+                "third_body_bodies": ["sun", "moon"],
+                "third_body_force_policy": _RESEARCH_FORCE_MODEL_POLICY,
+            }
+        )
+    return metadata
 
 
 def _uses_j2_baseline(force_model: ForceModelName) -> bool:
     return force_model in {ForceModelName.J2, ForceModelName.OREKIT_HIGH_FIDELITY}
+
+
+def _uses_configured_gravity_screening_baseline(scenario: Scenario) -> bool:
+    return (
+        scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+        and scenario.force_model.gravity_degree is not None
+        and scenario.force_model.gravity_order is not None
+    )
 
 
 def _drag_acceleration(jnp: Any, position: Any, velocity: Any, scenario: Scenario) -> Any:
@@ -297,14 +322,6 @@ def _validate_jax_force_model(scenario: Scenario) -> None:
         raise UnsupportedBackendError(
             "JAX research propagation currently supports only two_body, j2, and "
             "orekit_high_fidelity screening force models"
-        )
-    if (
-        scenario.force_model.gravity_degree is not None
-        or scenario.force_model.gravity_order is not None
-    ):
-        raise UnsupportedBackendError(
-            "JAX research propagation does not yet support configured high-order gravity; "
-            "use the Tudat backend for spherical harmonic degree/order propagation"
         )
 
 

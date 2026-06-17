@@ -384,7 +384,8 @@ two-body, J2, configured high-order Earth spherical harmonic, drag, SRP, and Sun
 third-body cross-check propagation runners, built-in JAX two-body and J2 research propagation
 runners, suite finite-difference covariance-history propagation through selected Tudat force
 models, a Tudat-vs-reference calibrated comparison product, `orekit_high_fidelity`
-screening through the JAX J2 baseline, JAX research approximations for atmospheric drag, solar
+screening through the JAX J2 baseline, configured degree/order high-order gravity screening through
+the same J2 baseline with explicit provenance, JAX research approximations for atmospheric drag, solar
 radiation pressure, and analytic circular Sun/Moon third-body gravity, opt-in JAX final-state
 transition sensitivities, JAX range/range-rate, inertial RA/Dec, and local-horizon az/el OD
 residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
@@ -418,8 +419,9 @@ Implemented slice:
 - `astro research-propagate --backend jax` runs vectorized two-body and J2 RK4 seeded ensembles and
   returns suite `MonteCarloResult` products.
 - `astro research-propagate --backend jax` accepts `orekit_high_fidelity` as a research screening
-  baseline backed by J2, plus explicit atmospheric-drag and solar-radiation-pressure force flags
-  with metadata marking the product as screening-only rather than an operational ephemeris.
+  baseline backed by J2, including configured degree/order high-order gravity metadata, plus
+  explicit atmospheric-drag and solar-radiation-pressure force flags with metadata marking the
+  product as screening-only rather than an operational ephemeris.
 - `astro research-propagate --backend jax` accepts `third_body_gravity: true` through an analytic
   circular Sun/Moon point-mass approximation and records
   `third_body_ephemeris_model = "analytic_circular_sun_moon_screening"` so the product remains
@@ -444,8 +446,9 @@ Definition of done:
   multi-scenario live Tudat validation. Native Tudat variational equations remain gated on validated
   body and acceleration-model construction.
 - `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
-  screening-only `orekit_high_fidelity`, drag, SRP, and analytic Sun/Moon third-body force flags
-  without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and
+  screening-only `orekit_high_fidelity`, configured degree/order high-order gravity provenance,
+  drag, SRP, and analytic Sun/Moon third-body force flags without replacing operational Orekit
+  semantics; `astro research-od-sensitivity --backend jax` and
   `astro research-estimate --backend jax` provide the first differentiable OD residual/Jacobian and
   research correction-loop primitives for range/range-rate, inertial RA/Dec, and local-horizon
   az/el sensitivity and topocentric az/el estimation. Ephemeris-backed third-body force models and

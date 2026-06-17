@@ -373,7 +373,7 @@ def test_research_propagate_jax_maps_orekit_high_fidelity_to_research_j2_baselin
     )
 
 
-def test_research_propagate_jax_rejects_high_order_gravity_shape() -> None:
+def test_research_propagate_jax_maps_high_order_gravity_to_screening_baseline() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml").model_copy(
         update={
             "force_model": ForceModelConfig(
@@ -384,15 +384,23 @@ def test_research_propagate_jax_rejects_high_order_gravity_shape() -> None:
         }
     )
 
-    with pytest.raises(UnsupportedBackendError, match="high-order gravity"):
-        research_propagate_jax(
-            scenario,
-            cases=1,
-            position_sigma_km=0.0,
-            velocity_sigma_km_s=0.0,
-            seed=7,
-            runtime_loader=_fake_runtime,
-        )
+    result = research_propagate_jax(
+        scenario,
+        cases=1,
+        position_sigma_km=0.0,
+        velocity_sigma_km_s=0.0,
+        seed=7,
+        runtime_loader=_fake_runtime,
+    )
+
+    assert result.metadata["force_model"] == "orekit_high_fidelity"
+    assert result.metadata["research_force_models"] == ["J2_high_order_screening_baseline"]
+    assert result.metadata["gravity_degree"] == 8
+    assert result.metadata["gravity_order"] == 8
+    assert result.metadata["gravity_harmonic_screening_model"] == (
+        "j2_baseline_with_configured_degree_order_metadata"
+    )
+    assert result.cases[0].trajectory.metadata["gravity_degree"] == 8
 
 
 def test_research_propagate_jax_runs_research_drag_and_srp_force_flags() -> None:

@@ -107,8 +107,9 @@ when their deltas are explicit. `astro compare-tudat-campaign` aggregates multip
 Tudat-vs-reference scenario comparisons into one pass/fail campaign product for release gates.
 Native Tudat variational equations remain future work. JAX research propagation returns suite
 `MonteCarloResult` products, can optionally include a final-state transition sensitivity matrix,
-and supports differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag,
-solar radiation pressure, and analytic circular Sun/Moon third-body gravity flags. Its research OD
+and supports differentiable screening approximations for `orekit_high_fidelity`, configured
+degree/order high-order gravity metadata through a J2 baseline, atmospheric drag, solar radiation
+pressure, and analytic circular Sun/Moon third-body gravity flags. Its research OD
 estimator uses backtracking Gauss-Newton corrections over normalized residual/Jacobian products so
 range/range-rate, inertial angle, and topocentric azimuth/elevation workflows can share the same
 product boundary. Those JAX force flags are explicitly research products, not operational
@@ -189,6 +190,7 @@ astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measureme
 astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output research_propagation.json
 astro research-propagate examples/scenarios/leo_orekit_drag.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_drag_research.json
 astro research-propagate examples/scenarios/leo_orekit_srp.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_srp_research.json
+astro research-propagate examples/scenarios/leo_jax_high_order_gravity_research.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_high_order_research.json
 astro research-propagate examples/scenarios/leo_jax_third_body_research.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_third_body_research.json
 astro research-od-sensitivity examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --output od_sensitivity.json
 astro research-od-sensitivity examples/scenarios/leo_two_station_angles.yaml angle_measurements.json --backend jax --output angle_od_sensitivity.json
@@ -377,8 +379,9 @@ range/range-rate ingest/export formats.
 `astro research-propagate` is the research backend entry point for seeded propagation ensembles.
 With `--backend local`, it runs the deterministic Monte Carlo workflow. With `--backend jax`, it
 loads the optional JAX runtime and runs vectorized RK4 ensembles for two-body, J2, and
-screening-only `orekit_high_fidelity` scenarios, including research approximations for atmospheric
-drag, solar radiation pressure, and analytic circular Sun/Moon third-body gravity. With
+screening-only `orekit_high_fidelity` scenarios, including configured high-order gravity
+degree/order metadata on a J2 baseline plus research approximations for atmospheric drag, solar
+radiation pressure, and analytic circular Sun/Moon third-body gravity. With
 `--include-sensitivities`, the JAX path adds a nominal final-state transition matrix computed
 through JAX autodiff to the `MonteCarloResult` metadata. Third-body JAX products record
 `third_body_ephemeris_model = "analytic_circular_sun_moon_screening"` so callers do not mistake the
