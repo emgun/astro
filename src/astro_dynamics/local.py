@@ -32,6 +32,7 @@ _MANEUVER_TIME_TOLERANCE_S = 1.0e-9
 _COVARIANCE_FD_REL_STEP = 1.0e-6
 _COVARIANCE_FD_ABS_STEP = 1.0e-8
 _STANDARD_GRAVITY_M_S2 = 9.80665
+_APSIS_RADIAL_VELOCITY_TOLERANCE_KM_S = 1.0e-9
 
 
 @dataclass(frozen=True)
@@ -532,6 +533,82 @@ def _maneuver_events(
     return events
 
 
+def _sample_radius_km(sample: TrajectorySample) -> float:
+    return float(np.linalg.norm(np.array(sample.state.position_km, dtype=np.float64)))
+
+
+def _sample_radial_velocity_km_s(sample: TrajectorySample) -> float:
+    position = np.array(sample.state.position_km, dtype=np.float64)
+    velocity = np.array(sample.state.velocity_km_s, dtype=np.float64)
+    radius = float(np.linalg.norm(position))
+    if radius == 0.0:
+        return 0.0
+    return float(np.dot(position, velocity) / radius)
+
+
+def _apsis_event_type(
+    radii_km: list[float],
+    radial_velocities_km_s: list[float],
+    index: int,
+) -> str | None:
+    if len(radii_km) < 2:
+        return None
+    radius = radii_km[index]
+    if index == 0:
+        if abs(radial_velocities_km_s[index]) > _APSIS_RADIAL_VELOCITY_TOLERANCE_KM_S:
+            return None
+        if radius < radii_km[1]:
+            return "periapsis"
+        if radius > radii_km[1]:
+            return "apoapsis"
+        return None
+    if index == len(radii_km) - 1:
+        if abs(radial_velocities_km_s[index]) > _APSIS_RADIAL_VELOCITY_TOLERANCE_KM_S:
+            return None
+        if radius < radii_km[index - 1]:
+            return "periapsis"
+        if radius > radii_km[index - 1]:
+            return "apoapsis"
+        return None
+
+    previous_radius = radii_km[index - 1]
+    next_radius = radii_km[index + 1]
+    if radius <= previous_radius and radius <= next_radius:
+        return "periapsis"
+    if radius >= previous_radius and radius >= next_radius:
+        return "apoapsis"
+    return None
+
+
+def _sampled_apsis_events(
+    samples: list[TrajectorySample],
+    scenario: Scenario,
+) -> list[TrajectoryEvent]:
+    radii_km = [_sample_radius_km(sample) for sample in samples]
+    radial_velocities_km_s = [_sample_radial_velocity_km_s(sample) for sample in samples]
+    events: list[TrajectoryEvent] = []
+    for index, sample in enumerate(samples):
+        event_type = _apsis_event_type(radii_km, radial_velocities_km_s, index)
+        if event_type is None:
+            continue
+        elapsed_s = (sample.epoch - scenario.initial_state.epoch).total_seconds()
+        events.append(
+            TrajectoryEvent(
+                event_type=event_type,
+                epoch=sample.epoch,
+                description=f"Sampled local {event_type} radius extremum.",
+                metadata={
+                    "event_detection": "sampled_radius_extrema",
+                    "sample_index": index,
+                    "elapsed_s": elapsed_s,
+                    "radius_km": radii_km[index],
+                    "radial_velocity_km_s": radial_velocities_km_s[index],
+                },
+            )
+        )
+    return events
+
+
 def _maneuver_metadata(schedule: list[_ScheduledManeuver]) -> dict[str, Any]:
     if not schedule:
         return {}
@@ -577,6 +654,13 @@ def _attitude_metadata(schedule: list[_ScheduledManeuver], sample_count: int) ->
         "attitude_model": "local_commanded_body_x_axis",
         "attitude_target_axis_body": "+X",
         "attitude_sample_count": sample_count,
+    }
+
+
+def _event_metadata(apsis_events: list[TrajectoryEvent]) -> dict[str, Any]:
+    return {
+        "event_detection": "sampled_radius_extrema",
+        "apsis_event_count": len(apsis_events),
     }
 
 
@@ -1024,6 +1108,7 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         if maneuver_schedule
         else {}
     )
+    apsis_events = _sampled_apsis_events(samples, scenario)
     metadata = (
         {
             "integrator": "rk4",
@@ -1037,6 +1122,7 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         | _maneuver_metadata(maneuver_schedule)
         | _attitude_metadata(maneuver_schedule, len(samples))
         | _covariance_metadata(scenario, covariance_matrix, covariance_transition_model)
+        | _event_metadata(apsis_events)
     )
 
     return Trajectory(
@@ -1044,7 +1130,7 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         samples=samples,
         force_model=scenario.force_model,
         backend="local",
-        events=maneuver_events,
+        events=sorted(maneuver_events + apsis_events, key=lambda event: event.epoch),
         maneuvers=scenario.maneuvers,
         covariance_history=covariance_history,
         metadata=metadata,

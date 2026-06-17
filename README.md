@@ -208,7 +208,10 @@ velocity direction. `radial_outward` and `radial_inward` rotate the thrust magni
 instantaneous local radial direction. Maneuvered local trajectories also include per-sample
 `AttitudeState` products with a body-to-inertial unit quaternion that points the spacecraft body +X
 axis along the commanded thrust direction during active thrust-vector burns. These are commanded
-pointing products, not full torque-level attitude-control simulations.
+pointing products, not full torque-level attitude-control simulations. Local orbital propagation
+also annotates sampled periapsis/apoapsis radius extrema as `TrajectoryEvent` records with sample
+index, elapsed time, radius, and radial velocity metadata. These are sample-level mission-analysis
+events, not sub-step root-solved event times.
 
 Local and Orekit propagation also accept an optional `initial_covariance` 6x6 matrix. When present,
 the backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference

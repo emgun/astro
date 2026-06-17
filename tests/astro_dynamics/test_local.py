@@ -91,6 +91,38 @@ def test_propagate_local_returns_expected_sample_count() -> None:
     assert trajectory.metadata["sample_step_s"] == scenario.propagation.step_s
 
 
+def test_propagate_local_annotates_sampled_apsis_events() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    eccentric_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": scenario.initial_state.cartesian.model_copy(
+                update={"velocity_km_s": (0.0, 8.0, 0.0)}
+            )
+        }
+    )
+    eccentric_scenario = scenario.model_copy(
+        update={
+            "initial_state": eccentric_state,
+            "propagation": scenario.propagation.model_copy(
+                update={"duration_s": 7200.0, "step_s": 60.0}
+            ),
+        }
+    )
+
+    trajectory = propagate_local(eccentric_scenario)
+
+    apsis_events = [
+        event for event in trajectory.events if event.event_type in {"periapsis", "apoapsis"}
+    ]
+    assert [event.event_type for event in apsis_events[:2]] == ["periapsis", "apoapsis"]
+    assert apsis_events[0].epoch == eccentric_scenario.initial_state.epoch
+    assert apsis_events[0].metadata["sample_index"] == 0
+    assert apsis_events[0].metadata["radius_km"] == pytest.approx(7000.0)
+    assert apsis_events[1].metadata["radius_km"] > apsis_events[0].metadata["radius_km"]
+    assert trajectory.metadata["event_detection"] == "sampled_radius_extrema"
+    assert trajectory.metadata["apsis_event_count"] >= 2
+
+
 def test_propagate_local_applies_finite_burn_schedule() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     burn = Maneuver(
@@ -147,7 +179,10 @@ def test_propagate_local_applies_thrust_vector_mass_flow_burn() -> None:
     assert trajectory.metadata["maneuver_model"] == "thrust_vector_mass_flow"
     assert trajectory.metadata["thrust_vector_burn_count"] == 1
     assert trajectory.metadata["final_mass_kg"] == pytest.approx(masses[-1])
-    assert trajectory.events[0].metadata["thrust_vector_n"] == (0.0, 0.25, 0.0)
+    maneuver_start = next(
+        event for event in trajectory.events if event.event_type == "maneuver_start"
+    )
+    assert maneuver_start.metadata["thrust_vector_n"] == (0.0, 0.25, 0.0)
 
 
 def test_propagate_local_applies_velocity_aligned_thrust_vector_burn() -> None:
@@ -175,7 +210,10 @@ def test_propagate_local_applies_velocity_aligned_thrust_vector_burn() -> None:
     assert trajectory.metadata["attitude_coupled_burn_count"] == 1
     assert trajectory.metadata["thrust_direction_modes"] == ["velocity_aligned"]
     assert trajectory.metadata["attitude_model"] == "local_commanded_body_x_axis"
-    assert trajectory.events[0].metadata["thrust_direction_mode"] == "velocity_aligned"
+    maneuver_start = next(
+        event for event in trajectory.events if event.event_type == "maneuver_start"
+    )
+    assert maneuver_start.metadata["thrust_direction_mode"] == "velocity_aligned"
     active_sample = trajectory.samples[1]
     assert active_sample.attitude is not None
     assert active_sample.attitude.mode == "velocity_aligned"
@@ -222,7 +260,10 @@ def test_propagate_local_applies_radial_thrust_vector_burn(
     assert expected_x_sign * velocity_delta[0] > 0.0
     assert trajectory.metadata["attitude_coupled_burn_count"] == 1
     assert trajectory.metadata["thrust_direction_modes"] == [thrust_direction_mode]
-    assert trajectory.events[0].metadata["thrust_direction_mode"] == thrust_direction_mode
+    maneuver_start = next(
+        event for event in trajectory.events if event.event_type == "maneuver_start"
+    )
+    assert maneuver_start.metadata["thrust_direction_mode"] == thrust_direction_mode
 
 
 def test_propagate_local_generates_covariance_history_from_initial_covariance() -> None:

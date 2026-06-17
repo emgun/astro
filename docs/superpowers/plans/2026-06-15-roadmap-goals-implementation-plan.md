@@ -223,7 +223,9 @@ finite-difference covariance propagation through the selected Orekit force model
 initial-state Monte Carlo, and commanded-attitude trajectory samples for maneuvered local
 propagation. The attitude-coupled finite-burn modes rotate thrust along instantaneous velocity or
 local radial directions and record body-to-inertial unit quaternion samples for the commanded body
-+X axis; drag/SRP/third-body variational-equation covariance dynamics and torque-level
++X axis. Local orbital propagation annotates sampled periapsis/apoapsis radius extrema as
+`TrajectoryEvent` records for deterministic mission-analysis products; drag/SRP/third-body
+variational-equation covariance dynamics, sub-step root-solved event location, and torque-level
 attitude-control maneuver dynamics remain deferred.
 
 Definition of done:
