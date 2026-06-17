@@ -95,6 +95,7 @@ environment. Install TudatPy through its supported distribution channel for your
 
 ```bash
 astro tudat-smoke
+astro propagate examples/scenarios/leo_two_body.yaml --backend tudat --output /tmp/astro-tudat-two-body.json
 ```
 
 ## Smoke Command Semantics

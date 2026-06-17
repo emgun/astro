@@ -92,8 +92,12 @@ astro jax-smoke
 
 Tudat and JAX are optional research/cross-check boundaries. TudatPy is not currently assumed to be
 available from PyPI on every platform, so its smoke command reports installation state without
-promising a pip-only install path. JAX research propagation returns suite `MonteCarloResult`
-products, can optionally include a final-state transition sensitivity matrix, and supports
+promising a pip-only install path. When TudatPy is installed, `astro propagate --backend tudat`
+runs a native two-body Earth point-mass cross-check using Tudat environment/body setup, fixed-step
+RK4, and Cowell translational propagation, then maps the state history back into the suite
+`Trajectory` product. Higher-fidelity Tudat force models remain future work. JAX research
+propagation returns suite `MonteCarloResult` products, can optionally include a final-state
+transition sensitivity matrix, and supports
 differentiable screening approximations for `orekit_high_fidelity`, atmospheric drag, solar
 radiation pressure, and analytic circular Sun/Moon third-body gravity flags. Those JAX force flags
 are explicitly research products, not operational ephemerides; ephemeris-backed third-body gravity
@@ -121,6 +125,7 @@ astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --outpu
 astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output orekit_srp_trajectory.json
 astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output orekit_third_body_trajectory.json
 astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend orekit --output orekit_high_fidelity_covariance.json
+astro propagate examples/scenarios/leo_two_body.yaml --backend tudat --output tudat_two_body_trajectory.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json

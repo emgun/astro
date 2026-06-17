@@ -55,7 +55,8 @@ Still roadmap-level:
   torque-level attitude-control maneuver dynamics.
 - Full native multi-motor RocketPy staging and full pitch-program multistage Dymos ascent
   optimization.
-- Live Tudat cross-check environment/body construction.
+- Tudat high-fidelity force-model/body construction beyond the current native two-body cross-check
+  runner.
 - Full precession-nutation reductions, DSN calibration products beyond the current configurable
   weather/frequency media primitives, and operational CCSDS support beyond current KVN TDM
   measurement families, suite multi-leg radiometric TDM extension, and OEM ephemeris interchange.
@@ -349,22 +350,24 @@ Tradeoff:
 ### Goal 5: High-Fidelity and Research Backends
 
 Status: high-fidelity/research backend slices implemented for runtime gates, product boundaries,
-and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke commands, Tudat propagation
-dispatch, built-in JAX two-body and J2 research propagation runners, `orekit_high_fidelity`
+and first JAX force-model expansion. TudatPy and JAX runtime gates, smoke commands, a native Tudat
+two-body cross-check propagation runner, built-in JAX two-body and J2 research propagation runners,
+`orekit_high_fidelity`
 screening through the JAX J2 baseline, JAX research approximations for atmospheric drag, solar
 radiation pressure, and analytic circular Sun/Moon third-body gravity, opt-in JAX final-state
 transition sensitivities, JAX range/range-rate, inertial RA/Dec, and local-horizon az/el OD
 residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
 Nyx/ANISE evaluation gate are
-implemented. Live Tudat
-environment construction, JAX ephemeris-backed third-body force models, and operational-grade
+implemented. Tudat high-fidelity force models beyond the current two-body runner, JAX
+ephemeris-backed third-body force models, and operational-grade
 differentiable OD estimator workflows remain gated on validated runner implementations.
 
 Implemented slice:
 
 - `astro tudat-smoke` and `astro jax-smoke` return structured availability diagnostics.
-- `astro propagate --backend tudat` is a recognized propagation boundary and returns suite
-  `Trajectory` products through a validated runner.
+- `astro propagate --backend tudat` runs a native Tudat two-body Earth point-mass cross-check when
+  TudatPy is installed, using Tudat environment/body setup, fixed-step RK4 integration, Cowell
+  translational propagation settings, and suite `Trajectory` product mapping.
 - `astro research-propagate --backend local` runs seeded local ensembles.
 - `astro research-propagate --backend jax` runs vectorized two-body and J2 RK4 seeded ensembles and
   returns suite `MonteCarloResult` products.
@@ -387,7 +390,9 @@ Implemented slice:
 
 Definition of done:
 
-- `astro propagate --backend tudat` supports at least one cross-check scenario and records Tudat provenance once a validated Tudat runner is supplied.
+- `astro propagate --backend tudat` supports at least one cross-check scenario and records Tudat
+  provenance through the native two-body runner. High-fidelity Tudat force models remain gated on
+  validated body and acceleration-model construction.
 - `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
   screening-only `orekit_high_fidelity`, drag, SRP, and analytic Sun/Moon third-body force flags
   without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and
