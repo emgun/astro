@@ -256,8 +256,11 @@ scenario's `doppler_transmit_frequency_hz` to convert line-of-sight range rate i
 received-frequency shift. Two-way and three-way range-like observables use iterative vacuum
 light-time over a linearized spacecraft state and carry `participant_path`/`transmitter` metadata,
 uplink/downlink light-time diagnostics, transmit/reflection/receive offsets, and an explicit
-`media_corrections_model = "none"` marker; they are product and estimator primitives, not full DSN
-media-correction models. Angle records use degrees. Ground stations can be supplied either as fixed
+media-corrections marker. Scenarios may set `radiometric_media_uplink_delay_km` and
+`radiometric_media_downlink_delay_km` for configured constant range-delay corrections, with
+`radiometric_media_source` preserved in measurement metadata; these are product and estimator
+primitives, not full DSN weather/frequency-dependent media models. Angle records use degrees.
+Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
 epoch using a deterministic UTC sidereal-time model by default. Scenarios may also provide fixed
@@ -307,7 +310,8 @@ The optional `metadata_json` column can carry a JSON object for row-level metada
 is intentionally under-observed for six-state OD.
 `examples/scenarios/leo_radiometric_links.yaml` demonstrates two-way and three-way radiometric
 measurement synthesis with explicit uplink/downlink station metadata and vacuum light-time
-diagnostics.
+diagnostics. `examples/scenarios/leo_radiometric_media.yaml` adds configured constant media range
+delays to the same product family.
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,
 `PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped

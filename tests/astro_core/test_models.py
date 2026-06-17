@@ -688,6 +688,21 @@ def test_measurement_config_accepts_doppler_frequency_and_noise() -> None:
     assert measurement_config.noise.doppler_sigma_hz == 0.05
 
 
+def test_measurement_config_accepts_configured_radiometric_media_delays() -> None:
+    measurement_config = MeasurementConfig(
+        radiometric_media_uplink_delay_km=0.002,
+        radiometric_media_downlink_delay_km=0.003,
+        radiometric_media_source="unit-test-media",
+    )
+
+    assert measurement_config.radiometric_media_uplink_delay_km == 0.002
+    assert measurement_config.radiometric_media_downlink_delay_km == 0.003
+    assert measurement_config.radiometric_media_source == "unit-test-media"
+
+    with pytest.raises(ValidationError, match="greater than or equal"):
+        MeasurementConfig(radiometric_media_uplink_delay_km=-0.001)
+
+
 def test_measurement_config_requires_non_empty_types() -> None:
     with pytest.raises(ValidationError):
         MeasurementConfig(types=())

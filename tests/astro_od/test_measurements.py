@@ -279,6 +279,36 @@ def test_generate_synthetic_measurements_supports_two_way_radiometric_records() 
     }
 
 
+def test_generate_synthetic_two_way_radiometrics_applies_configured_media_delay() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    two_way_measurements = scenario.measurements.model_copy(
+        update={
+            "types": (MeasurementType.TWO_WAY_RANGE,),
+            "noise": scenario.measurements.noise.model_copy(update={"range_sigma_km": 1.0e-12}),
+        }
+    )
+    delayed_measurements = two_way_measurements.model_copy(
+        update={
+            "radiometric_media_uplink_delay_km": 0.002,
+            "radiometric_media_downlink_delay_km": 0.003,
+            "radiometric_media_source": "unit-test-media",
+        }
+    )
+    undelayed_scenario = scenario.model_copy(update={"measurements": two_way_measurements})
+    delayed_scenario = scenario.model_copy(update={"measurements": delayed_measurements})
+    trajectory = propagate_local(undelayed_scenario)
+
+    undelayed = generate_synthetic_measurements(undelayed_scenario, trajectory)[0]
+    delayed = generate_synthetic_measurements(delayed_scenario, trajectory)[0]
+
+    assert delayed.metadata["media_corrections_model"] == "configured_constant_range_delay"
+    assert delayed.metadata["media_corrections_source"] == "unit-test-media"
+    assert delayed.metadata["uplink_media_delay_km"] == 0.002
+    assert delayed.metadata["downlink_media_delay_km"] == 0.003
+    assert delayed.metadata["total_media_delay_km"] == 0.005
+    assert delayed.metadata["truth"] - undelayed.metadata["truth"] == pytest.approx(0.005)
+
+
 def test_generate_synthetic_measurements_supports_three_way_radiometric_records() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     receiving_station = GroundStation(
@@ -320,6 +350,47 @@ def test_generate_synthetic_measurements_supports_three_way_radiometric_records(
     assert all(record.metadata["uplink_light_time_s"] > 0.0 for record in records)
     assert all(record.metadata["downlink_light_time_s"] > 0.0 for record in records)
     assert all(record.metadata["total_light_time_s"] > 0.0 for record in records)
+
+
+def test_generate_synthetic_three_way_radiometrics_applies_configured_media_delay() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    receiving_station = GroundStation(
+        name="y-axis-eci",
+        position_eci_km=(0.0, 6378.1363, 0.0),
+        frame=Frame.EME2000,
+        elevation_mask_deg=0.0,
+    )
+    three_way_measurements = scenario.measurements.model_copy(
+        update={
+            "types": (MeasurementType.THREE_WAY_RANGE,),
+            "noise": scenario.measurements.noise.model_copy(update={"range_sigma_km": 1.0e-12}),
+        }
+    )
+    delayed_measurements = three_way_measurements.model_copy(
+        update={
+            "radiometric_media_uplink_delay_km": 0.004,
+            "radiometric_media_downlink_delay_km": 0.006,
+            "radiometric_media_source": "unit-test-three-way-media",
+        }
+    )
+    undelayed_scenario = scenario.model_copy(
+        update={
+            "ground_stations": [scenario.ground_stations[0], receiving_station],
+            "measurements": three_way_measurements,
+        }
+    )
+    delayed_scenario = undelayed_scenario.model_copy(
+        update={"measurements": delayed_measurements}
+    )
+    trajectory = propagate_local(undelayed_scenario)
+
+    undelayed = generate_synthetic_measurements(undelayed_scenario, trajectory)[0]
+    delayed = generate_synthetic_measurements(delayed_scenario, trajectory)[0]
+
+    assert delayed.metadata["media_corrections_model"] == "configured_constant_range_delay"
+    assert delayed.metadata["media_corrections_source"] == "unit-test-three-way-media"
+    assert delayed.metadata["total_media_delay_km"] == 0.01
+    assert delayed.metadata["truth"] - undelayed.metadata["truth"] == pytest.approx(0.01)
 
 
 def test_generate_synthetic_measurements_supports_topocentric_angles() -> None:

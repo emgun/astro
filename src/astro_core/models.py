@@ -543,9 +543,18 @@ class MeasurementConfig(AstroModel):
     )
     cadence_s: FiniteFloat = Field(gt=0.0, default=60.0)
     doppler_transmit_frequency_hz: FiniteFloat = Field(gt=0.0, default=8.4e9)
+    radiometric_media_uplink_delay_km: FiniteFloat = Field(ge=0.0, default=0.0)
+    radiometric_media_downlink_delay_km: FiniteFloat = Field(ge=0.0, default=0.0)
+    radiometric_media_source: str = "none"
     noise: MeasurementNoise = Field(default_factory=MeasurementNoise)
 
-    @field_validator("cadence_s", "doppler_transmit_frequency_hz", mode="before")
+    @field_validator(
+        "cadence_s",
+        "doppler_transmit_frequency_hz",
+        "radiometric_media_uplink_delay_km",
+        "radiometric_media_downlink_delay_km",
+        mode="before",
+    )
     @classmethod
     def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
         return _numeric_scalar_input_must_be_number(value, "Measurement config scalar")

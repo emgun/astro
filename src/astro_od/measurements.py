@@ -433,8 +433,9 @@ def _measurement_geometry(
             spacecraft_velocity_km_s,
             station_position_km,
         )
+        media_metadata = _radiometric_media_metadata(scenario)
         return (
-            light_time_solution.total_range_km,
+            light_time_solution.total_range_km + media_metadata["total_media_delay_km"],
             scenario.measurements.noise.range_sigma_km,
             "km",
             {
@@ -442,6 +443,7 @@ def _measurement_geometry(
                 "radiometric_model": "iterative_two_way_linearized",
                 **_light_time_metadata(light_time_solution),
                 "round_trip_light_time_s": light_time_solution.total_light_time_s,
+                **media_metadata,
             },
         )
     if measurement_type is MeasurementType.TWO_WAY_RANGE_RATE:
@@ -451,6 +453,7 @@ def _measurement_geometry(
             spacecraft_velocity_km_s,
             station_position_km,
         )
+        media_metadata = _radiometric_media_metadata(scenario)
         return (
             two_way_range_rate_km_s(
                 spacecraft_position_km,
@@ -464,6 +467,7 @@ def _measurement_geometry(
                 "radiometric_model": "iterative_two_way_linearized",
                 **_light_time_metadata(light_time_solution),
                 "round_trip_light_time_s": light_time_solution.total_light_time_s,
+                **media_metadata,
             },
         )
     if measurement_type is MeasurementType.DOPPLER:
@@ -529,13 +533,15 @@ def _three_way_measurement_geometry(
             transmitter_position_km,
             receiver_position_km,
         )
+        media_metadata = _radiometric_media_metadata(scenario)
         return (
-            light_time_solution.total_range_km,
+            light_time_solution.total_range_km + media_metadata["total_media_delay_km"],
             scenario.measurements.noise.range_sigma_km,
             "km",
             {
                 "radiometric_model": "iterative_three_way_linearized",
                 **_light_time_metadata(light_time_solution),
+                **media_metadata,
             },
         )
     if measurement_type is MeasurementType.THREE_WAY_RANGE_RATE:
@@ -545,6 +551,7 @@ def _three_way_measurement_geometry(
             transmitter_position_km,
             receiver_position_km,
         )
+        media_metadata = _radiometric_media_metadata(scenario)
         return (
             three_way_range_rate_km_s(
                 spacecraft_position_km,
@@ -557,6 +564,7 @@ def _three_way_measurement_geometry(
             {
                 "radiometric_model": "iterative_three_way_linearized",
                 **_light_time_metadata(light_time_solution),
+                **media_metadata,
             },
         )
     raise ValueError(f"Unsupported three-way measurement type: {measurement_type}")
@@ -567,11 +575,24 @@ def _light_time_metadata(solution: RadiometricLightTimeSolution) -> dict[str, An
         "light_time_model": solution.light_time_model,
         "light_time_iterations": solution.iterations,
         "light_time_tolerance_s": _LIGHT_TIME_TOLERANCE_S,
-        "media_corrections_model": "none",
         "uplink_light_time_s": solution.uplink_light_time_s,
         "downlink_light_time_s": solution.downlink_light_time_s,
         "total_light_time_s": solution.total_light_time_s,
         "transmit_time_offset_s": solution.transmit_time_offset_s,
         "reflection_time_offset_s": solution.reflection_time_offset_s,
         "receive_time_offset_s": solution.receive_time_offset_s,
+    }
+
+
+def _radiometric_media_metadata(scenario: Scenario) -> dict[str, Any]:
+    uplink_delay_km = float(scenario.measurements.radiometric_media_uplink_delay_km)
+    downlink_delay_km = float(scenario.measurements.radiometric_media_downlink_delay_km)
+    total_delay_km = uplink_delay_km + downlink_delay_km
+    media_model = "configured_constant_range_delay" if total_delay_km > 0.0 else "none"
+    return {
+        "media_corrections_model": media_model,
+        "media_corrections_source": scenario.measurements.radiometric_media_source,
+        "uplink_media_delay_km": uplink_delay_km,
+        "downlink_media_delay_km": downlink_delay_km,
+        "total_media_delay_km": total_delay_km,
     }

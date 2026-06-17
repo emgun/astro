@@ -69,6 +69,20 @@ def test_load_radiometric_links_example_scenario() -> None:
     )
 
 
+def test_load_radiometric_media_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_radiometric_media.yaml"))
+    trajectory = propagate_local(scenario)
+    measurements = generate_synthetic_measurements(scenario, trajectory)
+
+    assert scenario.scenario_id == "leo-radiometric-media"
+    assert scenario.measurements.radiometric_media_uplink_delay_km == 0.002
+    assert scenario.measurements.radiometric_media_downlink_delay_km == 0.003
+    assert scenario.measurements.radiometric_media_source == "configured-example"
+    assert {record.metadata["media_corrections_model"] for record in measurements} == {
+        "configured_constant_range_delay"
+    }
+
+
 def test_load_velocity_aligned_burn_example_scenario() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_velocity_aligned_burn.yaml"))
 
