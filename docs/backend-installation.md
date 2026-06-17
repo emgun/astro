@@ -68,10 +68,10 @@ reached by one configured RocketPy flight, with metadata for whether the RocketP
 the full suite stage schedule. That multistage path is a composition adapter, not a validated
 multi-motor RocketPy staging solver. Live Dymos optimization currently supports a stage-aware
 vertical-ascent phase transcription wrapped in the suite launch-tuning product, with suite
-stage-plan metadata, pitch-program control-point metadata, tuned point indices, path constraints,
-and a coverage flag showing that the phase duration spans the configured burn schedule. Full
-pitch-program multistage Dymos optimization still requires a validated backend runner before it
-should be promoted beyond the adapter gate.
+stage-plan metadata, original and optimized pitch-program control-point schedules, tuned point
+indices, path constraints, and a coverage flag showing that the phase duration spans the configured
+burn schedule. Full pitch-program multistage Dymos optimization still requires a validated backend
+runner before it should be promoted beyond the adapter gate.
 
 ## Research Backends
 

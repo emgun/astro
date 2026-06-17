@@ -129,6 +129,36 @@ def _pitch_program_control_points(
     ]
 
 
+def _tuned_pitch_by_index(result: LaunchPitchTuningResult) -> dict[int, float]:
+    return {
+        int(point.point_index): float(point.tuned_pitch_deg)
+        for point in result.tuned_points
+    }
+
+
+def _optimized_pitch_program_control_points(
+    result: LaunchPitchTuningResult,
+    scenario: LaunchScenario,
+    *,
+    tuned_pitch_point_indices: list[int],
+) -> list[dict[str, bool | float | int | str]]:
+    if scenario.guidance.mode != "pitch_program":
+        return []
+    tuned_indices = set(tuned_pitch_point_indices)
+    tuned_pitch_by_index = _tuned_pitch_by_index(result)
+    return [
+        {
+            "index": index,
+            "time_s": point.time_s,
+            "baseline_pitch_deg": point.pitch_deg,
+            "pitch_deg": tuned_pitch_by_index.get(index, point.pitch_deg),
+            "tuned": index in tuned_indices,
+            "source": "suite_pitch_tuning" if index in tuned_indices else "baseline",
+        }
+        for index, point in enumerate(scenario.guidance.pitch_program)
+    ]
+
+
 def _dymos_phase_metadata(
     result: LaunchPitchTuningResult,
     scenario: LaunchScenario,
@@ -145,6 +175,13 @@ def _dymos_phase_metadata(
             scenario,
             tuned_pitch_point_indices=tuned_pitch_point_indices,
         ),
+        "optimized_pitch_program_control_points": _optimized_pitch_program_control_points(
+            result,
+            scenario,
+            tuned_pitch_point_indices=tuned_pitch_point_indices,
+        ),
+        "pitch_program_optimization_coupling": "dymos_phase_plus_suite_pitch_tuning",
+        "pitch_program_optimization_scope": "suite_tuning_not_full_dymos_pitch_transcription",
     }
 
 

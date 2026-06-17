@@ -25,7 +25,8 @@ Out of scope for this slice:
 - Pretending the current aggregate launch schema is enough for high-fidelity RocketPy vehicle construction.
 - Full RocketPy motor/rocket geometry authoring UI.
 - Full Dymos trajectory transcription and path-constraint library beyond the current stage-aware
-  vertical phase, pitch-program control metadata, and pitch-bound constraints.
+  vertical phase, original and optimized pitch-program control metadata, and pitch-bound
+  constraints.
 
 ## File Map
 
@@ -138,7 +139,7 @@ def propagate_launch_with_backend(scenario: LaunchScenario, backend: str) -> Lau
 - [x] Implement local optimizer command using `tune_pitch_program`.
 - [x] Implement Dymos adapter boundary that records runtime availability, runs the current
   stage-aware vertical phase model, and preserves suite pitch-program tuning products with
-  pitch-program control metadata.
+  original and optimized pitch-program control metadata.
 - [x] Run focused Dymos and CLI tests.
 - [x] Commit with `git commit -m "feat: add launch optimization command boundary"`.
 

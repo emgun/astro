@@ -72,6 +72,9 @@ def test_optimize_launch_dymos_runs_default_phase_transcription(
     assert len(seen_runtime) == 1
     assert result.backend == "dymos"
     assert result.metadata["source_backend"] == "dymos_phase"
+    tuned_pitch_by_index = {
+        point.point_index: point.tuned_pitch_deg for point in result.tuned_points
+    }
     assert result.metadata["dymos_phase"] == {
         "phase_model": "stage_aware_vertical_ascent",
         "transcription": "GaussLobatto",
@@ -92,6 +95,50 @@ def test_optimize_launch_dymos_runs_default_phase_transcription(
             {"index": 3, "time_s": 110.0, "pitch_deg": 20.0, "tuned": True},
             {"index": 4, "time_s": 140.0, "pitch_deg": 5.0, "tuned": False},
         ],
+        "optimized_pitch_program_control_points": [
+            {
+                "index": 0,
+                "time_s": 0.0,
+                "baseline_pitch_deg": 90.0,
+                "pitch_deg": 90.0,
+                "tuned": False,
+                "source": "baseline",
+            },
+            {
+                "index": 1,
+                "time_s": 30.0,
+                "baseline_pitch_deg": 75.0,
+                "pitch_deg": 75.0,
+                "tuned": False,
+                "source": "baseline",
+            },
+            {
+                "index": 2,
+                "time_s": 70.0,
+                "baseline_pitch_deg": 45.0,
+                "pitch_deg": tuned_pitch_by_index[2],
+                "tuned": True,
+                "source": "suite_pitch_tuning",
+            },
+            {
+                "index": 3,
+                "time_s": 110.0,
+                "baseline_pitch_deg": 20.0,
+                "pitch_deg": tuned_pitch_by_index[3],
+                "tuned": True,
+                "source": "suite_pitch_tuning",
+            },
+            {
+                "index": 4,
+                "time_s": 140.0,
+                "baseline_pitch_deg": 5.0,
+                "pitch_deg": 5.0,
+                "tuned": False,
+                "source": "baseline",
+            },
+        ],
+        "pitch_program_optimization_coupling": "dymos_phase_plus_suite_pitch_tuning",
+        "pitch_program_optimization_scope": "suite_tuning_not_full_dymos_pitch_transcription",
     }
     assert result.metadata["dymos_tuned_pitch_point_indices"] == [2, 3]
     assert result.metadata["stage_plan"]["total_burn_duration_s"] == 120.0
@@ -169,6 +216,13 @@ def test_live_dymos_optimization_returns_suite_product() -> None:
     assert dymos_phase["transcription"] == "GaussLobatto"
     assert dymos_phase["guidance_model"] == "pitch_program"
     assert len(dymos_phase["pitch_program_control_points"]) == 5
+    assert len(dymos_phase["optimized_pitch_program_control_points"]) == 5
+    assert dymos_phase["pitch_program_optimization_coupling"] == (
+        "dymos_phase_plus_suite_pitch_tuning"
+    )
+    assert dymos_phase["pitch_program_optimization_scope"] == (
+        "suite_tuning_not_full_dymos_pitch_transcription"
+    )
     assert dymos_phase["duration_s"] >= result.metadata["stage_plan"]["total_burn_duration_s"]
     assert dymos_phase["stage_count"] == result.metadata["stage_plan"]["stage_count"]
     assert dymos_phase["final_altitude_km"] > 0.0

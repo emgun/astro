@@ -286,9 +286,10 @@ launch examples, configured solid RocketPy direct simulation, multistage suite s
 annotation around one configured RocketPy flight, stage-schedule completeness metadata, a neutral
 `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics,
 Dymos stage-aware vertical-ascent phase transcription, Dymos suite stage-plan metadata,
-pitch-program control-point metadata, tuned point indices, and Dymos adapter optimization
-diagnostics are implemented. Full native multi-motor RocketPy staging and full pitch-program
-multistage Dymos ascent optimization remain gated on validated backend runners.
+pitch-program control-point metadata, optimized pitch-program schedule metadata, tuned point
+indices, and Dymos adapter optimization diagnostics are implemented. Full native multi-motor
+RocketPy staging and full pitch-program multistage Dymos ascent optimization remain gated on
+validated backend runners.
 
 Implemented slice:
 
@@ -315,7 +316,8 @@ Implemented slice:
 - Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
   iteration count, candidate count, path-constraint summary, best score, target insertion
   residuals, Dymos version, OpenMDAO version, phase duration, final altitude, final velocity,
-  pitch-program control-point metadata, tuned pitch point indices, and optimizer message.
+  original and optimized pitch-program control-point schedules, tuned pitch point indices, explicit
+  pitch-program optimization scope metadata, and optimizer message.
 - Dymos adapter provenance includes the suite stage plan, multistage flag, total burn duration, and
   whether the Dymos phase duration covers the full stage schedule.
 
@@ -329,7 +331,8 @@ Definition of done:
 - `astro optimize-launch --backend dymos` solves a stage-aware ascent optimization example through
   a bounded vertical-ascent Dymos phase model.
 - Dymos/OpenMDAO adapter reports path constraints, pitch-program control points, tuned pitch point
-  indices, optimizer status, convergence diagnostics, and target insertion residuals.
+  indices, optimized pitch-program control points, optimizer status, convergence diagnostics, and
+  target insertion residuals.
 - Dymos/OpenMDAO adapter reports the suite multistage plan and configured-burn coverage without
   claiming the current vertical-phase model is a full pitch-program multistage ascent optimizer.
 - Launch validation includes deterministic direct-simulation cases and one small optimization case.
