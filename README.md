@@ -109,6 +109,7 @@ astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output
 astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output velocity_aligned_burn_trajectory.json
 astro propagate examples/scenarios/leo_radial_burn.yaml --backend local --output radial_burn_trajectory.json
 astro propagate examples/scenarios/leo_covariance.yaml --backend local --output covariance_trajectory.json
+astro propagate examples/scenarios/leo_variational_covariance.yaml --backend local --output variational_covariance_trajectory.json
 astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
 astro propagate examples/scenarios/leo_j2.yaml --backend orekit --output orekit_j2_trajectory.json
 astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend orekit --output orekit_high_fidelity_trajectory.json
@@ -176,9 +177,16 @@ CCSDS OEM KVN text product containing UTC epochs plus Cartesian position and vel
 and km/s. `astro import-trajectory --format oem` converts a CCSDS OEM KVN text product back into a
 suite `Trajectory`; it requires `--scenario` because OEM does not encode the suite force model.
 The importer is intentionally strict: UTC time system, EME2000 reference frame, and Earth center are
-required. `astro monte-carlo` runs a seeded initial-state ensemble by perturbing the scenario's Cartesian state and propagating each case through the selected backend.
-This is a repeatable product workflow for uncertainty screening; it is not yet production covariance
-propagation or conjunction analysis.
+required. `astro monte-carlo` runs a seeded initial-state ensemble by perturbing the scenario's
+Cartesian state and propagating each case through the selected backend. This is a repeatable product
+workflow for uncertainty screening; it is not yet production conjunction analysis.
+
+Local covariance propagation accepts an optional `initial_covariance` and
+`covariance_process_noise_acceleration_km_s2`. The default `covariance_state_transition_model` is
+`finite_difference`, preserving the existing force-model and maneuver compatibility. Two-body
+scenarios without maneuvers may opt into `two_body_variational`, which integrates the state
+transition matrix with the analytic two-body acceleration Jacobian and stores per-step plus
+accumulated state-transition matrices in the trajectory product.
 
 Local orbital propagation accepts an optional `maneuvers` schedule on `Scenario`. Impulsive
 maneuvers apply their full `delta_v_km_s` at the maneuver epoch; finite burns apply the configured

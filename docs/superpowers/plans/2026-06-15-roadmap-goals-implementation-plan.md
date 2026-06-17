@@ -34,9 +34,9 @@ Implemented and protected:
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV export and CCSDS
   OEM ephemeris export/import,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
-  propagation, plus finite-difference local covariance propagation with optional acceleration
-  process noise, explicit per-sample state-transition/process-noise covariance products, and
-  velocity-aligned/radial attitude-coupled thrust-vector burn modes.
+  propagation, plus finite-difference and opt-in two-body variational local covariance propagation
+  with optional acceleration process noise, explicit per-sample state-transition/process-noise
+  covariance products, and velocity-aligned/radial attitude-coupled thrust-vector burn modes.
 - `astro_od` synthetic range/range-rate/one-way Doppler/iterative linearized two-way and three-way
   range/range-rate/right-ascension/declination/azimuth/elevation generation, measurement JSON/CSV
   ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy batch least-squares OD.
@@ -50,8 +50,8 @@ Implemented and protected:
 
 Still roadmap-level:
 
-- Analytic/variational high-fidelity covariance propagation and full attitude-control maneuver
-  dynamics.
+- Higher-fidelity variational covariance propagation beyond two-body and full attitude-control
+  maneuver dynamics.
 - Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization.
 - Live Tudat cross-check environment/body construction.
 - Full precession-nutation reductions, operational DSN weather/frequency-dependent media models for
@@ -210,12 +210,14 @@ Primary files:
 
 Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
 finite burns, local thrust-vector finite burns with mass depletion, CSV export and CCSDS OEM
-ephemeris export/import, finite-difference local covariance propagation with optional white-acceleration process
-noise, explicit per-sample and accumulated state-transition matrices, per-sample process-noise
-covariance matrices, Orekit finite-difference covariance propagation through the selected Orekit
-force model, and seeded initial-state Monte Carlo. The attitude-coupled finite-burn modes rotate
-thrust along instantaneous velocity or local radial directions; analytic variational-equation
-covariance dynamics and full attitude-control maneuver dynamics remain deferred.
+ephemeris export/import, finite-difference local covariance propagation, opt-in local two-body
+variational covariance propagation with an analytic acceleration Jacobian, optional
+white-acceleration process noise, explicit per-sample and accumulated state-transition matrices,
+per-sample process-noise covariance matrices, Orekit finite-difference covariance propagation
+through the selected Orekit force model, and seeded initial-state Monte Carlo. The
+attitude-coupled finite-burn modes rotate thrust along instantaneous velocity or local radial
+directions; higher-fidelity variational-equation covariance dynamics and full attitude-control
+maneuver dynamics remain deferred.
 
 Definition of done:
 
@@ -228,11 +230,12 @@ Definition of done:
   radial-outward, and radial-inward thrust directions for commanded attitude-coupled burn modes.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported. Local propagation can populate them from a
-  scenario initial covariance using finite-difference state transitions plus optional
-  white-acceleration process noise. Orekit propagation can populate the same suite product by
-  rebuilding and propagating perturbed Orekit states through the selected Orekit force model.
-  Both paths include per-sample state-transition matrices, accumulated state-transition matrices,
-  and process-noise covariance matrices.
+  scenario initial covariance using finite-difference state transitions or, for two-body scenarios
+  without maneuvers, opt-in variational state transitions integrated with the analytic two-body
+  acceleration Jacobian. Both local paths support optional white-acceleration process noise. Orekit
+  propagation can populate the same suite product by rebuilding and propagating perturbed Orekit
+  states through the selected Orekit force model. These paths include per-sample state-transition
+  matrices, accumulated state-transition matrices, and process-noise covariance matrices.
 
 Primary files:
 

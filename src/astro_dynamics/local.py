@@ -521,6 +521,61 @@ def _finite_difference_state_transition(
     return cast(FloatArray, transition)
 
 
+def two_body_acceleration_jacobian(position_km: FloatArray) -> FloatArray:
+    radius2, radius = _radius_metrics(position_km)
+    radius3 = radius2 * radius
+    radius5 = radius3 * radius2
+    identity = np.eye(3, dtype=np.float64)
+    outer_position = np.outer(position_km, position_km)
+    return cast(
+        FloatArray,
+        MU_EARTH_KM3_S2 * ((3.0 * outer_position / radius5) - (identity / radius3)),
+    )
+
+
+def _two_body_variational_derivative(augmented_state: FloatArray) -> FloatArray:
+    state = augmented_state[:6]
+    transition = augmented_state[6:].reshape((6, 6))
+    dynamics_jacobian = np.zeros((6, 6), dtype=np.float64)
+    dynamics_jacobian[:3, 3:] = np.eye(3, dtype=np.float64)
+    dynamics_jacobian[3:, :3] = two_body_acceleration_jacobian(state[:3])
+    transition_derivative = dynamics_jacobian @ transition
+    return cast(
+        FloatArray,
+        np.concatenate(
+            [
+                derivative(state, ForceModelName.TWO_BODY),
+                transition_derivative.reshape(36),
+            ]
+        ),
+    )
+
+
+def _rk4_variational_step_once(augmented_state: FloatArray, step_s: float) -> FloatArray:
+    k1 = _two_body_variational_derivative(augmented_state)
+    k2 = _two_body_variational_derivative(augmented_state + 0.5 * step_s * k1)
+    k3 = _two_body_variational_derivative(augmented_state + 0.5 * step_s * k2)
+    k4 = _two_body_variational_derivative(augmented_state + step_s * k3)
+    return cast(
+        FloatArray,
+        augmented_state + (step_s / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4),
+    )
+
+
+def _two_body_variational_step(
+    state: FloatArray,
+    step_s: float,
+) -> tuple[FloatArray, FloatArray]:
+    substep_count, substep_s = _internal_step_schedule(step_s)
+    augmented_state = cast(
+        FloatArray,
+        np.concatenate([state, np.eye(6, dtype=np.float64).reshape(36)]),
+    )
+    for _ in range(substep_count):
+        augmented_state = _rk4_variational_step_once(augmented_state, substep_s)
+    return augmented_state[:6], cast(FloatArray, augmented_state[6:].reshape((6, 6)))
+
+
 def _process_noise_covariance(acceleration_sigma_km_s2: float, step_s: float) -> FloatArray:
     process_noise = np.zeros((6, 6), dtype=np.float64)
     if acceleration_sigma_km_s2 == 0.0:
@@ -548,19 +603,95 @@ def _propagate_covariance(
     return cast(FloatArray, 0.5 * (propagated + propagated.T))
 
 
-def _covariance_metadata(scenario: Scenario, covariance: FloatArray | None) -> dict[str, Any]:
+def _covariance_transition_model(
+    scenario: Scenario,
+    *,
+    force_model: ForceModelName,
+    maneuver_schedule: list[_ScheduledManeuver],
+    covariance: FloatArray | None,
+) -> str:
+    model = scenario.covariance_state_transition_model
+    if covariance is None or model == "finite_difference":
+        return model
+    if force_model is not ForceModelName.TWO_BODY:
+        raise ValueError(
+            "two_body_variational covariance propagation requires two_body gravity"
+        )
+    if maneuver_schedule:
+        raise ValueError(
+            "two_body_variational covariance propagation does not support maneuvers"
+        )
+    return model
+
+
+def _covariance_product_model(covariance_transition_model: str) -> str:
+    if covariance_transition_model == "finite_difference":
+        return "finite_difference_state_transition"
+    return covariance_transition_model
+
+
+def _covariance_metadata(
+    scenario: Scenario,
+    covariance: FloatArray | None,
+    covariance_transition_model: str,
+) -> dict[str, Any]:
     if covariance is None:
         return {}
     process_noise_acceleration = scenario.covariance_process_noise_acceleration_km_s2
-    return {
-        "covariance_model": "finite_difference_state_transition",
+    metadata: dict[str, Any] = {
+        "covariance_model": _covariance_product_model(covariance_transition_model),
         "covariance_state_transition_storage": "per_sample_and_accumulated",
         "covariance_process_noise": _covariance_process_noise_model(process_noise_acceleration),
         "covariance_process_noise_acceleration_km_s2": process_noise_acceleration,
         "covariance_process_noise_storage": "per_sample_matrix",
-        "covariance_finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
-        "covariance_finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
     }
+    if covariance_transition_model == "finite_difference":
+        metadata |= {
+            "covariance_finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
+            "covariance_finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
+        }
+    else:
+        metadata |= {
+            "covariance_variational_dynamics": "two_body_acceleration_jacobian",
+        }
+    return metadata
+
+
+def _covariance_sample_metadata(
+    scenario: Scenario,
+    *,
+    step_index: int,
+    transition_step_s: float,
+    covariance_transition_model: str,
+) -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "covariance_sample_role": "initial" if step_index == 0 else "propagated",
+        "covariance_model": _covariance_product_model(covariance_transition_model),
+        "state_transition_model": (
+            "identity" if step_index == 0 else covariance_transition_model
+        ),
+        "transition_step_s": transition_step_s,
+        "process_noise_model": (
+            "none"
+            if step_index == 0
+            else _covariance_process_noise_model(
+                scenario.covariance_process_noise_acceleration_km_s2
+            )
+        ),
+        "process_noise_acceleration_km_s2": (
+            0.0 if step_index == 0 else scenario.covariance_process_noise_acceleration_km_s2
+        ),
+    }
+    if covariance_transition_model == "finite_difference":
+        metadata |= {
+            "finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
+            "finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
+        }
+    else:
+        metadata |= {
+            "variational_dynamics": "two_body_acceleration_jacobian",
+        }
+    return metadata
 
 
 def propagate_local(scenario: Scenario) -> Trajectory:
@@ -572,6 +703,12 @@ def propagate_local(scenario: Scenario) -> Trajectory:
     maneuver_events = _maneuver_events(maneuver_schedule, scenario)
     applied_impulses: set[int] = set()
     covariance_matrix = _initial_covariance_matrix(scenario)
+    covariance_transition_model = _covariance_transition_model(
+        scenario,
+        force_model=force_model,
+        maneuver_schedule=maneuver_schedule,
+        covariance=covariance_matrix,
+    )
     process_noise = _process_noise_covariance(
         scenario.covariance_process_noise_acceleration_km_s2,
         scenario.propagation.step_s,
@@ -611,30 +748,12 @@ def propagate_local(scenario: Scenario) -> Trajectory:
                     state_transition_matrix=previous_transition,
                     accumulated_state_transition_matrix=accumulated_transition,
                     process_noise_covariance=previous_process_noise,
-                    metadata={
-                        "covariance_sample_role": (
-                            "initial" if step_index == 0 else "propagated"
-                        ),
-                        "covariance_model": "finite_difference_state_transition",
-                        "state_transition_model": (
-                            "identity" if step_index == 0 else "finite_difference"
-                        ),
-                        "transition_step_s": previous_transition_step_s,
-                        "process_noise_model": (
-                            "none"
-                            if step_index == 0
-                            else _covariance_process_noise_model(
-                                scenario.covariance_process_noise_acceleration_km_s2
-                            )
-                        ),
-                        "process_noise_acceleration_km_s2": (
-                            0.0
-                            if step_index == 0
-                            else scenario.covariance_process_noise_acceleration_km_s2
-                        ),
-                        "finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
-                        "finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
-                    },
+                    metadata=_covariance_sample_metadata(
+                        scenario,
+                        step_index=step_index,
+                        transition_step_s=previous_transition_step_s,
+                        covariance_transition_model=covariance_transition_model,
+                    ),
                 )
             )
 
@@ -676,15 +795,23 @@ def propagate_local(scenario: Scenario) -> Trajectory:
                 )
             else:
                 if covariance_matrix is not None:
-                    transition = _finite_difference_state_transition(
-                        state,
-                        lambda trial_state: rk4_step(
-                            trial_state,
+                    if covariance_transition_model == "two_body_variational":
+                        state, transition = _two_body_variational_step(
+                            state,
                             scenario.propagation.step_s,
-                            force_model,
-                        ),
-                    )
-                state = rk4_step(state, scenario.propagation.step_s, force_model)
+                        )
+                    else:
+                        transition = _finite_difference_state_transition(
+                            state,
+                            lambda trial_state: rk4_step(
+                                trial_state,
+                                scenario.propagation.step_s,
+                                force_model,
+                            ),
+                        )
+                        state = rk4_step(state, scenario.propagation.step_s, force_model)
+                else:
+                    state = rk4_step(state, scenario.propagation.step_s, force_model)
 
             if covariance_matrix is not None and transition is not None:
                 covariance_matrix = _propagate_covariance(
@@ -716,7 +843,7 @@ def propagate_local(scenario: Scenario) -> Trajectory:
         }
         | mass_metadata
         | _maneuver_metadata(maneuver_schedule)
-        | _covariance_metadata(scenario, covariance_matrix)
+        | _covariance_metadata(scenario, covariance_matrix, covariance_transition_model)
     )
 
     return Trajectory(

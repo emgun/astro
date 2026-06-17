@@ -904,6 +904,10 @@ class Scenario(AstroModel):
     maneuvers: list[Maneuver] = Field(default_factory=list)
     initial_covariance: list[list[FiniteFloat]] | None = None
     covariance_process_noise_acceleration_km_s2: FiniteFloat = Field(ge=0.0, default=0.0)
+    covariance_state_transition_model: Literal[
+        "finite_difference",
+        "two_body_variational",
+    ] = "finite_difference"
     ground_stations: list[GroundStation] = Field(default_factory=list)
     measurements: MeasurementConfig = Field(default_factory=MeasurementConfig)
     metadata: dict[str, Any] = Field(default_factory=dict)
