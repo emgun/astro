@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -17,8 +18,23 @@ from astro_core.models import (
 FloatArray = NDArray[np.float64]
 MeasurementUnits = Literal["km", "km/s", "Hz", "deg"]
 SPEED_OF_LIGHT_KM_S = 299792.458
+_LIGHT_TIME_MAX_ITERATIONS = 8
+_LIGHT_TIME_TOLERANCE_S = 1.0e-12
 _ECI_NORTH_POLE = np.array([0.0, 0.0, 1.0], dtype=np.float64)
 _ECI_Y_AXIS = np.array([0.0, 1.0, 0.0], dtype=np.float64)
+
+
+@dataclass(frozen=True)
+class RadiometricLightTimeSolution:
+    light_time_model: str
+    total_range_km: float
+    total_light_time_s: float
+    uplink_light_time_s: float
+    downlink_light_time_s: float
+    iterations: int
+    transmit_time_offset_s: float
+    reflection_time_offset_s: float
+    receive_time_offset_s: float
 
 
 def _as_float_array(values: ArrayLike) -> FloatArray:
@@ -109,6 +125,86 @@ def three_way_light_time_s(
             receiver_position_km,
         )
         / SPEED_OF_LIGHT_KM_S
+    )
+
+
+def _linearized_spacecraft_position(
+    receive_spacecraft_position_km: FloatArray,
+    spacecraft_velocity_km_s: FloatArray,
+    receive_time_offset_s: float,
+) -> FloatArray:
+    return cast(
+        FloatArray,
+        receive_spacecraft_position_km + spacecraft_velocity_km_s * receive_time_offset_s,
+    )
+
+
+def iterative_two_way_light_time_solution(
+    receive_spacecraft_position_km: ArrayLike,
+    spacecraft_velocity_km_s: ArrayLike,
+    station_position_km: ArrayLike,
+    *,
+    max_iterations: int = _LIGHT_TIME_MAX_ITERATIONS,
+    tolerance_s: float = _LIGHT_TIME_TOLERANCE_S,
+) -> RadiometricLightTimeSolution:
+    return iterative_three_way_light_time_solution(
+        receive_spacecraft_position_km,
+        spacecraft_velocity_km_s,
+        station_position_km,
+        station_position_km,
+        max_iterations=max_iterations,
+        tolerance_s=tolerance_s,
+    )
+
+
+def iterative_three_way_light_time_solution(
+    receive_spacecraft_position_km: ArrayLike,
+    spacecraft_velocity_km_s: ArrayLike,
+    transmitter_position_km: ArrayLike,
+    receiver_position_km: ArrayLike,
+    *,
+    max_iterations: int = _LIGHT_TIME_MAX_ITERATIONS,
+    tolerance_s: float = _LIGHT_TIME_TOLERANCE_S,
+) -> RadiometricLightTimeSolution:
+    receive_spacecraft_position = _as_float_array(receive_spacecraft_position_km)
+    spacecraft_velocity = _as_float_array(spacecraft_velocity_km_s)
+    transmitter_position = _as_float_array(transmitter_position_km)
+    receiver_position = _as_float_array(receiver_position_km)
+
+    downlink_light_time = light_time_s(receive_spacecraft_position, receiver_position)
+    uplink_light_time = light_time_s(receive_spacecraft_position, transmitter_position)
+    iteration_count = 0
+
+    for iteration in range(1, max_iterations + 1):
+        iteration_count = iteration
+        reflection_time_offset = -downlink_light_time
+        reflection_position = _linearized_spacecraft_position(
+            receive_spacecraft_position,
+            spacecraft_velocity,
+            reflection_time_offset,
+        )
+        next_downlink_light_time = light_time_s(reflection_position, receiver_position)
+        next_uplink_light_time = light_time_s(reflection_position, transmitter_position)
+        converged = max(
+            abs(next_downlink_light_time - downlink_light_time),
+            abs(next_uplink_light_time - uplink_light_time),
+        ) <= tolerance_s
+        downlink_light_time = next_downlink_light_time
+        uplink_light_time = next_uplink_light_time
+        if converged:
+            break
+
+    total_light_time = uplink_light_time + downlink_light_time
+    return RadiometricLightTimeSolution(
+        light_time_model="vacuum_geometric_iterative_linearized",
+        total_range_km=float(total_light_time * SPEED_OF_LIGHT_KM_S),
+        total_light_time_s=float(total_light_time),
+        uplink_light_time_s=float(uplink_light_time),
+        downlink_light_time_s=float(downlink_light_time),
+        iterations=iteration_count,
+        transmit_time_offset_s=float(-total_light_time),
+        reflection_time_offset_s=float(-downlink_light_time),
+        receive_time_offset_s=0.0,
     )
 
 
@@ -332,27 +428,27 @@ def _measurement_geometry(
         )
     if measurement_type is MeasurementType.TWO_WAY_RANGE:
         observer = observer_name or scenario.ground_stations[0].name
-        round_trip_light_time_s = two_way_light_time_s(
+        light_time_solution = iterative_two_way_light_time_solution(
             spacecraft_position_km,
+            spacecraft_velocity_km_s,
             station_position_km,
         )
         return (
-            two_way_range_km(spacecraft_position_km, station_position_km),
+            light_time_solution.total_range_km,
             scenario.measurements.noise.range_sigma_km,
             "km",
             {
                 "participant_path": f"{observer},{scenario.spacecraft.name},{observer}",
-                "radiometric_model": "first_order_two_way_same_epoch",
-                "light_time_model": "vacuum_geometric_same_epoch",
-                "uplink_light_time_s": round_trip_light_time_s / 2.0,
-                "downlink_light_time_s": round_trip_light_time_s / 2.0,
-                "round_trip_light_time_s": round_trip_light_time_s,
+                "radiometric_model": "iterative_two_way_linearized",
+                **_light_time_metadata(light_time_solution),
+                "round_trip_light_time_s": light_time_solution.total_light_time_s,
             },
         )
     if measurement_type is MeasurementType.TWO_WAY_RANGE_RATE:
         observer = observer_name or scenario.ground_stations[0].name
-        round_trip_light_time_s = two_way_light_time_s(
+        light_time_solution = iterative_two_way_light_time_solution(
             spacecraft_position_km,
+            spacecraft_velocity_km_s,
             station_position_km,
         )
         return (
@@ -365,11 +461,9 @@ def _measurement_geometry(
             "km/s",
             {
                 "participant_path": f"{observer},{scenario.spacecraft.name},{observer}",
-                "radiometric_model": "first_order_two_way_same_epoch",
-                "light_time_model": "vacuum_geometric_same_epoch",
-                "uplink_light_time_s": round_trip_light_time_s / 2.0,
-                "downlink_light_time_s": round_trip_light_time_s / 2.0,
-                "round_trip_light_time_s": round_trip_light_time_s,
+                "radiometric_model": "iterative_two_way_linearized",
+                **_light_time_metadata(light_time_solution),
+                "round_trip_light_time_s": light_time_solution.total_light_time_s,
             },
         )
     if measurement_type is MeasurementType.DOPPLER:
@@ -429,27 +523,28 @@ def _three_way_measurement_geometry(
     scenario: Scenario,
 ) -> tuple[float, float, MeasurementUnits, dict[str, Any]]:
     if measurement_type is MeasurementType.THREE_WAY_RANGE:
-        uplink_light_time_s = light_time_s(spacecraft_position_km, transmitter_position_km)
-        downlink_light_time_s = light_time_s(spacecraft_position_km, receiver_position_km)
+        light_time_solution = iterative_three_way_light_time_solution(
+            spacecraft_position_km,
+            spacecraft_velocity_km_s,
+            transmitter_position_km,
+            receiver_position_km,
+        )
         return (
-            three_way_range_km(
-                spacecraft_position_km,
-                transmitter_position_km,
-                receiver_position_km,
-            ),
+            light_time_solution.total_range_km,
             scenario.measurements.noise.range_sigma_km,
             "km",
             {
-                "radiometric_model": "first_order_three_way_same_epoch",
-                "light_time_model": "vacuum_geometric_same_epoch",
-                "uplink_light_time_s": uplink_light_time_s,
-                "downlink_light_time_s": downlink_light_time_s,
-                "total_light_time_s": uplink_light_time_s + downlink_light_time_s,
+                "radiometric_model": "iterative_three_way_linearized",
+                **_light_time_metadata(light_time_solution),
             },
         )
     if measurement_type is MeasurementType.THREE_WAY_RANGE_RATE:
-        uplink_light_time_s = light_time_s(spacecraft_position_km, transmitter_position_km)
-        downlink_light_time_s = light_time_s(spacecraft_position_km, receiver_position_km)
+        light_time_solution = iterative_three_way_light_time_solution(
+            spacecraft_position_km,
+            spacecraft_velocity_km_s,
+            transmitter_position_km,
+            receiver_position_km,
+        )
         return (
             three_way_range_rate_km_s(
                 spacecraft_position_km,
@@ -460,11 +555,23 @@ def _three_way_measurement_geometry(
             scenario.measurements.noise.range_rate_sigma_km_s,
             "km/s",
             {
-                "radiometric_model": "first_order_three_way_same_epoch",
-                "light_time_model": "vacuum_geometric_same_epoch",
-                "uplink_light_time_s": uplink_light_time_s,
-                "downlink_light_time_s": downlink_light_time_s,
-                "total_light_time_s": uplink_light_time_s + downlink_light_time_s,
+                "radiometric_model": "iterative_three_way_linearized",
+                **_light_time_metadata(light_time_solution),
             },
         )
     raise ValueError(f"Unsupported three-way measurement type: {measurement_type}")
+
+
+def _light_time_metadata(solution: RadiometricLightTimeSolution) -> dict[str, Any]:
+    return {
+        "light_time_model": solution.light_time_model,
+        "light_time_iterations": solution.iterations,
+        "light_time_tolerance_s": _LIGHT_TIME_TOLERANCE_S,
+        "media_corrections_model": "none",
+        "uplink_light_time_s": solution.uplink_light_time_s,
+        "downlink_light_time_s": solution.downlink_light_time_s,
+        "total_light_time_s": solution.total_light_time_s,
+        "transmit_time_offset_s": solution.transmit_time_offset_s,
+        "reflection_time_offset_s": solution.reflection_time_offset_s,
+        "receive_time_offset_s": solution.receive_time_offset_s,
+    }

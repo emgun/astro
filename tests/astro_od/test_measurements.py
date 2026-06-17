@@ -18,6 +18,8 @@ from astro_dynamics.local import propagate_local
 from astro_od.measurements import (
     doppler_hz,
     generate_synthetic_measurements,
+    iterative_three_way_light_time_solution,
+    iterative_two_way_light_time_solution,
     light_time_s,
     range_km,
     range_rate_km_s,
@@ -74,6 +76,41 @@ def test_radiometric_light_time_helpers_return_vacuum_path_times() -> None:
         )
         / od_measurements.SPEED_OF_LIGHT_KM_S
     )
+
+
+def test_iterative_radiometric_light_time_accounts_for_linearized_spacecraft_motion() -> None:
+    spacecraft_position = np.array([7000.0, 0.0, 0.0])
+    spacecraft_velocity = np.array([7.5, 0.0, 0.0])
+    transmitter_position = np.array([6378.0, 0.0, 0.0])
+    receiver_position = np.array([0.0, 6378.0, 0.0])
+
+    two_way = iterative_two_way_light_time_solution(
+        spacecraft_position,
+        spacecraft_velocity,
+        transmitter_position,
+    )
+    three_way = iterative_three_way_light_time_solution(
+        spacecraft_position,
+        spacecraft_velocity,
+        transmitter_position,
+        receiver_position,
+    )
+
+    assert two_way.light_time_model == "vacuum_geometric_iterative_linearized"
+    assert two_way.total_light_time_s < two_way_light_time_s(
+        spacecraft_position,
+        transmitter_position,
+    )
+    assert two_way.transmit_time_offset_s < two_way.reflection_time_offset_s < 0.0
+    assert two_way.receive_time_offset_s == 0.0
+    assert two_way.iterations > 1
+    assert three_way.total_light_time_s < three_way_light_time_s(
+        spacecraft_position,
+        transmitter_position,
+        receiver_position,
+    )
+    assert three_way.uplink_light_time_s > 0.0
+    assert three_way.downlink_light_time_s > 0.0
 
 
 def test_two_way_radiometric_geometry_returns_round_trip_path() -> None:
@@ -227,12 +264,16 @@ def test_generate_synthetic_measurements_supports_two_way_radiometric_records() 
         MeasurementType.TWO_WAY_RANGE_RATE,
     }
     assert {record.metadata["radiometric_model"] for record in records} == {
-        "first_order_two_way_same_epoch"
+        "iterative_two_way_linearized"
     }
     assert {record.metadata["light_time_model"] for record in records} == {
-        "vacuum_geometric_same_epoch"
+        "vacuum_geometric_iterative_linearized"
     }
     assert all(record.metadata["round_trip_light_time_s"] > 0.0 for record in records)
+    assert all(record.metadata["light_time_iterations"] >= 1 for record in records)
+    assert all(record.metadata["transmit_time_offset_s"] < 0.0 for record in records)
+    assert all(record.metadata["reflection_time_offset_s"] < 0.0 for record in records)
+    assert all(record.metadata["receive_time_offset_s"] == 0.0 for record in records)
     assert {record.metadata["participant_path"] for record in records} == {
         "equator-eci,demo-sat,equator-eci"
     }
@@ -267,11 +308,15 @@ def test_generate_synthetic_measurements_supports_three_way_radiometric_records(
     assert {record.observer for record in records} == {"y-axis-eci"}
     assert {record.metadata["transmitter"] for record in records} == {"equator-eci"}
     assert {record.metadata["radiometric_model"] for record in records} == {
-        "first_order_three_way_same_epoch"
+        "iterative_three_way_linearized"
     }
     assert {record.metadata["light_time_model"] for record in records} == {
-        "vacuum_geometric_same_epoch"
+        "vacuum_geometric_iterative_linearized"
     }
+    assert all(record.metadata["light_time_iterations"] >= 1 for record in records)
+    assert all(record.metadata["transmit_time_offset_s"] < 0.0 for record in records)
+    assert all(record.metadata["reflection_time_offset_s"] < 0.0 for record in records)
+    assert all(record.metadata["receive_time_offset_s"] == 0.0 for record in records)
     assert all(record.metadata["uplink_light_time_s"] > 0.0 for record in records)
     assert all(record.metadata["downlink_light_time_s"] > 0.0 for record in records)
     assert all(record.metadata["total_light_time_s"] > 0.0 for record in records)

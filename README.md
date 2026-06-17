@@ -18,7 +18,7 @@ The current implementation slice covers:
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
   local ascent/orbit propagations, batch ranking, and report-to-report comparison.
-- Synthetic range, range-rate, one-way Doppler, first-order two-way/three-way range and
+- Synthetic range, range-rate, one-way Doppler, iterative linearized two-way/three-way range and
   range-rate, inertial right ascension, declination, azimuth, and elevation measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
 - CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
@@ -250,13 +250,14 @@ special launch-aware propagation path.
 `--backend orekit`. The explicit ingest workflow loads a scenario plus a JSON, CSV, or CCSDS
 Tracking Data Message (TDM) measurement file, then estimates from the caller-provided station
 geometry and measurement records without adding demo geometry. JSON and CSV can carry the suite's
-range, range-rate, one-way Doppler in Hz, first-order two-way/three-way range and range-rate,
+range, range-rate, one-way Doppler in Hz, iterative linearized two-way/three-way range and range-rate,
 inertial right-ascension/declination, and local-horizon azimuth/elevation records. Doppler uses the
 scenario's `doppler_transmit_frequency_hz` to convert line-of-sight range rate into a
-received-frequency shift. Two-way and three-way range-like observables use same-epoch geometric
-uplink/downlink path sums and carry `participant_path`/`transmitter` metadata plus vacuum
-geometric light-time diagnostics for each leg; they are product and estimator primitives, not full
-DSN media-correction or iterative transmit/receive-time models. Angle records use degrees. Ground stations can be supplied either as fixed
+received-frequency shift. Two-way and three-way range-like observables use iterative vacuum
+light-time over a linearized spacecraft state and carry `participant_path`/`transmitter` metadata,
+uplink/downlink light-time diagnostics, transmit/reflection/receive offsets, and an explicit
+`media_corrections_model = "none"` marker; they are product and estimator primitives, not full DSN
+media-correction models. Angle records use degrees. Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
 epoch using a deterministic UTC sidereal-time model by default. Scenarios may also provide fixed

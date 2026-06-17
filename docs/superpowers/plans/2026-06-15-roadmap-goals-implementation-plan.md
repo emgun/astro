@@ -37,7 +37,7 @@ Implemented and protected:
   propagation, plus finite-difference local covariance propagation with optional acceleration
   process noise, explicit per-sample state-transition/process-noise covariance products, and
   velocity-aligned/radial attitude-coupled thrust-vector burn modes.
-- `astro_od` synthetic range/range-rate/one-way Doppler/first-order two-way and three-way
+- `astro_od` synthetic range/range-rate/one-way Doppler/iterative linearized two-way and three-way
   range/range-rate/right-ascension/declination/azimuth/elevation generation, measurement JSON/CSV
   ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy batch least-squares OD.
 - `astro_launch` local vertical and pitch-program ascent baselines, launch-to-orbit handoff, pitch sweep, two-knot tuning, tuned launch reports, batch ranking, and report comparison.
@@ -54,10 +54,9 @@ Still roadmap-level:
   dynamics.
 - Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization.
 - Live Tudat cross-check environment/body construction.
-- Full precession-nutation reductions, operational DSN iterative transmit/receive-time and media
-  corrections for two-way/three-way radiometrics, and operational CCSDS support beyond current KVN
-  TDM measurement families, suite multi-leg radiometric TDM extension, and OEM ephemeris
-  interchange.
+- Full precession-nutation reductions, operational DSN media corrections for two-way/three-way
+  radiometrics, and operational CCSDS support beyond current KVN TDM measurement families, suite
+  multi-leg radiometric TDM extension, and OEM ephemeris interchange.
 - Richer JAX high-fidelity force models and full differentiable OD estimator workflows.
 
 ## Goal Ledger
@@ -159,16 +158,17 @@ Implemented slice:
 - Native Orekit covariance extraction records `covariance_status = "available"` when the physical
   covariance matrix is returned and `covariance_status = "unavailable"` with `covariance_fallback =
   "zero_6x6"` when Orekit reports a singular matrix.
-- The shared measurement surface supports range, range-rate, one-way Doppler in Hz, first-order
-  two-way and three-way range/range-rate with explicit participant-path metadata, inertial right
-  ascension, declination, and local-horizon azimuth/elevation records; wrapped angle residuals
-  handle 0/360 degree crossings.
-- First-order two-way/three-way radiometric records now carry vacuum geometric uplink/downlink
-  light-time diagnostics. These are provenance fields for same-epoch path-sum products, not full
-  DSN media corrections or iterative transmit/receive-time observables.
+- The shared measurement surface supports range, range-rate, one-way Doppler in Hz, iterative
+  linearized two-way and three-way range/range-rate with explicit participant-path metadata,
+  inertial right ascension, declination, and local-horizon azimuth/elevation records; wrapped angle
+  residuals handle 0/360 degree crossings.
+- Two-way/three-way radiometric records carry iterative vacuum light-time diagnostics over a
+  linearized spacecraft state, including uplink/downlink light time, transmit/reflection/receive
+  offsets, iteration count, tolerance, and `media_corrections_model = "none"`. They remain product
+  and estimator primitives, not full DSN media-corrected observables.
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
-  checked-in first-order two-way/three-way radiometric synthesis fixture. TDM export deliberately
+  checked-in iterative two-way/three-way radiometric synthesis fixture. TDM export deliberately
   rejects Hz Doppler until a precise CCSDS Doppler/count convention is added; explicit two-way and
   three-way suite records round-trip through TDM with an `ASTRO_MEASUREMENT_TYPE` metadata
   extension so legacy TDM files are not reinterpreted.

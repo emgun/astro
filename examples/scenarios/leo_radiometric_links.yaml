@@ -1,5 +1,5 @@
 scenario_id: leo-radiometric-links
-description: LEO two-way and three-way first-order radiometric measurement example.
+description: LEO two-way and three-way iterative linearized radiometric measurement example.
 spacecraft:
   name: demo-sat
   mass_kg: 120.0
