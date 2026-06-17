@@ -349,7 +349,29 @@ def _covariance_sample(
     )
 
 
-def _covariance_metadata(scenario: Scenario, covariance: FloatArray | None) -> dict[str, object]:
+def _covariance_transition_metadata(
+    propagator_metadata: dict[str, object],
+    *,
+    prefix: str = "",
+) -> dict[str, object]:
+    metadata: dict[str, object] = {}
+    if "propagator" in propagator_metadata:
+        metadata[f"{prefix}propagator"] = propagator_metadata["propagator"]
+    if "force_models" in propagator_metadata:
+        force_models = propagator_metadata["force_models"]
+        metadata[f"{prefix}force_models"] = (
+            list(force_models) if isinstance(force_models, list) else force_models
+        )
+    if "gravity_model" in propagator_metadata:
+        metadata[f"{prefix}gravity_model"] = propagator_metadata["gravity_model"]
+    return metadata
+
+
+def _covariance_metadata(
+    scenario: Scenario,
+    covariance: FloatArray | None,
+    propagator_metadata: dict[str, object],
+) -> dict[str, object]:
     if covariance is None:
         return {}
     process_noise_acceleration = scenario.covariance_process_noise_acceleration_km_s2
@@ -361,6 +383,10 @@ def _covariance_metadata(scenario: Scenario, covariance: FloatArray | None) -> d
         "covariance_process_noise_storage": "per_sample_matrix",
         "covariance_finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
         "covariance_finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
+        **_covariance_transition_metadata(
+            propagator_metadata,
+            prefix="covariance_transition_",
+        ),
     }
 
 
@@ -432,6 +458,10 @@ def propagate_orekit(
                         ),
                         "finite_difference_relative_step": _COVARIANCE_FD_REL_STEP,
                         "finite_difference_absolute_step": _COVARIANCE_FD_ABS_STEP,
+                        **_covariance_transition_metadata(
+                            propagator_config.metadata,
+                            prefix="transition_",
+                        ),
                     },
                 )
             )
@@ -479,6 +509,10 @@ def propagate_orekit(
             "data_path": runtime.data_path,
             **propagator_config.metadata,
             "units": "suite km/km_s converted to Orekit m/m_s",
-            **_covariance_metadata(scenario, _initial_covariance_matrix(scenario)),
+            **_covariance_metadata(
+                scenario,
+                _initial_covariance_matrix(scenario),
+                propagator_config.metadata,
+            ),
         },
     )

@@ -120,6 +120,7 @@ astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend oreki
 astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --output orekit_drag_trajectory.json
 astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output orekit_srp_trajectory.json
 astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output orekit_third_body_trajectory.json
+astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend orekit --output orekit_high_fidelity_covariance.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
@@ -220,13 +221,16 @@ Local and Orekit propagation also accept an optional `initial_covariance` 6x6 ma
 the backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference
 state transition. The local backend computes finite differences through its deterministic RK4
 reference dynamics; the Orekit backend computes finite differences by rebuilding and propagating
-perturbed Orekit states through the selected Orekit force model. Each covariance sample can carry
-the per-step `state_transition_matrix`, the `accumulated_state_transition_matrix` from the initial
-epoch, the `process_noise_covariance` applied for that step, and metadata naming the model and step
-size. The optional `covariance_process_noise_acceleration_km_s2` field adds a simple per-axis
-white-acceleration process-noise term over each propagation sample interval. This is useful for
-product wiring and first-order sensitivity screening; analytic variational-equation covariance
-dynamics, drag/SRP variational equations, and production conjunction analysis remain future work.
+perturbed Orekit states through the selected Orekit propagator and force model, including the
+high-fidelity drag/SRP/third-body flags when they are enabled. Orekit covariance metadata records
+the transition propagator and force-model list so high-fidelity covariance products remain auditable.
+Each covariance sample can carry the per-step `state_transition_matrix`, the
+`accumulated_state_transition_matrix` from the initial epoch, the `process_noise_covariance` applied
+for that step, and metadata naming the model and step size. The optional
+`covariance_process_noise_acceleration_km_s2` field adds a simple per-axis white-acceleration
+process-noise term over each propagation sample interval. This is useful for product wiring and
+first-order sensitivity screening; analytic variational-equation covariance dynamics, drag/SRP
+variational equations, and production conjunction analysis remain future work.
 
 `astro screen-conjunction` compares two trajectory products at common sample epochs and writes a
 deterministic first-order screening result with time of closest approach, miss distance, relative

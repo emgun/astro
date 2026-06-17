@@ -87,6 +87,48 @@ def test_propagate_orekit_populates_covariance_history_with_fake_runtime() -> No
     assert propagated_covariance.covariance[0][0] > initial_covariance.covariance[0][0]
 
 
+def test_propagate_orekit_high_fidelity_covariance_records_force_models() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml")).model_copy(
+        update={
+            "force_model": ForceModelConfig(
+                gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+                atmospheric_drag=True,
+                solar_radiation_pressure=True,
+                third_body_gravity=True,
+            )
+        }
+    )
+
+    trajectory = propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.metadata["covariance_model"] == "orekit_finite_difference_state_transition"
+    assert trajectory.metadata["covariance_transition_propagator"] == "NumericalPropagator"
+    assert trajectory.metadata["covariance_transition_force_models"] == [
+        "J2OnlyPerturbation",
+        "DragForce",
+        "SolarRadiationPressure",
+        "ThirdBodyAttraction(Sun)",
+        "ThirdBodyAttraction(Moon)",
+    ]
+    propagated_covariance = trajectory.covariance_history[1]
+    assert propagated_covariance.metadata["state_transition_model"] == "orekit_finite_difference"
+    assert propagated_covariance.metadata["transition_propagator"] == "NumericalPropagator"
+    assert propagated_covariance.metadata["transition_force_models"] == (
+        trajectory.metadata["covariance_transition_force_models"]
+    )
+
+
+def test_load_orekit_high_fidelity_covariance_example() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_orekit_high_fidelity_covariance.yaml"))
+
+    assert scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+    assert scenario.force_model.atmospheric_drag is True
+    assert scenario.force_model.solar_radiation_pressure is True
+    assert scenario.force_model.third_body_gravity is True
+    assert scenario.initial_covariance is not None
+    assert scenario.covariance_process_noise_acceleration_km_s2 > 0.0
+
+
 def test_propagate_orekit_j2_uses_numerical_force_model_with_fake_runtime() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml")).model_copy(
         update={"force_model": ForceModelConfig(gravity=ForceModelName.J2)}

@@ -130,6 +130,9 @@ Implemented slice:
   and reflectivity coefficient.
 - `propagate_orekit` supports `third_body_gravity: true` through Orekit `ThirdBodyAttraction` for
   the Sun and Moon.
+- Orekit covariance-history propagation records the selected transition propagator and force-model
+  list, so high-fidelity finite-difference covariance products identify J2, drag, SRP, and
+  Sun/Moon third-body dynamics used by the perturbed-state transitions.
 - `ForceModelConfig` includes explicit `atmospheric_drag`, `solar_radiation_pressure`, and
   `third_body_gravity` flags. Local and JAX report unsupported flags instead of silently ignoring
   requested physics; Orekit implements all three current high-fidelity flags.
