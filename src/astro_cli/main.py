@@ -439,12 +439,18 @@ def screen_conjunction_command(
     secondary_trajectory_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
     output: Annotated[Path, typer.Option()],
     threshold_km: Annotated[float, typer.Option()] = 1.0,
+    hard_body_radius_km: Annotated[float | None, typer.Option()] = None,
 ) -> None:
     """Screen two time-aligned trajectory products for closest approach."""
     primary = _load_trajectory_or_exit(primary_trajectory_path)
     secondary = _load_trajectory_or_exit(secondary_trajectory_path)
     try:
-        result = screen_conjunction(primary, secondary, threshold_km=threshold_km)
+        result = screen_conjunction(
+            primary,
+            secondary,
+            threshold_km=threshold_km,
+            hard_body_radius_km=hard_body_radius_km,
+        )
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc

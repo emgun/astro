@@ -123,7 +123,7 @@ astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit -
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
-astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --output conjunction_screening.json
+astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --hard-body-radius-km 0.02 --output conjunction_screening.json
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke
 astro dymos-smoke
@@ -230,8 +230,10 @@ dynamics, drag/SRP variational equations, and production conjunction analysis re
 
 `astro screen-conjunction` compares two trajectory products at common sample epochs and writes a
 deterministic first-order screening result with time of closest approach, miss distance, relative
-speed, threshold status, and relative-state metadata. It is a sample-aligned screening product, not a
-probability-of-collision or production conjunction assessment.
+speed, threshold status, and relative-state metadata. When both trajectories carry covariance
+history at TCA and `--hard-body-radius-km` is supplied, it also writes a bounded encounter-plane
+Gaussian density probability approximation. This is useful for covariance-aware screening, but it is
+not a full production conjunction assessment or validated high-fidelity probability integral.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage

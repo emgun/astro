@@ -29,6 +29,32 @@ def test_screen_conjunction_reports_time_aligned_closest_approach() -> None:
     assert result.metadata["screening_model"] == "time_aligned_sample_minimum_distance"
 
 
+def test_screen_conjunction_estimates_probability_from_covariance_history() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+    primary = propagate_local(scenario)
+    secondary_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": scenario.initial_state.cartesian.model_copy(
+                update={"position_km": (7000.05, 0.0, 0.0)}
+            )
+        }
+    )
+    secondary = propagate_local(scenario.model_copy(update={"initial_state": secondary_state}))
+
+    result = screen_conjunction(primary, secondary, threshold_km=1.0, hard_body_radius_km=0.02)
+
+    assert result.probability_of_collision is not None
+    assert 0.0 < result.probability_of_collision < 1.0
+    assert result.hard_body_radius_km == 0.02
+    assert result.metadata["probability_model"] == "encounter_plane_gaussian_density"
+    assert result.metadata["covariance_source"] == "trajectory_covariance_history"
+    assert result.metadata["combined_position_covariance_km2"] == [
+        [2.0, 0.0, 0.0],
+        [0.0, 2.0, 0.0],
+        [0.0, 0.0, 2.0],
+    ]
+
+
 def test_screen_conjunction_rejects_trajectories_without_common_epochs() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     primary = propagate_local(scenario)
