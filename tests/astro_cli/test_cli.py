@@ -10,7 +10,7 @@ from astro_backends.dymos import DymosSmokeResult
 from astro_backends.jax import JaxSmokeResult
 from astro_backends.orekit import OrekitSmokeResult
 from astro_backends.rocketpy import RocketPySmokeResult
-from astro_backends.tudat import TudatSmokeResult
+from astro_backends.tudat import TudatReferenceComparison, TudatSmokeResult
 from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
@@ -2078,6 +2078,70 @@ def test_tudat_smoke_command_reports_available_package(
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload == smoke_result.to_dict()
+
+
+def test_compare_tudat_reference_command_writes_json(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    scenario_path = tmp_path / "scenario.yaml"
+    output = tmp_path / "comparison.json"
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    _write_scenario(scenario_path, scenario)
+
+    def fake_compare(
+        candidate: Scenario,
+        *,
+        reference_backend: str,
+        position_tolerance_km: float,
+        velocity_tolerance_km_s: float,
+    ) -> TudatReferenceComparison:
+        assert candidate.scenario_id == scenario.scenario_id
+        assert reference_backend == "local"
+        assert position_tolerance_km == pytest.approx(0.25)
+        assert velocity_tolerance_km_s == pytest.approx(0.002)
+        return TudatReferenceComparison(
+            scenario_id=candidate.scenario_id,
+            candidate_backend="tudat",
+            reference_backend=reference_backend,
+            sample_count=11,
+            position_tolerance_km=position_tolerance_km,
+            velocity_tolerance_km_s=velocity_tolerance_km_s,
+            max_position_delta_km=0.1,
+            rms_position_delta_km=0.08,
+            final_position_delta_km=0.07,
+            max_velocity_delta_km_s=0.001,
+            rms_velocity_delta_km_s=0.0008,
+            final_velocity_delta_km_s=0.0007,
+            passed=True,
+            metadata={"tudat_runner": "native_two_body"},
+        )
+
+    monkeypatch.setattr("astro_cli.main.compare_tudat_to_reference", fake_compare)
+
+    result = runner.invoke(
+        app,
+        [
+            "compare-tudat-reference",
+            str(scenario_path),
+            "--reference-backend",
+            "local",
+            "--position-tolerance-km",
+            "0.25",
+            "--velocity-tolerance-km-s",
+            "0.002",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote Tudat reference comparison" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == scenario.scenario_id
+    assert payload["candidate_backend"] == "tudat"
+    assert payload["reference_backend"] == "local"
+    assert payload["passed"] is True
 
 
 def test_tudat_smoke_command_exits_nonzero_when_package_unavailable(

@@ -7,6 +7,7 @@ from typer.testing import CliRunner
 def test_packages_import() -> None:
     import astro_backends
     import astro_backends.orekit
+    import astro_backends.tudat
     import astro_cli
     import astro_core
     import astro_dynamics
@@ -124,6 +125,16 @@ def test_packages_import() -> None:
         "propagate_orekit",
         "run_orekit_smoke",
     }
+    expected_tudat_exports = {
+        "TudatReferenceComparison",
+        "TudatRuntime",
+        "TudatRuntimeUnavailable",
+        "TudatSmokeResult",
+        "compare_tudat_to_reference",
+        "load_tudat_runtime",
+        "propagate_tudat",
+        "run_tudat_smoke",
+    }
 
     assert expected_core_exports <= set(astro_core.__all__)
     assert astro_core.MU_EARTH_KM3_S2 == 398600.4418
@@ -139,6 +150,7 @@ def test_packages_import() -> None:
     assert set(astro_launch.__all__) == expected_launch_exports
     assert astro_backends.__all__ == []
     assert set(astro_backends.orekit.__all__) == expected_orekit_exports
+    assert set(astro_backends.tudat.__all__) == expected_tudat_exports
     assert astro_cli.__all__ == ["app"]
 
 
