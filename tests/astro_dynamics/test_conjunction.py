@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from astro_core.io import load_scenario
-from astro_dynamics.conjunction import screen_conjunction
+from astro_dynamics.conjunction import assess_conjunction_screening, screen_conjunction
 from astro_dynamics.local import propagate_local
 
 
@@ -114,3 +114,60 @@ def test_screen_conjunction_rejects_trajectories_without_common_epochs() -> None
         assert "common sample epochs" in str(exc)
     else:
         raise AssertionError("screen_conjunction should reject trajectories without common epochs")
+
+
+def test_assess_conjunction_screening_marks_covariance_close_approach_for_review() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+    primary = propagate_local(scenario)
+    secondary_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": scenario.initial_state.cartesian.model_copy(
+                update={"position_km": (7000.05, 0.0, 0.0)}
+            )
+        }
+    )
+    secondary = propagate_local(scenario.model_copy(update={"initial_state": secondary_state}))
+    screening = screen_conjunction(
+        primary,
+        secondary,
+        threshold_km=1.0,
+        hard_body_radius_km=0.5,
+        probability_method="integrated",
+    )
+
+    report = assess_conjunction_screening(screening)
+
+    assert report.assessment_status == "requires_review"
+    assert report.screening_status == "below_threshold"
+    assert report.has_collision_probability is True
+    assert report.probability_model == "encounter_plane_gaussian_integral"
+    assert [check.check_id for check in report.checks] == [
+        "miss_distance_above_threshold",
+        "collision_probability_available",
+        "integrated_probability_model",
+    ]
+    assert report.checks[0].passed is False
+    assert report.metadata["workflow"] == "conjunction_screening_assessment"
+
+
+def test_assess_conjunction_screening_marks_geometry_only_result_as_screening_only() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    primary = propagate_local(scenario)
+    secondary_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": scenario.initial_state.cartesian.model_copy(
+                update={"position_km": (7002.0, 0.0, 0.0)}
+            )
+        }
+    )
+    secondary = propagate_local(scenario.model_copy(update={"initial_state": secondary_state}))
+    screening = screen_conjunction(primary, secondary, threshold_km=1.0)
+
+    report = assess_conjunction_screening(screening)
+
+    assert report.assessment_status == "screening_only"
+    assert report.screening_status == "above_threshold"
+    assert report.has_collision_probability is False
+    assert report.probability_model is None
+    assert report.checks[1].check_id == "collision_probability_available"
+    assert report.checks[1].passed is False

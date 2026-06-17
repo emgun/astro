@@ -1,5 +1,11 @@
 from astro_dynamics.backends import propagate_with_backend
-from astro_dynamics.conjunction import ConjunctionScreeningResult, screen_conjunction
+from astro_dynamics.conjunction import (
+    ConjunctionAssessmentCheck,
+    ConjunctionAssessmentReport,
+    ConjunctionScreeningResult,
+    assess_conjunction_screening,
+    screen_conjunction,
+)
 from astro_dynamics.ephemeris import (
     dump_trajectory_ephemeris_csv,
     dump_trajectory_oem,
@@ -22,10 +28,13 @@ from astro_dynamics.monte_carlo import (
 
 __all__ = [
     "ConjunctionScreeningResult",
+    "ConjunctionAssessmentCheck",
+    "ConjunctionAssessmentReport",
     "MonteCarloCase",
     "MonteCarloResult",
     "acceleration_km_s2",
     "apply_impulsive_maneuver",
+    "assess_conjunction_screening",
     "derivative",
     "dump_trajectory_ephemeris_csv",
     "dump_trajectory_oem",

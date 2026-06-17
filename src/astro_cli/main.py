@@ -27,7 +27,11 @@ from astro_core.errors import (
 from astro_core.io import load_scenario, load_trajectory
 from astro_core.models import CartesianState, ForceModelName, GroundStation, Scenario, Trajectory
 from astro_dynamics.backends import propagate_with_backend
-from astro_dynamics.conjunction import screen_conjunction
+from astro_dynamics.conjunction import (
+    ConjunctionScreeningResult,
+    assess_conjunction_screening,
+    screen_conjunction,
+)
 from astro_dynamics.ephemeris import (
     dump_trajectory_aem,
     dump_trajectory_ephemeris_csv,
@@ -528,6 +532,28 @@ def screen_conjunction_command(
 
     _write_text_or_exit(output, result.model_dump_json(indent=2), "conjunction screening")
     typer.echo(f"wrote conjunction screening: {output}")
+
+
+@app.command("assess-conjunction")
+def assess_conjunction_command(
+    screening_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+) -> None:
+    """Assess a saved conjunction screening product for operational readiness."""
+    try:
+        screening = ConjunctionScreeningResult.model_validate_json(
+            screening_path.read_text(encoding="utf-8")
+        )
+        report = assess_conjunction_screening(screening)
+    except OSError as exc:
+        typer.echo(f"could not read conjunction screening {screening_path}: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    except ValueError as exc:
+        typer.echo(f"invalid conjunction screening {screening_path}: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    _write_text_or_exit(output, report.model_dump_json(indent=2), "conjunction assessment")
+    typer.echo(f"wrote conjunction assessment: {output}")
 
 
 @app.command("monte-carlo")

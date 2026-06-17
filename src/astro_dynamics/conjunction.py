@@ -84,6 +84,28 @@ class ConjunctionScreeningResult(AstroModel):
         return value
 
 
+class ConjunctionAssessmentCheck(AstroModel):
+    check_id: str = Field(min_length=1)
+    passed: bool
+    severity: Literal["info", "screening_limit", "review"]
+    message: str = Field(min_length=1)
+
+
+class ConjunctionAssessmentReport(AstroModel):
+    primary_scenario_id: str = Field(min_length=1)
+    secondary_scenario_id: str = Field(min_length=1)
+    assessment_status: Literal["screening_only", "operational_candidate", "requires_review"]
+    screening_status: Literal["below_threshold", "above_threshold"]
+    tca_epoch: datetime
+    miss_distance_km: FiniteFloat = Field(ge=0.0)
+    threshold_km: FiniteFloat = Field(gt=0.0)
+    has_collision_probability: bool
+    probability_of_collision: FiniteFloat | None = Field(default=None, ge=0.0, le=1.0)
+    probability_model: str | None = None
+    checks: tuple[ConjunctionAssessmentCheck, ...] = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 def _tuple3(values: np.ndarray[tuple[int], np.dtype[np.float64]]) -> Vector3:
     return (float(values[0]), float(values[1]), float(values[2]))
 
@@ -333,4 +355,79 @@ def screen_conjunction(
             "secondary_sample_count": len(secondary.samples),
         }
         | probability_metadata,
+    )
+
+
+def assess_conjunction_screening(
+    screening: ConjunctionScreeningResult,
+) -> ConjunctionAssessmentReport:
+    has_collision_probability = screening.probability_of_collision is not None
+    probability_model = screening.metadata.get("probability_model")
+    probability_model_text = str(probability_model) if probability_model is not None else None
+    miss_distance_above_threshold = screening.status == "above_threshold"
+    has_integrated_probability = probability_model_text == "encounter_plane_gaussian_integral"
+
+    checks = (
+        ConjunctionAssessmentCheck(
+            check_id="miss_distance_above_threshold",
+            passed=miss_distance_above_threshold,
+            severity="info" if miss_distance_above_threshold else "review",
+            message=(
+                "TCA miss distance is above the configured screening threshold."
+                if miss_distance_above_threshold
+                else "TCA miss distance is at or below the configured screening threshold."
+            ),
+        ),
+        ConjunctionAssessmentCheck(
+            check_id="collision_probability_available",
+            passed=has_collision_probability,
+            severity="info" if has_collision_probability else "screening_limit",
+            message=(
+                "Collision probability is available from covariance-backed screening."
+                if has_collision_probability
+                else "Collision probability is unavailable; result is geometry-only screening."
+            ),
+        ),
+        ConjunctionAssessmentCheck(
+            check_id="integrated_probability_model",
+            passed=has_integrated_probability,
+            severity="info" if has_integrated_probability else "screening_limit",
+            message=(
+                "Collision probability uses integrated encounter-plane Gaussian quadrature."
+                if has_integrated_probability
+                else "Collision probability is missing or uses a lower-fidelity approximation."
+            ),
+        ),
+    )
+
+    if not has_collision_probability:
+        assessment_status: Literal[
+            "screening_only",
+            "operational_candidate",
+            "requires_review",
+        ] = "screening_only"
+    elif not miss_distance_above_threshold or not has_integrated_probability:
+        assessment_status = "requires_review"
+    else:
+        assessment_status = "operational_candidate"
+
+    return ConjunctionAssessmentReport(
+        primary_scenario_id=screening.primary_scenario_id,
+        secondary_scenario_id=screening.secondary_scenario_id,
+        assessment_status=assessment_status,
+        screening_status=screening.status,
+        tca_epoch=screening.tca_epoch,
+        miss_distance_km=screening.miss_distance_km,
+        threshold_km=screening.threshold_km,
+        has_collision_probability=has_collision_probability,
+        probability_of_collision=screening.probability_of_collision,
+        probability_model=probability_model_text,
+        checks=checks,
+        metadata={
+            "workflow": "conjunction_screening_assessment",
+            "screening_model": screening.metadata.get("screening_model"),
+            "primary_backend": screening.metadata.get("primary_backend"),
+            "secondary_backend": screening.metadata.get("secondary_backend"),
+            "assessment_boundary": "screening_readiness_report",
+        },
     )

@@ -19,6 +19,7 @@ from astro_cli.main import app
 from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, MeasurementRecord, MeasurementType, Scenario
+from astro_dynamics.conjunction import screen_conjunction
 from astro_dynamics.ephemeris import dump_trajectory_oem
 from astro_dynamics.local import propagate_local
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
@@ -368,6 +369,46 @@ def test_screen_conjunction_command_writes_integrated_probability(tmp_path: Path
     assert payload["probability_of_collision"] > 0.0
     assert payload["metadata"]["probability_model"] == "encounter_plane_gaussian_integral"
     assert payload["metadata"]["probability_quadrature"] == "gauss_legendre_polar"
+
+
+def test_assess_conjunction_command_writes_report(tmp_path: Path) -> None:
+    screening_path = tmp_path / "conjunction.json"
+    output = tmp_path / "conjunction-report.json"
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+    primary = propagate_local(scenario)
+    secondary_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": scenario.initial_state.cartesian.model_copy(
+                update={"position_km": (7000.05, 0.0, 0.0)}
+            )
+        }
+    )
+    secondary = propagate_local(scenario.model_copy(update={"initial_state": secondary_state}))
+    screening = screen_conjunction(
+        primary,
+        secondary,
+        threshold_km=1.0,
+        hard_body_radius_km=0.5,
+        probability_method="integrated",
+    )
+    screening_path.write_text(screening.model_dump_json(indent=2), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "assess-conjunction",
+            str(screening_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote conjunction assessment" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["assessment_status"] == "requires_review"
+    assert payload["screening_status"] == "below_threshold"
+    assert payload["has_collision_probability"] is True
 
 
 def test_export_trajectory_command_writes_oem(tmp_path: Path) -> None:

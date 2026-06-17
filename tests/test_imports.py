@@ -36,11 +36,14 @@ def test_packages_import() -> None:
         "parse_iers_finals_eop",
     }
     expected_dynamics_exports = {
+        "ConjunctionAssessmentCheck",
+        "ConjunctionAssessmentReport",
         "ConjunctionScreeningResult",
         "MonteCarloCase",
         "MonteCarloResult",
         "acceleration_km_s2",
         "apply_impulsive_maneuver",
+        "assess_conjunction_screening",
         "derivative",
         "dump_trajectory_ephemeris_csv",
         "dump_trajectory_oem",

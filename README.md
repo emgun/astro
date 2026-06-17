@@ -149,6 +149,7 @@ astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro export-trajectory attitude_trajectory.json --format aem --output attitude_trajectory.aem
 astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
 astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output conjunction_screening.json
+astro assess-conjunction conjunction_screening.json --output conjunction_assessment.json
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke
 astro dymos-smoke
@@ -216,7 +217,8 @@ or a CCSDS AEM KVN quaternion attitude product for trajectories with commanded a
 importer is intentionally strict: UTC time system, EME2000 reference frame, and Earth center are
 required. `astro monte-carlo` runs a seeded initial-state ensemble by perturbing the scenario's
 Cartesian state and propagating each case through the selected backend. This is a repeatable product
-workflow for uncertainty screening; it is not yet production conjunction analysis.
+workflow for uncertainty screening; conjunction readiness still depends on the screening and
+assessment products below.
 
 Local covariance propagation accepts an optional `initial_covariance` and
 `covariance_process_noise_acceleration_km_s2`. The default `covariance_state_transition_model` is
@@ -257,7 +259,7 @@ for that step, and metadata naming the model and step size. The optional
 `covariance_process_noise_acceleration_km_s2` field adds a simple per-axis white-acceleration
 process-noise term over each propagation sample interval. This is useful for product wiring and
 first-order sensitivity screening; analytic variational-equation covariance dynamics, drag/SRP
-variational equations, and production conjunction analysis remain future work.
+variational equations, and externally validated production conjunction services remain future work.
 
 `astro screen-conjunction` compares two trajectory products at common sample epochs and writes a
 deterministic first-order screening result with time of closest approach, miss distance, relative
@@ -265,8 +267,12 @@ speed, threshold status, and relative-state metadata. When both trajectories car
 history at TCA and `--hard-body-radius-km` is supplied, it also writes a bounded encounter-plane
 probability estimate. The default `integrated` method numerically integrates the 2D Gaussian over
 the hard-body disk with Gauss-Legendre polar quadrature; `--probability-method density` preserves the
-faster local-density-times-area screening approximation. This is useful for covariance-aware
-screening, but it is not a full production conjunction assessment.
+faster local-density-times-area screening approximation. `astro assess-conjunction` reads a saved
+screening product and writes a conservative readiness report that marks geometry-only results as
+`screening_only`, close approaches as `requires_review`, and covariance-backed above-threshold
+integrated-probability results as `operational_candidate`. This is useful for covariance-aware
+screening and review workflow routing, but it is not a full externally validated production
+conjunction service.
 
 `astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
 vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage
