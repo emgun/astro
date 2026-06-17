@@ -543,9 +543,22 @@ class MeasurementConfig(AstroModel):
     )
     cadence_s: FiniteFloat = Field(gt=0.0, default=60.0)
     doppler_transmit_frequency_hz: FiniteFloat = Field(gt=0.0, default=8.4e9)
+    radiometric_media_model: Literal[
+        "configured_constant_range_delay",
+        "weather_frequency",
+    ] = "configured_constant_range_delay"
     radiometric_media_uplink_delay_km: FiniteFloat = Field(ge=0.0, default=0.0)
     radiometric_media_downlink_delay_km: FiniteFloat = Field(ge=0.0, default=0.0)
     radiometric_media_source: str = "none"
+    radiometric_weather_pressure_hpa: FiniteFloat = Field(ge=0.0, default=1013.25)
+    radiometric_weather_temperature_k: FiniteFloat = Field(gt=0.0, default=293.15)
+    radiometric_weather_relative_humidity: FiniteFloat = Field(
+        ge=0.0,
+        le=1.0,
+        default=0.5,
+    )
+    radiometric_zenith_total_electron_content_tecu: FiniteFloat = Field(ge=0.0, default=0.0)
+    radiometric_media_min_elevation_deg: FiniteFloat = Field(gt=0.0, lt=90.0, default=5.0)
     noise: MeasurementNoise = Field(default_factory=MeasurementNoise)
 
     @field_validator(
@@ -553,6 +566,11 @@ class MeasurementConfig(AstroModel):
         "doppler_transmit_frequency_hz",
         "radiometric_media_uplink_delay_km",
         "radiometric_media_downlink_delay_km",
+        "radiometric_weather_pressure_hpa",
+        "radiometric_weather_temperature_k",
+        "radiometric_weather_relative_humidity",
+        "radiometric_zenith_total_electron_content_tecu",
+        "radiometric_media_min_elevation_deg",
         mode="before",
     )
     @classmethod

@@ -83,6 +83,22 @@ def test_load_radiometric_media_example_scenario() -> None:
     }
 
 
+def test_load_radiometric_weather_frequency_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_radiometric_weather_frequency.yaml"))
+    trajectory = propagate_local(scenario)
+    measurements = generate_synthetic_measurements(scenario, trajectory)
+
+    assert scenario.scenario_id == "leo-radiometric-weather-frequency"
+    assert scenario.measurements.radiometric_media_model == "weather_frequency"
+    assert scenario.measurements.radiometric_media_source == (
+        "configured-weather-frequency-example"
+    )
+    assert {record.metadata["media_corrections_model"] for record in measurements} == {
+        "weather_frequency_range_delay"
+    }
+    assert all(record.metadata["total_media_delay_km"] > 0.0 for record in measurements)
+
+
 def test_load_velocity_aligned_burn_example_scenario() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_velocity_aligned_burn.yaml"))
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import exp, radians, sin
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -22,6 +23,8 @@ _LIGHT_TIME_MAX_ITERATIONS = 8
 _LIGHT_TIME_TOLERANCE_S = 1.0e-12
 _ECI_NORTH_POLE = np.array([0.0, 0.0, 1.0], dtype=np.float64)
 _ECI_Y_AXIS = np.array([0.0, 1.0, 0.0], dtype=np.float64)
+_IONOSPHERE_RANGE_DELAY_CONSTANT_M3_S2 = 40.3
+_TECU_ELECTRONS_PER_M2 = 1.0e16
 
 
 @dataclass(frozen=True)
@@ -433,7 +436,12 @@ def _measurement_geometry(
             spacecraft_velocity_km_s,
             station_position_km,
         )
-        media_metadata = _radiometric_media_metadata(scenario)
+        media_metadata = radiometric_media_metadata(
+            scenario,
+            spacecraft_position_km,
+            station_position_km,
+            station_position_km,
+        )
         return (
             light_time_solution.total_range_km + media_metadata["total_media_delay_km"],
             scenario.measurements.noise.range_sigma_km,
@@ -453,7 +461,12 @@ def _measurement_geometry(
             spacecraft_velocity_km_s,
             station_position_km,
         )
-        media_metadata = _radiometric_media_metadata(scenario)
+        media_metadata = radiometric_media_metadata(
+            scenario,
+            spacecraft_position_km,
+            station_position_km,
+            station_position_km,
+        )
         return (
             two_way_range_rate_km_s(
                 spacecraft_position_km,
@@ -533,7 +546,12 @@ def _three_way_measurement_geometry(
             transmitter_position_km,
             receiver_position_km,
         )
-        media_metadata = _radiometric_media_metadata(scenario)
+        media_metadata = radiometric_media_metadata(
+            scenario,
+            spacecraft_position_km,
+            transmitter_position_km,
+            receiver_position_km,
+        )
         return (
             light_time_solution.total_range_km + media_metadata["total_media_delay_km"],
             scenario.measurements.noise.range_sigma_km,
@@ -551,7 +569,12 @@ def _three_way_measurement_geometry(
             transmitter_position_km,
             receiver_position_km,
         )
-        media_metadata = _radiometric_media_metadata(scenario)
+        media_metadata = radiometric_media_metadata(
+            scenario,
+            spacecraft_position_km,
+            transmitter_position_km,
+            receiver_position_km,
+        )
         return (
             three_way_range_rate_km_s(
                 spacecraft_position_km,
@@ -584,15 +607,117 @@ def _light_time_metadata(solution: RadiometricLightTimeSolution) -> dict[str, An
     }
 
 
-def _radiometric_media_metadata(scenario: Scenario) -> dict[str, Any]:
-    uplink_delay_km = float(scenario.measurements.radiometric_media_uplink_delay_km)
-    downlink_delay_km = float(scenario.measurements.radiometric_media_downlink_delay_km)
+def _saturation_vapor_pressure_hpa(temperature_k: float) -> float:
+    temperature_c = temperature_k - 273.15
+    return 6.112 * exp((17.62 * temperature_c) / (243.12 + temperature_c))
+
+
+def _zenith_troposphere_delay_km(scenario: Scenario) -> float:
+    pressure_hpa = float(scenario.measurements.radiometric_weather_pressure_hpa)
+    temperature_k = float(scenario.measurements.radiometric_weather_temperature_k)
+    relative_humidity = float(scenario.measurements.radiometric_weather_relative_humidity)
+    vapor_pressure_hpa = relative_humidity * _saturation_vapor_pressure_hpa(temperature_k)
+    hydrostatic_delay_m = 0.0022768 * pressure_hpa
+    wet_delay_m = 0.002277 * ((1255.0 / temperature_k) + 0.05) * vapor_pressure_hpa
+    return float((hydrostatic_delay_m + wet_delay_m) / 1000.0)
+
+
+def _zenith_ionosphere_delay_km(scenario: Scenario) -> float:
+    tec_electrons_m2 = (
+        float(scenario.measurements.radiometric_zenith_total_electron_content_tecu)
+        * _TECU_ELECTRONS_PER_M2
+    )
+    frequency_hz = float(scenario.measurements.doppler_transmit_frequency_hz)
+    delay_m = _IONOSPHERE_RANGE_DELAY_CONSTANT_M3_S2 * tec_electrons_m2 / frequency_hz**2
+    return float(delay_m / 1000.0)
+
+
+def _mapped_media_leg_delay(
+    scenario: Scenario,
+    spacecraft_position_km: ArrayLike,
+    station_position_km: ArrayLike,
+) -> tuple[float, float, float, float]:
+    raw_elevation_deg = elevation_deg(spacecraft_position_km, station_position_km)
+    mapped_elevation_deg = max(
+        raw_elevation_deg,
+        float(scenario.measurements.radiometric_media_min_elevation_deg),
+    )
+    mapping = 1.0 / sin(radians(mapped_elevation_deg))
+    troposphere_delay_km = _zenith_troposphere_delay_km(scenario) * mapping
+    ionosphere_delay_km = _zenith_ionosphere_delay_km(scenario) * mapping
+    return (
+        float(troposphere_delay_km + ionosphere_delay_km),
+        float(troposphere_delay_km),
+        float(ionosphere_delay_km),
+        float(mapped_elevation_deg),
+    )
+
+
+def radiometric_media_metadata(
+    scenario: Scenario,
+    spacecraft_position_km: ArrayLike,
+    uplink_station_position_km: ArrayLike,
+    downlink_station_position_km: ArrayLike,
+) -> dict[str, Any]:
+    configured_uplink_delay_km = float(scenario.measurements.radiometric_media_uplink_delay_km)
+    configured_downlink_delay_km = float(
+        scenario.measurements.radiometric_media_downlink_delay_km
+    )
+    uplink_delay_km = configured_uplink_delay_km
+    downlink_delay_km = configured_downlink_delay_km
+    weather_metadata: dict[str, Any] = {}
+
+    if scenario.measurements.radiometric_media_model == "weather_frequency":
+        (
+            uplink_weather_delay_km,
+            uplink_troposphere_delay_km,
+            uplink_ionosphere_delay_km,
+            uplink_elevation_deg,
+        ) = _mapped_media_leg_delay(scenario, spacecraft_position_km, uplink_station_position_km)
+        (
+            downlink_weather_delay_km,
+            downlink_troposphere_delay_km,
+            downlink_ionosphere_delay_km,
+            downlink_elevation_deg,
+        ) = _mapped_media_leg_delay(scenario, spacecraft_position_km, downlink_station_position_km)
+        uplink_delay_km += uplink_weather_delay_km
+        downlink_delay_km += downlink_weather_delay_km
+        weather_metadata = {
+            "configured_uplink_media_delay_km": configured_uplink_delay_km,
+            "configured_downlink_media_delay_km": configured_downlink_delay_km,
+            "uplink_troposphere_delay_km": uplink_troposphere_delay_km,
+            "downlink_troposphere_delay_km": downlink_troposphere_delay_km,
+            "uplink_ionosphere_delay_km": uplink_ionosphere_delay_km,
+            "downlink_ionosphere_delay_km": downlink_ionosphere_delay_km,
+            "media_frequency_hz": float(scenario.measurements.doppler_transmit_frequency_hz),
+            "zenith_total_electron_content_tecu": float(
+                scenario.measurements.radiometric_zenith_total_electron_content_tecu
+            ),
+            "weather_pressure_hpa": float(scenario.measurements.radiometric_weather_pressure_hpa),
+            "weather_temperature_k": float(
+                scenario.measurements.radiometric_weather_temperature_k
+            ),
+            "weather_relative_humidity": float(
+                scenario.measurements.radiometric_weather_relative_humidity
+            ),
+            "uplink_media_elevation_deg": uplink_elevation_deg,
+            "downlink_media_elevation_deg": downlink_elevation_deg,
+            "media_min_elevation_deg": float(
+                scenario.measurements.radiometric_media_min_elevation_deg
+            ),
+            "troposphere_model": "saastamoinen_surface_weather_simple_mapping",
+            "ionosphere_model": "first_order_group_delay_tec_frequency",
+        }
+
     total_delay_km = uplink_delay_km + downlink_delay_km
-    media_model = "configured_constant_range_delay" if total_delay_km > 0.0 else "none"
+    if scenario.measurements.radiometric_media_model == "weather_frequency":
+        media_model = "weather_frequency_range_delay"
+    else:
+        media_model = "configured_constant_range_delay" if total_delay_km > 0.0 else "none"
     return {
         "media_corrections_model": media_model,
         "media_corrections_source": scenario.measurements.radiometric_media_source,
         "uplink_media_delay_km": uplink_delay_km,
         "downlink_media_delay_km": downlink_delay_km,
         "total_media_delay_km": total_delay_km,
-    }
+    } | weather_metadata

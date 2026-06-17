@@ -1,0 +1,46 @@
+scenario_id: leo-radiometric-weather-frequency
+description: LEO radiometric example with configured weather and frequency-dependent media delays.
+spacecraft:
+  name: demo-sat
+  mass_kg: 120.0
+  area_m2: 2.5
+  drag_coefficient: 2.2
+  reflectivity_coefficient: 1.3
+initial_state:
+  epoch: "2026-01-01T00:00:00+00:00"
+  time_scale: UTC
+  frame: EME2000
+  central_body: earth
+  representation: cartesian
+  cartesian:
+    position_km: [7000.0, 0.0, 0.0]
+    velocity_km_s: [0.0, 7.5, 1.0]
+force_model:
+  gravity: two_body
+propagation:
+  duration_s: 600.0
+  step_s: 60.0
+ground_stations:
+  - name: uplink-eci
+    position_eci_km: [6378.1363, 0.0, 0.0]
+    frame: EME2000
+    elevation_mask_deg: 0.0
+  - name: downlink-eci
+    position_eci_km: [0.0, 6378.1363, 0.0]
+    frame: EME2000
+    elevation_mask_deg: 0.0
+measurements:
+  types: [two_way_range, two_way_range_rate, three_way_range, three_way_range_rate]
+  cadence_s: 60.0
+  doppler_transmit_frequency_hz: 8400000000.0
+  radiometric_media_model: weather_frequency
+  radiometric_media_source: configured-weather-frequency-example
+  radiometric_weather_pressure_hpa: 1012.0
+  radiometric_weather_temperature_k: 289.0
+  radiometric_weather_relative_humidity: 0.45
+  radiometric_zenith_total_electron_content_tecu: 8.0
+  radiometric_media_min_elevation_deg: 5.0
+  noise:
+    range_sigma_km: 0.01
+    range_rate_sigma_km_s: 0.00001
+    seed: 42

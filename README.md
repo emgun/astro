@@ -266,9 +266,12 @@ received-frequency shift. Two-way and three-way range-like observables use itera
 light-time over a linearized spacecraft state and carry `participant_path`/`transmitter` metadata,
 uplink/downlink light-time diagnostics, transmit/reflection/receive offsets, and an explicit
 media-corrections marker. Scenarios may set `radiometric_media_uplink_delay_km` and
-`radiometric_media_downlink_delay_km` for configured constant range-delay corrections, with
-`radiometric_media_source` preserved in measurement metadata; these are product and estimator
-primitives, not full DSN weather/frequency-dependent media models. Angle records use degrees.
+`radiometric_media_downlink_delay_km` for configured constant range-delay corrections, or set
+`radiometric_media_model: weather_frequency` to apply a configured surface-weather troposphere
+delay plus first-order TEC/frequency ionosphere group delay with per-leg elevation mapping.
+`radiometric_media_source` and the component delays are preserved in measurement metadata. These
+are configurable product and estimator primitives, not full DSN calibration pipelines. Angle
+records use degrees.
 Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
@@ -323,7 +326,9 @@ is intentionally under-observed for six-state OD.
 `examples/scenarios/leo_radiometric_links.yaml` demonstrates two-way and three-way radiometric
 measurement synthesis with explicit uplink/downlink station metadata and vacuum light-time
 diagnostics. `examples/scenarios/leo_radiometric_media.yaml` adds configured constant media range
-delays to the same product family.
+delays to the same product family. `examples/scenarios/leo_radiometric_weather_frequency.yaml`
+adds configured pressure, temperature, humidity, TEC, carrier frequency, and elevation mapping
+metadata for weather/frequency-dependent media corrections.
 
 TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,
 `PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped

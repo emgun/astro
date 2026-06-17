@@ -23,6 +23,7 @@ from astro_od.measurements import (
     declination_deg,
     doppler_hz,
     elevation_deg,
+    radiometric_media_metadata,
     range_km,
     range_rate_km_s,
     right_ascension_deg,
@@ -152,7 +153,15 @@ def _predicted_measurement(
     if measurement.measurement_type is MeasurementType.RANGE_RATE:
         return range_rate_km_s(spacecraft_position, spacecraft_velocity, station_position)
     if measurement.measurement_type is MeasurementType.TWO_WAY_RANGE:
-        return two_way_range_km(spacecraft_position, station_position)
+        media_metadata = radiometric_media_metadata(
+            scenario,
+            spacecraft_position,
+            station_position,
+            station_position,
+        )
+        return two_way_range_km(spacecraft_position, station_position) + float(
+            media_metadata["total_media_delay_km"]
+        )
     if measurement.measurement_type is MeasurementType.TWO_WAY_RANGE_RATE:
         return two_way_range_rate_km_s(
             spacecraft_position,
@@ -165,11 +174,17 @@ def _predicted_measurement(
             measurement,
             "transmitter",
         )
-        return three_way_range_km(
+        media_metadata = radiometric_media_metadata(
+            scenario,
             spacecraft_position,
             transmitter_position,
             station_position,
         )
+        return three_way_range_km(
+            spacecraft_position,
+            transmitter_position,
+            station_position,
+        ) + float(media_metadata["total_media_delay_km"])
     if measurement.measurement_type is MeasurementType.THREE_WAY_RANGE_RATE:
         transmitter_position = _station_position_from_metadata(
             scenario,

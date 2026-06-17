@@ -23,6 +23,7 @@ from astro_od.estimation import estimate_initial_state, residual_vector
 from astro_od.measurements import (
     doppler_hz,
     generate_synthetic_measurements,
+    radiometric_media_metadata,
     range_km,
     range_rate_km_s,
 )
@@ -196,6 +197,50 @@ def test_residual_vector_supports_two_way_radiometric_range() -> None:
     residuals = residual_vector(state_vector, scenario, [measurement], _single_sample_propagator)
 
     assert residuals.tolist() == pytest.approx([2.0])
+
+
+def test_residual_vector_applies_weather_frequency_media_to_radiometric_ranges() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    measurements_config = scenario.measurements.model_copy(
+        update={
+            "types": (MeasurementType.TWO_WAY_RANGE,),
+            "radiometric_media_model": "weather_frequency",
+            "radiometric_media_source": "unit-test-weather-frequency",
+            "radiometric_weather_pressure_hpa": 1012.0,
+            "radiometric_weather_temperature_k": 289.0,
+            "radiometric_weather_relative_humidity": 0.45,
+            "radiometric_zenith_total_electron_content_tecu": 8.0,
+            "radiometric_media_min_elevation_deg": 5.0,
+            "noise": scenario.measurements.noise.model_copy(update={"range_sigma_km": 0.01}),
+        }
+    )
+    scenario = scenario.model_copy(update={"measurements": measurements_config})
+    state = scenario.initial_state.cartesian
+    state_vector = np.concatenate([state.position_array(), state.velocity_array()])
+    station_position = scenario.ground_stations[0].position_array(scenario.initial_state.epoch)
+    media_metadata = radiometric_media_metadata(
+        scenario,
+        state.position_array(),
+        station_position,
+        station_position,
+    )
+    predicted = 2.0 * range_km(state.position_array(), station_position) + float(
+        media_metadata["total_media_delay_km"]
+    )
+    measurement = MeasurementRecord(
+        measurement_type=MeasurementType.TWO_WAY_RANGE,
+        epoch=scenario.initial_state.epoch,
+        observer="equator-eci",
+        observed_object=scenario.spacecraft.name,
+        value=predicted,
+        sigma=0.01,
+        units="km",
+        metadata=media_metadata,
+    )
+
+    residuals = residual_vector(state_vector, scenario, [measurement], _single_sample_propagator)
+
+    assert max(abs(float(residual)) for residual in residuals) < 1.0e-8
 
 
 def test_residual_vector_supports_three_way_radiometric_range() -> None:

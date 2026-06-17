@@ -54,9 +54,9 @@ Still roadmap-level:
   maneuver dynamics.
 - Full native multi-motor RocketPy staging and full multistage Dymos ascent optimization.
 - Live Tudat cross-check environment/body construction.
-- Full precession-nutation reductions, operational DSN weather/frequency-dependent media models for
-  two-way/three-way radiometrics, and operational CCSDS support beyond current KVN TDM measurement
-  families, suite multi-leg radiometric TDM extension, and OEM ephemeris interchange.
+- Full precession-nutation reductions, DSN calibration products beyond the current configurable
+  weather/frequency media primitives, and operational CCSDS support beyond current KVN TDM
+  measurement families, suite multi-leg radiometric TDM extension, and OEM ephemeris interchange.
 - Richer JAX high-fidelity force models and full differentiable OD estimator workflows.
 
 ## Goal Ledger
@@ -165,14 +165,17 @@ Implemented slice:
 - Two-way/three-way radiometric records carry iterative vacuum light-time diagnostics over a
   linearized spacecraft state, including uplink/downlink light time, transmit/reflection/receive
   offsets, iteration count, tolerance, and media-correction metadata. Scenarios can configure
-  constant uplink/downlink media range delays with a source label. These remain product and
-  estimator primitives, not full DSN weather/frequency-dependent media observables.
+  constant uplink/downlink media range delays with a source label, or opt into a configured
+  `weather_frequency` model with surface pressure, temperature, relative humidity, zenith TEC,
+  carrier frequency, and per-leg elevation mapping. These remain product and estimator primitives,
+  not full DSN calibration products.
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
   checked-in iterative two-way/three-way radiometric synthesis fixture. `leo_radiometric_media.yaml`
-  provides a checked-in configured constant media-delay fixture. Explicit Hz Doppler, two-way, and
-  three-way suite records round-trip through TDM with `ASTRO_MEASUREMENT_TYPE` metadata extensions
-  so legacy TDM files are not reinterpreted.
+  provides a checked-in configured constant media-delay fixture, and
+  `leo_radiometric_weather_frequency.yaml` provides a checked-in weather/frequency media fixture.
+  Explicit Hz Doppler, two-way, and three-way suite records round-trip through TDM with
+  `ASTRO_MEASUREMENT_TYPE` metadata extensions so legacy TDM files are not reinterpreted.
 - Ground stations support fixed `position_eci_km` definitions and WGS-84 geodetic
   `latitude_deg`/`longitude_deg`/`altitude_km` definitions, with geodetic stations rotated into
   inertial measurement geometry at each measurement epoch using a deterministic UTC sidereal-time

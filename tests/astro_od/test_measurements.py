@@ -309,6 +309,49 @@ def test_generate_synthetic_two_way_radiometrics_applies_configured_media_delay(
     assert delayed.metadata["truth"] - undelayed.metadata["truth"] == pytest.approx(0.005)
 
 
+def test_generate_synthetic_two_way_radiometrics_applies_weather_frequency_media_delay() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    two_way_measurements = scenario.measurements.model_copy(
+        update={
+            "types": (MeasurementType.TWO_WAY_RANGE,),
+            "noise": scenario.measurements.noise.model_copy(update={"range_sigma_km": 1.0e-12}),
+        }
+    )
+    weather_frequency_measurements = two_way_measurements.model_copy(
+        update={
+            "radiometric_media_model": "weather_frequency",
+            "radiometric_media_source": "unit-test-weather-frequency",
+            "radiometric_weather_pressure_hpa": 1012.0,
+            "radiometric_weather_temperature_k": 289.0,
+            "radiometric_weather_relative_humidity": 0.45,
+            "radiometric_zenith_total_electron_content_tecu": 8.0,
+            "radiometric_media_min_elevation_deg": 5.0,
+        }
+    )
+    undelayed_scenario = scenario.model_copy(update={"measurements": two_way_measurements})
+    delayed_scenario = scenario.model_copy(update={"measurements": weather_frequency_measurements})
+    trajectory = propagate_local(undelayed_scenario)
+
+    undelayed = generate_synthetic_measurements(undelayed_scenario, trajectory)[0]
+    delayed = generate_synthetic_measurements(delayed_scenario, trajectory)[0]
+
+    assert delayed.metadata["media_corrections_model"] == "weather_frequency_range_delay"
+    assert delayed.metadata["media_corrections_source"] == "unit-test-weather-frequency"
+    assert delayed.metadata["uplink_troposphere_delay_km"] > 0.0
+    assert delayed.metadata["downlink_troposphere_delay_km"] > 0.0
+    assert delayed.metadata["uplink_ionosphere_delay_km"] > 0.0
+    assert delayed.metadata["downlink_ionosphere_delay_km"] > 0.0
+    assert delayed.metadata["media_frequency_hz"] == 8.4e9
+    assert delayed.metadata["uplink_media_elevation_deg"] >= 5.0
+    assert delayed.metadata["total_media_delay_km"] == pytest.approx(
+        delayed.metadata["uplink_media_delay_km"]
+        + delayed.metadata["downlink_media_delay_km"]
+    )
+    assert delayed.metadata["truth"] - undelayed.metadata["truth"] == pytest.approx(
+        delayed.metadata["total_media_delay_km"]
+    )
+
+
 def test_generate_synthetic_measurements_supports_three_way_radiometric_records() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
     receiving_station = GroundStation(

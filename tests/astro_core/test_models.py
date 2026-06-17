@@ -703,6 +703,27 @@ def test_measurement_config_accepts_configured_radiometric_media_delays() -> Non
         MeasurementConfig(radiometric_media_uplink_delay_km=-0.001)
 
 
+def test_measurement_config_accepts_weather_frequency_media_model() -> None:
+    measurement_config = MeasurementConfig(
+        radiometric_media_model="weather_frequency",
+        radiometric_weather_pressure_hpa=1012.0,
+        radiometric_weather_temperature_k=289.0,
+        radiometric_weather_relative_humidity=0.45,
+        radiometric_zenith_total_electron_content_tecu=8.0,
+        radiometric_media_min_elevation_deg=7.0,
+    )
+
+    assert measurement_config.radiometric_media_model == "weather_frequency"
+    assert measurement_config.radiometric_weather_pressure_hpa == 1012.0
+    assert measurement_config.radiometric_weather_temperature_k == 289.0
+    assert measurement_config.radiometric_weather_relative_humidity == 0.45
+    assert measurement_config.radiometric_zenith_total_electron_content_tecu == 8.0
+    assert measurement_config.radiometric_media_min_elevation_deg == 7.0
+
+    with pytest.raises(ValidationError):
+        MeasurementConfig(radiometric_weather_relative_humidity=1.2)
+
+
 def test_measurement_config_requires_non_empty_types() -> None:
     with pytest.raises(ValidationError):
         MeasurementConfig(types=())
