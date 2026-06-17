@@ -35,8 +35,8 @@ Implemented and protected:
   OEM ephemeris export/import,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
   propagation, plus finite-difference local covariance propagation with optional acceleration
-  process noise, explicit per-sample state-transition/process-noise covariance products, and a
-  velocity-aligned attitude-coupled thrust-vector burn mode.
+  process noise, explicit per-sample state-transition/process-noise covariance products, and
+  velocity-aligned/radial attitude-coupled thrust-vector burn modes.
 - `astro_od` synthetic range/range-rate/one-way Doppler/first-order two-way and three-way
   range/range-rate/right-ascension/declination/azimuth/elevation generation, measurement JSON/CSV
   ingest/export, TDM range/range-rate/angle ingest/export, and local SciPy batch least-squares OD.
@@ -212,9 +212,9 @@ finite burns, local thrust-vector finite burns with mass depletion, CSV export a
 ephemeris export/import, finite-difference local covariance propagation with optional white-acceleration process
 noise, explicit per-sample and accumulated state-transition matrices, per-sample process-noise
 covariance matrices, Orekit finite-difference covariance propagation through the selected Orekit
-force model, and seeded initial-state Monte Carlo. The first attitude-coupled finite-burn mode
-rotates thrust along the instantaneous velocity direction; analytic variational-equation covariance
-dynamics and full attitude-control maneuver dynamics remain deferred.
+force model, and seeded initial-state Monte Carlo. The attitude-coupled finite-burn modes rotate
+thrust along instantaneous velocity or local radial directions; analytic variational-equation
+covariance dynamics and full attitude-control maneuver dynamics remain deferred.
 
 Definition of done:
 
@@ -223,8 +223,8 @@ Definition of done:
   the suite's current maturity. OEM import requires scenario context because OEM does not encode
   the suite force model.
 - Maneuver products cover impulsive delta-v, local finite burns with constant inertial
-  acceleration, local thrust-vector finite burns with mass-flow depletion, and velocity-aligned
-  thrust direction for the first attitude-coupled burn mode.
+  acceleration, local thrust-vector finite burns with mass-flow depletion, and velocity-aligned,
+  radial-outward, and radial-inward thrust directions for commanded attitude-coupled burn modes.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported. Local propagation can populate them from a
   scenario initial covariance using finite-difference state transitions plus optional

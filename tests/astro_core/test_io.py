@@ -76,6 +76,13 @@ def test_load_velocity_aligned_burn_example_scenario() -> None:
     assert scenario.maneuvers[0].thrust_direction_mode == "velocity_aligned"
 
 
+def test_load_radial_burn_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_radial_burn.yaml"))
+
+    assert scenario.scenario_id == "leo-radial-burn"
+    assert scenario.maneuvers[0].thrust_direction_mode == "radial_outward"
+
+
 def test_load_j2_example_scenario() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_j2.yaml"))
 

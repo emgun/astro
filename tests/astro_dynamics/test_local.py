@@ -1,5 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -174,6 +175,42 @@ def test_propagate_local_applies_velocity_aligned_thrust_vector_burn() -> None:
     assert trajectory.metadata["attitude_coupled_burn_count"] == 1
     assert trajectory.metadata["thrust_direction_modes"] == ["velocity_aligned"]
     assert trajectory.events[0].metadata["thrust_direction_mode"] == "velocity_aligned"
+
+
+@pytest.mark.parametrize(
+    ("thrust_direction_mode", "expected_x_sign"),
+    [
+        ("radial_outward", 1.0),
+        ("radial_inward", -1.0),
+    ],
+)
+def test_propagate_local_applies_radial_thrust_vector_burn(
+    thrust_direction_mode: Literal["radial_outward", "radial_inward"],
+    expected_x_sign: float,
+) -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    burn = Maneuver(
+        name="radial-trim",
+        epoch=scenario.initial_state.epoch + timedelta(seconds=60),
+        frame=scenario.initial_state.frame,
+        delta_v_km_s=(0.0, 0.0, 0.0),
+        duration_s=120.0,
+        thrust_vector_n=(0.0, 0.25, 0.0),
+        specific_impulse_s=220.0,
+        thrust_direction_mode=thrust_direction_mode,
+    )
+    maneuvered_scenario = scenario.model_copy(update={"maneuvers": [burn]})
+
+    baseline = propagate_local(scenario)
+    trajectory = propagate_local(maneuvered_scenario)
+    baseline_final_velocity = np.array(baseline.samples[-1].state.velocity_km_s)
+    maneuvered_final_velocity = np.array(trajectory.samples[-1].state.velocity_km_s)
+    velocity_delta = maneuvered_final_velocity - baseline_final_velocity
+
+    assert expected_x_sign * velocity_delta[0] > 0.0
+    assert trajectory.metadata["attitude_coupled_burn_count"] == 1
+    assert trajectory.metadata["thrust_direction_modes"] == [thrust_direction_mode]
+    assert trajectory.events[0].metadata["thrust_direction_mode"] == thrust_direction_mode
 
 
 def test_propagate_local_generates_covariance_history_from_initial_covariance() -> None:

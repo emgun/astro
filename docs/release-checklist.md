@@ -14,6 +14,7 @@ Use this checklist before tagging or publishing a release candidate.
 - [ ] `astro propagate examples/scenarios/meo_two_body.yaml --backend local --output /tmp/astro-meo.json`
 - [ ] `astro propagate examples/scenarios/geo_two_body.yaml --backend local --output /tmp/astro-geo.json`
 - [ ] `astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output /tmp/astro-finite-burn.json`
+- [ ] `astro propagate examples/scenarios/leo_radial_burn.yaml --backend local --output /tmp/astro-radial-burn.json`
 - [ ] `astro propagate examples/scenarios/leo_covariance.yaml --backend local --output /tmp/astro-covariance.json`
 - [ ] `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv`
 - [ ] `astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output /tmp/astro-measurements.json`

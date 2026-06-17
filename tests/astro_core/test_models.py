@@ -549,6 +549,22 @@ def test_maneuver_accepts_velocity_aligned_thrust_direction_mode() -> None:
     assert maneuver.thrust_direction_mode == "velocity_aligned"
 
 
+def test_maneuver_accepts_radial_thrust_direction_modes() -> None:
+    for thrust_direction_mode in ("radial_outward", "radial_inward"):
+        maneuver = Maneuver(
+            name=thrust_direction_mode,
+            epoch=datetime(2026, 1, 1, 0, 5, tzinfo=UTC),
+            frame=Frame.EME2000,
+            delta_v_km_s=(0.0, 0.0, 0.0),
+            duration_s=120.0,
+            thrust_vector_n=(0.0, 0.25, 0.0),
+            specific_impulse_s=220.0,
+            thrust_direction_mode=thrust_direction_mode,
+        )
+
+        assert maneuver.thrust_direction_mode == thrust_direction_mode
+
+
 def test_maneuver_and_covariance_validation() -> None:
     epoch = datetime(2026, 1, 1, tzinfo=UTC)
 

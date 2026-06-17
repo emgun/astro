@@ -629,7 +629,12 @@ class Maneuver(AstroModel):
     duration_s: FiniteFloat = Field(ge=0.0, default=0.0)
     thrust_vector_n: Vector3 | None = None
     specific_impulse_s: FiniteFloat | None = Field(default=None, gt=0.0)
-    thrust_direction_mode: Literal["inertial", "velocity_aligned"] = "inertial"
+    thrust_direction_mode: Literal[
+        "inertial",
+        "velocity_aligned",
+        "radial_outward",
+        "radial_inward",
+    ] = "inertial"
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("epoch", mode="before")

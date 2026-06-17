@@ -172,6 +172,7 @@ def _finite_burn_acceleration_km_s2(
     schedule: list[_ScheduledManeuver],
     elapsed_s: float,
     mass_kg: float,
+    position_km: FloatArray,
     velocity_km_s: FloatArray,
 ) -> FloatArray:
     acceleration = np.zeros(3, dtype=np.float64)
@@ -194,6 +195,19 @@ def _finite_burn_acceleration_km_s2(
                         )
                     thrust_vector_n = (
                         float(np.linalg.norm(thrust_vector_n)) * velocity_km_s / velocity_norm
+                    )
+                elif maneuver.thrust_direction_mode in {"radial_outward", "radial_inward"}:
+                    position_norm = float(np.linalg.norm(position_km))
+                    if position_norm == 0.0:
+                        raise ValueError("radial thrust requires nonzero spacecraft position")
+                    direction_sign = (
+                        1.0 if maneuver.thrust_direction_mode == "radial_outward" else -1.0
+                    )
+                    thrust_vector_n = (
+                        direction_sign
+                        * float(np.linalg.norm(thrust_vector_n))
+                        * position_km
+                        / position_norm
                     )
                 thrust_acceleration_m_s2 = thrust_vector_n / mass_kg
                 acceleration = acceleration + thrust_acceleration_m_s2 / 1000.0
@@ -244,6 +258,7 @@ def _derivative_with_maneuvers(
         schedule,
         elapsed_s,
         mass_kg,
+        position,
         velocity,
     )
     return cast(
