@@ -163,6 +163,30 @@ def test_research_od_sensitivity_jax_returns_residual_jacobian_product() -> None
     assert np.linalg.matrix_rank(jacobian) >= 6
 
 
+def test_research_od_sensitivity_jax_supports_inertial_angles() -> None:
+    scenario = load_scenario("examples/scenarios/leo_two_station_angles.yaml")
+    trajectory = propagate_local(scenario)
+    noisy_measurements = generate_synthetic_measurements(scenario, trajectory)
+    truth_measurements = [
+        record.model_copy(update={"value": record.metadata["truth"]})
+        for record in noisy_measurements
+    ]
+
+    result = research_od_sensitivity_jax(
+        scenario,
+        truth_measurements,
+        runtime_loader=_fake_autodiff_runtime,
+    )
+
+    jacobian = np.asarray(result.jacobian)
+    assert result.metadata["measurement_types"] == ["right_ascension", "declination"]
+    assert result.metadata["angle_residual_convention"] == "wrapped_degrees"
+    assert max(abs(value) for value in result.residuals) < 1.0e-6
+    assert jacobian.shape == (len(truth_measurements), 6)
+    assert np.all(np.isfinite(jacobian))
+    assert np.linalg.matrix_rank(jacobian) >= 4
+
+
 def test_research_estimate_jax_runs_gauss_newton_correction() -> None:
     truth_scenario = load_scenario("examples/scenarios/leo_two_station_od.yaml")
     truth_measurements = [
@@ -221,7 +245,7 @@ def test_research_od_sensitivity_jax_rejects_unsupported_measurement_type() -> N
     scenario = load_scenario("examples/scenarios/leo_doppler.yaml")
     measurements = generate_synthetic_measurements(scenario, propagate_local(scenario))
 
-    with pytest.raises(UnsupportedBackendError, match="range and range_rate"):
+    with pytest.raises(UnsupportedBackendError, match="right_ascension, and declination"):
         research_od_sensitivity_jax(
             scenario,
             measurements,

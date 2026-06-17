@@ -30,7 +30,12 @@ JaxResearchRunner = Callable[[Scenario, JaxRuntime, int, float, float, int], Mon
 FloatArray = NDArray[np.float64]
 _MAX_RK4_INTERNAL_STEP_S = 30.0
 _STATE_DIMENSION = 6
-_SUPPORTED_JAX_OD_MEASUREMENTS = {MeasurementType.RANGE, MeasurementType.RANGE_RATE}
+_SUPPORTED_JAX_OD_MEASUREMENTS = {
+    MeasurementType.RANGE,
+    MeasurementType.RANGE_RATE,
+    MeasurementType.RIGHT_ASCENSION,
+    MeasurementType.DECLINATION,
+}
 _SUPPORTED_JAX_GRAVITY_MODELS = {
     ForceModelName.TWO_BODY,
     ForceModelName.J2,
@@ -472,7 +477,8 @@ def _jax_od_measurement_specs(
     for record in measurements:
         if record.measurement_type not in _SUPPORTED_JAX_OD_MEASUREMENTS:
             raise UnsupportedBackendError(
-                "JAX OD sensitivity currently supports only range and range_rate measurements; "
+                "JAX OD sensitivity currently supports only range, range_rate, "
+                "right_ascension, and declination measurements; "
                 f"unsupported measurement type: {record.measurement_type}"
             )
         if record.observed_object != scenario.spacecraft.name:
@@ -519,10 +525,22 @@ def _jax_od_residual_vector(
         distance = jnp.linalg.norm(relative_position)
         if measurement_type is MeasurementType.RANGE:
             predicted = distance
-        else:
+            residual = (predicted - value) / sigma
+        elif measurement_type is MeasurementType.RANGE_RATE:
             line_of_sight = relative_position / distance
             predicted = jnp.dot(velocity, line_of_sight)
-        residuals.append((predicted - value) / sigma)
+            residual = (predicted - value) / sigma
+        else:
+            line_of_sight = relative_position / distance
+            if measurement_type is MeasurementType.RIGHT_ASCENSION:
+                predicted = jnp.arctan2(line_of_sight[1], line_of_sight[0]) * 180.0 / np.pi
+                predicted = predicted % 360.0
+                residual = ((predicted - value + 180.0) % 360.0 - 180.0) / sigma
+            else:
+                clipped_z = jnp.clip(line_of_sight[2], -1.0, 1.0)
+                predicted = jnp.arcsin(clipped_z) * 180.0 / np.pi
+                residual = (predicted - value) / sigma
+        residuals.append(residual)
     return jnp.stack(residuals)
 
 
@@ -621,6 +639,7 @@ def research_od_sensitivity_jax(
             "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
             "measurement_types": _unique_measurement_type_values(measurements),
             "residual_convention": "(predicted - observed) / sigma",
+            "angle_residual_convention": "wrapped_degrees",
             **_research_force_metadata(scenario),
         },
     )
@@ -714,6 +733,7 @@ def research_estimate_jax(
             "measurement_types": _unique_measurement_type_values(measurements),
             "measurement_count": len(measurement_specs),
             "residual_convention": "(predicted - observed) / sigma",
+            "angle_residual_convention": "wrapped_degrees",
             "max_iterations": max_iterations,
             "correction_tolerance": correction_tolerance,
             "residual_tolerance": residual_tolerance,
