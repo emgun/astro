@@ -115,11 +115,13 @@ construction remains gated on validated API wiring. JAX research propagation ret
 `MonteCarloResult` products, can optionally include a final-state transition sensitivity matrix,
 and supports differentiable screening approximations for `orekit_high_fidelity`, configured
 degree/order high-order gravity metadata through a J2 baseline, atmospheric drag, solar radiation
-pressure, and analytic circular Sun/Moon third-body gravity flags. Its research OD
+pressure, analytic circular Sun/Moon third-body gravity flags, and configured third-body ephemeris
+sample screening. Its research OD
 estimator uses backtracking Gauss-Newton corrections over normalized residual/Jacobian products so
 range/range-rate, inertial angle, and topocentric azimuth/elevation workflows can share the same
 product boundary. Those JAX force flags are explicitly research products, not operational
-ephemerides; ephemeris-backed third-body gravity remains an Orekit/Tudat-grade integration task.
+ephemerides; standards-grade third-body ephemeris handling remains an Orekit/Tudat-grade integration
+task.
 
 ## Commands
 
@@ -393,11 +395,13 @@ With `--backend local`, it runs the deterministic Monte Carlo workflow. With `--
 loads the optional JAX runtime and runs vectorized RK4 ensembles for two-body, J2, and
 screening-only `orekit_high_fidelity` scenarios, including configured high-order gravity
 degree/order metadata on a J2 baseline plus research approximations for atmospheric drag, solar
-radiation pressure, and analytic circular Sun/Moon third-body gravity. With
+radiation pressure, analytic circular Sun/Moon third-body gravity, and configured third-body
+ephemeris samples. With
 `--include-sensitivities`, the JAX path adds a nominal final-state transition matrix computed
-through JAX autodiff to the `MonteCarloResult` metadata. Third-body JAX products record
-`third_body_ephemeris_model = "analytic_circular_sun_moon_screening"` so callers do not mistake the
-screening approximation for operational ephemeris-backed Orekit/Tudat semantics.
+through JAX autodiff to the `MonteCarloResult` metadata. Third-body JAX products record either
+`third_body_ephemeris_model = "analytic_circular_sun_moon_screening"` or
+`"configured_ephemeris_samples_screening"` so callers do not mistake the screening approximation for
+operational ephemeris-backed Orekit/Tudat semantics.
 
 `astro research-od-sensitivity --backend jax` loads an explicit measurement file and writes an
 `OdSensitivityResult` containing normalized OD residuals and the residual Jacobian with respect to

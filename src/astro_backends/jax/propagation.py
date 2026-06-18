@@ -51,6 +51,7 @@ _EXPONENTIAL_ATMOSPHERE_SCALE_HEIGHT_M = 60_000.0
 _SOLAR_RADIATION_PRESSURE_N_M2 = 4.56e-6
 _RESEARCH_FORCE_MODEL_POLICY = "screening_only_not_operational_ephemeris"
 _THIRD_BODY_EPHEMERIS_MODEL = "analytic_circular_sun_moon_screening"
+_CONFIGURED_THIRD_BODY_EPHEMERIS_MODEL = "configured_ephemeris_samples_screening"
 _J2000_UNIX_TIMESTAMP_S = 946728000.0
 _SECONDS_PER_DAY = 86400.0
 _SUN_MU_KM3_S2 = 132_712_440_018.0
@@ -120,7 +121,10 @@ def _research_force_model_names(scenario: Scenario) -> list[str]:
     if scenario.force_model.solar_radiation_pressure:
         force_models.append("constant_direction_solar_radiation_pressure")
     if scenario.force_model.third_body_gravity:
-        force_models.append("analytic_sun_moon_third_body")
+        if _has_configured_third_body_ephemerides(scenario):
+            force_models.append("configured_ephemeris_third_body")
+        else:
+            force_models.append("analytic_sun_moon_third_body")
     return force_models
 
 
@@ -137,6 +141,18 @@ def _research_force_metadata(scenario: Scenario) -> dict[str, Any]:
             }
         )
     if scenario.force_model.third_body_gravity:
+        if _has_configured_third_body_ephemerides(scenario):
+            metadata.update(
+                {
+                    "third_body_ephemeris_model": _CONFIGURED_THIRD_BODY_EPHEMERIS_MODEL,
+                    "third_body_bodies": _configured_third_body_names(scenario),
+                    "third_body_force_policy": _RESEARCH_FORCE_MODEL_POLICY,
+                    "third_body_ephemeris_sample_count": len(
+                        scenario.force_model.third_body_ephemerides
+                    ),
+                }
+            )
+            return metadata
         metadata.update(
             {
                 "third_body_ephemeris_model": _THIRD_BODY_EPHEMERIS_MODEL,
@@ -145,6 +161,14 @@ def _research_force_metadata(scenario: Scenario) -> dict[str, Any]:
             }
         )
     return metadata
+
+
+def _has_configured_third_body_ephemerides(scenario: Scenario) -> bool:
+    return bool(scenario.force_model.third_body_ephemerides)
+
+
+def _configured_third_body_names(scenario: Scenario) -> list[str]:
+    return sorted({sample.body for sample in scenario.force_model.third_body_ephemerides})
 
 
 def _uses_j2_baseline(force_model: ForceModelName) -> bool:
@@ -230,12 +254,71 @@ def _point_mass_third_body_acceleration(
     )
 
 
+def _configured_third_body_position_km(
+    jnp: Any,
+    scenario: Scenario,
+    body: str,
+    elapsed_s: float,
+) -> Any:
+    samples = sorted(
+        (
+            sample
+            for sample in scenario.force_model.third_body_ephemerides
+            if sample.body == body
+        ),
+        key=lambda sample: sample.epoch,
+    )
+    sample_elapsed_s = np.asarray(
+        [
+            (sample.epoch - scenario.initial_state.epoch).total_seconds()
+            for sample in samples
+        ],
+        dtype=np.float64,
+    )
+    positions_km = np.asarray(
+        [sample.position_km for sample in samples],
+        dtype=np.float64,
+    )
+    return jnp.asarray(
+        tuple(
+            float(np.interp(elapsed_s, sample_elapsed_s, positions_km[:, axis]))
+            for axis in range(3)
+        )
+    )
+
+
+def _configured_third_body_mu_km3_s2(scenario: Scenario, body: str) -> float:
+    for sample in scenario.force_model.third_body_ephemerides:
+        if sample.body == body:
+            return float(sample.mu_km3_s2)
+    raise ValueError(f"missing configured third-body ephemeris samples for {body}")
+
+
+def _configured_third_body_acceleration(
+    jnp: Any,
+    position: Any,
+    scenario: Scenario,
+    elapsed_s: float,
+) -> Any:
+    acceleration = jnp.zeros_like(position)
+    for body in _configured_third_body_names(scenario):
+        acceleration = acceleration + _point_mass_third_body_acceleration(
+            jnp,
+            position,
+            _configured_third_body_position_km(jnp, scenario, body, elapsed_s),
+            _configured_third_body_mu_km3_s2(scenario, body),
+        )
+    return acceleration
+
+
 def _third_body_acceleration(
     jnp: Any,
     position: Any,
     scenario: Scenario,
     elapsed_s: float,
 ) -> Any:
+    if _has_configured_third_body_ephemerides(scenario):
+        return _configured_third_body_acceleration(jnp, position, scenario, elapsed_s)
     days_since_j2000 = _days_since_j2000(scenario, elapsed_s)
     sun_position_km = _analytic_sun_position_km(jnp, days_since_j2000)
     moon_position_km = _analytic_moon_position_km(jnp, days_since_j2000)

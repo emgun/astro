@@ -1,3 +1,4 @@
+from datetime import timedelta
 from types import SimpleNamespace
 
 import numpy as np
@@ -11,7 +12,7 @@ from astro_backends.jax.propagation import (
 from astro_backends.jax.runtime import JaxRuntime, load_jax_runtime
 from astro_core.errors import UnsupportedBackendError
 from astro_core.io import load_scenario
-from astro_core.models import ForceModelConfig, ForceModelName, Scenario
+from astro_core.models import ForceModelConfig, ForceModelName, Scenario, ThirdBodyEphemerisPoint
 from astro_dynamics.local import propagate_local
 from astro_dynamics.monte_carlo import MonteCarloResult, run_initial_state_monte_carlo
 from astro_od.measurements import generate_synthetic_measurements
@@ -467,6 +468,54 @@ def test_research_propagate_jax_runs_research_third_body_force_flag() -> None:
     )
     assert result.cases[0].trajectory.metadata["third_body_ephemeris_model"] == (
         "analytic_circular_sun_moon_screening"
+    )
+    assert np.all(np.isfinite(np.asarray(final_state.position_km)))
+    assert np.all(np.isfinite(np.asarray(final_state.velocity_km_s)))
+
+
+def test_research_propagate_jax_uses_configured_third_body_ephemeris_samples() -> None:
+    scenario = load_scenario("examples/scenarios/leo_two_body.yaml")
+    force_model = ForceModelConfig(
+        gravity=ForceModelName.OREKIT_HIGH_FIDELITY,
+        third_body_gravity=True,
+        third_body_ephemerides=[
+            ThirdBodyEphemerisPoint(
+                body="sun",
+                epoch=scenario.initial_state.epoch,
+                position_km=(149_597_870.7, 0.0, 0.0),
+                mu_km3_s2=132_712_440_018.0,
+            ),
+            ThirdBodyEphemerisPoint(
+                body="sun",
+                epoch=scenario.initial_state.epoch
+                + timedelta(seconds=scenario.propagation.step_s),
+                position_km=(149_597_870.7, 10_000.0, 0.0),
+                mu_km3_s2=132_712_440_018.0,
+            ),
+        ],
+    )
+    scenario = scenario.model_copy(update={"force_model": force_model})
+
+    result = research_propagate_jax(
+        scenario,
+        cases=1,
+        position_sigma_km=0.0,
+        velocity_sigma_km_s=0.0,
+        seed=7,
+        runtime_loader=_fake_runtime,
+    )
+
+    final_state = result.cases[0].trajectory.samples[-1].state
+    assert result.metadata["research_force_models"] == [
+        "J2",
+        "configured_ephemeris_third_body",
+    ]
+    assert result.metadata["third_body_ephemeris_model"] == (
+        "configured_ephemeris_samples_screening"
+    )
+    assert result.metadata["third_body_bodies"] == ["sun"]
+    assert result.cases[0].trajectory.metadata["third_body_ephemeris_model"] == (
+        "configured_ephemeris_samples_screening"
     )
     assert np.all(np.isfinite(np.asarray(final_state.position_km)))
     assert np.all(np.isfinite(np.asarray(final_state.velocity_km_s)))

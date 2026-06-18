@@ -179,6 +179,40 @@ class Spacecraft(AstroModel):
         return _numeric_scalar_input_must_be_number(value, "Spacecraft scalar")
 
 
+class ThirdBodyEphemerisPoint(AstroModel):
+    body: str = Field(min_length=1)
+    epoch: datetime
+    position_km: Vector3
+    mu_km3_s2: FiniteFloat = Field(gt=0.0)
+
+    @field_validator("epoch", mode="before")
+    @classmethod
+    def epoch_input_must_be_datetime_or_string(cls, value: Any) -> Any:
+        return _datetime_input_must_be_datetime_or_string(value, "Third-body ephemeris epoch")
+
+    @field_validator("epoch")
+    @classmethod
+    def epoch_must_be_aware(cls, value: datetime) -> datetime:
+        return _datetime_must_be_aware(value, "Third-body ephemeris epoch")
+
+    @field_validator("position_km", mode="before")
+    @classmethod
+    def vector_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_sequence_input_must_be_numbers(value, "Third-body ephemeris vector")
+
+    @field_validator("position_km")
+    @classmethod
+    def values_must_be_finite(cls, value: Vector3) -> Vector3:
+        if not all(isfinite(component) for component in value):
+            raise ValueError("Third-body ephemeris position values must be finite")
+        return value
+
+    @field_validator("mu_km3_s2", mode="before")
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "Third-body ephemeris scalar")
+
+
 class ForceModelConfig(AstroModel):
     gravity: ForceModelName
     atmospheric_drag: bool = False
@@ -186,6 +220,7 @@ class ForceModelConfig(AstroModel):
     third_body_gravity: bool = False
     gravity_degree: int | None = Field(default=None, ge=0)
     gravity_order: int | None = Field(default=None, ge=0)
+    third_body_ephemerides: list[ThirdBodyEphemerisPoint] = Field(default_factory=list)
 
     @field_validator("gravity_degree", "gravity_order", mode="before")
     @classmethod
@@ -214,6 +249,8 @@ class ForceModelConfig(AstroModel):
             raise ValueError("j2 gravity requires gravity_degree=2 and gravity_order=0")
         if self.gravity is ForceModelName.OREKIT_HIGH_FIDELITY and self.gravity_degree < 2:
             raise ValueError("orekit_high_fidelity gravity_degree must be at least 2")
+        if self.third_body_ephemerides and not self.third_body_gravity:
+            raise ValueError("third_body_ephemerides require third_body_gravity=true")
         return self
 
     def enabled_high_fidelity_flags(self) -> tuple[str, ...]:
