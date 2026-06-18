@@ -778,6 +778,47 @@ def _final_state_transition_matrix(
     return [[float(component) for component in row] for row in transition_matrix]
 
 
+def _initial_covariance_matrix(scenario: Scenario) -> FloatArray | None:
+    if scenario.initial_covariance is None:
+        return None
+    return cast(FloatArray, np.asarray(scenario.initial_covariance, dtype=np.float64))
+
+
+def _matrix_to_nested_list(matrix: FloatArray) -> list[list[float]]:
+    return [[float(component) for component in row] for row in matrix]
+
+
+def _jax_sensitivity_metadata(
+    scenario: Scenario,
+    runtime: JaxRuntime,
+) -> dict[str, object]:
+    transition_matrix = np.asarray(
+        _final_state_transition_matrix(scenario, runtime),
+        dtype=np.float64,
+    )
+    metadata: dict[str, object] = {
+        "sensitivity_model": "jax_jacfwd_final_state_transition",
+        "final_state_transition_matrix": _matrix_to_nested_list(transition_matrix),
+    }
+    initial_covariance = _initial_covariance_matrix(scenario)
+    if initial_covariance is not None:
+        final_covariance = cast(
+            FloatArray,
+            transition_matrix @ initial_covariance @ transition_matrix.T,
+        )
+        final_covariance = cast(FloatArray, 0.5 * (final_covariance + final_covariance.T))
+        metadata.update(
+            {
+                "covariance_sensitivity_model": "jax_jacfwd_linear_covariance_map",
+                "covariance_sensitivity_formula": "P_final = Phi * P_initial * Phi^T",
+                "covariance_initial_source": "scenario.initial_covariance",
+                "final_covariance_matrix": _matrix_to_nested_list(final_covariance),
+                "final_covariance_trace": float(np.trace(final_covariance)),
+            }
+        )
+    return metadata
+
+
 def _normal_matrix_covariance(
     jacobian: FloatArray,
 ) -> tuple[FloatArray, FloatArray, str]:
@@ -1009,8 +1050,7 @@ def _with_jax_sensitivities(
         return result
     metadata = {
         **result.metadata,
-        "sensitivity_model": "jax_jacfwd_final_state_transition",
-        "final_state_transition_matrix": _final_state_transition_matrix(scenario, runtime),
+        **_jax_sensitivity_metadata(scenario, runtime),
     }
     return result.model_copy(update={"metadata": metadata})
 

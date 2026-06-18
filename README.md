@@ -116,12 +116,12 @@ simulator APIs, the suite builds an initial-Cartesian-state parameter set, runs 
 equations, and maps `state_transition_matrix_history` into suite covariance samples. If the
 variational API is unavailable or incompatible, the suite fails explicitly rather than falling back
 to finite differences. Live TudatPy execution still requires an installed TudatPy runtime. JAX
-research propagation returns suite
-`MonteCarloResult` products, can optionally include a final-state transition sensitivity matrix,
-and supports differentiable screening approximations for `orekit_high_fidelity`, configured
-degree/order high-order gravity metadata through a J2 baseline, atmospheric drag, solar radiation
-pressure, analytic circular Sun/Moon third-body gravity flags, and configured third-body ephemeris
-sample screening. Its research OD
+research propagation returns suite `MonteCarloResult` products, can optionally include a final-state
+transition sensitivity matrix, maps `scenario.initial_covariance` to a final covariance through that
+transition when available, and supports differentiable screening approximations for
+`orekit_high_fidelity`, configured degree/order high-order gravity metadata through a J2 baseline,
+atmospheric drag, solar radiation pressure, analytic circular Sun/Moon third-body gravity flags, and
+configured third-body ephemeris sample screening. Its research OD
 estimator uses backtracking Gauss-Newton corrections over normalized residual/Jacobian products so
 range/range-rate, inertial angle, and topocentric azimuth/elevation workflows can share the same
 product boundary. Those JAX force flags are explicitly research products, not operational
@@ -421,7 +421,9 @@ degree/order metadata on a J2 baseline plus research approximations for atmosphe
 radiation pressure, analytic circular Sun/Moon third-body gravity, and configured third-body
 ephemeris samples. With
 `--include-sensitivities`, the JAX path adds a nominal final-state transition matrix computed
-through JAX autodiff to the `MonteCarloResult` metadata. Third-body JAX products record either
+through JAX autodiff to the `MonteCarloResult` metadata. When the scenario carries
+`initial_covariance`, it also records the propagated final covariance using
+`P_final = Phi * P_initial * Phi^T`. Third-body JAX products record either
 `third_body_ephemeris_model = "analytic_circular_sun_moon_screening"` or
 `"configured_ephemeris_samples_screening"` so callers do not mistake the screening approximation for
 operational ephemeris-backed Orekit/Tudat semantics.

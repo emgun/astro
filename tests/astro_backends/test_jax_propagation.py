@@ -136,6 +136,52 @@ def test_research_propagate_jax_can_include_final_state_sensitivities() -> None:
     assert transition_matrix[0][3] > 0.0
 
 
+def test_research_propagate_jax_maps_initial_covariance_with_high_fidelity_forces() -> None:
+    base_scenario = load_scenario("examples/scenarios/leo_orekit_drag.yaml")
+    initial_covariance = [
+        [1.0 if row == column else 0.0 for column in range(6)] for row in range(6)
+    ]
+    scenario = Scenario.model_validate(
+        base_scenario.model_dump(mode="json")
+        | {
+            "initial_covariance": initial_covariance,
+        }
+    )
+
+    result = research_propagate_jax(
+        scenario,
+        cases=1,
+        position_sigma_km=0.0,
+        velocity_sigma_km_s=0.0,
+        seed=7,
+        runtime_loader=_fake_autodiff_runtime,
+        include_sensitivities=True,
+    )
+
+    transition_matrix = np.asarray(result.metadata["final_state_transition_matrix"])
+    final_covariance = np.asarray(result.metadata["final_covariance_matrix"])
+    assert result.metadata["covariance_sensitivity_model"] == (
+        "jax_jacfwd_linear_covariance_map"
+    )
+    assert result.metadata["covariance_sensitivity_formula"] == (
+        "P_final = Phi * P_initial * Phi^T"
+    )
+    assert result.metadata["covariance_initial_source"] == "scenario.initial_covariance"
+    assert "exponential_atmospheric_drag" in result.metadata["research_force_models"]
+    assert transition_matrix.shape == (6, 6)
+    assert final_covariance.shape == (6, 6)
+    np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-10)
+    np.testing.assert_allclose(
+        final_covariance,
+        transition_matrix @ np.asarray(initial_covariance) @ transition_matrix.T,
+        rtol=1.0e-10,
+        atol=1.0e-10,
+    )
+    assert result.metadata["final_covariance_trace"] == pytest.approx(
+        float(np.trace(final_covariance))
+    )
+
+
 def test_research_od_sensitivity_jax_returns_residual_jacobian_product() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_station_od.yaml")
     trajectory = propagate_local(scenario)
