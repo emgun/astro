@@ -108,10 +108,13 @@ selected Tudat force model. `astro compare-tudat-reference` writes calibrated po
 tolerance metrics against a reference backend so live Tudat force-model runs can be promoted only
 when their deltas are explicit. `astro compare-tudat-campaign` aggregates multiple calibrated
 Tudat-vs-reference scenario comparisons into one pass/fail campaign product for release gates.
-`covariance_state_transition_model: tudat_variational` is an opt-in native variational runner
-contract for Tudat-backed covariance products; if no validated native runner is supplied, the suite
-fails explicitly rather than falling back to finite differences. Live TudatPy variational-equation
-construction remains gated on validated API wiring. JAX research propagation returns suite
+`covariance_state_transition_model: tudat_variational` is an opt-in native variational construction
+path for Tudat-backed covariance products. When TudatPy exposes the expected estimation and
+simulator APIs, the suite builds an initial-Cartesian-state parameter set, runs Tudat variational
+equations, and maps `state_transition_matrix_history` into suite covariance samples. If the
+variational API is unavailable or incompatible, the suite fails explicitly rather than falling back
+to finite differences. Live TudatPy execution still requires an installed TudatPy runtime. JAX
+research propagation returns suite
 `MonteCarloResult` products, can optionally include a final-state transition sensitivity matrix,
 and supports differentiable screening approximations for `orekit_high_fidelity`, configured
 degree/order high-order gravity metadata through a J2 baseline, atmospheric drag, solar radiation
@@ -277,9 +280,10 @@ for that step, and metadata naming the model and step size. The optional
 `covariance_process_noise_acceleration_km_s2` field adds a simple per-axis white-acceleration
 process-noise term over each propagation sample interval. This is useful for product wiring and
 first-order sensitivity screening. Tudat also accepts an explicit `tudat_variational` covariance
-transition model when a native variational runner is supplied, which keeps native variational
-products distinguishable from finite-difference products. Drag/SRP variational equations and
-externally validated production conjunction services remain future work.
+transition model, which builds TudatPy variational equations when the optional variational API is
+available and keeps native variational products distinguishable from finite-difference products.
+Drag/SRP/third-body variational validation and externally validated production conjunction services
+remain future work.
 
 `astro screen-conjunction` compares two trajectory products at common sample epochs and writes a
 deterministic first-order screening result with time of closest approach, miss distance, relative

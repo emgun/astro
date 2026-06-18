@@ -54,6 +54,18 @@ def _load_tudat_propagation_api() -> dict[str, Any]:
         raise UnsupportedBackendError(f"TudatPy propagation API import failed: {exc}") from exc
 
 
+def _load_tudat_variational_api() -> dict[str, Any]:
+    try:
+        return {
+            "estimation_setup": import_module("tudatpy.dynamics.estimation_setup"),
+            "simulator": import_module("tudatpy.dynamics.simulator"),
+        }
+    except (ImportError, KeyError) as exc:
+        raise UnsupportedBackendError(
+            f"TudatPy variational API import failed: {exc}"
+        ) from exc
+
+
 def _validate_default_tudat_scenario(scenario: Scenario) -> None:
     if scenario.force_model.gravity not in _SUPPORTED_DEFAULT_TUDAT_FORCE_MODELS:
         supported = ", ".join(
@@ -441,6 +453,169 @@ def _propagate_tudat_state_vector(
     return _state_vector_from_sample(_propagate_tudat_default(trial_scenario, runtime).samples[-1])
 
 
+def _nearest_history_value(history: dict[float, Any], epoch: float) -> Any:
+    if epoch in history:
+        return history[epoch]
+    closest_epoch = min(history, key=lambda candidate_epoch: abs(candidate_epoch - epoch))
+    return history[closest_epoch]
+
+
+def _run_tudat_native_variational_covariance(
+    scenario: Scenario,
+    runtime: TudatRuntime,
+    trajectory: Trajectory,
+) -> tuple[list[CovarianceSample], dict[str, object]]:
+    propagation_api = _load_tudat_propagation_api()
+    variational_api = _load_tudat_variational_api()
+    spice = propagation_api["spice"]
+    environment_setup = propagation_api["environment_setup"]
+    propagation_setup = propagation_api["propagation_setup"]
+    simulator = variational_api["simulator"]
+    time_representation = propagation_api["time_representation"]
+    estimation_setup = variational_api["estimation_setup"]
+
+    spice.load_standard_kernels()
+    global_frame_origin = "Earth"
+    global_frame_orientation = "J2000"
+    body_settings = environment_setup.get_default_body_settings(
+        _tudat_body_names(scenario),
+        global_frame_origin,
+        global_frame_orientation,
+    )
+    bodies = environment_setup.create_system_of_bodies(body_settings)
+    bodies.create_empty_body(_SPACECRAFT_NAME)
+    bodies.get(_SPACECRAFT_NAME).mass = scenario.spacecraft.mass_kg
+    _configure_tudat_spacecraft_environment(scenario, bodies, environment_setup)
+
+    bodies_to_propagate = [_SPACECRAFT_NAME]
+    central_bodies = ["Earth"]
+    spacecraft_accelerations, _acceleration_metadata, _force_model_metadata, _runner_name = (
+        _tudat_gravity_acceleration_settings(scenario, propagation_setup)
+    )
+    acceleration_settings = {_SPACECRAFT_NAME: spacecraft_accelerations}
+    acceleration_models = propagation_setup.create_acceleration_models(
+        bodies,
+        acceleration_settings,
+        bodies_to_propagate,
+        central_bodies,
+    )
+    start_epoch = _tudat_epoch(scenario.initial_state.epoch, time_representation)
+    end_epoch = _tudat_epoch(
+        scenario.initial_state.epoch + timedelta(seconds=scenario.propagation.duration_s),
+        time_representation,
+    )
+    integrator_settings = propagation_setup.integrator.runge_kutta_fixed_step(
+        scenario.propagation.step_s,
+        propagation_setup.integrator.rk_4,
+    )
+    termination_settings = propagation_setup.propagator.time_termination(end_epoch)
+    propagator_settings = propagation_setup.propagator.translational(
+        central_bodies,
+        acceleration_models,
+        bodies_to_propagate,
+        _initial_state_si(scenario),
+        start_epoch,
+        integrator_settings,
+        termination_settings,
+        propagator=propagation_setup.propagator.cowell,
+    )
+    try:
+        parameter_settings = estimation_setup.parameter.initial_states(
+            propagator_settings,
+            bodies,
+        )
+        parameters_to_estimate = estimation_setup.create_parameter_set(
+            parameter_settings,
+            bodies,
+            propagator_settings,
+        )
+        variational_solver = simulator.create_variational_equations_solver(
+            bodies,
+            propagator_settings,
+            parameters_to_estimate,
+            simulate_dynamics_on_creation=True,
+        )
+    except (AttributeError, TypeError) as exc:
+        raise UnsupportedBackendError(
+            f"TudatPy variational API is incompatible with Astro Suite: {exc}"
+        ) from exc
+
+    transition_history = getattr(variational_solver, "state_transition_matrix_history", None)
+    if not isinstance(transition_history, dict) or not transition_history:
+        raise UnsupportedBackendError(
+            "TudatPy variational solver did not expose state_transition_matrix_history"
+        )
+
+    initial_covariance = _initial_covariance_matrix(scenario)
+    if initial_covariance is None:
+        return [], {}
+    process_noise = _process_noise_covariance(
+        scenario.covariance_process_noise_acceleration_km_s2,
+        scenario.propagation.step_s,
+    )
+    zero_process_noise = np.zeros((6, 6), dtype=np.float64)
+    covariance_history: list[CovarianceSample] = []
+    for sample_index, sample in enumerate(trajectory.samples):
+        elapsed_s = sample_index * scenario.propagation.step_s
+        transition = cast(
+            FloatArray,
+            np.asarray(
+                _nearest_history_value(transition_history, start_epoch + elapsed_s),
+                dtype=np.float64,
+            ),
+        )
+        sample_process_noise = zero_process_noise if sample_index == 0 else process_noise
+        covariance = _propagate_covariance(
+            initial_covariance,
+            transition,
+            sample_process_noise,
+        )
+        covariance_history.append(
+            _covariance_sample(
+                sample.epoch,
+                covariance,
+                state_transition_matrix=transition,
+                accumulated_state_transition_matrix=transition,
+                process_noise_covariance=sample_process_noise,
+                metadata={
+                    "covariance_sample_role": (
+                        "initial" if sample_index == 0 else "propagated"
+                    ),
+                    "covariance_model": "tudat_native_variational_equations",
+                    "state_transition_model": (
+                        "identity" if sample_index == 0 else "tudat_native_variational"
+                    ),
+                    "transition_step_s": elapsed_s,
+                    "process_noise_model": (
+                        "none"
+                        if sample_index == 0
+                        else _covariance_process_noise_model(
+                            scenario.covariance_process_noise_acceleration_km_s2
+                        )
+                    ),
+                    "process_noise_acceleration_km_s2": (
+                        0.0
+                        if sample_index == 0
+                        else scenario.covariance_process_noise_acceleration_km_s2
+                    ),
+                    **_covariance_transition_metadata(
+                        trajectory.metadata,
+                        prefix="transition_",
+                    ),
+                },
+            )
+        )
+
+    return covariance_history, {
+        "covariance_native_variational_runner": "default_tudatpy",
+        "native_variational_parameter_set": "initial_cartesian_state",
+        "native_variational_solver": "create_variational_equations_solver",
+        "native_variational_transition_history": "state_transition_matrix_history",
+        "native_variational_sample_count": len(covariance_history),
+        "native_variational_tudat_version": runtime.package_version,
+    }
+
+
 def _trajectory_with_covariance_history(
     scenario: Scenario,
     runtime: TudatRuntime,
@@ -453,10 +628,7 @@ def _trajectory_with_covariance_history(
         return trajectory
     if scenario.covariance_state_transition_model == "tudat_variational":
         if tudat_variational_runner is None:
-            raise UnsupportedBackendError(
-                "native Tudat variational covariance propagation requires a native "
-                "Tudat variational runner"
-            )
+            tudat_variational_runner = _run_tudat_native_variational_covariance
         native_covariance_history, native_metadata = tudat_variational_runner(
             scenario,
             runtime,

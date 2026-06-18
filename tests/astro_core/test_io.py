@@ -168,6 +168,19 @@ def test_load_orekit_third_body_example_scenario() -> None:
     assert scenario.force_model.enabled_high_fidelity_flags() == ("third_body_gravity",)
 
 
+def test_load_tudat_variational_covariance_example_scenario() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_tudat_variational_covariance.yaml"))
+
+    assert scenario.scenario_id == "leo-tudat-variational-covariance"
+    assert scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
+    assert scenario.force_model.enabled_high_fidelity_flags() == (
+        "atmospheric_drag",
+        "solar_radiation_pressure",
+        "third_body_gravity",
+    )
+    assert scenario.covariance_state_transition_model == "tudat_variational"
+
+
 def test_load_eccentric_two_body_example_scenario_has_interior_apsis_root() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_eccentric_two_body.yaml"))
 

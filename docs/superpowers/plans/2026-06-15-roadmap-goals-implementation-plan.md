@@ -65,9 +65,10 @@ Still roadmap-level:
   deterministic bounded quaternion-error PD primitive.
 - Full native multi-motor RocketPy staging and full target-seeking multistage Dymos ascent
   optimization beyond the current native pitch-control transcription.
-- Native Tudat variational-equation covariance propagation has an explicit opt-in runner contract;
-  live TudatPy variational-equation construction remains gated on validated API wiring. Default
-  Tudat covariance continues to use the suite finite-difference transition product.
+- Native Tudat variational-equation covariance propagation now has an explicit opt-in default
+  construction boundary that builds the initial-state parameter set and reads TudatPy
+  `state_transition_matrix_history` when the optional variational API is present. Default Tudat
+  covariance continues to use the suite finite-difference transition product.
 - Full standards-grade precession-nutation reductions beyond the current compact
   `iau_2006_2000a_simplified` geodetic-station option, native standards-grade DSN ODF/TNF parsing
   beyond the normalized CSV and suite-owned ASTRODSN1 binary tracking bridges plus truth-tagged
@@ -469,11 +470,13 @@ Definition of done:
   gravity, drag, SRP, and third-body cross-check scenarios and records Tudat provenance through the
   native runners. Initial-covariance scenarios produce finite-difference covariance-history products
   through the selected Tudat force model by default, and `tudat_variational` provides an explicit
-  native variational runner contract that refuses silent finite-difference downgrade.
+  native variational construction path that refuses silent finite-difference downgrade when TudatPy
+  variational APIs are unavailable or incompatible.
   `astro compare-tudat-reference` and
   `astro compare-tudat-campaign` write calibrated reference-delta products for single-scenario and
-  multi-scenario live Tudat validation. Native Tudat variational equations remain gated on validated
-  body and acceleration-model construction.
+  multi-scenario live Tudat validation. Native Tudat variational equations now have a suite-owned
+  construction boundary; full live production confidence remains gated on an installed TudatPy
+  runtime and force-model-by-force-model validation.
 - `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
   screening-only `orekit_high_fidelity`, configured degree/order high-order gravity provenance,
   drag, SRP, analytic Sun/Moon third-body, and configured third-body ephemeris sample force flags

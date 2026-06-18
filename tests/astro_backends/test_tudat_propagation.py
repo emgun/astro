@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -47,7 +47,7 @@ def test_propagate_tudat_runs_drag_with_fake_tudat_modules(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scenario = load_scenario("examples/scenarios/leo_orekit_drag.yaml")
-    fake_modules = _FakeTudatModules()
+    fake_modules = _FakeTudatModules(include_variational_api=False)
     monkeypatch.setattr(
         "astro_backends.tudat.propagation.import_module",
         fake_modules.import_module,
@@ -290,8 +290,46 @@ def test_propagate_tudat_requires_native_variational_runner_when_requested(
         fake_modules.import_module,
     )
 
-    with pytest.raises(UnsupportedBackendError, match="native Tudat variational"):
+    with pytest.raises(UnsupportedBackendError, match="TudatPy variational API import failed"):
         propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+
+def test_propagate_tudat_uses_default_native_variational_runner_when_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_scenario = load_scenario("examples/scenarios/leo_orekit_high_fidelity_covariance.yaml")
+    scenario = Scenario.model_validate(
+        {
+            **base_scenario.model_dump(mode="json"),
+            "covariance_state_transition_model": "tudat_variational",
+            "covariance_process_noise_acceleration_km_s2": 0.0,
+            "propagation": {
+                **base_scenario.propagation.model_dump(mode="json"),
+                "duration_s": 120.0,
+            },
+        }
+    )
+    fake_modules = _FakeTudatModules(include_variational_api=True)
+    monkeypatch.setattr(
+        "astro_backends.tudat.propagation.import_module",
+        fake_modules.import_module,
+    )
+
+    trajectory = propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+    assert fake_modules.estimation_setup.parameter.initial_state_settings is not None
+    assert fake_modules.estimation_setup.created_parameter_settings is not None
+    assert fake_modules.simulator.variational_solver_created is True
+    assert trajectory.metadata["covariance_model"] == "tudat_native_variational_equations"
+    assert trajectory.metadata["covariance_native_variational_runner"] == "default_tudatpy"
+    assert trajectory.metadata["native_variational_parameter_set"] == "initial_cartesian_state"
+    assert trajectory.metadata["native_variational_solver"] == "create_variational_equations_solver"
+    assert trajectory.covariance_history[0].metadata["state_transition_model"] == "identity"
+    assert trajectory.covariance_history[1].metadata["state_transition_model"] == (
+        "tudat_native_variational"
+    )
+    first_transition = np.array(trajectory.covariance_history[1].state_transition_matrix)
+    assert first_transition[0, 0] == pytest.approx(1.01)
 
 
 def test_propagate_tudat_uses_native_variational_runner_when_requested(
@@ -579,9 +617,17 @@ class _FakeDynamicsSimulator:
         initial_state = propagator_settings["initial_state"]
         if not isinstance(initial_state, list):
             raise AssertionError("initial_state should be a list")
-        start_epoch = float(propagator_settings["start_epoch"])
-        end_epoch = float(propagator_settings["termination_settings"]["end_epoch"])
-        step_s = float(propagator_settings["integrator_settings"]["time_step"])
+        termination_settings = cast(
+            dict[str, object],
+            propagator_settings["termination_settings"],
+        )
+        integrator_settings = cast(
+            dict[str, object],
+            propagator_settings["integrator_settings"],
+        )
+        start_epoch = float(cast(float, propagator_settings["start_epoch"]))
+        end_epoch = float(cast(float, termination_settings["end_epoch"]))
+        step_s = float(cast(float, integrator_settings["time_step"]))
         self.state_history: dict[float, list[float]] = {}
         sample_count = int(round((end_epoch - start_epoch) / step_s)) + 1
         for index in range(sample_count):
@@ -598,28 +644,126 @@ class _FakeDynamicsSimulator:
 
 
 class _FakeSimulator:
-    @staticmethod
+    variational_solver_created = False
+
+    @classmethod
     def create_dynamics_simulator(
+        cls,
         _bodies: _FakeBodies,
         propagator_settings: dict[str, object],
     ) -> _FakeDynamicsSimulator:
         return _FakeDynamicsSimulator(propagator_settings)
 
+    @classmethod
+    def create_variational_equations_solver(
+        cls,
+        _bodies: _FakeBodies,
+        propagator_settings: dict[str, object],
+        parameters_to_estimate: dict[str, object],
+        *,
+        simulate_dynamics_on_creation: bool,
+    ) -> "_FakeVariationalEquationsSolver":
+        cls.variational_solver_created = True
+        return _FakeVariationalEquationsSolver(
+            propagator_settings,
+            parameters_to_estimate,
+            simulate_dynamics_on_creation=simulate_dynamics_on_creation,
+        )
+
+
+class _FakeVariationalEquationsSolver:
+    def __init__(
+        self,
+        propagator_settings: dict[str, object],
+        parameters_to_estimate: dict[str, object],
+        *,
+        simulate_dynamics_on_creation: bool,
+    ) -> None:
+        parameter_settings = cast(
+            dict[str, object],
+            parameters_to_estimate["parameter_settings"],
+        )
+        if parameter_settings["type"] != "initial_states":
+            raise AssertionError("expected initial state parameter settings")
+        if not simulate_dynamics_on_creation:
+            raise AssertionError("expected dynamics simulation on creation")
+        termination_settings = cast(
+            dict[str, object],
+            propagator_settings["termination_settings"],
+        )
+        integrator_settings = cast(
+            dict[str, object],
+            propagator_settings["integrator_settings"],
+        )
+        start_epoch = float(cast(float, propagator_settings["start_epoch"]))
+        end_epoch = float(cast(float, termination_settings["end_epoch"]))
+        step_s = float(cast(float, integrator_settings["time_step"]))
+        sample_count = int(round((end_epoch - start_epoch) / step_s)) + 1
+        self.state_transition_matrix_history: dict[float, list[list[float]]] = {}
+        for index in range(sample_count):
+            transition = np.eye(6) + index * 0.01 * np.eye(6)
+            self.state_transition_matrix_history[start_epoch + index * step_s] = (
+                transition.tolist()
+            )
+
+
+class _FakeParameterSetup:
+    initial_state_settings: dict[str, object] | None = None
+
+    @classmethod
+    def initial_states(
+        cls,
+        propagator_settings: dict[str, object],
+        bodies: _FakeBodies,
+    ) -> dict[str, object]:
+        cls.initial_state_settings = {
+            "type": "initial_states",
+            "propagator": propagator_settings,
+            "body_count": len(bodies._bodies),
+        }
+        return cls.initial_state_settings
+
+
+class _FakeEstimationSetup:
+    parameter = _FakeParameterSetup
+    created_parameter_settings: dict[str, object] | None = None
+
+    @classmethod
+    def create_parameter_set(
+        cls,
+        parameter_settings: dict[str, object],
+        bodies: _FakeBodies,
+        propagator_settings: dict[str, object],
+    ) -> dict[str, object]:
+        cls.created_parameter_settings = parameter_settings
+        return {
+            "parameter_settings": parameter_settings,
+            "body_count": len(bodies._bodies),
+            "propagator": propagator_settings,
+        }
+
 
 class _FakeTudatModules:
-    def __init__(self) -> None:
+    def __init__(self, *, include_variational_api: bool = False) -> None:
         self.spice = _FakeSpice()
         self.environment_setup = _FakeEnvironmentSetup
         self.environment_setup.requested_bodies = []
         self.environment_setup.aerodynamic_interfaces = {}
         self.environment_setup.radiation_pressure_targets = {}
+        self.estimation_setup = _FakeEstimationSetup
+        self.estimation_setup.parameter.initial_state_settings = None
+        self.estimation_setup.created_parameter_settings = None
+        self.simulator = _FakeSimulator
+        self.simulator.variational_solver_created = False
         self.modules: dict[str, Any] = {
             "tudatpy.interface.spice": self.spice,
             "tudatpy.dynamics.environment_setup": self.environment_setup,
             "tudatpy.dynamics.propagation_setup": _FakePropagationSetup,
-            "tudatpy.dynamics.simulator": _FakeSimulator,
+            "tudatpy.dynamics.simulator": self.simulator,
             "tudatpy.astro.time_representation": SimpleNamespace(DateTime=_FakeDateTime),
         }
+        if include_variational_api:
+            self.modules["tudatpy.dynamics.estimation_setup"] = self.estimation_setup
 
     def import_module(self, module_name: str) -> Any:
         return self.modules[module_name]
