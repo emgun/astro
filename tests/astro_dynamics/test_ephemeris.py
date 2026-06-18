@@ -5,6 +5,7 @@ from astro_dynamics.ephemeris import (
     dump_trajectory_aem,
     dump_trajectory_ephemeris_csv,
     dump_trajectory_oem,
+    load_trajectory_aem,
     load_trajectory_oem,
 )
 from astro_dynamics.local import propagate_local
@@ -90,6 +91,63 @@ def test_dump_trajectory_aem_rejects_trajectory_without_attitude_samples() -> No
         assert "attitude samples" in str(exc)
     else:
         raise AssertionError("expected AEM export to require attitude samples")
+
+
+def test_load_trajectory_aem_attaches_attitude_to_base_trajectory() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_velocity_aligned_burn.yaml"))
+    trajectory = propagate_local(scenario)
+    payload = dump_trajectory_aem(trajectory)
+    base_trajectory = trajectory.model_copy(
+        update={
+            "samples": [
+                sample.model_copy(update={"attitude": None})
+                for sample in trajectory.samples
+            ],
+            "metadata": {**trajectory.metadata, "attitude_model": "stripped-for-test"},
+        }
+    )
+
+    loaded = load_trajectory_aem(payload, base_trajectory=base_trajectory)
+
+    attitude_samples = [sample for sample in trajectory.samples if sample.attitude is not None]
+    loaded_attitude_samples = [sample for sample in loaded.samples if sample.attitude is not None]
+    assert [sample.epoch for sample in loaded.samples] == [
+        sample.epoch for sample in trajectory.samples
+    ]
+    assert [sample.state for sample in loaded.samples] == [
+        sample.state for sample in trajectory.samples
+    ]
+    assert len(loaded_attitude_samples) == len(attitude_samples)
+    assert loaded_attitude_samples[0].attitude is not None
+    assert attitude_samples[0].attitude is not None
+    assert loaded_attitude_samples[0].attitude.body_to_inertial_quaternion == (
+        attitude_samples[0].attitude.body_to_inertial_quaternion
+    )
+    assert loaded_attitude_samples[0].attitude.frame == attitude_samples[0].attitude.frame
+    assert loaded_attitude_samples[0].attitude.metadata["source_format"] == "ccsds_aem_kvn"
+    assert loaded.metadata["attitude_source_format"] == "ccsds_aem_kvn"
+    assert loaded.metadata["aem_time_system"] == "UTC"
+    assert loaded.metadata["aem_ref_frame_a"] == "EME2000"
+    assert loaded.metadata["aem_attitude_sample_count"] == len(attitude_samples)
+
+
+def test_load_trajectory_aem_rejects_unmatched_attitude_epoch() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_velocity_aligned_burn.yaml"))
+    trajectory = propagate_local(scenario)
+    lines = dump_trajectory_aem(trajectory).splitlines()
+    data_start = lines.index("DATA_START")
+    lines[data_start + 1] = lines[data_start + 1].replace(
+        "2026-01-01T00:00:00.000000Z",
+        "2026-01-02T00:00:00.000000Z",
+    )
+    payload = "\n".join(lines)
+
+    try:
+        load_trajectory_aem(payload, base_trajectory=trajectory)
+    except ValueError as exc:
+        assert "must match base trajectory sample epochs" in str(exc)
+    else:
+        raise AssertionError("expected unmatched AEM epoch to fail")
 
 
 def test_load_trajectory_oem_round_trips_export_with_scenario_force_model() -> None:

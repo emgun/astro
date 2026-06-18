@@ -3,10 +3,14 @@ from __future__ import annotations
 import csv
 from datetime import UTC, datetime
 from io import StringIO
+from typing import cast
 
 from astro_core.models import (
+    AttitudeState,
     CartesianState,
     ForceModelConfig,
+    Frame,
+    Quaternion4,
     Trajectory,
     TrajectorySample,
 )
@@ -29,6 +33,13 @@ def _parse_oem_epoch(raw_epoch: str) -> datetime:
         return datetime.fromisoformat(raw_epoch.replace("Z", "+00:00")).astimezone(UTC)
     except ValueError as exc:
         raise ValueError(f"Invalid OEM epoch {raw_epoch!r}") from exc
+
+
+def _parse_kvn_assignment(line: str) -> tuple[str, str]:
+    key, separator, value = line.partition("=")
+    if not separator:
+        raise ValueError(f"Invalid KVN assignment line: {line}")
+    return key.strip(), value.strip()
 
 
 def dump_trajectory_ephemeris_csv(trajectory: Trajectory) -> str:
@@ -216,4 +227,113 @@ def load_trajectory_oem(payload: str, *, force_model: ForceModelConfig) -> Traje
             "oem_time_system": metadata["TIME_SYSTEM"],
             "force_model_source": "scenario",
         },
+    )
+
+
+def load_trajectory_aem(payload: str, *, base_trajectory: Trajectory) -> Trajectory:
+    metadata: dict[str, str] = {}
+    comments: dict[str, str] = {}
+    attitude_by_epoch: dict[datetime, AttitudeState] = {}
+    in_metadata = False
+    in_data = False
+
+    for raw_line in payload.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line == "META_START":
+            in_metadata = True
+            continue
+        if line == "META_STOP":
+            in_metadata = False
+            continue
+        if line == "DATA_START":
+            in_data = True
+            continue
+        if line == "DATA_STOP":
+            in_data = False
+            continue
+        if line.startswith("COMMENT "):
+            raw_comment = line.removeprefix("COMMENT ")
+            key, separator, value = raw_comment.partition("=")
+            if separator:
+                comments[key.strip()] = value.strip()
+            continue
+        if "=" in line:
+            key, value = _parse_kvn_assignment(line)
+            if in_metadata or key in {"CCSDS_AEM_VERS", "CREATION_DATE", "ORIGINATOR"}:
+                metadata[key] = value
+            continue
+
+        if not in_data:
+            raise ValueError("AEM attitude rows must appear between DATA_START and DATA_STOP")
+
+        fields = line.split()
+        if len(fields) != 5:
+            raise ValueError("AEM quaternion rows must contain epoch and 4 quaternion fields")
+        epoch = _parse_oem_epoch(fields[0])
+        try:
+            quaternion_values = tuple(float(value) for value in fields[1:])
+        except ValueError as exc:
+            raise ValueError(f"Invalid numeric AEM quaternion row: {line}") from exc
+        if len(quaternion_values) != 4:
+            raise ValueError("AEM quaternion rows must contain 4 quaternion fields")
+        quaternion = cast(Quaternion4, quaternion_values)
+        attitude_by_epoch[epoch] = AttitudeState(
+            mode="inertial",
+            frame=Frame.EME2000,
+            body_to_inertial_quaternion=quaternion,
+            metadata={
+                "source_format": "ccsds_aem_kvn",
+                "aem_attitude_type": metadata.get("ATTITUDE_TYPE", ""),
+                "aem_ref_frame_a": metadata.get("REF_FRAME_A", ""),
+                "aem_ref_frame_b": metadata.get("REF_FRAME_B", ""),
+                "quaternion_order": comments.get("quaternion_order", "QC Q1 Q2 Q3"),
+            },
+        )
+
+    if metadata.get("CCSDS_AEM_VERS") != "2.0":
+        raise ValueError("AEM ingest supports CCSDS_AEM_VERS = 2.0")
+    if metadata.get("TIME_SYSTEM") != "UTC":
+        raise ValueError("AEM ingest supports only TIME_SYSTEM = UTC")
+    if metadata.get("REF_FRAME_A") != "EME2000":
+        raise ValueError("AEM ingest supports only REF_FRAME_A = EME2000")
+    if metadata.get("ATTITUDE_TYPE") != "QUATERNION":
+        raise ValueError("AEM ingest supports only ATTITUDE_TYPE = QUATERNION")
+    if comments.get("quaternion_order", "QC Q1 Q2 Q3") != "QC Q1 Q2 Q3":
+        raise ValueError("AEM ingest supports only quaternion_order = QC Q1 Q2 Q3")
+    if not attitude_by_epoch:
+        raise ValueError("AEM ingest requires at least one quaternion row")
+
+    base_epochs = {sample.epoch for sample in base_trajectory.samples}
+    unmatched_epochs = sorted(set(attitude_by_epoch) - base_epochs)
+    if unmatched_epochs:
+        raise ValueError(
+            "AEM attitude rows must match base trajectory sample epochs; "
+            f"unmatched epoch {unmatched_epochs[0].isoformat()}"
+        )
+
+    samples = [
+        sample.model_copy(update={"attitude": attitude_by_epoch.get(sample.epoch)})
+        if sample.epoch in attitude_by_epoch
+        else sample
+        for sample in base_trajectory.samples
+    ]
+    return base_trajectory.model_copy(
+        update={
+            "samples": samples,
+            "metadata": {
+                **base_trajectory.metadata,
+                "attitude_source_format": "ccsds_aem_kvn",
+                "aem_version": metadata["CCSDS_AEM_VERS"],
+                "aem_originator": metadata.get("ORIGINATOR", ""),
+                "aem_object_name": metadata.get("OBJECT_NAME", ""),
+                "aem_object_id": metadata.get("OBJECT_ID", ""),
+                "aem_ref_frame_a": metadata["REF_FRAME_A"],
+                "aem_ref_frame_b": metadata.get("REF_FRAME_B", ""),
+                "aem_time_system": metadata["TIME_SYSTEM"],
+                "aem_attitude_type": metadata["ATTITUDE_TYPE"],
+                "aem_attitude_sample_count": len(attitude_by_epoch),
+            },
+        }
     )

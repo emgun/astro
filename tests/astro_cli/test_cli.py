@@ -21,7 +21,7 @@ from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, MeasurementRecord, MeasurementType, Scenario
 from astro_dynamics.conjunction import screen_conjunction
-from astro_dynamics.ephemeris import dump_trajectory_oem
+from astro_dynamics.ephemeris import dump_trajectory_aem, dump_trajectory_oem
 from astro_dynamics.local import propagate_local
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
 from astro_launch.io import load_launch_scenario
@@ -540,6 +540,55 @@ def test_import_trajectory_command_reads_oem_with_scenario_context(tmp_path: Pat
     assert payload["backend"] == "local"
     assert payload["metadata"]["source_format"] == "ccsds_oem_kvn"
     assert len(payload["samples"]) == 11
+
+
+def test_import_trajectory_command_reads_aem_with_state_trajectory_context(
+    tmp_path: Path,
+) -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_velocity_aligned_burn.yaml"))
+    trajectory = propagate_local(scenario)
+    state_trajectory = trajectory.model_copy(
+        update={
+            "samples": [
+                sample.model_copy(update={"attitude": None})
+                for sample in trajectory.samples
+            ]
+        }
+    )
+    aem_path = tmp_path / "trajectory.aem"
+    state_trajectory_path = tmp_path / "state-trajectory.json"
+    output = tmp_path / "trajectory.json"
+    aem_path.write_text(dump_trajectory_aem(trajectory), encoding="utf-8")
+    state_trajectory_path.write_text(
+        state_trajectory.model_dump_json(indent=2),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "import-trajectory",
+            str(aem_path),
+            "--format",
+            "aem",
+            "--scenario",
+            "examples/scenarios/leo_velocity_aligned_burn.yaml",
+            "--state-trajectory",
+            str(state_trajectory_path),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote trajectory" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    attitude_samples = [
+        sample for sample in payload["samples"] if sample["attitude"] is not None
+    ]
+    assert payload["metadata"]["attitude_source_format"] == "ccsds_aem_kvn"
+    assert payload["metadata"]["aem_attitude_sample_count"] == len(attitude_samples)
+    assert attitude_samples[0]["attitude"]["metadata"]["source_format"] == "ccsds_aem_kvn"
 
 
 def test_monte_carlo_command_writes_json(tmp_path: Path) -> None:

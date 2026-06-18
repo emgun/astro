@@ -23,6 +23,7 @@ Use this checklist before tagging or publishing a release candidate.
 - [ ] `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv`
 - [ ] `astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output /tmp/astro-velocity-aligned-burn.json`
 - [ ] `astro export-trajectory /tmp/astro-velocity-aligned-burn.json --format aem --output /tmp/astro-attitude.aem`
+- [ ] `astro import-trajectory /tmp/astro-attitude.aem --format aem --scenario examples/scenarios/leo_velocity_aligned_burn.yaml --state-trajectory /tmp/astro-velocity-aligned-burn.json --output /tmp/astro-attitude-from-aem.json`
 - [ ] `astro propagate-attitude examples/attitude/rigid_body_torque.yaml --output /tmp/astro-attitude-dynamics.json`
 - [ ] `astro propagate-attitude examples/attitude/closed_loop_pd.yaml --output /tmp/astro-attitude-control.json`
 - [ ] `astro propagate-attitude examples/attitude/closed_loop_sensor_actuator.yaml --output /tmp/astro-attitude-sensor-actuator.json`

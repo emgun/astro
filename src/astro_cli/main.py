@@ -41,6 +41,7 @@ from astro_dynamics.ephemeris import (
     dump_trajectory_aem,
     dump_trajectory_ephemeris_csv,
     dump_trajectory_oem,
+    load_trajectory_aem,
     load_trajectory_oem,
 )
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
@@ -487,8 +488,17 @@ def import_trajectory(
     scenario_path: Annotated[Path, typer.Option("--scenario", exists=True, readable=True)],
     trajectory_format: Annotated[
         str,
-        typer.Option("--format", help="Input trajectory format: oem."),
+        typer.Option("--format", help="Input trajectory format: oem or aem."),
     ] = "oem",
+    state_trajectory_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--state-trajectory",
+            exists=True,
+            readable=True,
+            help="Base suite trajectory JSON for AEM attitude-only import.",
+        ),
+    ] = None,
 ) -> None:
     """Import an external trajectory product into suite trajectory JSON."""
     scenario = _load_scenario_or_exit(scenario_path)
@@ -504,6 +514,17 @@ def import_trajectory(
             trajectory = load_trajectory_oem(payload, force_model=scenario.force_model)
         except ValueError as exc:
             typer.echo(f"invalid OEM trajectory {trajectory_path}: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+    elif normalized_format == "aem":
+        try:
+            base_trajectory = (
+                _load_trajectory_or_exit(state_trajectory_path)
+                if state_trajectory_path is not None
+                else propagate_with_backend(scenario, backend="local")
+            )
+            trajectory = load_trajectory_aem(payload, base_trajectory=base_trajectory)
+        except (UnsupportedBackendError, ValueError) as exc:
+            typer.echo(f"invalid AEM trajectory {trajectory_path}: {exc}", err=True)
             raise typer.Exit(code=2) from exc
     else:
         typer.echo(f"unsupported trajectory import format: {trajectory_format}", err=True)

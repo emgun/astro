@@ -17,8 +17,10 @@ from astro_dynamics.conjunction import (
     screen_conjunction,
 )
 from astro_dynamics.ephemeris import (
+    dump_trajectory_aem,
     dump_trajectory_ephemeris_csv,
     dump_trajectory_oem,
+    load_trajectory_aem,
     load_trajectory_oem,
 )
 from astro_dynamics.local import (
@@ -53,8 +55,10 @@ __all__ = [
     "apply_impulsive_maneuver",
     "assess_conjunction_screening",
     "derivative",
+    "dump_trajectory_aem",
     "dump_trajectory_ephemeris_csv",
     "dump_trajectory_oem",
+    "load_trajectory_aem",
     "j2_acceleration_km_s2",
     "load_trajectory_oem",
     "propagate_local",

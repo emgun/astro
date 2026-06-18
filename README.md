@@ -162,6 +162,7 @@ astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro export-trajectory attitude_trajectory.json --format aem --output attitude_trajectory.aem
 astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
+astro import-trajectory attitude_trajectory.aem --format aem --scenario examples/scenarios/leo_velocity_aligned_burn.yaml --state-trajectory attitude_state_trajectory.json --output imported_attitude_trajectory.json
 astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output conjunction_screening.json
 astro assess-conjunction conjunction_screening.json --output conjunction_assessment.json
 astro propagate-attitude examples/attitude/rigid_body_torque.yaml --output attitude_dynamics.json
@@ -234,7 +235,10 @@ or a CCSDS AEM KVN quaternion attitude product for trajectories with commanded a
 `astro import-trajectory --format oem` converts a CCSDS OEM KVN text product back into a suite
 `Trajectory`; it requires `--scenario` because OEM does not encode the suite force model. The
 importer is intentionally strict: UTC time system, EME2000 reference frame, and Earth center are
-required. `astro monte-carlo` runs a seeded initial-state ensemble by perturbing the scenario's
+required. `astro import-trajectory --format aem` attaches CCSDS AEM KVN quaternion attitude rows to
+a state-bearing suite trajectory supplied with `--state-trajectory` because AEM is attitude-only.
+It validates UTC, EME2000 frame A, quaternion attitude type, and `QC Q1 Q2 Q3` quaternion order.
+`astro monte-carlo` runs a seeded initial-state ensemble by perturbing the scenario's
 Cartesian state and propagating each case through the selected backend. This is a repeatable product
 workflow for uncertainty screening; conjunction readiness still depends on the screening and
 assessment products below.
