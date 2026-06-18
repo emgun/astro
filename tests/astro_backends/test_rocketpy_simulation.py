@@ -179,6 +179,19 @@ def test_propagate_launch_rocketpy_composes_multistage_stage_schedule() -> None:
     assert trajectory.metadata["rocketpy_stage_schedule_duration_s"] == 120.0
     assert trajectory.metadata["rocketpy_stage_schedule_complete"] is True
     assert trajectory.metadata["rocketpy_composition"] == "single_flight_suite_stage_schedule"
+    assert trajectory.metadata["rocketpy_multistage_adapter_contract"] == {
+        "execution_scope": "single_configured_rocketpy_flight_with_suite_stage_annotations",
+        "native_multistage_execution": False,
+        "suite_stage_count": 2,
+        "suite_stage_names": ["stage-1", "stage-2"],
+        "rocketpy_config_count": 1,
+        "annotated_stage_events": True,
+        "stage_schedule_complete": True,
+        "stage_schedule_duration_s": 120.0,
+        "native_multistage_gap": (
+            "runtime has no suite-validated staged multi-motor flight API"
+        ),
+    }
     assert trajectory.samples[0].stage_name == "stage-1"
     assert trajectory.samples[7].stage_name == "stage-2"
     assert trajectory.samples[-1].stage_name == "payload"
@@ -318,6 +331,12 @@ def test_live_rocketpy_configured_launch_examples_return_suite_products() -> Non
     assert two_stage_trajectory.metadata["rocketpy_composition"] == (
         "single_flight_suite_stage_schedule"
     )
+    assert two_stage_trajectory.metadata["rocketpy_multistage_adapter_contract"][
+        "native_multistage_execution"
+    ] is False
+    assert two_stage_trajectory.metadata["rocketpy_multistage_adapter_contract"][
+        "suite_stage_names"
+    ] == ["stage-1", "stage-2"]
     assert len(two_stage_trajectory.samples) >= 2
     assert all(
         sample.stage_name in {"stage-1", "stage-2", "payload"}

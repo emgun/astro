@@ -65,8 +65,9 @@ an aggregate point-mass model, while RocketPy-specific vehicle/motor/flight fiel
 optional `rocketpy` launch-scenario section. Live RocketPy simulation currently supports explicitly
 configured solid rockets and can annotate multistage suite scenarios with stage events/samples
 reached by one configured RocketPy flight, with metadata for whether the RocketPy solution covered
-the full suite stage schedule. That multistage path is a composition adapter, not a validated
-multi-motor RocketPy staging solver. Live Dymos optimization currently supports a stage-aware
+the full suite stage schedule plus a multistage adapter contract that records the non-native
+composition scope. That multistage path is a composition adapter, not a validated multi-motor
+RocketPy staging solver. Live Dymos optimization currently supports a stage-aware
 vertical-ascent phase transcription wrapped in the suite launch-tuning product, with suite
 stage-plan metadata, original and optimized pitch-program control-point schedules, tuned point
 indices, path constraints, a Dymos-ready pitch-program transcription contract with per-stage control

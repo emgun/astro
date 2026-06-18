@@ -305,7 +305,8 @@ RocketPy multistage suite-stage composition added, and first live stage-aware Dy
 transcription added. RocketPy and Dymos/OpenMDAO optional runtime gates, smoke commands, launch
 backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured
 launch examples, configured solid RocketPy direct simulation, multistage suite stage-event/sample
-annotation around one configured RocketPy flight, stage-schedule completeness metadata, a neutral
+annotation around one configured RocketPy flight, stage-schedule completeness metadata, a RocketPy
+multistage adapter contract that records the non-native composition scope, a neutral
 `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics,
 Dymos stage-aware vertical-ascent phase transcription, Dymos suite stage-plan metadata,
 pitch-program control-point metadata, optimized pitch-program schedule metadata, tuned point
@@ -332,6 +333,9 @@ Implemented slice:
   returned `LaunchTrajectory` with reached suite stage events and sample stage names around one
   configured RocketPy flight, with metadata identifying the composition tradeoff and whether the
   RocketPy solution covered the full suite stage schedule.
+- Multistage RocketPy products include an adapter contract that records the execution scope, suite
+  stage names, schedule duration/completeness, one configured RocketPy flight, and explicit
+  `native_multistage_execution = false` status.
 - `astro optimize-launch --backend local` runs the existing pitch-program tuner through a neutral optimization entry point.
 - `astro optimize-launch --backend dymos` runs a stage-aware Dymos/OpenMDAO vertical-ascent phase
   transcription that spans the configured burn schedule, then returns the existing suite

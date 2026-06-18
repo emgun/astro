@@ -76,8 +76,9 @@ loads the optional runtime, requires explicit `rocketpy` vehicle/motor/flight co
 launch scenario, runs configured solid-rocket flights through RocketPy, preserves the
 `LaunchTrajectory` product boundary, and can annotate multistage suite scenarios with stage
 events/samples reached by a single configured RocketPy flight, including metadata for whether the
-RocketPy solution covered the full suite stage schedule. That multistage path is an adapter
-composition layer, not a validated multi-motor RocketPy staging solver. The `dymos` launch
+RocketPy solution covered the full suite stage schedule plus a multistage adapter contract that
+records the non-native composition scope. That multistage path is an adapter composition layer, not
+a validated multi-motor RocketPy staging solver. The `dymos` launch
 optimization path runs a stage-aware Dymos/OpenMDAO vertical-ascent phase transcription and returns
 the existing `LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan
 metadata, original and optimized pitch-program control-point schedules, tuned point indices, path

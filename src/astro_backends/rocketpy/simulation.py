@@ -262,6 +262,27 @@ def _stage_events(
     return events
 
 
+def _rocketpy_multistage_adapter_contract(
+    scenario: LaunchScenario,
+    *,
+    stage_schedule_complete: bool,
+    stage_schedule_duration_s: float,
+) -> dict[str, Any] | None:
+    if len(scenario.vehicle.stages) <= 1:
+        return None
+    return {
+        "execution_scope": "single_configured_rocketpy_flight_with_suite_stage_annotations",
+        "native_multistage_execution": False,
+        "suite_stage_count": len(scenario.vehicle.stages),
+        "suite_stage_names": [stage.name for stage in scenario.vehicle.stages],
+        "rocketpy_config_count": 1,
+        "annotated_stage_events": True,
+        "stage_schedule_complete": stage_schedule_complete,
+        "stage_schedule_duration_s": stage_schedule_duration_s,
+        "native_multistage_gap": "runtime has no suite-validated staged multi-motor flight API",
+    }
+
+
 def _trajectory_from_rocketpy_flight(
     scenario: LaunchScenario,
     config: LaunchRocketPyConfig,
@@ -331,6 +352,35 @@ def _trajectory_from_rocketpy_flight(
     }
     is_multistage = len(scenario.vehicle.stages) > 1
     stage_schedule_duration_s = _stage_windows(scenario)[-1][2]
+    stage_schedule_complete = sample_times_s[-1] >= stage_schedule_duration_s - 1.0e-9
+    metadata: dict[str, Any] = {
+        "model": (
+            "rocketpy_configured_multistage_composition"
+            if is_multistage
+            else "rocketpy_single_stage_solid"
+        ),
+        "integrator": "rocketpy",
+        "sample_step_s": scenario.propagation.step_s,
+        "rocketpy_solution_end_s": sample_times_s[-1],
+        "rail_length_m": config.rail_length_m,
+        "inclination_deg": config.inclination_deg,
+        "heading_deg": config.heading_deg,
+        "rocketpy_stage_count": len(scenario.vehicle.stages),
+        "rocketpy_stage_schedule_duration_s": stage_schedule_duration_s,
+        "rocketpy_stage_schedule_complete": stage_schedule_complete,
+        "rocketpy_composition": (
+            "single_flight_suite_stage_schedule"
+            if is_multistage
+            else "single_stage_direct_flight"
+        ),
+    }
+    multistage_contract = _rocketpy_multistage_adapter_contract(
+        scenario,
+        stage_schedule_complete=stage_schedule_complete,
+        stage_schedule_duration_s=stage_schedule_duration_s,
+    )
+    if multistage_contract is not None:
+        metadata["rocketpy_multistage_adapter_contract"] = multistage_contract
     return LaunchTrajectory(
         scenario_id=scenario.scenario_id,
         samples=samples,
@@ -338,29 +388,7 @@ def _trajectory_from_rocketpy_flight(
         insertion_state=insertion_state,
         target_miss=target_miss,
         backend="rocketpy_direct",
-        metadata={
-            "model": (
-                "rocketpy_configured_multistage_composition"
-                if is_multistage
-                else "rocketpy_single_stage_solid"
-            ),
-            "integrator": "rocketpy",
-            "sample_step_s": scenario.propagation.step_s,
-            "rocketpy_solution_end_s": sample_times_s[-1],
-            "rail_length_m": config.rail_length_m,
-            "inclination_deg": config.inclination_deg,
-            "heading_deg": config.heading_deg,
-            "rocketpy_stage_count": len(scenario.vehicle.stages),
-            "rocketpy_stage_schedule_duration_s": stage_schedule_duration_s,
-            "rocketpy_stage_schedule_complete": (
-                sample_times_s[-1] >= stage_schedule_duration_s - 1.0e-9
-            ),
-            "rocketpy_composition": (
-                "single_flight_suite_stage_schedule"
-                if is_multistage
-                else "single_stage_direct_flight"
-            ),
-        },
+        metadata=metadata,
     )
 
 
