@@ -21,6 +21,9 @@ Use this checklist before tagging or publishing a release candidate.
 - [ ] `astro propagate examples/scenarios/leo_variational_covariance.yaml --backend local --output /tmp/astro-variational-covariance.json`
 - [ ] `astro propagate examples/scenarios/leo_j2_variational_covariance.yaml --backend local --output /tmp/astro-j2-variational-covariance.json`
 - [ ] `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv`
+- [ ] `astro export-trajectory /tmp/astro-local-trajectory.json --format oem --output /tmp/astro-local-trajectory.oem`
+- [ ] `astro export-trajectory /tmp/astro-local-trajectory.json --format opm --output /tmp/astro-local-state.opm`
+- [ ] `astro import-trajectory examples/trajectories/leo_initial_state.opm --format opm --scenario examples/scenarios/leo_two_body.yaml --output /tmp/astro-local-state-from-opm.json`
 - [ ] `astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output /tmp/astro-velocity-aligned-burn.json`
 - [ ] `astro export-trajectory /tmp/astro-velocity-aligned-burn.json --format aem --output /tmp/astro-attitude.aem`
 - [ ] `astro import-trajectory /tmp/astro-attitude.aem --format aem --scenario examples/scenarios/leo_velocity_aligned_burn.yaml --state-trajectory /tmp/astro-velocity-aligned-burn.json --output /tmp/astro-attitude-from-aem.json`

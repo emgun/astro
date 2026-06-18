@@ -21,7 +21,11 @@ from astro_core.errors import NumericalConvergenceError, UnsupportedBackendError
 from astro_core.io import load_scenario
 from astro_core.models import CartesianState, MeasurementRecord, MeasurementType, Scenario
 from astro_dynamics.conjunction import screen_conjunction
-from astro_dynamics.ephemeris import dump_trajectory_aem, dump_trajectory_oem
+from astro_dynamics.ephemeris import (
+    dump_trajectory_aem,
+    dump_trajectory_oem,
+    dump_trajectory_opm,
+)
 from astro_dynamics.local import propagate_local
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
 from astro_launch.io import load_launch_scenario
@@ -437,6 +441,32 @@ def test_export_trajectory_command_writes_oem(tmp_path: Path) -> None:
     assert "2026-01-01T00:00:00.000000Z 7000.0 0.0 0.0 0.0 7.5 1.0" in payload
 
 
+def test_export_trajectory_command_writes_opm(tmp_path: Path) -> None:
+    trajectory_path = tmp_path / "trajectory.json"
+    output = tmp_path / "trajectory.opm"
+    _write_orbit_trajectory(trajectory_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "export-trajectory",
+            str(trajectory_path),
+            "--format",
+            "opm",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote trajectory" in result.stdout
+    payload = output.read_text(encoding="utf-8")
+    assert payload.startswith("CCSDS_OPM_VERS = 2.0")
+    assert "OBJECT_NAME = leo-two-body" in payload
+    assert "EPOCH = 2026-01-01T00:00:00.000000Z" in payload
+    assert "X = 7000.0" in payload
+
+
 def test_propagate_attitude_command_writes_json(tmp_path: Path) -> None:
     output = tmp_path / "attitude.json"
 
@@ -540,6 +570,37 @@ def test_import_trajectory_command_reads_oem_with_scenario_context(tmp_path: Pat
     assert payload["backend"] == "local"
     assert payload["metadata"]["source_format"] == "ccsds_oem_kvn"
     assert len(payload["samples"]) == 11
+
+
+def test_import_trajectory_command_reads_opm_with_scenario_context(tmp_path: Path) -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    trajectory = propagate_local(scenario)
+    opm_path = tmp_path / "trajectory.opm"
+    output = tmp_path / "trajectory.json"
+    opm_path.write_text(dump_trajectory_opm(trajectory), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "import-trajectory",
+            str(opm_path),
+            "--format",
+            "opm",
+            "--scenario",
+            "examples/scenarios/leo_two_body.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote trajectory" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "leo-two-body"
+    assert payload["backend"] == "local"
+    assert payload["metadata"]["source_format"] == "ccsds_opm_kvn"
+    assert payload["metadata"]["opm_state_units"] == "km_and_km_per_s"
+    assert len(payload["samples"]) == 1
 
 
 def test_import_trajectory_command_reads_aem_with_state_trajectory_context(

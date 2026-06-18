@@ -108,6 +108,37 @@ def dump_trajectory_oem(trajectory: Trajectory, *, originator: str = "ASTRO_SUIT
     return "\n".join(lines)
 
 
+def dump_trajectory_opm(trajectory: Trajectory, *, originator: str = "ASTRO_SUITE") -> str:
+    """Export the first trajectory sample as a CCSDS OPM KVN orbit state message."""
+    sample = trajectory.samples[0]
+    position = sample.state.position_km
+    velocity = sample.state.velocity_km_s
+    lines = [
+        "CCSDS_OPM_VERS = 2.0",
+        f"CREATION_DATE = {_format_oem_epoch(sample.epoch)}",
+        f"ORIGINATOR = {originator}",
+        f"COMMENT scenario_id = {trajectory.scenario_id}",
+        f"COMMENT backend = {trajectory.backend}",
+        "META_START",
+        f"OBJECT_NAME = {trajectory.scenario_id}",
+        f"OBJECT_ID = {trajectory.scenario_id}",
+        "CENTER_NAME = EARTH",
+        "REF_FRAME = EME2000",
+        "TIME_SYSTEM = UTC",
+        "META_STOP",
+        f"EPOCH = {_format_oem_epoch(sample.epoch)}",
+        f"X = {_format_oem_float(position[0])}",
+        f"Y = {_format_oem_float(position[1])}",
+        f"Z = {_format_oem_float(position[2])}",
+        f"X_DOT = {_format_oem_float(velocity[0])}",
+        f"Y_DOT = {_format_oem_float(velocity[1])}",
+        f"Z_DOT = {_format_oem_float(velocity[2])}",
+    ]
+    if sample.mass_kg is not None:
+        lines.append(f"MASS = {_format_oem_float(sample.mass_kg)}")
+    return "\n".join(lines)
+
+
 def dump_trajectory_aem(trajectory: Trajectory, *, originator: str = "ASTRO_SUITE") -> str:
     attitude_samples = [sample for sample in trajectory.samples if sample.attitude is not None]
     if not attitude_samples:
@@ -225,6 +256,103 @@ def load_trajectory_oem(payload: str, *, force_model: ForceModelConfig) -> Traje
             "oem_center_name": metadata["CENTER_NAME"],
             "oem_ref_frame": metadata["REF_FRAME"],
             "oem_time_system": metadata["TIME_SYSTEM"],
+            "force_model_source": "scenario",
+        },
+    )
+
+
+def load_trajectory_opm(payload: str, *, force_model: ForceModelConfig) -> Trajectory:
+    metadata: dict[str, str] = {}
+    comments: dict[str, str] = {}
+    state_values: dict[str, str] = {}
+    in_metadata = False
+
+    for raw_line in payload.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line == "META_START":
+            in_metadata = True
+            continue
+        if line == "META_STOP":
+            in_metadata = False
+            continue
+        if line.startswith("COMMENT "):
+            raw_comment = line.removeprefix("COMMENT ")
+            key, separator, value = raw_comment.partition("=")
+            if separator:
+                comments[key.strip()] = value.strip()
+            continue
+        if "=" in line:
+            key, value = _parse_kvn_assignment(line)
+            if in_metadata or key in {
+                "CCSDS_OPM_VERS",
+                "CREATION_DATE",
+                "ORIGINATOR",
+            }:
+                metadata[key] = value
+            else:
+                state_values[key] = value
+            continue
+
+        raise ValueError(f"Invalid OPM KVN line: {line}")
+
+    if metadata.get("CCSDS_OPM_VERS") != "2.0":
+        raise ValueError("OPM ingest supports CCSDS_OPM_VERS = 2.0")
+    if metadata.get("TIME_SYSTEM") != "UTC":
+        raise ValueError("OPM ingest supports only TIME_SYSTEM = UTC")
+    if metadata.get("REF_FRAME") != "EME2000":
+        raise ValueError("OPM ingest supports only REF_FRAME = EME2000")
+    if metadata.get("CENTER_NAME") != "EARTH":
+        raise ValueError("OPM ingest supports only CENTER_NAME = EARTH")
+
+    required_state_keys = {"EPOCH", "X", "Y", "Z", "X_DOT", "Y_DOT", "Z_DOT"}
+    missing_state_keys = sorted(required_state_keys - set(state_values))
+    if missing_state_keys:
+        raise ValueError("OPM ingest missing state keys: " + ", ".join(missing_state_keys))
+
+    try:
+        epoch = _parse_oem_epoch(state_values["EPOCH"])
+        position = (
+            float(state_values["X"]),
+            float(state_values["Y"]),
+            float(state_values["Z"]),
+        )
+        velocity = (
+            float(state_values["X_DOT"]),
+            float(state_values["Y_DOT"]),
+            float(state_values["Z_DOT"]),
+        )
+        mass_kg = float(state_values["MASS"]) if "MASS" in state_values else None
+    except ValueError as exc:
+        raise ValueError("Invalid numeric OPM state value") from exc
+
+    scenario_id = comments.get("scenario_id") or metadata.get("OBJECT_NAME")
+    if scenario_id is None:
+        raise ValueError("OPM ingest requires COMMENT scenario_id or OBJECT_NAME")
+
+    backend = comments.get("backend", "opm")
+    return Trajectory(
+        scenario_id=scenario_id,
+        samples=[
+            TrajectorySample(
+                epoch=epoch,
+                state=CartesianState(position_km=position, velocity_km_s=velocity),
+                mass_kg=mass_kg,
+            )
+        ],
+        force_model=force_model,
+        backend=backend,
+        metadata={
+            "source_format": "ccsds_opm_kvn",
+            "opm_version": metadata["CCSDS_OPM_VERS"],
+            "opm_originator": metadata.get("ORIGINATOR", ""),
+            "opm_object_name": metadata.get("OBJECT_NAME", ""),
+            "opm_object_id": metadata.get("OBJECT_ID", ""),
+            "opm_center_name": metadata["CENTER_NAME"],
+            "opm_ref_frame": metadata["REF_FRAME"],
+            "opm_time_system": metadata["TIME_SYSTEM"],
+            "opm_state_units": "km_and_km_per_s",
             "force_model_source": "scenario",
         },
     )

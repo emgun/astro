@@ -14,8 +14,9 @@ The current implementation slice covers:
   covariance history, plus local commanded-attitude samples for maneuvered trajectories, local
   rigid-body torque and closed-loop PD attitude-control propagation,
   finite-difference covariance propagation with optional acceleration process noise, per-sample
-  state-transition/process-noise products, CSV and CCSDS OEM ephemeris export/import, CCSDS AEM
-  attitude export, and seeded initial-state Monte Carlo propagation.
+  state-transition/process-noise products, CSV and CCSDS OEM ephemeris export/import, CCSDS OPM
+  single-state export/import, CCSDS AEM attitude export, and seeded initial-state Monte Carlo
+  propagation.
 - Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
   depletion, drag, events, and launch-to-orbit insertion handoff.
 - Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
@@ -160,8 +161,10 @@ astro compare-tudat-reference examples/scenarios/leo_two_body.yaml --reference-b
 astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output tudat_reference_campaign.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
+astro export-trajectory trajectory.json --format opm --output trajectory.opm
 astro export-trajectory attitude_trajectory.json --format aem --output attitude_trajectory.aem
 astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
+astro import-trajectory examples/trajectories/leo_initial_state.opm --format opm --scenario examples/scenarios/leo_two_body.yaml --output imported_opm_trajectory.json
 astro import-trajectory attitude_trajectory.aem --format aem --scenario examples/scenarios/leo_velocity_aligned_burn.yaml --state-trajectory attitude_state_trajectory.json --output imported_attitude_trajectory.json
 astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output conjunction_screening.json
 astro assess-conjunction conjunction_screening.json --output conjunction_assessment.json
@@ -231,12 +234,14 @@ and the backend error recorded in metadata instead of treating the fallback as a
 
 `astro export-trajectory` converts suite trajectory JSON into a CSV ephemeris table, a CCSDS OEM
 KVN text product containing UTC epochs plus Cartesian position and velocity samples in km and km/s,
-or a CCSDS AEM KVN quaternion attitude product for trajectories with commanded attitude samples.
-`astro import-trajectory --format oem` converts a CCSDS OEM KVN text product back into a suite
-`Trajectory`; it requires `--scenario` because OEM does not encode the suite force model. The
-importer is intentionally strict: UTC time system, EME2000 reference frame, and Earth center are
-required. `astro import-trajectory --format aem` attaches CCSDS AEM KVN quaternion attitude rows to
-a state-bearing suite trajectory supplied with `--state-trajectory` because AEM is attitude-only.
+an OPM KVN single-state orbit message, or a CCSDS AEM KVN quaternion attitude product for
+trajectories with commanded attitude samples. `astro import-trajectory --format oem` converts a
+CCSDS OEM KVN text product back into a suite `Trajectory`; `--format opm` imports an OPM orbit
+message as a one-sample suite `Trajectory`. Both require `--scenario` because those products do not
+encode the suite force model. The importers are intentionally strict: UTC time system, EME2000
+reference frame, and Earth center are required. `astro import-trajectory --format aem` attaches
+CCSDS AEM KVN quaternion attitude rows to a state-bearing suite trajectory supplied with
+`--state-trajectory` because AEM is attitude-only.
 It validates UTC, EME2000 frame A, quaternion attitude type, and `QC Q1 Q2 Q3` quaternion order.
 `astro monte-carlo` runs a seeded initial-state ensemble by perturbing the scenario's
 Cartesian state and propagating each case through the selected backend. This is a repeatable product

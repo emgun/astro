@@ -41,8 +41,10 @@ from astro_dynamics.ephemeris import (
     dump_trajectory_aem,
     dump_trajectory_ephemeris_csv,
     dump_trajectory_oem,
+    dump_trajectory_opm,
     load_trajectory_aem,
     load_trajectory_oem,
+    load_trajectory_opm,
 )
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
 from astro_launch.backends import propagate_launch_with_backend
@@ -461,7 +463,7 @@ def export_trajectory(
     output: Annotated[Path, typer.Option()],
     trajectory_format: Annotated[
         str,
-        typer.Option("--format", help="Output trajectory format: csv, oem, or aem."),
+        typer.Option("--format", help="Output trajectory format: csv, oem, opm, or aem."),
     ] = "csv",
 ) -> None:
     """Export a trajectory product to an ephemeris table."""
@@ -471,6 +473,8 @@ def export_trajectory(
         payload = dump_trajectory_ephemeris_csv(trajectory)
     elif normalized_format == "oem":
         payload = dump_trajectory_oem(trajectory)
+    elif normalized_format == "opm":
+        payload = dump_trajectory_opm(trajectory)
     elif normalized_format == "aem":
         try:
             payload = dump_trajectory_aem(trajectory)
@@ -492,7 +496,7 @@ def import_trajectory(
     scenario_path: Annotated[Path, typer.Option("--scenario", exists=True, readable=True)],
     trajectory_format: Annotated[
         str,
-        typer.Option("--format", help="Input trajectory format: oem or aem."),
+        typer.Option("--format", help="Input trajectory format: oem, opm, or aem."),
     ] = "oem",
     state_trajectory_path: Annotated[
         Path | None,
@@ -518,6 +522,12 @@ def import_trajectory(
             trajectory = load_trajectory_oem(payload, force_model=scenario.force_model)
         except ValueError as exc:
             typer.echo(f"invalid OEM trajectory {trajectory_path}: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+    elif normalized_format == "opm":
+        try:
+            trajectory = load_trajectory_opm(payload, force_model=scenario.force_model)
+        except ValueError as exc:
+            typer.echo(f"invalid OPM trajectory {trajectory_path}: {exc}", err=True)
             raise typer.Exit(code=2) from exc
     elif normalized_format == "aem":
         try:
