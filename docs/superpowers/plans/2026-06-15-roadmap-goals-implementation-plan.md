@@ -318,9 +318,10 @@ multistage adapter contract that records the non-native composition scope, a neu
 Dymos stage-aware vertical-ascent phase transcription, opt-in native Dymos pitch-control
 transcription, Dymos suite stage-plan metadata, pitch-program control-point metadata, optimized
 pitch-program schedule metadata, tuned point indices, a Dymos pitch-program transcription contract
-with per-stage control coverage, and Dymos adapter optimization diagnostics are implemented. Full
-native multi-motor RocketPy staging and full target-seeking multistage Dymos ascent optimization
-remain gated on deeper validated backend runners.
+with per-stage control coverage, target-insertion residual/tolerance assessment, and Dymos adapter
+optimization diagnostics are implemented. Full native multi-motor RocketPy staging and full
+target-seeking multistage Dymos ascent design optimization remain gated on deeper validated backend
+runners.
 
 Implemented slice:
 
@@ -353,9 +354,10 @@ Implemented slice:
   executed.
 - Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
   iteration count, candidate count, path-constraint summary, best score, target insertion
-  residuals, Dymos version, OpenMDAO version, phase duration, final altitude, final velocity,
-  original and optimized pitch-program control-point schedules, tuned pitch point indices, explicit
-  pitch-program optimization scope metadata, and optimizer message.
+  residuals, target-insertion tolerance assessment, Dymos version, OpenMDAO version, phase
+  duration, final altitude, final velocity, original and optimized pitch-program control-point
+  schedules, tuned pitch point indices, explicit pitch-program optimization scope metadata, and
+  optimizer message.
 - Dymos adapter results include a pitch-program transcription contract that records the pitch
   control name, bounds, optimized control points, tuned control indices, per-stage phase/control
   coverage, execution status, and transcription name so downstream launch tools can distinguish the

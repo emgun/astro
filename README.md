@@ -82,10 +82,10 @@ a validated multi-motor RocketPy staging solver. The default `dymos` launch opti
 stage-aware Dymos/OpenMDAO vertical-ascent phase transcription and returns the existing
 `LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan metadata,
 original and optimized pitch-program control-point schedules, tuned point indices, path constraints,
-and a flag showing that the Dymos phase duration covers the configured burn schedule. The opt-in
-`--dymos-mode pitch-program` path runs a native Dymos pitch-control transcription over the suite
-pitch program and marks the transcription contract as executed. Full target-seeking multistage
-Dymos ascent optimization remains future work.
+target-insertion residual/tolerance assessment, and a flag showing that the Dymos phase duration
+covers the configured burn schedule. The opt-in `--dymos-mode pitch-program` path runs a native
+Dymos pitch-control transcription over the suite pitch program and marks the transcription contract
+as executed. Full target-seeking multistage Dymos ascent design optimization remains future work.
 
 Optional research backend smoke checks:
 
@@ -330,7 +330,9 @@ pitch-program control-point metadata, the optimized pitch-program schedule, tune
 constraints, and a Dymos-ready pitch-program transcription contract with stage-phase control
 coverage. `--dymos-mode pitch-program` runs a native Dymos pitch-control transcription and maps the
 resulting control values back into the same suite product with `execution_status = "executed"`.
-The current suite still does not claim a full target-seeking multistage ascent design optimizer.
+Both paths report target-insertion residuals against scenario tolerances, per-component
+within-tolerance status, and the weighted altitude/velocity objective. The current suite still does
+not claim a full target-seeking multistage ascent design optimizer.
 
 `astro report-tuned-launch` runs the current local end-to-end launch analysis: tune two pitch knots,
 propagate the tuned ascent, hand off insertion to an orbit scenario, propagate a short orbital arc,

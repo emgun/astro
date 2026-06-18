@@ -79,6 +79,7 @@ def _with_dymos_provenance(
         scenario,
         tuned_pitch_point_indices=tuned_pitch_point_indices,
     )
+    target_assessment = _target_insertion_assessment(result, scenario)
     metadata = {
         **result.metadata,
         "adapter": "dymos",
@@ -92,6 +93,8 @@ def _with_dymos_provenance(
         "candidate_count": source_candidate_count,
         "best_score": result.best_case.score,
         "target_insertion_residuals": result.best_case.target_miss,
+        "target_insertion_assessment": target_assessment,
+        "target_insertion_satisfied": target_assessment["satisfied"],
         "stage_plan": stage_plan,
         "multistage": stage_plan["stage_count"] > 1,
         "dymos_tuned_pitch_point_indices": tuned_pitch_point_indices,
@@ -116,6 +119,44 @@ def _with_dymos_provenance(
             pitch_program_transcription_contract
         )
     return result.model_copy(update={"backend": "dymos", "metadata": metadata})
+
+
+def _target_insertion_assessment(
+    result: LaunchPitchTuningResult,
+    scenario: LaunchScenario,
+) -> dict[str, Any]:
+    altitude_miss_km = float(result.best_case.target_miss["altitude_miss_km"])
+    velocity_miss_km_s = float(result.best_case.target_miss["velocity_miss_km_s"])
+    altitude_tolerance_km = float(scenario.target_orbit.altitude_tolerance_km)
+    velocity_tolerance_km_s = float(scenario.target_orbit.velocity_tolerance_km_s)
+    altitude_satisfied = abs(altitude_miss_km) <= altitude_tolerance_km
+    velocity_satisfied = abs(velocity_miss_km_s) <= velocity_tolerance_km_s
+    return {
+        "status": "within_tolerance" if altitude_satisfied and velocity_satisfied else "miss",
+        "satisfied": altitude_satisfied and velocity_satisfied,
+        "target_altitude_km": float(scenario.target_orbit.altitude_km),
+        "target_circular_velocity_km_s": _circular_velocity_km_s(
+            scenario.target_orbit.altitude_km
+        ),
+        "tolerances": {
+            "altitude_tolerance_km": altitude_tolerance_km,
+            "velocity_tolerance_km_s": velocity_tolerance_km_s,
+        },
+        "residuals": {
+            "altitude_miss_km": altitude_miss_km,
+            "velocity_miss_km_s": velocity_miss_km_s,
+        },
+        "component_status": {
+            "altitude": "within_tolerance" if altitude_satisfied else "miss",
+            "velocity": "within_tolerance" if velocity_satisfied else "miss",
+        },
+        "score": float(result.best_case.score),
+        "score_weights": {
+            "altitude_weight": float(result.altitude_weight),
+            "velocity_weight": float(result.velocity_weight),
+        },
+        "objective": "minimize_weighted_altitude_velocity_insertion_residuals",
+    }
 
 
 def _stage_plan_metadata(scenario: LaunchScenario) -> dict[str, Any]:

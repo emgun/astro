@@ -245,6 +245,15 @@ def test_optimize_launch_dymos_returns_suite_product_with_fake_runner() -> None:
     assert result.metadata["candidate_count"] == result.metadata["source_candidate_count"]
     assert result.metadata["best_score"] == result.best_case.score
     assert result.metadata["target_insertion_residuals"] == result.best_case.target_miss
+    assessment = result.metadata["target_insertion_assessment"]
+    assert assessment["target_altitude_km"] == scenario.target_orbit.altitude_km
+    assert assessment["tolerances"] == {
+        "altitude_tolerance_km": scenario.target_orbit.altitude_tolerance_km,
+        "velocity_tolerance_km_s": scenario.target_orbit.velocity_tolerance_km_s,
+    }
+    assert assessment["residuals"] == result.best_case.target_miss
+    assert assessment["objective"] == "minimize_weighted_altitude_velocity_insertion_residuals"
+    assert result.metadata["target_insertion_satisfied"] == assessment["satisfied"]
     assert result.metadata["stage_plan"] == {
         "stage_count": 2,
         "total_burn_duration_s": 120.0,
@@ -321,6 +330,12 @@ def test_optimize_launch_dymos_runs_native_pitch_program_transcription(
     assert result.best_case.target_miss == {
         "altitude_miss_km": -5.0,
         "velocity_miss_km_s": 0.05,
+    }
+    assert result.metadata["target_insertion_satisfied"] is True
+    assert result.metadata["target_insertion_assessment"]["status"] == "within_tolerance"
+    assert result.metadata["target_insertion_assessment"]["component_status"] == {
+        "altitude": "within_tolerance",
+        "velocity": "within_tolerance",
     }
     dymos_phase = result.metadata["dymos_phase"]
     assert dymos_phase["phase_model"] == "stage_aware_pitch_program_ascent"
