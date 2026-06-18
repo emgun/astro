@@ -461,7 +461,8 @@ Implemented slice:
   transition matrix in `MonteCarloResult.metadata` using JAX autodiff.
 - `astro research-od-sensitivity --backend jax` records normalized range/range-rate, inertial
   right-ascension/declination, and local-horizon azimuth/elevation residuals plus a residual
-  Jacobian with respect to the initial Cartesian state in an `OdSensitivityResult`.
+  Jacobian, normalized-residual normal matrix, and inverse-normal covariance diagnostic with
+  respect to the initial Cartesian state in an `OdSensitivityResult`.
 - `astro research-estimate --backend jax` runs a research backtracking Gauss-Newton correction loop
   over the same normalized residual/Jacobian model and returns the suite `EstimateResult` product
   with explicit research-backend metadata, including accepted step scales for angular OD damping.
@@ -484,9 +485,10 @@ Definition of done:
   screening-only `orekit_high_fidelity`, configured degree/order high-order gravity provenance,
   drag, SRP, analytic Sun/Moon third-body, and configured third-body ephemeris sample force flags
   without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and
-  `astro research-estimate --backend jax` provide the first differentiable OD residual/Jacobian and
-  research correction-loop primitives for range/range-rate, inertial RA/Dec, and local-horizon
-  az/el sensitivity and topocentric az/el estimation. Standards-grade ephemeris services and
+  `astro research-estimate --backend jax` provide the first differentiable OD residual/Jacobian,
+  normal/covariance diagnostic, and research correction-loop primitives for range/range-rate,
+  inertial RA/Dec, and local-horizon az/el sensitivity and topocentric az/el estimation.
+  Standards-grade ephemeris services and
   operational-grade differentiable OD estimators still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.
 - Batch acceleration and Monte Carlo workflows preserve deterministic seeds and validation tolerances.

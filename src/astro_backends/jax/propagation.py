@@ -769,6 +769,20 @@ def _final_state_transition_matrix(
     return [[float(component) for component in row] for row in transition_matrix]
 
 
+def _normal_matrix_covariance(
+    jacobian: FloatArray,
+) -> tuple[FloatArray, FloatArray, str]:
+    normal_matrix = cast(FloatArray, jacobian.T @ jacobian)
+    covariance_status = "available"
+    try:
+        covariance_matrix = np.linalg.inv(normal_matrix)
+    except np.linalg.LinAlgError:
+        covariance_matrix = np.linalg.pinv(normal_matrix)
+        covariance_status = "pseudo_inverse"
+    covariance_matrix = cast(FloatArray, 0.5 * (covariance_matrix + covariance_matrix.T))
+    return normal_matrix, covariance_matrix, covariance_status
+
+
 def research_od_sensitivity_jax(
     scenario: Scenario,
     measurements: list[MeasurementRecord],
@@ -784,6 +798,7 @@ def research_od_sensitivity_jax(
         runtime,
         initial,
     )
+    normal_matrix, covariance_matrix, covariance_status = _normal_matrix_covariance(jacobian)
     metadata: dict[str, object] = {
         "adapter": "jax",
         "jax_version": runtime.jax_version,
@@ -795,6 +810,10 @@ def research_od_sensitivity_jax(
         "measurement_types": _unique_measurement_type_values(measurements),
         "residual_convention": "(predicted - observed) / sigma",
         "angle_residual_convention": "wrapped_degrees",
+        "normal_matrix_convention": "J_transpose_J_of_normalized_residuals",
+        "normal_matrix_rank": int(np.linalg.matrix_rank(normal_matrix)),
+        "covariance_status": covariance_status,
+        "covariance_convention": "inverse_normal_matrix_of_normalized_residuals",
         **_research_force_metadata(scenario),
     }
     if _uses_topocentric_angle_measurements(measurement_specs):
@@ -809,6 +828,8 @@ def research_od_sensitivity_jax(
         state_dimension=_STATE_DIMENSION,
         residuals=[float(value) for value in residuals],
         jacobian=[[float(component) for component in row] for row in jacobian],
+        normal_matrix=[[float(component) for component in row] for row in normal_matrix],
+        covariance=[[float(component) for component in row] for row in covariance_matrix],
         metadata=metadata,
     )
 
@@ -910,14 +931,7 @@ def research_estimate_jax(
     if residuals is None or jacobian is None:
         raise UnsupportedBackendError("JAX research estimator did not evaluate residuals")
 
-    normal_matrix = jacobian.T @ jacobian
-    covariance_status = "available"
-    try:
-        covariance_matrix = np.linalg.inv(normal_matrix)
-    except np.linalg.LinAlgError:
-        covariance_matrix = np.linalg.pinv(normal_matrix)
-        covariance_status = "pseudo_inverse"
-    covariance_matrix = cast(FloatArray, 0.5 * (covariance_matrix + covariance_matrix.T))
+    _normal_matrix, covariance_matrix, covariance_status = _normal_matrix_covariance(jacobian)
     rms = float(np.sqrt(np.mean(residuals * residuals)))
     estimated_cartesian = scenario.initial_state.cartesian.model_copy(
         update={

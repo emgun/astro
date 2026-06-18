@@ -152,15 +152,26 @@ def test_research_od_sensitivity_jax_returns_residual_jacobian_product() -> None
     )
 
     jacobian = np.asarray(result.jacobian)
+    normal_matrix = np.asarray(result.normal_matrix)
+    covariance = np.asarray(result.covariance)
     assert result.scenario_id == scenario.scenario_id
     assert result.backend == "jax"
     assert result.measurement_count == len(truth_measurements)
     assert result.state_dimension == 6
     assert result.metadata["sensitivity_model"] == "jax_jacfwd_od_residuals"
     assert result.metadata["measurement_types"] == ["range", "range_rate"]
+    assert result.metadata["normal_matrix_convention"] == "J_transpose_J_of_normalized_residuals"
+    assert result.metadata["covariance_convention"] == (
+        "inverse_normal_matrix_of_normalized_residuals"
+    )
     assert max(abs(value) for value in result.residuals) < 1.0e-6
     assert jacobian.shape == (len(truth_measurements), 6)
+    assert normal_matrix.shape == (6, 6)
+    assert covariance.shape == (6, 6)
     assert np.all(np.isfinite(jacobian))
+    assert np.all(np.isfinite(normal_matrix))
+    assert np.all(np.isfinite(covariance))
+    np.testing.assert_allclose(normal_matrix, jacobian.T @ jacobian)
     assert np.linalg.matrix_rank(jacobian) >= 6
 
 

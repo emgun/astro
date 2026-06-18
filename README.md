@@ -412,10 +412,11 @@ operational ephemeris-backed Orekit/Tudat semantics.
 
 `astro research-od-sensitivity --backend jax` loads an explicit measurement file and writes an
 `OdSensitivityResult` containing normalized OD residuals and the residual Jacobian with respect to
-the initial Cartesian state. This is the first differentiable OD primitive for range/range-rate,
-inertial right-ascension/declination, and local-horizon azimuth/elevation workflows; it currently
-supports two-body/J2 force models and measurement epochs aligned with propagation samples. Right
-ascension and azimuth residuals use wrapped degrees so 0/360 degree crossings stay continuous.
+the initial Cartesian state, plus the normalized-residual normal matrix and inverse-normal
+covariance diagnostic. This is the first differentiable OD primitive for range/range-rate, inertial
+right-ascension/declination, and local-horizon azimuth/elevation workflows; it currently supports
+two-body/J2 force models and measurement epochs aligned with propagation samples. Right ascension
+and azimuth residuals use wrapped degrees so 0/360 degree crossings stay continuous.
 Topocentric angular sensitivity metadata records a horizontal-norm floor because azimuth is
 geometrically undefined and elevation derivatives are singular at exact zenith/nadir passes.
 `astro research-estimate --backend jax` runs a research Gauss-Newton

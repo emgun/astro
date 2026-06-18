@@ -941,7 +941,10 @@ def test_estimate_result_rejects_numpy_array_outputs() -> None:
 
 
 def test_od_sensitivity_result_accepts_rectangular_jacobian() -> None:
-    result = make_od_sensitivity_result()
+    result = make_od_sensitivity_result(
+        normal_matrix=make_covariance(),
+        covariance=make_covariance(),
+    )
 
     assert result.scenario_id == "leo-demo"
     assert result.backend == "jax"
@@ -949,6 +952,8 @@ def test_od_sensitivity_result_accepts_rectangular_jacobian() -> None:
     assert result.state_dimension == 6
     assert len(result.jacobian) == 2
     assert all(len(row) == 6 for row in result.jacobian)
+    assert len(result.normal_matrix or []) == 6
+    assert len(result.covariance or []) == 6
 
 
 def test_od_sensitivity_result_rejects_mismatched_residual_and_jacobian_shapes() -> None:
@@ -960,6 +965,12 @@ def test_od_sensitivity_result_rejects_mismatched_residual_and_jacobian_shapes()
 
     with pytest.raises(ValidationError, match="finite"):
         make_od_sensitivity_result(residuals=[0.0, float("nan")])
+
+    with pytest.raises(ValidationError, match="normal_matrix"):
+        make_od_sensitivity_result(normal_matrix=[[1.0, 0.0], [0.0, 1.0]])
+
+    with pytest.raises(ValidationError, match="covariance"):
+        make_od_sensitivity_result(covariance=[[1.0, 0.0], [0.0, 1.0]])
 
 
 def test_spacecraft_requires_positive_mass_and_area() -> None:

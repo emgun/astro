@@ -1086,6 +1086,8 @@ class OdSensitivityResult(AstroModel):
     state_dimension: int = Field(gt=0)
     residuals: list[FiniteFloat]
     jacobian: list[list[FiniteFloat]]
+    normal_matrix: list[list[FiniteFloat]] | None = None
+    covariance: list[list[FiniteFloat]] | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("measurement_count", "state_dimension", mode="before")
@@ -1103,6 +1105,13 @@ class OdSensitivityResult(AstroModel):
     def jacobian_inputs_must_be_numeric(cls, value: Any) -> Any:
         return _numeric_matrix_input_must_be_numbers(value, "OD sensitivity Jacobian")
 
+    @field_validator("normal_matrix", "covariance", mode="before")
+    @classmethod
+    def matrix_inputs_must_be_numeric(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        return _numeric_matrix_input_must_be_numbers(value, "OD sensitivity matrix")
+
     @model_validator(mode="after")
     def validate_residual_jacobian_shape(self) -> OdSensitivityResult:
         if len(self.residuals) != self.measurement_count:
@@ -1115,6 +1124,20 @@ class OdSensitivityResult(AstroModel):
             raise ValueError("OD sensitivity residuals must be finite")
         if any(not isfinite(component) for row in self.jacobian for component in row):
             raise ValueError("OD sensitivity Jacobian values must be finite")
+        for matrix_name, matrix in (
+            ("normal_matrix", self.normal_matrix),
+            ("covariance", self.covariance),
+        ):
+            if matrix is None:
+                continue
+            if len(matrix) != self.state_dimension or any(
+                len(row) != self.state_dimension for row in matrix
+            ):
+                raise ValueError(
+                    f"OD sensitivity {matrix_name} must match state_dimension"
+                )
+            if any(not isfinite(component) for row in matrix for component in row):
+                raise ValueError(f"OD sensitivity {matrix_name} values must be finite")
         return self
 
 
