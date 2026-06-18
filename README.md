@@ -78,12 +78,14 @@ launch scenario, runs configured solid-rocket flights through RocketPy, preserve
 events/samples reached by a single configured RocketPy flight, including metadata for whether the
 RocketPy solution covered the full suite stage schedule plus a multistage adapter contract that
 records the non-native composition scope. That multistage path is an adapter composition layer, not
-a validated multi-motor RocketPy staging solver. The `dymos` launch
-optimization path runs a stage-aware Dymos/OpenMDAO vertical-ascent phase transcription and returns
-the existing `LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan
-metadata, original and optimized pitch-program control-point schedules, tuned point indices, path
-constraints, and a flag showing that the Dymos phase duration covers the configured burn schedule;
-full pitch-program multistage Dymos ascent optimization remains future work.
+a validated multi-motor RocketPy staging solver. The default `dymos` launch optimization path runs a
+stage-aware Dymos/OpenMDAO vertical-ascent phase transcription and returns the existing
+`LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan metadata,
+original and optimized pitch-program control-point schedules, tuned point indices, path constraints,
+and a flag showing that the Dymos phase duration covers the configured burn schedule. The opt-in
+`--dymos-mode pitch-program` path runs a native Dymos pitch-control transcription over the suite
+pitch program and marks the transcription contract as executed. Full target-seeking multistage
+Dymos ascent optimization remains future work.
 
 Optional research backend smoke checks:
 
@@ -309,13 +311,13 @@ a coarse-to-fine targeting analysis tool, not a production optimizer.
 
 `astro optimize-launch` is the neutral launch optimization entry point. With `--backend local`, it
 uses the current pitch-program tuner and writes the same `LaunchPitchTuningResult` product. With
-`--backend dymos`, it loads the optional Dymos/OpenMDAO runtime, runs the current stage-aware
-vertical phase, preserves the suite pitch-program tuning product, and records pitch-program
-control-point metadata, the optimized pitch-program schedule, tuned indices, path constraints, and
-a Dymos-ready pitch-program transcription contract with stage-phase control coverage. Scope metadata
-still shows the pitch tuning is suite-coupled rather than a full Dymos pitch transcription.
-The current suite still does not claim a full multistage pitch-program optimal-control solve from
-the local aggregate schema.
+`--backend dymos`, it loads the optional Dymos/OpenMDAO runtime. The default `--dymos-mode phase`
+runs the stage-aware vertical phase, preserves the suite pitch-program tuning product, and records
+pitch-program control-point metadata, the optimized pitch-program schedule, tuned indices, path
+constraints, and a Dymos-ready pitch-program transcription contract with stage-phase control
+coverage. `--dymos-mode pitch-program` runs a native Dymos pitch-control transcription and maps the
+resulting control values back into the same suite product with `execution_status = "executed"`.
+The current suite still does not claim a full target-seeking multistage ascent design optimizer.
 
 `astro report-tuned-launch` runs the current local end-to-end launch analysis: tune two pitch knots,
 propagate the tuned ascent, hand off insertion to an orbit scenario, propagate a short orbital arc,

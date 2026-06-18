@@ -7,7 +7,11 @@ from typing import Annotated
 import typer
 import yaml
 
-from astro_backends.dymos import optimize_launch_dymos, run_dymos_smoke
+from astro_backends.dymos import (
+    optimize_launch_dymos,
+    run_dymos_pitch_program_optimization,
+    run_dymos_smoke,
+)
 from astro_backends.jax import (
     research_estimate_jax,
     research_od_sensitivity_jax,
@@ -921,6 +925,13 @@ def optimize_launch(
     refinement_factor: Annotated[float, typer.Option()] = 0.5,
     altitude_weight: Annotated[float, typer.Option()] = 1.0,
     velocity_weight: Annotated[float, typer.Option()] = 1.0,
+    dymos_mode: Annotated[
+        str,
+        typer.Option(
+            "--dymos-mode",
+            help="Dymos optimization mode: phase or pitch-program.",
+        ),
+    ] = "phase",
 ) -> None:
     """Run a launch optimization workflow and write an optimization product."""
     scenario = _load_launch_scenario_or_exit(scenario_path)
@@ -936,7 +947,17 @@ def optimize_launch(
                 velocity_weight=velocity_weight,
             )
         elif backend == "dymos":
-            result = optimize_launch_dymos(scenario)
+            if dymos_mode == "phase":
+                result = optimize_launch_dymos(scenario)
+            elif dymos_mode == "pitch-program":
+                result = optimize_launch_dymos(
+                    scenario,
+                    optimizer_runner=run_dymos_pitch_program_optimization,
+                )
+            else:
+                raise UnsupportedBackendError(
+                    f"unsupported Dymos launch optimization mode: {dymos_mode}"
+                )
         else:
             raise UnsupportedBackendError(f"unsupported launch optimization backend: {backend}")
     except (ValueError, UnsupportedBackendError) as exc:

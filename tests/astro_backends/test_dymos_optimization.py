@@ -4,7 +4,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from astro_backends.dymos.optimization import DymosPhaseSummary, optimize_launch_dymos
+from astro_backends.dymos.optimization import (
+    DymosPhaseSummary,
+    DymosPitchProgramSummary,
+    optimize_launch_dymos,
+    run_dymos_pitch_program_optimization,
+)
 from astro_backends.dymos.runtime import DymosRuntime
 from astro_core.errors import UnsupportedBackendError
 from astro_launch.io import load_launch_scenario
@@ -262,6 +267,79 @@ def test_optimize_launch_dymos_returns_suite_product_with_fake_runner() -> None:
     ] == 2
 
 
+def test_optimize_launch_dymos_runs_native_pitch_program_transcription(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = make_pitch_program_launch_scenario()
+    seen_runtime: list[DymosRuntime] = []
+
+    def fake_pitch_solver(
+        candidate: LaunchScenario,
+        runtime: DymosRuntime,
+    ) -> DymosPitchProgramSummary:
+        assert candidate is scenario
+        seen_runtime.append(runtime)
+        return DymosPitchProgramSummary(
+            phase_model="stage_aware_pitch_program_ascent",
+            transcription="GaussLobatto",
+            num_segments=4,
+            order=3,
+            duration_s=120.0,
+            stage_count=2,
+            total_burn_duration_s=120.0,
+            final_altitude_km=155.0,
+            final_velocity_km_s=7.65,
+            final_radial_velocity_km_s=0.25,
+            final_horizontal_velocity_km_s=7.64,
+            final_downrange_km=480.0,
+            target_miss={
+                "altitude_miss_km": -5.0,
+                "velocity_miss_km_s": 0.05,
+            },
+            optimized_pitch_deg_by_point_index={2: 42.0, 3: 18.0},
+            optimizer_success=True,
+            optimizer_message="Optimization terminated successfully",
+        )
+
+    monkeypatch.setattr(
+        "astro_backends.dymos.optimization._solve_dymos_pitch_program_phase",
+        fake_pitch_solver,
+    )
+
+    result = optimize_launch_dymos(
+        scenario,
+        runtime_loader=_fake_runtime,
+        optimizer_runner=run_dymos_pitch_program_optimization,
+    )
+
+    assert len(seen_runtime) == 1
+    assert result.backend == "dymos"
+    assert result.metadata["source_backend"] == "dymos_pitch_program"
+    assert result.metadata["optimizer_status"] == "completed"
+    assert result.metadata["converged"] is True
+    assert result.best_case.pitch_deg_by_point_index == {"2": 42.0, "3": 18.0}
+    assert result.best_case.target_miss == {
+        "altitude_miss_km": -5.0,
+        "velocity_miss_km_s": 0.05,
+    }
+    dymos_phase = result.metadata["dymos_phase"]
+    assert dymos_phase["phase_model"] == "stage_aware_pitch_program_ascent"
+    assert dymos_phase["pitch_program_optimization_coupling"] == (
+        "native_dymos_pitch_control"
+    )
+    assert dymos_phase["pitch_program_optimization_scope"] == (
+        "native_dymos_pitch_program_transcription"
+    )
+    contract = result.metadata["dymos_pitch_program_transcription_contract"]
+    assert contract["execution_status"] == "executed"
+    assert contract["phase_coupling"] == "native_dymos_pitch_control"
+    assert contract["optimized_control_points"][2]["pitch_deg"] == 42.0
+    assert contract["optimized_control_points"][2]["source"] == "dymos_pitch_program_control"
+    assert contract["optimized_control_points"][3]["pitch_deg"] == 18.0
+    assert contract["optimized_control_points"][3]["source"] == "dymos_pitch_program_control"
+    assert result.metadata["dymos_tuned_pitch_point_indices"] == [2, 3]
+
+
 @pytest.mark.dymos_live
 def test_live_dymos_optimization_returns_suite_product() -> None:
     if os.environ.get("ASTRO_RUN_DYMOS_LIVE") != "1":
@@ -308,3 +386,38 @@ def test_live_dymos_optimization_returns_suite_product() -> None:
     assert dymos_phase["final_altitude_km"] > 0.0
     assert dymos_phase["final_velocity_km_s"] > 0.0
     assert result.best_case.score >= 0.0
+
+
+@pytest.mark.dymos_live
+def test_live_dymos_pitch_program_optimization_executes_native_transcription() -> None:
+    if os.environ.get("ASTRO_RUN_DYMOS_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_DYMOS_LIVE=1 to run live Dymos launch optimization")
+    pytest.importorskip("dymos")
+    pytest.importorskip("openmdao")
+
+    scenario = load_launch_scenario(Path("examples/launch/pitch_program_two_stage.yaml"))
+
+    result = optimize_launch_dymos(
+        scenario,
+        optimizer_runner=run_dymos_pitch_program_optimization,
+    )
+
+    assert result.backend == "dymos"
+    assert result.metadata["source_backend"] == "dymos_pitch_program"
+    assert result.metadata["converged"] is True
+    assert result.metadata["dymos_phase"]["phase_model"] == "stage_aware_pitch_program_ascent"
+    assert result.metadata["dymos_phase"]["pitch_program_optimization_coupling"] == (
+        "native_dymos_pitch_control"
+    )
+    assert result.metadata["dymos_phase"]["pitch_program_optimization_scope"] == (
+        "native_dymos_pitch_program_transcription"
+    )
+    contract = result.metadata["dymos_pitch_program_transcription_contract"]
+    assert contract["execution_status"] == "executed"
+    assert contract["phase_coupling"] == "native_dymos_pitch_control"
+    assert contract["optimized_control_points"][2]["source"] == (
+        "dymos_pitch_program_control"
+    )
+    assert contract["optimized_control_points"][3]["source"] == (
+        "dymos_pitch_program_control"
+    )
