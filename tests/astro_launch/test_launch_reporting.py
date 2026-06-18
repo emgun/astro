@@ -49,6 +49,7 @@ def test_generate_tuned_launch_report_runs_tune_launch_handoff_and_orbit_arc() -
     assert [check.name for check in report.insertion_assessment.checks] == [
         "insertion_altitude_miss",
         "insertion_velocity_miss",
+        "insertion_radial_velocity_miss",
     ]
     assert [check.name for check in report.short_arc_assessment.checks] == [
         "short_arc_final_altitude_miss",
@@ -68,6 +69,7 @@ def test_generate_tuned_launch_report_passes_with_loose_target_tolerances() -> N
         update={
             "altitude_tolerance_km": 5000.0,
             "velocity_tolerance_km_s": 20.0,
+            "radial_velocity_tolerance_km_s": 20.0,
         }
     )
     loose_scenario = scenario.model_copy(update={"target_orbit": loose_target})
@@ -116,6 +118,7 @@ def test_compare_tuned_launch_reports_summarizes_pass_and_metric_deltas() -> Non
     assert [metric.name for metric in comparison.metric_deltas] == [
         "insertion_altitude_miss",
         "insertion_velocity_miss",
+        "insertion_radial_velocity_miss",
         "short_arc_final_altitude_miss",
         "short_arc_final_velocity_miss",
     ]

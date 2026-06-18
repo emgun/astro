@@ -72,11 +72,10 @@ vertical-ascent phase transcription wrapped in the suite launch-tuning product, 
 native pitch-control transcription selected with `astro optimize-launch --backend dymos
 --dymos-mode pitch-program`. Dymos products include suite stage-plan metadata, original and
 optimized pitch-program control-point schedules, tuned point indices, path constraints, a
-pitch-program transcription contract with per-stage control coverage, target-insertion
-residual/tolerance assessment, and a coverage flag showing that the phase duration spans the
-configured burn schedule. Full target-seeking multistage Dymos optimization still requires
-additional validation before it should be promoted beyond the adapter
-gate.
+pitch-program transcription contract with per-stage control coverage, altitude, velocity, and
+radial-velocity target-insertion residual/tolerance assessment, and a coverage flag showing that the
+phase duration spans the configured burn schedule. Full target-seeking multistage Dymos optimization
+still requires additional validation before it should be promoted beyond the adapter gate.
 
 ## Research Backends
 

@@ -873,6 +873,7 @@ def sweep_launch_pitch(
     ] = "10,20,30",
     altitude_weight: Annotated[float, typer.Option()] = 1.0,
     velocity_weight: Annotated[float, typer.Option()] = 1.0,
+    radial_velocity_weight: Annotated[float, typer.Option()] = 1.0,
 ) -> None:
     """Sweep one launch pitch-program knot and write a targeting product."""
     scenario = _load_launch_scenario_or_exit(scenario_path)
@@ -884,6 +885,7 @@ def sweep_launch_pitch(
             pitch_values_deg=pitch_values,
             altitude_weight=altitude_weight,
             velocity_weight=velocity_weight,
+            radial_velocity_weight=radial_velocity_weight,
         )
     except ValueError as exc:
         typer.echo(f"could not sweep launch pitch: {exc}", err=True)
@@ -909,6 +911,7 @@ def tune_launch_pitch(
     refinement_factor: Annotated[float, typer.Option()] = 0.5,
     altitude_weight: Annotated[float, typer.Option()] = 1.0,
     velocity_weight: Annotated[float, typer.Option()] = 1.0,
+    radial_velocity_weight: Annotated[float, typer.Option()] = 1.0,
     tuned_scenario_output: Annotated[Path | None, typer.Option()] = None,
 ) -> None:
     """Tune two launch pitch-program knots and optionally write the tuned scenario."""
@@ -923,6 +926,7 @@ def tune_launch_pitch(
             refinement_factor=refinement_factor,
             altitude_weight=altitude_weight,
             velocity_weight=velocity_weight,
+            radial_velocity_weight=radial_velocity_weight,
         )
     except ValueError as exc:
         typer.echo(f"could not tune launch pitch: {exc}", err=True)
@@ -960,6 +964,7 @@ def optimize_launch(
     refinement_factor: Annotated[float, typer.Option()] = 0.5,
     altitude_weight: Annotated[float, typer.Option()] = 1.0,
     velocity_weight: Annotated[float, typer.Option()] = 1.0,
+    radial_velocity_weight: Annotated[float, typer.Option()] = 1.0,
     dymos_mode: Annotated[
         str,
         typer.Option(
@@ -980,6 +985,7 @@ def optimize_launch(
                 refinement_factor=refinement_factor,
                 altitude_weight=altitude_weight,
                 velocity_weight=velocity_weight,
+                radial_velocity_weight=radial_velocity_weight,
             )
         elif backend == "dymos":
             if dymos_mode == "phase":
@@ -1019,6 +1025,7 @@ def report_tuned_launch(
     refinement_factor: Annotated[float, typer.Option()] = 0.5,
     altitude_weight: Annotated[float, typer.Option()] = 1.0,
     velocity_weight: Annotated[float, typer.Option()] = 1.0,
+    radial_velocity_weight: Annotated[float, typer.Option()] = 1.0,
     orbit_duration_s: Annotated[float, typer.Option()] = 600.0,
     orbit_step_s: Annotated[float, typer.Option()] = 60.0,
     spacecraft_name: Annotated[str, typer.Option()] = "launch-payload",
@@ -1046,6 +1053,7 @@ def report_tuned_launch(
             refinement_factor=refinement_factor,
             altitude_weight=altitude_weight,
             velocity_weight=velocity_weight,
+            radial_velocity_weight=radial_velocity_weight,
             orbit_duration_s=orbit_duration_s,
             orbit_step_s=orbit_step_s,
             spacecraft_name=spacecraft_name,
@@ -1085,6 +1093,7 @@ def batch_report_tuned_launch(
     refinement_factor: Annotated[float, typer.Option()] = 0.5,
     altitude_weight: Annotated[float, typer.Option()] = 1.0,
     velocity_weight: Annotated[float, typer.Option()] = 1.0,
+    radial_velocity_weight: Annotated[float, typer.Option()] = 1.0,
     orbit_duration_s: Annotated[float, typer.Option()] = 600.0,
     orbit_step_s: Annotated[float, typer.Option()] = 60.0,
     spacecraft_name: Annotated[str, typer.Option()] = "launch-payload",
@@ -1113,6 +1122,7 @@ def batch_report_tuned_launch(
             refinement_factor=refinement_factor,
             altitude_weight=altitude_weight,
             velocity_weight=velocity_weight,
+            radial_velocity_weight=radial_velocity_weight,
             orbit_duration_s=orbit_duration_s,
             orbit_step_s=orbit_step_s,
             spacecraft_name=spacecraft_name,

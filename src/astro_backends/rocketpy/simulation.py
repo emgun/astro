@@ -349,6 +349,7 @@ def _trajectory_from_rocketpy_flight(
         "altitude_miss_km": insertion_sample.altitude_km - scenario.target_orbit.altitude_km,
         "velocity_miss_km_s": insertion_sample.velocity_km_s
         - _circular_velocity_km_s(scenario.target_orbit.altitude_km),
+        "radial_velocity_miss_km_s": insertion_sample.radial_velocity_km_s,
     }
     is_multistage = len(scenario.vehicle.stages) > 1
     stage_schedule_duration_s = _stage_windows(scenario)[-1][2]

@@ -1368,6 +1368,7 @@ def test_report_tuned_launch_command_writes_json(tmp_path: Path) -> None:
     assert [check["name"] for check in payload["insertion_assessment"]["checks"]] == [
         "insertion_altitude_miss",
         "insertion_velocity_miss",
+        "insertion_radial_velocity_miss",
     ]
     assert [check["name"] for check in payload["short_arc_assessment"]["checks"]] == [
         "short_arc_final_altitude_miss",
@@ -1445,6 +1446,7 @@ def test_compare_tuned_launch_reports_command_writes_json(tmp_path: Path) -> Non
     assert [metric["name"] for metric in payload["metric_deltas"]] == [
         "insertion_altitude_miss",
         "insertion_velocity_miss",
+        "insertion_radial_velocity_miss",
         "short_arc_final_altitude_miss",
         "short_arc_final_velocity_miss",
     ]

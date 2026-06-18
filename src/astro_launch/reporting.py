@@ -56,6 +56,10 @@ def _insertion_metrics(
         horizontal_velocity_km_s=insertion_sample.horizontal_velocity_km_s,
         altitude_miss_km=trajectory.target_miss["altitude_miss_km"],
         velocity_miss_km_s=trajectory.target_miss["velocity_miss_km_s"],
+        radial_velocity_miss_km_s=trajectory.target_miss.get(
+            "radial_velocity_miss_km_s",
+            insertion_sample.radial_velocity_km_s,
+        ),
     )
 
 
@@ -135,6 +139,12 @@ def _insertion_assessment(
                 tolerance=scenario.target_orbit.velocity_tolerance_km_s,
                 units="km/s",
             ),
+            _check_against_tolerance(
+                name="insertion_radial_velocity_miss",
+                value=metrics.radial_velocity_miss_km_s,
+                tolerance=scenario.target_orbit.radial_velocity_tolerance_km_s,
+                units="km/s",
+            ),
         ]
     )
 
@@ -202,6 +212,12 @@ def compare_tuned_launch_reports(
             units="km/s",
         ),
         _metric_delta(
+            name="insertion_radial_velocity_miss",
+            baseline_value=baseline.insertion_metrics.radial_velocity_miss_km_s,
+            candidate_value=candidate.insertion_metrics.radial_velocity_miss_km_s,
+            units="km/s",
+        ),
+        _metric_delta(
             name="short_arc_final_altitude_miss",
             baseline_value=baseline.short_arc_metrics.final_altitude_miss_km,
             candidate_value=candidate.short_arc_metrics.final_altitude_miss_km,
@@ -258,6 +274,7 @@ def generate_tuned_launch_report_batch(
     refinement_factor: float = 0.5,
     altitude_weight: float = 1.0,
     velocity_weight: float = 1.0,
+    radial_velocity_weight: float = 1.0,
     orbit_duration_s: float = 600.0,
     orbit_step_s: float = 60.0,
     spacecraft_name: str = "launch-payload",
@@ -279,6 +296,7 @@ def generate_tuned_launch_report_batch(
             refinement_factor=refinement_factor,
             altitude_weight=altitude_weight,
             velocity_weight=velocity_weight,
+            radial_velocity_weight=radial_velocity_weight,
             orbit_duration_s=orbit_duration_s,
             orbit_step_s=orbit_step_s,
             spacecraft_name=spacecraft_name,
@@ -343,6 +361,7 @@ def generate_tuned_launch_report(
     refinement_factor: float = 0.5,
     altitude_weight: float = 1.0,
     velocity_weight: float = 1.0,
+    radial_velocity_weight: float = 1.0,
     orbit_duration_s: float = 600.0,
     orbit_step_s: float = 60.0,
     spacecraft_name: str = "launch-payload",
@@ -361,6 +380,7 @@ def generate_tuned_launch_report(
         refinement_factor=refinement_factor,
         altitude_weight=altitude_weight,
         velocity_weight=velocity_weight,
+        radial_velocity_weight=radial_velocity_weight,
     )
     launch_trajectory = propagate_launch_local(tuning_result.tuned_scenario)
     orbit_scenario = launch_trajectory_to_orbit_scenario(

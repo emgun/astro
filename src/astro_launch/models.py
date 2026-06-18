@@ -164,12 +164,14 @@ class TargetOrbit(AstroModel):
     inclination_deg: FiniteFloat = Field(ge=0.0, le=180.0)
     altitude_tolerance_km: FiniteFloat = Field(gt=0.0, default=10.0)
     velocity_tolerance_km_s: FiniteFloat = Field(gt=0.0, default=0.1)
+    radial_velocity_tolerance_km_s: FiniteFloat = Field(gt=0.0, default=0.1)
 
     @field_validator(
         "altitude_km",
         "inclination_deg",
         "altitude_tolerance_km",
         "velocity_tolerance_km_s",
+        "radial_velocity_tolerance_km_s",
         mode="before",
     )
     @classmethod
@@ -477,6 +479,7 @@ class LaunchPitchSweepCase(AstroModel):
     score: FiniteFloat = Field(ge=0.0)
     altitude_miss_km: FiniteFloat
     velocity_miss_km_s: FiniteFloat
+    radial_velocity_miss_km_s: FiniteFloat = 0.0
     final_altitude_km: FiniteFloat
     final_velocity_km_s: FiniteFloat
     final_radial_velocity_km_s: FiniteFloat
@@ -489,6 +492,7 @@ class LaunchPitchSweepCase(AstroModel):
         "score",
         "altitude_miss_km",
         "velocity_miss_km_s",
+        "radial_velocity_miss_km_s",
         "final_altitude_km",
         "final_velocity_km_s",
         "final_radial_velocity_km_s",
@@ -508,6 +512,7 @@ class LaunchPitchSweepResult(AstroModel):
     baseline_pitch_deg: FiniteFloat = Field(ge=0.0, le=90.0)
     altitude_weight: FiniteFloat = Field(ge=0.0)
     velocity_weight: FiniteFloat = Field(ge=0.0)
+    radial_velocity_weight: FiniteFloat = Field(ge=0.0, default=1.0)
     cases: list[LaunchPitchSweepCase] = Field(min_length=1)
     best_case: LaunchPitchSweepCase
     backend: str = Field(min_length=1)
@@ -518,6 +523,7 @@ class LaunchPitchSweepResult(AstroModel):
         "baseline_pitch_deg",
         "altitude_weight",
         "velocity_weight",
+        "radial_velocity_weight",
         mode="before",
     )
     @classmethod
@@ -548,6 +554,7 @@ class LaunchPitchTuningCase(AstroModel):
     score: FiniteFloat = Field(ge=0.0)
     altitude_miss_km: FiniteFloat
     velocity_miss_km_s: FiniteFloat
+    radial_velocity_miss_km_s: FiniteFloat = 0.0
     final_altitude_km: FiniteFloat
     final_velocity_km_s: FiniteFloat
     final_radial_velocity_km_s: FiniteFloat
@@ -559,6 +566,7 @@ class LaunchPitchTuningCase(AstroModel):
         "score",
         "altitude_miss_km",
         "velocity_miss_km_s",
+        "radial_velocity_miss_km_s",
         "final_altitude_km",
         "final_velocity_km_s",
         "final_radial_velocity_km_s",
@@ -591,6 +599,7 @@ class LaunchPitchTuningResult(AstroModel):
     refinement_factor: FiniteFloat = Field(gt=0.0, lt=1.0)
     altitude_weight: FiniteFloat = Field(ge=0.0)
     velocity_weight: FiniteFloat = Field(ge=0.0)
+    radial_velocity_weight: FiniteFloat = Field(ge=0.0, default=1.0)
     iterations: list[LaunchPitchTuningIteration] = Field(min_length=1)
     best_case: LaunchPitchTuningCase
     tuned_scenario: LaunchScenario
@@ -602,6 +611,7 @@ class LaunchPitchTuningResult(AstroModel):
         "refinement_factor",
         "altitude_weight",
         "velocity_weight",
+        "radial_velocity_weight",
         mode="before",
     )
     @classmethod
@@ -618,6 +628,7 @@ class LaunchReportInsertionMetrics(AstroModel):
     horizontal_velocity_km_s: FiniteFloat
     altitude_miss_km: FiniteFloat
     velocity_miss_km_s: FiniteFloat
+    radial_velocity_miss_km_s: FiniteFloat
 
     @field_validator(
         "target_altitude_km",
@@ -628,6 +639,7 @@ class LaunchReportInsertionMetrics(AstroModel):
         "horizontal_velocity_km_s",
         "altitude_miss_km",
         "velocity_miss_km_s",
+        "radial_velocity_miss_km_s",
         mode="before",
     )
     @classmethod

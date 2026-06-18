@@ -21,6 +21,9 @@ def test_propagate_launch_local_returns_events_samples_and_insertion_state() -> 
     assert trajectory.insertion_state.cartesian.position_km[0] > R_EARTH_KM
     assert trajectory.target_miss["altitude_miss_km"] != 0.0
     assert "velocity_miss_km_s" in trajectory.target_miss
+    assert trajectory.target_miss["radial_velocity_miss_km_s"] == (
+        trajectory.samples[-1].radial_velocity_km_s
+    )
     assert all(sample.downrange_km == 0.0 for sample in trajectory.samples)
     assert all(sample.horizontal_velocity_km_s == 0.0 for sample in trajectory.samples)
 

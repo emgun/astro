@@ -24,6 +24,7 @@ class _TargetingMetrics:
     score: float
     altitude_miss_km: float
     velocity_miss_km_s: float
+    radial_velocity_miss_km_s: float
     final_altitude_km: float
     final_velocity_km_s: float
     final_radial_velocity_km_s: float
@@ -104,20 +105,27 @@ def _launch_targeting_metrics(
     *,
     altitude_weight: float,
     velocity_weight: float,
+    radial_velocity_weight: float,
 ) -> _TargetingMetrics:
     trajectory = propagate_launch_local(scenario)
     final_sample = trajectory.samples[-1]
     target_miss = {key: float(value) for key, value in trajectory.target_miss.items()}
     altitude_miss_km = target_miss["altitude_miss_km"]
     velocity_miss_km_s = target_miss["velocity_miss_km_s"]
+    radial_velocity_miss_km_s = target_miss.get(
+        "radial_velocity_miss_km_s",
+        final_sample.radial_velocity_km_s,
+    )
     score = (
         abs(altitude_miss_km) * altitude_weight
         + abs(velocity_miss_km_s) * velocity_weight
+        + abs(radial_velocity_miss_km_s) * radial_velocity_weight
     )
     return _TargetingMetrics(
         score=score,
         altitude_miss_km=altitude_miss_km,
         velocity_miss_km_s=velocity_miss_km_s,
+        radial_velocity_miss_km_s=radial_velocity_miss_km_s,
         final_altitude_km=final_sample.altitude_km,
         final_velocity_km_s=final_sample.velocity_km_s,
         final_radial_velocity_km_s=final_sample.radial_velocity_km_s,
@@ -137,6 +145,7 @@ def _sweep_case_from_metrics(
         score=metrics.score,
         altitude_miss_km=metrics.altitude_miss_km,
         velocity_miss_km_s=metrics.velocity_miss_km_s,
+        radial_velocity_miss_km_s=metrics.radial_velocity_miss_km_s,
         final_altitude_km=metrics.final_altitude_km,
         final_velocity_km_s=metrics.final_velocity_km_s,
         final_radial_velocity_km_s=metrics.final_radial_velocity_km_s,
@@ -161,6 +170,7 @@ def _tuning_case_from_metrics(
         score=metrics.score,
         altitude_miss_km=metrics.altitude_miss_km,
         velocity_miss_km_s=metrics.velocity_miss_km_s,
+        radial_velocity_miss_km_s=metrics.radial_velocity_miss_km_s,
         final_altitude_km=metrics.final_altitude_km,
         final_velocity_km_s=metrics.final_velocity_km_s,
         final_radial_velocity_km_s=metrics.final_radial_velocity_km_s,
@@ -170,12 +180,28 @@ def _tuning_case_from_metrics(
     )
 
 
-def _validate_score_weights(altitude_weight: float, velocity_weight: float) -> tuple[float, float]:
+def _score_description() -> str:
+    return (
+        "abs(altitude_miss_km) * altitude_weight + "
+        "abs(velocity_miss_km_s) * velocity_weight + "
+        "abs(radial_velocity_miss_km_s) * radial_velocity_weight"
+    )
+
+
+def _validate_targeting_weights(
+    altitude_weight: float,
+    velocity_weight: float,
+    radial_velocity_weight: float,
+) -> tuple[float, float, float]:
     altitude_weight = _validated_weight(altitude_weight, "altitude_weight")
     velocity_weight = _validated_weight(velocity_weight, "velocity_weight")
-    if altitude_weight == 0.0 and velocity_weight == 0.0:
-        raise ValueError("at least one sweep score weight must be greater than zero")
-    return altitude_weight, velocity_weight
+    radial_velocity_weight = _validated_weight(
+        radial_velocity_weight,
+        "radial_velocity_weight",
+    )
+    if altitude_weight == 0.0 and velocity_weight == 0.0 and radial_velocity_weight == 0.0:
+        raise ValueError("at least one targeting score weight must be greater than zero")
+    return altitude_weight, velocity_weight, radial_velocity_weight
 
 
 def sweep_pitch_program(
@@ -185,13 +211,15 @@ def sweep_pitch_program(
     pitch_values_deg: Sequence[float],
     altitude_weight: float = 1.0,
     velocity_weight: float = 1.0,
+    radial_velocity_weight: float = 1.0,
 ) -> LaunchPitchSweepResult:
     """Sweep one pitch-program point and score final target miss."""
     pitch_program = _validated_pitch_program(scenario, point_index)
     pitch_values = _validated_pitch_values(pitch_values_deg)
-    altitude_weight, velocity_weight = _validate_score_weights(
+    altitude_weight, velocity_weight, radial_velocity_weight = _validate_targeting_weights(
         altitude_weight,
         velocity_weight,
+        radial_velocity_weight,
     )
 
     cases: list[LaunchPitchSweepCase] = []
@@ -206,6 +234,7 @@ def sweep_pitch_program(
             swept_scenario,
             altitude_weight=altitude_weight,
             velocity_weight=velocity_weight,
+            radial_velocity_weight=radial_velocity_weight,
         )
         cases.append(_sweep_case_from_metrics(pitch_deg=pitch_deg, metrics=metrics))
 
@@ -218,13 +247,13 @@ def sweep_pitch_program(
         baseline_pitch_deg=baseline_point.pitch_deg,
         altitude_weight=altitude_weight,
         velocity_weight=velocity_weight,
+        radial_velocity_weight=radial_velocity_weight,
         cases=cases,
         best_case=best_case,
         backend="local",
         metadata={
             "workflow": "pitch_program_sweep",
-            "score": "abs(altitude_miss_km) * altitude_weight + "
-            "abs(velocity_miss_km_s) * velocity_weight",
+            "score": _score_description(),
             "candidate_count": len(cases),
             "guidance_mode": scenario.guidance.mode,
         },
@@ -320,15 +349,17 @@ def tune_pitch_program(
     refinement_factor: float = 0.5,
     altitude_weight: float = 1.0,
     velocity_weight: float = 1.0,
+    radial_velocity_weight: float = 1.0,
 ) -> LaunchPitchTuningResult:
     """Coarse-to-fine tune two pitch-program points with a deterministic grid search."""
     pitch_program, point_indices = _validated_tuning_pitch_program(scenario, point_indices)
     initial_span_deg = _validated_positive_float(initial_span_deg, "initial_span_deg")
     iterations = _validated_iterations(iterations)
     refinement_factor = _validated_refinement_factor(refinement_factor)
-    altitude_weight, velocity_weight = _validate_score_weights(
+    altitude_weight, velocity_weight, radial_velocity_weight = _validate_targeting_weights(
         altitude_weight,
         velocity_weight,
+        radial_velocity_weight,
     )
 
     center_pitch_deg_by_point_index = {
@@ -356,6 +387,7 @@ def tune_pitch_program(
                 candidate_scenario,
                 altitude_weight=altitude_weight,
                 velocity_weight=velocity_weight,
+                radial_velocity_weight=radial_velocity_weight,
             )
             cases.append(
                 _tuning_case_from_metrics(
@@ -403,14 +435,14 @@ def tune_pitch_program(
         refinement_factor=refinement_factor,
         altitude_weight=altitude_weight,
         velocity_weight=velocity_weight,
+        radial_velocity_weight=radial_velocity_weight,
         iterations=tuning_iterations,
         best_case=best_case,
         tuned_scenario=tuned_scenario,
         backend="local",
         metadata={
             "workflow": "pitch_program_tuning",
-            "score": "abs(altitude_miss_km) * altitude_weight + "
-            "abs(velocity_miss_km_s) * velocity_weight",
+            "score": _score_description(),
             "candidate_count": candidate_count,
             "grid": "coarse_to_fine_3x3",
             "guidance_mode": scenario.guidance.mode,

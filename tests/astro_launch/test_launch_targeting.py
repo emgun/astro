@@ -25,6 +25,17 @@ def test_sweep_pitch_program_varies_one_knot_without_mutating_scenario() -> None
     assert all(case.final_downrange_km > 0.0 for case in result.cases)
     assert all("altitude_miss_km" in case.target_miss for case in result.cases)
     assert all("velocity_miss_km_s" in case.target_miss for case in result.cases)
+    assert result.radial_velocity_weight == 1.0
+    assert all("radial_velocity_miss_km_s" in case.target_miss for case in result.cases)
+    assert all(
+        case.radial_velocity_miss_km_s == case.target_miss["radial_velocity_miss_km_s"]
+        for case in result.cases
+    )
+    assert result.metadata["score"] == (
+        "abs(altitude_miss_km) * altitude_weight + "
+        "abs(velocity_miss_km_s) * velocity_weight + "
+        "abs(radial_velocity_miss_km_s) * radial_velocity_weight"
+    )
 
 
 @pytest.mark.parametrize(
@@ -127,6 +138,16 @@ def test_tune_pitch_program_refines_two_knots_and_returns_tuned_scenario() -> No
             {"point_indices": (2, 3), "refinement_factor": 1.0},
             "refinement_factor",
         ),
+        (
+            make_pitch_program_launch_scenario(),
+            {
+                "point_indices": (2, 3),
+                "altitude_weight": 0.0,
+                "velocity_weight": 0.0,
+                "radial_velocity_weight": 0.0,
+            },
+            "at least one targeting score weight",
+        ),
     ],
 )
 def test_tune_pitch_program_rejects_invalid_inputs(
@@ -136,3 +157,24 @@ def test_tune_pitch_program_rejects_invalid_inputs(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         tune_pitch_program(scenario, **kwargs)
+
+
+def test_tune_pitch_program_can_score_only_radial_velocity() -> None:
+    scenario = make_pitch_program_launch_scenario()
+
+    result = tune_pitch_program(
+        scenario,
+        point_indices=(2, 3),
+        iterations=1,
+        altitude_weight=0.0,
+        velocity_weight=0.0,
+        radial_velocity_weight=2.0,
+    )
+
+    assert result.altitude_weight == 0.0
+    assert result.velocity_weight == 0.0
+    assert result.radial_velocity_weight == 2.0
+    assert result.best_case.score == abs(result.best_case.radial_velocity_miss_km_s) * 2.0
+    assert result.best_case.target_miss["radial_velocity_miss_km_s"] == (
+        result.best_case.radial_velocity_miss_km_s
+    )

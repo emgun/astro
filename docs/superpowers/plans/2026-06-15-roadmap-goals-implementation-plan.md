@@ -321,10 +321,10 @@ multistage adapter contract that records the non-native composition scope, a neu
 Dymos stage-aware vertical-ascent phase transcription, opt-in native Dymos pitch-control
 transcription, Dymos suite stage-plan metadata, pitch-program control-point metadata, optimized
 pitch-program schedule metadata, tuned point indices, a Dymos pitch-program transcription contract
-with per-stage control coverage, target-insertion residual/tolerance assessment, and Dymos adapter
-optimization diagnostics are implemented. Full native multi-motor RocketPy staging and full
-target-seeking multistage Dymos ascent design optimization remain gated on deeper validated backend
-runners.
+with per-stage control coverage, altitude, velocity, and radial-velocity target-insertion
+residual/tolerance assessment, and Dymos adapter optimization diagnostics are implemented. Full
+native multi-motor RocketPy staging and full target-seeking multistage Dymos ascent design
+optimization remain gated on deeper validated backend runners.
 
 Implemented slice:
 
@@ -357,7 +357,8 @@ Implemented slice:
   executed.
 - Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
   iteration count, candidate count, path-constraint summary, best score, target insertion
-  residuals, target-insertion tolerance assessment, Dymos version, OpenMDAO version, phase
+  residuals for altitude, velocity, and radial velocity, target-insertion tolerance assessment,
+  Dymos version, OpenMDAO version, phase
   duration, final altitude, final velocity, original and optimized pitch-program control-point
   schedules, tuned pitch point indices, explicit pitch-program optimization scope metadata, and
   optimizer message.
@@ -380,7 +381,7 @@ Definition of done:
   native Dymos pitch-control transcription.
 - Dymos/OpenMDAO adapter reports path constraints, pitch-program control points, tuned pitch point
   indices, optimized pitch-program control points, optimizer status, convergence diagnostics, and
-  target insertion residuals.
+  altitude, velocity, and radial-velocity target insertion residuals.
 - Dymos/OpenMDAO adapter reports the suite multistage plan and configured-burn coverage without
   claiming the current simplified phase models are a full target-seeking multistage ascent design
   optimizer.

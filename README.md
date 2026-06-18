@@ -83,8 +83,9 @@ a validated multi-motor RocketPy staging solver. The default `dymos` launch opti
 stage-aware Dymos/OpenMDAO vertical-ascent phase transcription and returns the existing
 `LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan metadata,
 original and optimized pitch-program control-point schedules, tuned point indices, path constraints,
-target-insertion residual/tolerance assessment, and a flag showing that the Dymos phase duration
-covers the configured burn schedule. The opt-in `--dymos-mode pitch-program` path runs a native
+altitude, velocity, and radial-velocity target-insertion residual/tolerance assessment, and a flag
+showing that the Dymos phase duration covers the configured burn schedule. The opt-in
+`--dymos-mode pitch-program` path runs a native
 Dymos pitch-control transcription over the suite pitch program and marks the transcription contract
 as executed. Full target-seeking multistage Dymos ascent design optimization remains future work.
 
@@ -320,9 +321,9 @@ baseline, not a production launch simulator.
 
 `astro sweep-launch-pitch` is the first launch targeting workflow. It varies one pitch-program knot,
 runs the local launch propagator for each candidate pitch angle, and writes a JSON product with
-altitude miss, velocity miss, weighted score, final downrange, and the best case. It is a transparent
-grid sweep rather than an optimizer; that keeps the target-miss contract clear before adding Dymos,
-OpenMDAO, or RocketPy-backed targeting.
+altitude miss, velocity miss, radial-velocity miss, weighted score, final downrange, and the best
+case. It is a transparent grid sweep rather than an optimizer; that keeps the target-miss contract
+clear before adding Dymos, OpenMDAO, or RocketPy-backed targeting.
 
 `astro tune-launch-pitch` is the first multi-knot targeting workflow. It varies two pitch-program
 knots on a deterministic 3x3 grid, shrinks the search span each iteration, writes a JSON trace of
@@ -338,14 +339,14 @@ constraints, and a Dymos-ready pitch-program transcription contract with stage-p
 coverage. `--dymos-mode pitch-program` runs a native Dymos pitch-control transcription and maps the
 resulting control values back into the same suite product with `execution_status = "executed"`.
 Both paths report target-insertion residuals against scenario tolerances, per-component
-within-tolerance status, and the weighted altitude/velocity objective. The current suite still does
-not claim a full target-seeking multistage ascent design optimizer.
+within-tolerance status, and the weighted altitude/velocity/radial-velocity objective. The current
+suite still does not claim a full target-seeking multistage ascent design optimizer.
 
 `astro report-tuned-launch` runs the current local end-to-end launch analysis: tune two pitch knots,
 propagate the tuned ascent, hand off insertion to an orbit scenario, propagate a short orbital arc,
 and write one JSON product with the component products plus insertion and short-arc target metrics.
-The report also includes pass/fail assessment gates using the target orbit's configured altitude
-and velocity tolerances, with named checks for insertion and short-arc misses.
+The report also includes pass/fail assessment gates using the target orbit's configured altitude,
+velocity, and radial-velocity tolerances, with named checks for insertion and short-arc misses.
 It is a deterministic report over local baselines, not a substitute for high-fidelity ascent design.
 
 `astro batch-report-tuned-launch` runs the tuned launch report workflow for multiple iteration

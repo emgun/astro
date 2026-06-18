@@ -127,13 +127,29 @@ def _target_insertion_assessment(
 ) -> dict[str, Any]:
     altitude_miss_km = float(result.best_case.target_miss["altitude_miss_km"])
     velocity_miss_km_s = float(result.best_case.target_miss["velocity_miss_km_s"])
+    radial_velocity_miss_km_s = float(
+        result.best_case.target_miss.get(
+            "radial_velocity_miss_km_s",
+            result.best_case.final_radial_velocity_km_s,
+        )
+    )
     altitude_tolerance_km = float(scenario.target_orbit.altitude_tolerance_km)
     velocity_tolerance_km_s = float(scenario.target_orbit.velocity_tolerance_km_s)
+    radial_velocity_tolerance_km_s = float(
+        scenario.target_orbit.radial_velocity_tolerance_km_s
+    )
     altitude_satisfied = abs(altitude_miss_km) <= altitude_tolerance_km
     velocity_satisfied = abs(velocity_miss_km_s) <= velocity_tolerance_km_s
+    radial_velocity_satisfied = (
+        abs(radial_velocity_miss_km_s) <= radial_velocity_tolerance_km_s
+    )
     return {
-        "status": "within_tolerance" if altitude_satisfied and velocity_satisfied else "miss",
-        "satisfied": altitude_satisfied and velocity_satisfied,
+        "status": (
+            "within_tolerance"
+            if altitude_satisfied and velocity_satisfied and radial_velocity_satisfied
+            else "miss"
+        ),
+        "satisfied": altitude_satisfied and velocity_satisfied and radial_velocity_satisfied,
         "target_altitude_km": float(scenario.target_orbit.altitude_km),
         "target_circular_velocity_km_s": _circular_velocity_km_s(
             scenario.target_orbit.altitude_km
@@ -141,21 +157,27 @@ def _target_insertion_assessment(
         "tolerances": {
             "altitude_tolerance_km": altitude_tolerance_km,
             "velocity_tolerance_km_s": velocity_tolerance_km_s,
+            "radial_velocity_tolerance_km_s": radial_velocity_tolerance_km_s,
         },
         "residuals": {
             "altitude_miss_km": altitude_miss_km,
             "velocity_miss_km_s": velocity_miss_km_s,
+            "radial_velocity_miss_km_s": radial_velocity_miss_km_s,
         },
         "component_status": {
             "altitude": "within_tolerance" if altitude_satisfied else "miss",
             "velocity": "within_tolerance" if velocity_satisfied else "miss",
+            "radial_velocity": (
+                "within_tolerance" if radial_velocity_satisfied else "miss"
+            ),
         },
         "score": float(result.best_case.score),
         "score_weights": {
             "altitude_weight": float(result.altitude_weight),
             "velocity_weight": float(result.velocity_weight),
+            "radial_velocity_weight": float(result.radial_velocity_weight),
         },
-        "objective": "minimize_weighted_altitude_velocity_insertion_residuals",
+        "objective": "minimize_weighted_altitude_velocity_radial_insertion_residuals",
     }
 
 
@@ -635,21 +657,34 @@ def _pitch_program_summary_to_tuning_result(
     ]
     altitude_miss_km = float(summary.target_miss["altitude_miss_km"])
     velocity_miss_km_s = float(summary.target_miss["velocity_miss_km_s"])
+    radial_velocity_miss_km_s = float(
+        summary.target_miss.get(
+            "radial_velocity_miss_km_s",
+            summary.final_radial_velocity_km_s,
+        )
+    )
+    target_miss = {
+        **summary.target_miss,
+        "radial_velocity_miss_km_s": radial_velocity_miss_km_s,
+    }
     best_case = LaunchPitchTuningCase(
         iteration=1,
         pitch_deg_by_point_index={
             str(point_index): pitch_deg
             for point_index, pitch_deg in optimized_pitch_deg_by_point_index.items()
         },
-        score=abs(altitude_miss_km) + abs(velocity_miss_km_s),
+        score=abs(altitude_miss_km)
+        + abs(velocity_miss_km_s)
+        + abs(radial_velocity_miss_km_s),
         altitude_miss_km=altitude_miss_km,
         velocity_miss_km_s=velocity_miss_km_s,
+        radial_velocity_miss_km_s=radial_velocity_miss_km_s,
         final_altitude_km=summary.final_altitude_km,
         final_velocity_km_s=summary.final_velocity_km_s,
         final_radial_velocity_km_s=summary.final_radial_velocity_km_s,
         final_horizontal_velocity_km_s=summary.final_horizontal_velocity_km_s,
         final_downrange_km=summary.final_downrange_km,
-        target_miss=summary.target_miss,
+        target_miss=target_miss,
     )
     iteration = LaunchPitchTuningIteration(
         iteration=1,
@@ -657,13 +692,15 @@ def _pitch_program_summary_to_tuning_result(
         cases=[best_case],
         best_case=best_case,
     )
+    dymos_phase_metadata = summary.to_metadata()
+    dymos_phase_metadata["target_miss"] = target_miss
     metadata = {
         **baseline.metadata,
         "workflow": "dymos_pitch_program_optimization",
         "candidate_count": len(summary.optimized_pitch_deg_by_point_index),
         "optimizer_status": "completed" if summary.optimizer_success else "failed",
         "converged": summary.optimizer_success,
-        "dymos_phase": summary.to_metadata(),
+        "dymos_phase": dymos_phase_metadata,
         "dymos_pitch_program_transcription_status": "executed",
         "pitch_program_control_source": "dymos_pitch_program_control",
         "pitch_program_optimization_coupling": "native_dymos_pitch_control",
@@ -680,6 +717,7 @@ def _pitch_program_summary_to_tuning_result(
                 optimized_pitch_deg_by_point_index,
             ),
             "backend": "dymos_pitch_program",
+            "radial_velocity_weight": 1.0,
             "metadata": metadata,
         }
     )
@@ -795,6 +833,7 @@ def _solve_dymos_pitch_program_phase(
         "altitude_miss_km": final_altitude_km - scenario.target_orbit.altitude_km,
         "velocity_miss_km_s": final_velocity_km_s
         - _circular_velocity_km_s(scenario.target_orbit.altitude_km),
+        "radial_velocity_miss_km_s": final_radial_velocity_km_s,
     }
     point_indices = _dymos_pitch_tuning_indices(scenario)
     optimized_pitch_deg_by_point_index = {
