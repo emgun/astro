@@ -237,9 +237,10 @@ KVN text product containing UTC epochs plus Cartesian position and velocity samp
 an OPM KVN single-state orbit message, or a CCSDS AEM KVN quaternion attitude product for
 trajectories with commanded attitude samples. `astro import-trajectory --format oem` converts a
 CCSDS OEM KVN text product back into a suite `Trajectory`; `--format opm` imports an OPM orbit
-message as a one-sample suite `Trajectory`. Both require `--scenario` because those products do not
-encode the suite force model. The importers are intentionally strict: UTC time system, EME2000
-reference frame, and Earth center are required. `astro import-trajectory --format aem` attaches
+message as a one-sample suite `Trajectory` and maps an optional OPM covariance block into one
+suite `CovarianceSample`. Both require `--scenario` because those products do not encode the suite
+force model. The importers are intentionally strict: UTC time system, EME2000 reference frame, and
+Earth center are required. `astro import-trajectory --format aem` attaches
 CCSDS AEM KVN quaternion attitude rows to a state-bearing suite trajectory supplied with
 `--state-trajectory` because AEM is attitude-only.
 It validates UTC, EME2000 frame A, quaternion attitude type, and `QC Q1 Q2 Q3` quaternion order.

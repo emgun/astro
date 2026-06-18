@@ -33,7 +33,7 @@ Implemented and protected:
   Earth-orientation ingest for UT1-UTC and polar motion samples.
 - `astro_dynamics.local` two-body and J2 deterministic RK4 propagation.
 - `astro_dynamics` flight-dynamics product helpers for impulsive maneuvers, CSV export, CCSDS
-  OEM ephemeris export/import, CCSDS OPM single-state export/import, and CCSDS AEM quaternion attitude export,
+  OEM ephemeris export/import, CCSDS OPM single-state/covariance export/import, and CCSDS AEM quaternion attitude export,
   local constant-acceleration finite-burn propagation, and seeded initial-state Monte Carlo
   propagation, plus finite-difference and opt-in two-body/J2 variational local covariance
   propagation with optional acceleration process noise, explicit per-sample
@@ -74,7 +74,7 @@ Still roadmap-level:
   parsing beyond the normalized CSV, strict KVN-style ODF/TNF tracking deck, and suite-owned
   ASTRODSN1 binary tracking bridges plus truth-tagged station-bias calibration product, and
   operational CCSDS support beyond current KVN TDM measurement
-  families, suite multi-leg radiometric TDM extension, OEM/OPM orbit-state interchange, and AEM
+  families, suite multi-leg radiometric TDM extension, OEM/OPM orbit-state and OPM covariance interchange, and AEM
   quaternion attitude export/import.
 - Richer JAX high-fidelity force models and full differentiable OD estimator workflows.
 
@@ -247,7 +247,7 @@ Primary files:
 
 Status: implemented for product primitives, impulsive maneuvers, local constant-acceleration
 finite burns, local thrust-vector finite burns with mass depletion, CSV export, CCSDS OEM
-ephemeris export/import, CCSDS OPM single-state export/import, CCSDS AEM quaternion attitude export/import, finite-difference local covariance propagation, opt-in local two-body
+ephemeris export/import, CCSDS OPM single-state/covariance export/import, CCSDS AEM quaternion attitude export/import, finite-difference local covariance propagation, opt-in local two-body
 and J2 variational covariance propagation with analytic two-body and finite-difference J2
 acceleration Jacobians, optional white-acceleration process noise, explicit per-sample and
 accumulated state-transition matrices, per-sample process-noise covariance matrices, Orekit
@@ -271,7 +271,7 @@ Definition of done:
 
 - Orbital `Trajectory` supports event and maneuver records without breaking launch products.
 - Ephemeris export/import supports JSON plus CSV export, CCSDS OEM KVN state-history interchange,
-  CCSDS OPM KVN single-state orbit-message interchange, and CCSDS AEM KVN quaternion attitude
+  CCSDS OPM KVN single-state orbit-message interchange with optional covariance blocks, and CCSDS AEM KVN quaternion attitude
   export/import selected for the suite's current maturity. OEM and OPM import require scenario
   context because those products do not encode the suite force model; AEM import requires a
   state-bearing suite trajectory because AEM is attitude-only.

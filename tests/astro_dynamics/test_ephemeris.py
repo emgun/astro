@@ -75,6 +75,22 @@ def test_dump_trajectory_opm_writes_ccsds_opm_kvn_state_message() -> None:
     assert "Y_DOT = 7.5" in lines
 
 
+def test_dump_trajectory_opm_writes_covariance_block_when_available() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+    trajectory = propagate_local(scenario)
+
+    payload = dump_trajectory_opm(trajectory)
+
+    lines = payload.splitlines()
+    assert "COVARIANCE_START" in lines
+    assert "COV_REF_FRAME = EME2000" in lines
+    assert "CX_X = 1.0" in lines
+    assert "CY_Y = 1.0" in lines
+    assert "CX_DOT_X_DOT = 1e-06" in lines
+    assert "CZ_DOT_Z_DOT = 1e-06" in lines
+    assert "COVARIANCE_STOP" in lines
+
+
 def test_dump_trajectory_aem_writes_ccsds_quaternion_product() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_velocity_aligned_burn.yaml"))
     trajectory = propagate_local(scenario)
@@ -212,6 +228,37 @@ def test_load_trajectory_opm_round_trips_first_sample_with_scenario_force_model(
     assert loaded.metadata["opm_time_system"] == "UTC"
     assert loaded.metadata["opm_ref_frame"] == "EME2000"
     assert loaded.metadata["opm_state_units"] == "km_and_km_per_s"
+
+
+def test_load_trajectory_opm_imports_covariance_block() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    payload = Path("examples/trajectories/leo_initial_state.opm").read_text(encoding="utf-8")
+
+    loaded = load_trajectory_opm(payload, force_model=scenario.force_model)
+
+    assert len(loaded.covariance_history) == 1
+    covariance_sample = loaded.covariance_history[0]
+    assert covariance_sample.epoch == loaded.samples[0].epoch
+    assert covariance_sample.covariance[0][0] == 1.0
+    assert covariance_sample.covariance[3][3] == 0.000001
+    assert covariance_sample.state_transition_matrix is not None
+    assert covariance_sample.state_transition_matrix[0][0] == 1.0
+    assert covariance_sample.metadata["source_format"] == "ccsds_opm_kvn"
+    assert covariance_sample.metadata["covariance_model"] == "imported_opm_single_epoch"
+    assert loaded.metadata["opm_covariance_sample_count"] == 1
+
+
+def test_load_trajectory_opm_rejects_incomplete_covariance_block() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
+    payload = Path("examples/trajectories/leo_initial_state.opm").read_text(encoding="utf-8")
+    payload = payload.replace("CZ_DOT_Z_DOT = 0.000001", "")
+
+    try:
+        load_trajectory_opm(payload, force_model=scenario.force_model)
+    except ValueError as exc:
+        assert "CZ_DOT_Z_DOT" in str(exc)
+    else:
+        raise AssertionError("expected incomplete OPM covariance block to fail")
 
 
 def test_load_trajectory_opm_rejects_missing_state_key() -> None:

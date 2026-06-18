@@ -24,7 +24,6 @@ from astro_dynamics.conjunction import screen_conjunction
 from astro_dynamics.ephemeris import (
     dump_trajectory_aem,
     dump_trajectory_oem,
-    dump_trajectory_opm,
 )
 from astro_dynamics.local import propagate_local
 from astro_dynamics.monte_carlo import run_initial_state_monte_carlo
@@ -573,17 +572,13 @@ def test_import_trajectory_command_reads_oem_with_scenario_context(tmp_path: Pat
 
 
 def test_import_trajectory_command_reads_opm_with_scenario_context(tmp_path: Path) -> None:
-    scenario = load_scenario(Path("examples/scenarios/leo_two_body.yaml"))
-    trajectory = propagate_local(scenario)
-    opm_path = tmp_path / "trajectory.opm"
     output = tmp_path / "trajectory.json"
-    opm_path.write_text(dump_trajectory_opm(trajectory), encoding="utf-8")
 
     result = runner.invoke(
         app,
         [
             "import-trajectory",
-            str(opm_path),
+            "examples/trajectories/leo_initial_state.opm",
             "--format",
             "opm",
             "--scenario",
@@ -600,7 +595,12 @@ def test_import_trajectory_command_reads_opm_with_scenario_context(tmp_path: Pat
     assert payload["backend"] == "local"
     assert payload["metadata"]["source_format"] == "ccsds_opm_kvn"
     assert payload["metadata"]["opm_state_units"] == "km_and_km_per_s"
+    assert payload["metadata"]["opm_covariance_sample_count"] == 1
     assert len(payload["samples"]) == 1
+    assert len(payload["covariance_history"]) == 1
+    assert payload["covariance_history"][0]["metadata"]["covariance_model"] == (
+        "imported_opm_single_epoch"
+    )
 
 
 def test_import_trajectory_command_reads_aem_with_state_trajectory_context(

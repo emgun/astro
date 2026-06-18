@@ -8,11 +8,36 @@ from typing import cast
 from astro_core.models import (
     AttitudeState,
     CartesianState,
+    CovarianceSample,
     ForceModelConfig,
     Frame,
     Quaternion4,
     Trajectory,
     TrajectorySample,
+)
+
+OPM_COVARIANCE_ENTRIES: tuple[tuple[int, int, str], ...] = (
+    (0, 0, "CX_X"),
+    (1, 0, "CY_X"),
+    (1, 1, "CY_Y"),
+    (2, 0, "CZ_X"),
+    (2, 1, "CZ_Y"),
+    (2, 2, "CZ_Z"),
+    (3, 0, "CX_DOT_X"),
+    (3, 1, "CX_DOT_Y"),
+    (3, 2, "CX_DOT_Z"),
+    (3, 3, "CX_DOT_X_DOT"),
+    (4, 0, "CY_DOT_X"),
+    (4, 1, "CY_DOT_Y"),
+    (4, 2, "CY_DOT_Z"),
+    (4, 3, "CY_DOT_X_DOT"),
+    (4, 4, "CY_DOT_Y_DOT"),
+    (5, 0, "CZ_DOT_X"),
+    (5, 1, "CZ_DOT_Y"),
+    (5, 2, "CZ_DOT_Z"),
+    (5, 3, "CZ_DOT_X_DOT"),
+    (5, 4, "CZ_DOT_Y_DOT"),
+    (5, 5, "CZ_DOT_Z_DOT"),
 )
 
 
@@ -26,6 +51,10 @@ def _format_oem_float(value: float) -> str:
 
 def _format_aem_float(value: float) -> str:
     return repr(float(value))
+
+
+def _identity_matrix(size: int = 6) -> list[list[float]]:
+    return [[1.0 if row == column else 0.0 for column in range(size)] for row in range(size)]
 
 
 def _parse_oem_epoch(raw_epoch: str) -> datetime:
@@ -136,6 +165,25 @@ def dump_trajectory_opm(trajectory: Trajectory, *, originator: str = "ASTRO_SUIT
     ]
     if sample.mass_kg is not None:
         lines.append(f"MASS = {_format_oem_float(sample.mass_kg)}")
+    covariance_sample = next(
+        (
+            covariance
+            for covariance in trajectory.covariance_history
+            if covariance.epoch == sample.epoch
+        ),
+        None,
+    )
+    if covariance_sample is not None:
+        lines.extend(
+            [
+                "COVARIANCE_START",
+                "COV_REF_FRAME = EME2000",
+            ]
+        )
+        covariance = covariance_sample.covariance
+        for row_index, column_index, key in OPM_COVARIANCE_ENTRIES:
+            lines.append(f"{key} = {_format_oem_float(covariance[row_index][column_index])}")
+        lines.append("COVARIANCE_STOP")
     return "\n".join(lines)
 
 
@@ -265,7 +313,10 @@ def load_trajectory_opm(payload: str, *, force_model: ForceModelConfig) -> Traje
     metadata: dict[str, str] = {}
     comments: dict[str, str] = {}
     state_values: dict[str, str] = {}
+    covariance_metadata: dict[str, str] = {}
+    covariance_values: dict[str, str] = {}
     in_metadata = False
+    in_covariance = False
 
     for raw_line in payload.splitlines():
         line = raw_line.strip()
@@ -277,6 +328,16 @@ def load_trajectory_opm(payload: str, *, force_model: ForceModelConfig) -> Traje
         if line == "META_STOP":
             in_metadata = False
             continue
+        if line == "COVARIANCE_START":
+            if in_covariance:
+                raise ValueError("OPM covariance block has nested COVARIANCE_START")
+            in_covariance = True
+            continue
+        if line == "COVARIANCE_STOP":
+            if not in_covariance:
+                raise ValueError("OPM covariance block has COVARIANCE_STOP without start")
+            in_covariance = False
+            continue
         if line.startswith("COMMENT "):
             raw_comment = line.removeprefix("COMMENT ")
             key, separator, value = raw_comment.partition("=")
@@ -285,7 +346,12 @@ def load_trajectory_opm(payload: str, *, force_model: ForceModelConfig) -> Traje
             continue
         if "=" in line:
             key, value = _parse_kvn_assignment(line)
-            if in_metadata or key in {
+            if in_covariance:
+                if key == "COV_REF_FRAME":
+                    covariance_metadata[key] = value
+                else:
+                    covariance_values[key] = value
+            elif in_metadata or key in {
                 "CCSDS_OPM_VERS",
                 "CREATION_DATE",
                 "ORIGINATOR",
@@ -297,6 +363,8 @@ def load_trajectory_opm(payload: str, *, force_model: ForceModelConfig) -> Traje
 
         raise ValueError(f"Invalid OPM KVN line: {line}")
 
+    if in_covariance:
+        raise ValueError("OPM covariance block ended before COVARIANCE_STOP")
     if metadata.get("CCSDS_OPM_VERS") != "2.0":
         raise ValueError("OPM ingest supports CCSDS_OPM_VERS = 2.0")
     if metadata.get("TIME_SYSTEM") != "UTC":
@@ -327,6 +395,42 @@ def load_trajectory_opm(payload: str, *, force_model: ForceModelConfig) -> Traje
     except ValueError as exc:
         raise ValueError("Invalid numeric OPM state value") from exc
 
+    covariance_history: list[CovarianceSample] = []
+    if covariance_values:
+        covariance_frame = covariance_metadata.get("COV_REF_FRAME")
+        if covariance_frame != "EME2000":
+            raise ValueError("OPM covariance ingest supports only COV_REF_FRAME = EME2000")
+        expected_covariance_keys = {key for _row, _column, key in OPM_COVARIANCE_ENTRIES}
+        missing_covariance_keys = sorted(expected_covariance_keys - set(covariance_values))
+        if missing_covariance_keys:
+            raise ValueError(
+                "OPM covariance block missing keys: " + ", ".join(missing_covariance_keys)
+            )
+        covariance_matrix = [[0.0 for _column in range(6)] for _row in range(6)]
+        try:
+            for row_index, column_index, key in OPM_COVARIANCE_ENTRIES:
+                covariance_value = float(covariance_values[key])
+                covariance_matrix[row_index][column_index] = covariance_value
+                covariance_matrix[column_index][row_index] = covariance_value
+        except ValueError as exc:
+            raise ValueError("Invalid numeric OPM covariance value") from exc
+        covariance_history.append(
+            CovarianceSample(
+                epoch=epoch,
+                covariance=covariance_matrix,
+                state_transition_matrix=_identity_matrix(),
+                accumulated_state_transition_matrix=_identity_matrix(),
+                metadata={
+                    "source_format": "ccsds_opm_kvn",
+                    "covariance_model": "imported_opm_single_epoch",
+                    "covariance_reference_frame": covariance_frame,
+                    "covariance_state_order": "X Y Z X_DOT Y_DOT Z_DOT",
+                    "covariance_state_units": "km_and_km_per_s",
+                    "state_transition_model": "identity",
+                },
+            )
+        )
+
     scenario_id = comments.get("scenario_id") or metadata.get("OBJECT_NAME")
     if scenario_id is None:
         raise ValueError("OPM ingest requires COMMENT scenario_id or OBJECT_NAME")
@@ -343,6 +447,7 @@ def load_trajectory_opm(payload: str, *, force_model: ForceModelConfig) -> Traje
         ],
         force_model=force_model,
         backend=backend,
+        covariance_history=covariance_history,
         metadata={
             "source_format": "ccsds_opm_kvn",
             "opm_version": metadata["CCSDS_OPM_VERS"],
@@ -353,6 +458,7 @@ def load_trajectory_opm(payload: str, *, force_model: ForceModelConfig) -> Traje
             "opm_ref_frame": metadata["REF_FRAME"],
             "opm_time_system": metadata["TIME_SYSTEM"],
             "opm_state_units": "km_and_km_per_s",
+            "opm_covariance_sample_count": len(covariance_history),
             "force_model_source": "scenario",
         },
     )
