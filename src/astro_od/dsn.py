@@ -38,6 +38,7 @@ DSN_OBSERVABLE_TYPES = {
 }
 
 DSN_TRACKING_FORMATS = {"odf", "tnf"}
+DSN_KVN_VERSION_KEYS = {"DSN_TRACKING_VERS", "CCSDS_DSN_TRACKING_VERS"}
 DSN_BINARY_MAGIC = b"ASTRODSN1"
 DSN_BINARY_HEADER = "<BBqddB"
 DSN_BINARY_HEADER_SIZE = calcsize(DSN_BINARY_HEADER)
@@ -130,6 +131,42 @@ def load_dsn_binary_tracking_measurements(path: Path | str) -> MeasurementProduc
     )
 
 
+def load_dsn_kvn_tracking_measurements(path: Path | str) -> MeasurementProduct:
+    """Load strict DSN ODF/TNF KVN-style tracking text decks."""
+    measurement_path = Path(path)
+    try:
+        payload = measurement_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise InvalidMeasurementFileError(
+            f"could not read DSN KVN tracking file {measurement_path}: {exc}"
+        ) from exc
+
+    records, header = _dsn_kvn_tracking_records(measurement_path, payload)
+    if not records:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} contains no rows"
+        )
+    scenario_ids = {record.metadata["dsn_scenario_id"] for record in records}
+    if len(scenario_ids) != 1:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} must contain a single scenario_id"
+        )
+    tracking_formats = sorted(
+        {str(record.metadata["dsn_tracking_format"]) for record in records}
+    )
+    return MeasurementProduct(
+        scenario_id=str(next(iter(scenario_ids))),
+        measurements=records,
+        metadata={
+            "source_format": "dsn_odf_tnf_kvn",
+            "tracking_formats": tracking_formats,
+            "measurement_count": len(records),
+            "dsn_tracking_version": _dsn_kvn_version(header),
+            "originator": header.get("ORIGINATOR", ""),
+        },
+    )
+
+
 def _validate_dsn_tracking_columns(measurement_path: Path, fieldnames: Sequence[str]) -> None:
     missing_columns = DSN_TRACKING_REQUIRED_COLUMNS - set(fieldnames)
     if missing_columns:
@@ -191,6 +228,219 @@ def _dsn_tracking_record(
     except ValidationError as exc:
         raise InvalidMeasurementFileError(
             f"DSN tracking file {measurement_path} row {row_number} is invalid: {exc}"
+        ) from exc
+
+
+def _dsn_kvn_tracking_records(
+    measurement_path: Path,
+    payload: str,
+) -> tuple[list[MeasurementRecord], dict[str, str]]:
+    header: dict[str, str] = {}
+    segment_metadata: dict[str, str] = {}
+    records: list[MeasurementRecord] = []
+    in_metadata = False
+    in_data = False
+
+    for line_number, raw_line in enumerate(payload.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line == "META_START":
+            if in_metadata:
+                raise InvalidMeasurementFileError(
+                    f"DSN KVN tracking file {measurement_path} line {line_number} "
+                    "has nested META_START"
+                )
+            in_metadata = True
+            segment_metadata = {}
+            continue
+        if line == "META_STOP":
+            if not in_metadata:
+                raise InvalidMeasurementFileError(
+                    f"DSN KVN tracking file {measurement_path} line {line_number} "
+                    "has META_STOP without META_START"
+                )
+            _validate_dsn_kvn_segment_metadata(
+                measurement_path,
+                line_number,
+                segment_metadata,
+            )
+            in_metadata = False
+            continue
+        if line == "DATA_START":
+            if in_data:
+                raise InvalidMeasurementFileError(
+                    f"DSN KVN tracking file {measurement_path} line {line_number} "
+                    "has nested DATA_START"
+                )
+            if in_metadata:
+                raise InvalidMeasurementFileError(
+                    f"DSN KVN tracking file {measurement_path} line {line_number} "
+                    "starts data inside metadata"
+                )
+            _validate_dsn_kvn_segment_metadata(
+                measurement_path,
+                line_number,
+                segment_metadata,
+            )
+            in_data = True
+            continue
+        if line == "DATA_STOP":
+            if not in_data:
+                raise InvalidMeasurementFileError(
+                    f"DSN KVN tracking file {measurement_path} line {line_number} "
+                    "has DATA_STOP without DATA_START"
+                )
+            in_data = False
+            continue
+        if "=" in line and not in_data:
+            key, value = _kvn_assignment(measurement_path, line_number, line)
+            if in_metadata:
+                segment_metadata[key] = value
+            else:
+                header[key] = value
+            continue
+
+        if not in_data:
+            raise InvalidMeasurementFileError(
+                f"DSN KVN tracking file {measurement_path} line {line_number} "
+                "has a data row outside DATA_START/DATA_STOP"
+            )
+        records.append(
+            _dsn_kvn_tracking_record(
+                measurement_path,
+                line_number,
+                line,
+                segment_metadata,
+            )
+        )
+
+    if in_metadata:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} ended inside META block"
+        )
+    if in_data:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} ended inside DATA block"
+        )
+    if _dsn_kvn_version(header) != "1.0":
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} supports only version 1.0"
+        )
+    return records, header
+
+
+def _kvn_assignment(
+    measurement_path: Path,
+    line_number: int,
+    line: str,
+) -> tuple[str, str]:
+    key, separator, value = line.partition("=")
+    if not separator:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} line {line_number} "
+            "is not a KEY = VALUE assignment"
+        )
+    key = key.strip().upper()
+    value = value.strip()
+    if not key or not value:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} line {line_number} "
+            "has an empty KVN key or value"
+        )
+    return key, value
+
+
+def _dsn_kvn_version(header: dict[str, str]) -> str:
+    for version_key in DSN_KVN_VERSION_KEYS:
+        if version_key in header:
+            return header[version_key]
+    return ""
+
+
+def _validate_dsn_kvn_segment_metadata(
+    measurement_path: Path,
+    line_number: int,
+    metadata: dict[str, str],
+) -> None:
+    required = {
+        "SCENARIO_ID",
+        "TRACKING_FORMAT",
+        "STATION",
+        "SPACECRAFT",
+        "TIME_SYSTEM",
+    }
+    missing = sorted(required - set(metadata))
+    if missing:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} line {line_number} "
+            "metadata is missing required keys: "
+            + ", ".join(missing)
+        )
+    if metadata["TIME_SYSTEM"].upper() != "UTC":
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} line {line_number} "
+            "supports only TIME_SYSTEM = UTC"
+        )
+    if metadata["TRACKING_FORMAT"].lower() not in DSN_TRACKING_FORMATS:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} line {line_number} "
+            "supports only TRACKING_FORMAT = ODF or TNF"
+        )
+
+
+def _dsn_kvn_tracking_record(
+    measurement_path: Path,
+    line_number: int,
+    line: str,
+    segment_metadata: dict[str, str],
+) -> MeasurementRecord:
+    fields = line.split()
+    if len(fields) != 5:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} line {line_number} "
+            "rows must contain epoch, observable, value, sigma, and units"
+        )
+    epoch, observable, raw_value, raw_sigma, units = fields
+    observable = observable.lower()
+    measurement_type = DSN_OBSERVABLE_TYPES.get(observable)
+    if measurement_type is None:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} line {line_number} "
+            f"uses unsupported observable {observable!r}"
+        )
+    tracking_format = segment_metadata["TRACKING_FORMAT"].lower()
+    metadata: dict[str, Any] = {
+        "source_format": "dsn_odf_tnf_kvn",
+        "dsn_tracking_format": tracking_format,
+        "dsn_observable": observable,
+        "dsn_scenario_id": segment_metadata["SCENARIO_ID"],
+        "time_system": segment_metadata["TIME_SYSTEM"].upper(),
+    }
+    _copy_kvn_optional_metadata(segment_metadata, metadata, "PARTICIPANT_PATH", "participant_path")
+    _copy_kvn_optional_metadata(segment_metadata, metadata, "TRANSMITTER", "transmitter")
+    _copy_kvn_optional_metadata(
+        segment_metadata,
+        metadata,
+        "MEDIA_SOURCE",
+        "media_corrections_source",
+    )
+    try:
+        return MeasurementRecord.model_validate(
+            {
+                "measurement_type": measurement_type,
+                "epoch": epoch,
+                "observer": segment_metadata["STATION"],
+                "observed_object": segment_metadata["SPACECRAFT"],
+                "value": float(raw_value),
+                "sigma": float(raw_sigma),
+                "units": units,
+                "metadata": metadata,
+            }
+        )
+    except (ValidationError, ValueError) as exc:
+        raise InvalidMeasurementFileError(
+            f"DSN KVN tracking file {measurement_path} line {line_number} is invalid: {exc}"
         ) from exc
 
 
@@ -389,3 +639,14 @@ def _copy_optional_metadata(
     value = row.get(column)
     if value is not None and value.strip():
         metadata[column] = value.strip()
+
+
+def _copy_kvn_optional_metadata(
+    source: dict[str, str],
+    metadata: dict[str, Any],
+    source_key: str,
+    metadata_key: str,
+) -> None:
+    value = source.get(source_key)
+    if value is not None and value.strip():
+        metadata[metadata_key] = value.strip()

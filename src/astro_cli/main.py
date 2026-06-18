@@ -60,7 +60,11 @@ from astro_od.calibration import (
     generate_dsn_calibration_product_from_measurements,
     generate_station_calibration_product_from_measurements,
 )
-from astro_od.dsn import load_dsn_binary_tracking_measurements, load_dsn_tracking_measurements
+from astro_od.dsn import (
+    load_dsn_binary_tracking_measurements,
+    load_dsn_kvn_tracking_measurements,
+    load_dsn_tracking_measurements,
+)
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import (
     dump_measurements_csv,
@@ -1242,6 +1246,30 @@ def import_dsn_binary_tracking(
     """Import ASTRODSN1 binary DSN tracking bridge records into suite measurements."""
     try:
         product = load_dsn_binary_tracking_measurements(tracking_path)
+    except InvalidMeasurementFileError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    payload = json.dumps(
+        {
+            "scenario_id": product.scenario_id,
+            "metadata": product.metadata or {},
+            "measurements": [record.model_dump(mode="json") for record in product.measurements],
+        },
+        indent=2,
+    )
+    _write_text_or_exit(output, payload, "measurements")
+    typer.echo(f"wrote measurements: {output}")
+
+
+@app.command("import-dsn-kvn-tracking")
+def import_dsn_kvn_tracking(
+    tracking_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+) -> None:
+    """Import strict DSN ODF/TNF KVN-style tracking text decks into suite measurements."""
+    try:
+        product = load_dsn_kvn_tracking_measurements(tracking_path)
     except InvalidMeasurementFileError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc

@@ -7,7 +7,11 @@ from astro_od.calibration import (
     generate_dsn_calibration_product_from_measurements,
     generate_station_calibration_product_from_measurements,
 )
-from astro_od.dsn import load_dsn_binary_tracking_measurements, load_dsn_tracking_measurements
+from astro_od.dsn import (
+    load_dsn_binary_tracking_measurements,
+    load_dsn_kvn_tracking_measurements,
+    load_dsn_tracking_measurements,
+)
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import load_measurements
 from astro_od.measurements import (
@@ -44,6 +48,7 @@ __all__ = [
     "generate_synthetic_measurements",
     "light_time_s",
     "load_dsn_binary_tracking_measurements",
+    "load_dsn_kvn_tracking_measurements",
     "load_dsn_tracking_measurements",
     "load_measurements",
     "range_km",

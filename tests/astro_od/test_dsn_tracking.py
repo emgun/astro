@@ -5,7 +5,11 @@ import pytest
 
 from astro_core.errors import InvalidMeasurementFileError
 from astro_core.models import MeasurementType
-from astro_od.dsn import load_dsn_binary_tracking_measurements, load_dsn_tracking_measurements
+from astro_od.dsn import (
+    load_dsn_binary_tracking_measurements,
+    load_dsn_kvn_tracking_measurements,
+    load_dsn_tracking_measurements,
+)
 
 
 def test_load_dsn_tracking_measurements_maps_normalized_odf_tnf_rows(
@@ -52,6 +56,49 @@ def test_load_dsn_tracking_measurements_rejects_mixed_scenario_ids(tmp_path: Pat
 
     with pytest.raises(InvalidMeasurementFileError, match="single scenario_id"):
         load_dsn_tracking_measurements(path)
+
+
+def test_load_dsn_kvn_tracking_measurements_maps_odf_tnf_segments() -> None:
+    product = load_dsn_kvn_tracking_measurements("examples/measurements/dsn_tracking_kvn.txt")
+
+    assert product.scenario_id == "dsn-kvn-demo"
+    assert len(product.measurements) == 2
+    assert product.metadata["source_format"] == "dsn_odf_tnf_kvn"
+    assert product.metadata["dsn_tracking_version"] == "1.0"
+    assert product.metadata["tracking_formats"] == ["odf", "tnf"]
+    assert product.measurements[0].measurement_type is MeasurementType.TWO_WAY_RANGE
+    assert product.measurements[0].metadata["dsn_tracking_format"] == "odf"
+    assert product.measurements[0].metadata["participant_path"] == "DSS-14,demo-sat,DSS-14"
+    assert product.measurements[1].measurement_type is MeasurementType.THREE_WAY_RANGE_RATE
+    assert product.measurements[1].metadata["dsn_tracking_format"] == "tnf"
+    assert product.measurements[1].metadata["transmitter"] == "DSS-14"
+
+
+def test_load_dsn_kvn_tracking_measurements_rejects_non_utc_time_system(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "dsn_tracking_kvn.txt"
+    path.write_text(
+        "\n".join(
+            [
+                "DSN_TRACKING_VERS = 1.0",
+                "META_START",
+                "SCENARIO_ID = dsn-kvn-demo",
+                "TRACKING_FORMAT = ODF",
+                "STATION = DSS-14",
+                "SPACECRAFT = demo-sat",
+                "TIME_SYSTEM = TAI",
+                "META_STOP",
+                "DATA_START",
+                "2026-01-01T00:00:00+00:00 two_way_range 12345.6 0.01 km",
+                "DATA_STOP",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(InvalidMeasurementFileError, match="TIME_SYSTEM = UTC"):
+        load_dsn_kvn_tracking_measurements(path)
 
 
 def test_load_dsn_binary_tracking_measurements_maps_fixed_records(tmp_path: Path) -> None:

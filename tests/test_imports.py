@@ -82,6 +82,7 @@ def test_packages_import() -> None:
         "generate_synthetic_measurements",
         "light_time_s",
         "load_dsn_binary_tracking_measurements",
+        "load_dsn_kvn_tracking_measurements",
         "load_dsn_tracking_measurements",
         "load_measurements",
         "range_km",

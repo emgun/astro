@@ -1917,6 +1917,29 @@ def test_import_dsn_binary_tracking_command_writes_measurement_json(tmp_path: Pa
     assert payload["measurements"][0]["metadata"]["binary_record_index"] == 0
 
 
+def test_import_dsn_kvn_tracking_command_writes_measurement_json(tmp_path: Path) -> None:
+    output_path = tmp_path / "dsn_kvn_measurements.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "import-dsn-kvn-tracking",
+            "examples/measurements/dsn_tracking_kvn.txt",
+            "--output",
+            str(output_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "wrote measurements" in result.stdout
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["scenario_id"] == "dsn-kvn-demo"
+    assert payload["metadata"]["source_format"] == "dsn_odf_tnf_kvn"
+    assert payload["metadata"]["tracking_formats"] == ["odf", "tnf"]
+    assert payload["measurements"][0]["measurement_type"] == "two_way_range"
+    assert payload["measurements"][0]["metadata"]["dsn_tracking_format"] == "odf"
+
+
 def _binary_dsn_tracking_record(
     *,
     tracking_format: int,

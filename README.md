@@ -376,8 +376,10 @@ statistics. This is a calibration product over the suite's supported radiometric
 full binary DSN ODF/TNF standards pipeline. `astro station-calibration` estimates per-station and
 per-measurement-type biases from truth-tagged measurement records. `astro import-dsn-tracking`
 ingests a normalized CSV bridge for ODF/TNF-style DSN tracking rows into normal suite measurement
-JSON with format provenance, and `astro import-dsn-binary-tracking` ingests the suite-owned
-`ASTRODSN1` fixed-record binary tracking bridge. Angle records use degrees.
+JSON with format provenance, `astro import-dsn-kvn-tracking` ingests strict DSN ODF/TNF
+KVN-style tracking decks with per-segment metadata, and `astro import-dsn-binary-tracking` ingests
+the suite-owned `ASTRODSN1` fixed-record binary tracking bridge. These are suite-owned bridge
+formats, not a full binary NASA ODF/TNF standards pipeline. Angle records use degrees.
 Ground stations can be supplied either as fixed
 `position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
 coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
@@ -462,6 +464,8 @@ astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml 
 
 astro import-dsn-tracking examples/measurements/dsn_tracking_normalized.csv \
   --output /tmp/astro-dsn-tracking-measurements.json
+astro import-dsn-kvn-tracking examples/measurements/dsn_tracking_kvn.txt \
+  --output /tmp/astro-dsn-kvn-tracking-measurements.json
 python -m pytest tests/astro_od/test_dsn_tracking.py::test_load_dsn_binary_tracking_measurements_maps_fixed_records \
   tests/astro_cli/test_cli.py::test_import_dsn_binary_tracking_command_writes_measurement_json -q
 astro station-calibration examples/scenarios/leo_two_station_od.yaml \
