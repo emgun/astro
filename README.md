@@ -166,6 +166,7 @@ astro screen-conjunction primary_trajectory.json secondary_trajectory.json --thr
 astro assess-conjunction conjunction_screening.json --output conjunction_assessment.json
 astro propagate-attitude examples/attitude/rigid_body_torque.yaml --output attitude_dynamics.json
 astro propagate-attitude examples/attitude/closed_loop_pd.yaml --output attitude_control.json
+astro propagate-attitude examples/attitude/closed_loop_sensor_actuator.yaml --output attitude_sensor_actuator.json
 astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
 astro rocketpy-smoke
 astro dymos-smoke
@@ -260,8 +261,10 @@ instantaneous local radial direction. Maneuvered local trajectories also include
 axis along the commanded thrust direction during active thrust-vector burns. These are commanded
 pointing products. `astro propagate-attitude` separately propagates a diagonal rigid-body attitude
 state from scheduled torque commands or a bounded quaternion-error PD control law and writes
-quaternion/rate/control-torque history. The closed-loop mode is a deterministic ACS validation
-primitive, not a validated spacecraft actuator/sensor simulation. Local orbital propagation
+quaternion/rate/control-torque history. The closed-loop mode can optionally include deterministic
+sensor attitude/rate bias and actuator scale/bias/deadband screening metadata. This is an ACS
+product-wiring and sensitivity primitive, not a validated spacecraft actuator/sensor simulation.
+Local orbital propagation
 also annotates periapsis/apoapsis `TrajectoryEvent` records. For no-maneuver trajectories, apsides
 are root-located between propagation samples through radial-velocity bisection and include bracket,
 elapsed time, radius, and radial-velocity metadata. Maneuvered trajectories keep sample-safe apsis

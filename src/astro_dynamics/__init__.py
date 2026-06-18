@@ -1,7 +1,9 @@
 from astro_dynamics.attitude import (
+    AttitudeActuatorConfig,
     AttitudeControlConfig,
     AttitudeDynamicsResult,
     AttitudeDynamicsSample,
+    AttitudeSensorConfig,
     RigidBodyAttitudeConfig,
     TorqueCommand,
     propagate_rigid_body_attitude,
@@ -37,7 +39,9 @@ from astro_dynamics.monte_carlo import (
 __all__ = [
     "AttitudeDynamicsResult",
     "AttitudeDynamicsSample",
+    "AttitudeActuatorConfig",
     "AttitudeControlConfig",
+    "AttitudeSensorConfig",
     "ConjunctionAssessmentCheck",
     "ConjunctionAssessmentReport",
     "ConjunctionScreeningResult",

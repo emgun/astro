@@ -3,7 +3,9 @@ from math import acos
 import pytest
 
 from astro_dynamics.attitude import (
+    AttitudeActuatorConfig,
     AttitudeControlConfig,
+    AttitudeSensorConfig,
     RigidBodyAttitudeConfig,
     TorqueCommand,
     propagate_rigid_body_attitude,
@@ -80,6 +82,50 @@ def test_propagate_closed_loop_attitude_reduces_quaternion_error() -> None:
     assert result.metadata["attitude_dynamics_model"] == "diagonal_rigid_body_closed_loop_pd"
     assert result.metadata["control_model"] == "quaternion_error_pd"
     assert result.metadata["control_saturation_enabled"] is True
+
+
+def test_propagate_closed_loop_attitude_applies_sensor_and_actuator_screening() -> None:
+    config = RigidBodyAttitudeConfig(
+        duration_s=1.0,
+        step_s=1.0,
+        inertia_kg_m2=(2.0, 2.0, 2.0),
+        control=AttitudeControlConfig(
+            target_body_to_inertial_quaternion=(1.0, 0.0, 0.0, 0.0),
+            proportional_gain_n_m_per_rad=(0.0, 0.0, 0.0),
+            derivative_gain_n_m_per_rad_s=(0.0, 0.0, 1.0),
+            max_torque_n_m=(0.0, 0.0, 1.0),
+            sensor=AttitudeSensorConfig(
+                attitude_bias_rad=(0.0, 0.0, 0.02),
+                angular_rate_bias_rad_s=(0.0, 0.0, 0.1),
+            ),
+            actuator=AttitudeActuatorConfig(
+                torque_scale=(1.0, 1.0, 0.5),
+                torque_bias_n_m=(0.0, 0.0, 0.02),
+                deadband_n_m=(0.0, 0.0, 0.0),
+            ),
+        ),
+    )
+
+    result = propagate_rigid_body_attitude(config)
+
+    first_sample = result.samples[0]
+    assert first_sample.measured_angular_rate_rad_s == pytest.approx((0.0, 0.0, 0.1))
+    assert first_sample.measured_body_to_inertial_quaternion == pytest.approx(
+        (0.99995000042, 0.0, 0.0, 0.00999983333)
+    )
+    assert first_sample.commanded_control_torque_n_m == pytest.approx((0.0, 0.0, -0.1))
+    assert first_sample.control_torque_n_m == pytest.approx((0.0, 0.0, -0.03))
+    assert first_sample.applied_torque_n_m == pytest.approx((0.0, 0.0, -0.03))
+    assert result.metadata["attitude_dynamics_model"] == (
+        "diagonal_rigid_body_closed_loop_pd_sensor_actuator_screening"
+    )
+    assert result.metadata["attitude_sensor_model"] == "deterministic_bias"
+    assert result.metadata["attitude_actuator_model"] == "deterministic_scale_bias_deadband"
+
+
+def test_attitude_actuator_config_rejects_negative_deadband() -> None:
+    with pytest.raises(ValueError, match="scale and deadband"):
+        AttitudeActuatorConfig(deadband_n_m=(0.0, 0.0, -0.1))
 
 
 def _quaternion_distance_rad(
