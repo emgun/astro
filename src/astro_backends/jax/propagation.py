@@ -706,6 +706,15 @@ def _uses_topocentric_angle_measurements(
     )
 
 
+def _uses_inertial_angle_measurements(
+    measurement_specs: list[tuple[MeasurementType, int, FloatArray, float, float]],
+) -> bool:
+    return any(
+        measurement_type in {MeasurementType.RIGHT_ASCENSION, MeasurementType.DECLINATION}
+        for measurement_type, _sample_index, _station_position, _value, _sigma in measurement_specs
+    )
+
+
 def _unique_measurement_type_values(measurements: list[MeasurementRecord]) -> list[str]:
     values: list[str] = []
     for measurement in measurements:
@@ -821,6 +830,8 @@ def research_od_sensitivity_jax(
         metadata["topocentric_angle_horizontal_norm_floor"] = (
             _TOPOCENTRIC_ANGLE_HORIZONTAL_NORM_FLOOR
         )
+    if _uses_inertial_angle_measurements(measurement_specs):
+        metadata["inertial_angle_estimation_frame"] = "EME2000"
     return OdSensitivityResult(
         scenario_id=scenario.scenario_id,
         backend="jax",
@@ -943,6 +954,39 @@ def research_estimate_jax(
         update={"cartesian": estimated_cartesian}
     )
 
+    metadata: dict[str, object] = {
+        "adapter": "jax",
+        "backend": "jax_research_estimator",
+        "estimator": "jax_research_gauss_newton",
+        "jax_version": runtime.jax_version,
+        "jaxlib_version": runtime.jaxlib_version,
+        "sensitivity_model": "jax_jacfwd_od_residuals",
+        "force_model": scenario.force_model.gravity.value,
+        "research_force_models": _research_force_model_names(scenario),
+        "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
+        "measurement_types": _unique_measurement_type_values(measurements),
+        "measurement_count": len(measurement_specs),
+        "residual_convention": "(predicted - observed) / sigma",
+        "angle_residual_convention": "wrapped_degrees",
+        "max_iterations": max_iterations,
+        "correction_tolerance": correction_tolerance,
+        "residual_tolerance": residual_tolerance,
+        "step_strategy": "backtracking_gauss_newton",
+        "step_scale_history": accepted_step_scales,
+        "line_search_backtrack_count": line_search_backtrack_count,
+        "line_search_step_scales": list(_GAUSS_NEWTON_STEP_SCALES),
+        "covariance_status": covariance_status,
+        "covariance_convention": "inverse_normal_matrix_of_normalized_residuals",
+        **_research_force_metadata(scenario),
+    }
+    if _uses_topocentric_angle_measurements(measurement_specs):
+        metadata["topocentric_angle_sensitivity_regularization"] = "horizontal_norm_floor"
+        metadata["topocentric_angle_horizontal_norm_floor"] = (
+            _TOPOCENTRIC_ANGLE_HORIZONTAL_NORM_FLOOR
+        )
+    if _uses_inertial_angle_measurements(measurement_specs):
+        metadata["inertial_angle_estimation_frame"] = "EME2000"
+
     return EstimateResult(
         estimated_state=estimated_state,
         residuals=[float(value) for value in residuals],
@@ -950,31 +994,7 @@ def research_estimate_jax(
         rms=rms,
         iterations=iterations,
         converged=converged,
-        metadata={
-            "adapter": "jax",
-            "backend": "jax_research_estimator",
-            "estimator": "jax_research_gauss_newton",
-            "jax_version": runtime.jax_version,
-            "jaxlib_version": runtime.jaxlib_version,
-            "sensitivity_model": "jax_jacfwd_od_residuals",
-            "force_model": scenario.force_model.gravity.value,
-            "research_force_models": _research_force_model_names(scenario),
-            "research_force_model_policy": _RESEARCH_FORCE_MODEL_POLICY,
-            "measurement_types": _unique_measurement_type_values(measurements),
-            "measurement_count": len(measurement_specs),
-            "residual_convention": "(predicted - observed) / sigma",
-            "angle_residual_convention": "wrapped_degrees",
-            "max_iterations": max_iterations,
-            "correction_tolerance": correction_tolerance,
-            "residual_tolerance": residual_tolerance,
-            "step_strategy": "backtracking_gauss_newton",
-            "step_scale_history": accepted_step_scales,
-            "line_search_backtrack_count": line_search_backtrack_count,
-            "line_search_step_scales": list(_GAUSS_NEWTON_STEP_SCALES),
-            "covariance_status": covariance_status,
-            "covariance_convention": "inverse_normal_matrix_of_normalized_residuals",
-            **_research_force_metadata(scenario),
-        },
+        metadata=metadata,
     )
 
 

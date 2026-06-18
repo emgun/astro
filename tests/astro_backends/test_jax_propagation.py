@@ -352,6 +352,54 @@ def test_research_estimate_jax_damps_topocentric_angle_corrections() -> None:
     assert result.metadata["line_search_backtrack_count"] > 0
 
 
+def test_research_estimate_jax_supports_inertial_angle_corrections() -> None:
+    truth_scenario = load_scenario("examples/scenarios/leo_two_station_angles.yaml")
+    truth_measurements = [
+        record.model_copy(update={"value": record.metadata["truth"]})
+        for record in generate_synthetic_measurements(
+            truth_scenario,
+            propagate_local(truth_scenario),
+        )
+    ]
+    truth_state = truth_scenario.initial_state.cartesian
+    initial_guess = truth_scenario.initial_state.model_copy(
+        update={
+            "cartesian": truth_state.model_copy(
+                update={
+                    "position_km": (
+                        truth_state.position_km[0] + 0.01,
+                        truth_state.position_km[1] - 0.005,
+                        truth_state.position_km[2] + 0.005,
+                    ),
+                    "velocity_km_s": truth_state.velocity_km_s,
+                }
+            )
+        }
+    )
+    scenario = truth_scenario.model_copy(update={"initial_state": initial_guess})
+
+    result = research_estimate_jax(
+        scenario,
+        truth_measurements,
+        runtime_loader=_fake_autodiff_runtime,
+        max_iterations=8,
+    )
+
+    initial_error = np.linalg.norm(
+        np.array(initial_guess.cartesian.position_km)
+        - np.array(truth_state.position_km)
+    )
+    estimated_error = np.linalg.norm(
+        np.array(result.estimated_state.cartesian.position_km)
+        - np.array(truth_state.position_km)
+    )
+    assert result.converged is True
+    assert result.rms < 1.0e-5
+    assert estimated_error < initial_error
+    assert result.metadata["measurement_types"] == ["right_ascension", "declination"]
+    assert result.metadata["inertial_angle_estimation_frame"] == "EME2000"
+
+
 def test_research_od_sensitivity_jax_rejects_unsupported_measurement_type() -> None:
     scenario = load_scenario("examples/scenarios/leo_doppler.yaml")
     measurements = generate_synthetic_measurements(scenario, propagate_local(scenario))

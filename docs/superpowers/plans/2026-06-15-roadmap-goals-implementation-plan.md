@@ -421,10 +421,12 @@ the same J2 baseline with explicit provenance, JAX research approximations for a
 solar radiation pressure, analytic circular Sun/Moon third-body gravity, and configured third-body
 ephemeris sample screening, opt-in JAX final-state
 transition sensitivities, JAX range/range-rate, inertial RA/Dec, and local-horizon az/el OD
-residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow, and a
+residual Jacobian products, a first JAX research Gauss-Newton OD estimate workflow for
+range/range-rate plus inertial and topocentric angles, and a
 Nyx/ANISE evaluation gate are
 implemented. The JAX research estimator now uses backtracking Gauss-Newton step acceptance for
-range/range-rate and topocentric azimuth/elevation OD products. Live TudatPy variational equation
+range/range-rate, inertial right-ascension/declination, and topocentric azimuth/elevation OD
+products. Live TudatPy variational equation
 construction and broader calibrated live comparison campaigns beyond the current
 two-body/J2/high-order-gravity/drag/SRP/third-body runner and Tudat-vs-reference comparison product,
 standards-grade JAX ephemeris services and operational-grade differentiable OD estimator workflows
@@ -471,7 +473,8 @@ Implemented slice:
   respect to the initial Cartesian state in an `OdSensitivityResult`.
 - `astro research-estimate --backend jax` runs a research backtracking Gauss-Newton correction loop
   over the same normalized residual/Jacobian model and returns the suite `EstimateResult` product
-  with explicit research-backend metadata, including accepted step scales for angular OD damping.
+  with explicit research-backend metadata, including accepted step scales for angular OD damping
+  and explicit EME2000 provenance for inertial RA/Dec estimation.
 - `docs/research/nyx-evaluation.md` records the current Nyx/ANISE decision as evaluation-only.
 
 Definition of done:
@@ -493,7 +496,7 @@ Definition of done:
   without replacing operational Orekit semantics; `astro research-od-sensitivity --backend jax` and
   `astro research-estimate --backend jax` provide the first differentiable OD residual/Jacobian,
   normal/covariance diagnostic, and research correction-loop primitives for range/range-rate,
-  inertial RA/Dec, and local-horizon az/el sensitivity and topocentric az/el estimation.
+  inertial RA/Dec, and local-horizon az/el sensitivity and estimation.
   Standards-grade ephemeris services and
   operational-grade differentiable OD estimators still require validated JAX runners.
 - Nyx/ANISE evaluation has a documented yes/no decision for a production adapter.

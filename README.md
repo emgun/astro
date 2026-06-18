@@ -213,6 +213,7 @@ astro research-od-sensitivity examples/scenarios/leo_two_station_od.yaml measure
 astro research-od-sensitivity examples/scenarios/leo_two_station_angles.yaml angle_measurements.json --backend jax --output angle_od_sensitivity.json
 astro research-od-sensitivity examples/scenarios/leo_two_station_topocentric.yaml topocentric_measurements.json --backend jax --output topocentric_od_sensitivity.json
 astro research-estimate examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --max-iterations 5 --output research_estimate.json
+astro research-estimate examples/scenarios/leo_two_station_angles.yaml angle_measurements.json --backend jax --max-iterations 8 --output angle_research_estimate.json
 astro research-estimate examples/scenarios/leo_two_station_topocentric.yaml topocentric_measurements.json --backend jax --max-iterations 8 --output topocentric_research_estimate.json
 astro orekit-smoke
 ```
@@ -435,8 +436,9 @@ Topocentric angular sensitivity metadata records a horizontal-norm floor because
 geometrically undefined and elevation derivatives are singular at exact zenith/nadir passes.
 `astro research-estimate --backend jax` runs a research Gauss-Newton
 correction loop over the same JAX residual/Jacobian model and writes the suite `EstimateResult`
-product with normalized-residual metadata. It is a differentiable OD workflow for screening and
-method development, not a replacement for the deterministic local estimator or native Orekit OD.
+product with normalized-residual metadata for range/range-rate, inertial RA/Dec, and topocentric
+az/el workflows. It is a differentiable OD workflow for screening and method development, not a
+replacement for the deterministic local estimator or native Orekit OD.
 
 CSV inputs use one row per measurement with these required columns:
 
