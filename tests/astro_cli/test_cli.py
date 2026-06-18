@@ -514,6 +514,34 @@ def test_propagate_attitude_command_writes_closed_loop_control_json(tmp_path: Pa
     assert payload["metadata"]["control_model"] == "quaternion_error_pd"
 
 
+def test_propagate_attitude_command_writes_sensor_actuator_metrics(tmp_path: Path) -> None:
+    output = tmp_path / "attitude-sensor-actuator.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "propagate-attitude",
+            "examples/attitude/closed_loop_sensor_actuator.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["metadata"]["attitude_dynamics_model"] == (
+        "diagonal_rigid_body_closed_loop_pd_sensor_actuator_screening"
+    )
+    assert payload["metadata"]["attitude_control_status"] == "within_tolerance"
+    assert payload["metadata"]["pointing_tolerance_rad"] == 0.1
+    assert payload["metadata"]["angular_rate_tolerance_rad_s"] == 0.05
+    assert payload["metadata"]["torque_saturation_sample_count"] == 0
+    assert payload["metadata"]["actuator_deadband_sample_count"] == 0
+    assert payload["samples"][0]["attitude_error_rad"] > 0.0
+    assert payload["samples"][0]["torque_saturated"] is False
+    assert payload["samples"][0]["actuator_deadband_applied"] is False
+
+
 def test_export_trajectory_command_writes_aem(tmp_path: Path) -> None:
     trajectory_path = tmp_path / "trajectory.json"
     output = tmp_path / "trajectory.aem"

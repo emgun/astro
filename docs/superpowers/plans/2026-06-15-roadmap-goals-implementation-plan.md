@@ -260,9 +260,11 @@ probability methods, including a numerical 2D Gaussian hard-body disk integral, 
 conjunction screening assessment reports, and commanded-attitude
 trajectory samples for maneuvered local propagation, plus diagonal rigid-body torque, bounded
 quaternion-error PD, and deterministic sensor/actuator screening attitude-control propagation
-products. The attitude-coupled finite-burn modes rotate thrust along instantaneous velocity or
-local radial directions and record body-to-inertial unit quaternion samples for the commanded body
-+X axis. Local orbital propagation annotates periapsis/apoapsis `TrajectoryEvent` records for
+products with explicit final/max attitude-rate error metrics, tolerance status, saturation counts,
+and actuator deadband counts. The attitude-coupled finite-burn modes rotate thrust along
+instantaneous velocity or local radial directions and record body-to-inertial unit quaternion
+samples for the commanded body +X axis. Local orbital propagation annotates periapsis/apoapsis
+`TrajectoryEvent` records for
 deterministic mission-analysis products, using radial-velocity root location for no-maneuver local
 trajectories and sample-safe extrema annotation for maneuvered trajectories. The
 `examples/scenarios/leo_eccentric_two_body.yaml` scenario exercises an interior apoapsis root
@@ -286,7 +288,9 @@ Definition of done:
 - `astro propagate-attitude` supports scheduled open-loop body torques, a bounded quaternion-error
   PD closed-loop control primitive, and opt-in deterministic sensor attitude/rate bias plus
   actuator scale/bias/deadband screening with per-sample measured-state, commanded-torque, and
-  applied-control-torque provenance.
+  applied-control-torque provenance. Closed-loop products report configured pointing/rate
+  tolerances, final and max attitude/rate errors, within-tolerance status, torque saturation counts,
+  and actuator deadband counts.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported. Local propagation can populate them from a
   scenario initial covariance using finite-difference state transitions, for two-body scenarios

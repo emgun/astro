@@ -274,7 +274,9 @@ axis along the commanded thrust direction during active thrust-vector burns. The
 pointing products. `astro propagate-attitude` separately propagates a diagonal rigid-body attitude
 state from scheduled torque commands or a bounded quaternion-error PD control law and writes
 quaternion/rate/control-torque history. The closed-loop mode can optionally include deterministic
-sensor attitude/rate bias and actuator scale/bias/deadband screening metadata. This is an ACS
+sensor attitude/rate bias and actuator scale/bias/deadband screening metadata. Closed-loop products
+also report final/max attitude error, final/max angular-rate error, configured control tolerances,
+within-tolerance status, torque saturation counts, and actuator deadband counts. This is an ACS
 product-wiring and sensitivity primitive, not a validated spacecraft actuator/sensor simulation.
 Local orbital propagation
 also annotates periapsis/apoapsis `TrajectoryEvent` records. For no-maneuver trajectories, apsides
