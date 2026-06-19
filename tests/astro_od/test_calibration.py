@@ -85,7 +85,73 @@ def test_generate_dsn_calibration_product_from_tdm_measurements(tmp_path: Path) 
 
 
 def test_generate_station_calibration_product_summarizes_station_biases() -> None:
-    records = [
+    records = _station_calibration_records()
+
+    product = generate_station_calibration_product_from_measurements("dsn-demo", records)
+
+    assert product.scenario_id == "dsn-demo"
+    assert product.calibration_model == "station_measurement_bias_from_truth_metadata"
+    assert product.station_count == 2
+    assert product.entry_count == 2
+    assert product.measurement_count == 3
+    assert product.uncalibrated_measurement_count == 0
+    assert product.truth_metadata_key == "truth"
+    dss14 = product.entries[0]
+    assert dss14.station == "DSS-14"
+    assert dss14.measurement_type == "range"
+    assert dss14.bias_mean == pytest.approx(0.2)
+    assert dss14.bias_min == pytest.approx(0.15)
+    assert dss14.bias_max == pytest.approx(0.25)
+    assert dss14.bias_rms == pytest.approx(((0.25**2 + 0.15**2) / 2.0) ** 0.5)
+    assert dss14.bias_abs_mean == pytest.approx(0.2)
+    assert dss14.bias_std == pytest.approx(0.05)
+    assert dss14.sigma_mean == pytest.approx(0.5)
+    assert dss14.sigma_min == pytest.approx(0.5)
+    assert dss14.sigma_max == pytest.approx(0.5)
+    assert dss14.normalized_bias_mean == pytest.approx(0.4)
+    assert dss14.normalized_bias_rms == pytest.approx(0.41231056256176607)
+    dss43 = product.entries[1]
+    assert dss43.station == "DSS-43"
+    assert dss43.measurement_type == "range_rate"
+    assert dss43.bias_mean == pytest.approx(-0.01)
+    assert dss43.bias_abs_mean == pytest.approx(0.01)
+    assert dss43.bias_std == pytest.approx(0.0)
+    assert dss43.sigma_min == pytest.approx(0.01)
+    assert dss43.sigma_max == pytest.approx(0.01)
+    assert dss43.normalized_bias_mean == pytest.approx(-1.0)
+    assert dss43.normalized_bias_rms == pytest.approx(1.0)
+    assert product.metadata["source_measurement_count"] == 3
+    assert product.metadata["calibrated_measurement_count"] == 3
+    assert product.metadata["calibration_scope"] == "measurement_residual_summary"
+    assert product.metadata["grouping_keys"] == ["observer", "measurement_type", "units"]
+    assert product.metadata["residual_definition"] == "measurement_value_minus_truth_metadata"
+
+
+def test_generate_station_calibration_product_counts_uncalibrated_records() -> None:
+    records = _station_calibration_records()
+    records.append(
+        MeasurementRecord(
+            measurement_type=MeasurementType.RANGE,
+            epoch="2026-01-01T00:02:00+00:00",
+            observer="DSS-14",
+            observed_object="demo-sat",
+            value=12.0,
+            sigma=0.5,
+            units="km",
+            metadata={},
+        )
+    )
+
+    product = generate_station_calibration_product_from_measurements("dsn-demo", records)
+
+    assert product.measurement_count == 3
+    assert product.uncalibrated_measurement_count == 1
+    assert product.metadata["source_measurement_count"] == 4
+    assert product.metadata["calibrated_measurement_count"] == 3
+
+
+def _station_calibration_records() -> list[MeasurementRecord]:
+    return [
         MeasurementRecord(
             measurement_type=MeasurementType.RANGE,
             epoch="2026-01-01T00:00:00+00:00",
@@ -117,21 +183,6 @@ def test_generate_station_calibration_product_summarizes_station_biases() -> Non
             metadata={"truth": -0.01},
         ),
     ]
-
-    product = generate_station_calibration_product_from_measurements("dsn-demo", records)
-
-    assert product.scenario_id == "dsn-demo"
-    assert product.calibration_model == "station_measurement_bias_from_truth_metadata"
-    assert product.station_count == 2
-    assert product.entry_count == 2
-    dss14 = product.entries[0]
-    assert dss14.station == "DSS-14"
-    assert dss14.measurement_type == "range"
-    assert dss14.bias_mean == pytest.approx(0.2)
-    assert dss14.bias_rms == pytest.approx(((0.25**2 + 0.15**2) / 2.0) ** 0.5)
-    assert dss14.normalized_bias_mean == pytest.approx(0.4)
-    assert product.metadata["source_measurement_count"] == 3
-    assert product.metadata["calibrated_measurement_count"] == 3
 
 
 def load_measurements_from_text(

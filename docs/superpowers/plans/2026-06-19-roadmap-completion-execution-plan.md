@@ -144,7 +144,7 @@ git commit -m "docs: clarify roadmap validation boundaries"
 - Modify: `docs/validation-matrix.md`
 - Modify: `docs/superpowers/plans/2026-06-15-roadmap-goals-implementation-plan.md`
 
-- [ ] **Step 1: Add failing model/test assertions**
+- [x] **Step 1: Add failing model/test assertions**
 
 Extend `tests/astro_od/test_calibration.py::test_generate_station_calibration_product_summarizes_station_biases` with these assertions:
 
@@ -192,7 +192,7 @@ def test_generate_station_calibration_product_counts_uncalibrated_records() -> N
     assert product.metadata["calibrated_measurement_count"] == 3
 ```
 
-- [ ] **Step 2: Run the focused failing test**
+- [x] **Step 2: Run the focused failing test**
 
 Run:
 
@@ -202,7 +202,7 @@ python -m pytest tests/astro_od/test_calibration.py::test_generate_station_calib
 
 Expected before implementation: failure for missing `uncalibrated_measurement_count`, `truth_metadata_key`, and new entry fields.
 
-- [ ] **Step 3: Implement deterministic residual diagnostics**
+- [x] **Step 3: Implement deterministic residual diagnostics**
 
 Add these fields to `StationCalibrationEntry`:
 
@@ -262,7 +262,7 @@ Set:
 uncalibrated_measurement_count=len(measurement_records) - calibrated_measurement_count
 ```
 
-- [ ] **Step 4: Extend CLI assertions**
+- [x] **Step 4: Extend CLI assertions**
 
 In `tests/astro_cli/test_cli.py::test_station_calibration_command_writes_json`, add:
 
@@ -274,7 +274,7 @@ assert payload["metadata"]["grouping_keys"] == ["observer", "measurement_type", 
 assert payload["entries"][0]["normalized_bias_rms"] >= 0.0
 ```
 
-- [ ] **Step 5: Update docs**
+- [x] **Step 5: Update docs**
 
 Update `README.md` station calibration wording to:
 
@@ -288,7 +288,7 @@ Update `docs/validation-matrix.md` station calibration row to mention:
 mean/min/max/RMS, population standard deviation, mean absolute residual, sigma min/mean/max, normalized mean/RMS bias, calibrated/uncalibrated counts, and explicit non-native DSN limitations.
 ```
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
 
 Run:
 
@@ -301,7 +301,7 @@ git diff --check
 
 Expected: all pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 Run:
 

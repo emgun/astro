@@ -383,8 +383,11 @@ delay plus first-order TEC/frequency ionosphere group delay with per-leg elevati
 `astro dsn-calibration` turns those generated radiometric records into an auditable DSN-style media
 calibration summary product with per-record leg delays, elevation diagnostics, and aggregate delay
 statistics. This is a calibration product over the suite's supported radiometric primitives, not a
-full binary DSN ODF/TNF standards pipeline. `astro station-calibration` estimates per-station and
-per-measurement-type biases from truth-tagged measurement records. `astro import-dsn-tracking`
+full binary DSN ODF/TNF standards pipeline. `astro station-calibration` summarizes
+per-station/per-measurement-type residual biases from suite measurement records carrying `truth`
+metadata. It reports grouped residual statistics and sigma-normalized diagnostics for auditability;
+it does not solve station coordinates, clock terms, media parameters, or native NASA ODF/TNF
+station calibration records. `astro import-dsn-tracking`
 ingests a normalized CSV bridge for ODF/TNF-style DSN tracking rows into normal suite measurement
 JSON with format provenance, `astro import-dsn-kvn-tracking` ingests strict DSN ODF/TNF
 KVN-style tracking decks with per-segment metadata, and `astro import-dsn-binary-tracking` ingests

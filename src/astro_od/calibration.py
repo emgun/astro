@@ -52,8 +52,13 @@ class StationCalibrationEntry(AstroModel):
     bias_min: FiniteFloat
     bias_max: FiniteFloat
     bias_rms: FiniteFloat = Field(ge=0.0)
+    bias_std: FiniteFloat = Field(ge=0.0)
+    bias_abs_mean: FiniteFloat = Field(ge=0.0)
     sigma_mean: FiniteFloat = Field(gt=0.0)
+    sigma_min: FiniteFloat = Field(gt=0.0)
+    sigma_max: FiniteFloat = Field(gt=0.0)
     normalized_bias_mean: FiniteFloat
+    normalized_bias_rms: FiniteFloat = Field(ge=0.0)
 
 
 class StationCalibrationProduct(AstroModel):
@@ -62,6 +67,8 @@ class StationCalibrationProduct(AstroModel):
     station_count: int = Field(ge=1)
     entry_count: int = Field(ge=1)
     measurement_count: int = Field(ge=1)
+    uncalibrated_measurement_count: int = Field(ge=0)
+    truth_metadata_key: str = "truth"
     entries: tuple[StationCalibrationEntry, ...] = Field(min_length=1)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -113,6 +120,15 @@ def generate_station_calibration_product_from_measurements(
     product_metadata: dict[str, Any] = {
         "workflow": "station_calibration",
         "calibration_reference": "measurement_metadata_truth",
+        "calibration_scope": "measurement_residual_summary",
+        "calibration_limitations": [
+            "requires suite measurement truth metadata",
+            "does not solve station coordinates",
+            "does not solve station clock or media calibration parameters",
+            "does not decode native NASA ODF/TNF station calibration records",
+        ],
+        "grouping_keys": ["observer", "measurement_type", "units"],
+        "residual_definition": "measurement_value_minus_truth_metadata",
         "source_measurement_count": len(measurement_records),
         "calibrated_measurement_count": calibrated_measurement_count,
     }
@@ -123,6 +139,7 @@ def generate_station_calibration_product_from_measurements(
         station_count=len({entry.station for entry in entries}),
         entry_count=len(entries),
         measurement_count=calibrated_measurement_count,
+        uncalibrated_measurement_count=len(measurement_records) - calibrated_measurement_count,
         entries=entries,
         metadata=product_metadata,
     )
@@ -188,6 +205,7 @@ def _station_calibration_entry(
     sigmas = [sigma for _residual, sigma in residual_sigma_pairs]
     bias_mean = fmean(residuals)
     sigma_mean = fmean(sigmas)
+    bias_rms = sqrt(fmean([residual * residual for residual in residuals]))
     return StationCalibrationEntry(
         station=station,
         measurement_type=measurement_type,
@@ -196,9 +214,14 @@ def _station_calibration_entry(
         bias_mean=bias_mean,
         bias_min=min(residuals),
         bias_max=max(residuals),
-        bias_rms=sqrt(fmean([residual * residual for residual in residuals])),
+        bias_rms=bias_rms,
+        bias_std=sqrt(fmean([(residual - bias_mean) ** 2 for residual in residuals])),
+        bias_abs_mean=fmean([abs(residual) for residual in residuals]),
         sigma_mean=sigma_mean,
+        sigma_min=min(sigmas),
+        sigma_max=max(sigmas),
         normalized_bias_mean=bias_mean / sigma_mean,
+        normalized_bias_rms=bias_rms / sigma_mean,
     )
 
 

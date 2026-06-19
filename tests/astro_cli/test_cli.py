@@ -1632,6 +1632,11 @@ def test_station_calibration_command_writes_json(tmp_path: Path) -> None:
     assert payload["calibration_model"] == "station_measurement_bias_from_truth_metadata"
     assert payload["station_count"] == 2
     assert payload["entry_count"] == 4
+    assert payload["truth_metadata_key"] == "truth"
+    assert payload["uncalibrated_measurement_count"] == 0
+    assert payload["metadata"]["calibration_scope"] == "measurement_residual_summary"
+    assert payload["metadata"]["grouping_keys"] == ["observer", "measurement_type", "units"]
+    assert payload["entries"][0]["normalized_bias_rms"] >= 0.0
     assert payload["metadata"]["measurement_file"].endswith(
         "leo_two_station_od_measurements.json"
     )

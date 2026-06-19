@@ -211,10 +211,12 @@ Implemented slice:
   suite measurement JSON with source-format, tracking-format, participant-path, and transmitter
   provenance, `astro import-dsn-kvn-tracking` ingests strict ODF/TNF KVN-style tracking decks with
   per-segment metadata, and `astro import-dsn-binary-tracking` ingests the suite-owned ASTRODSN1
-  fixed-record binary bridge. `astro station-calibration` estimates
-  per-station/per-measurement-type bias products from truth-tagged measurement records. Native
-  standards-grade binary ODF/TNF parsing and full DSN station calibration remain deeper standards
-  work.
+  fixed-record binary bridge. `astro station-calibration` summarizes
+  per-station/per-measurement-type residual bias products from truth-tagged measurement records,
+  including residual dispersion, sigma range, normalized mean/RMS bias, calibrated/uncalibrated
+  counts, and explicit limitations that it does not solve station coordinates, clock terms, media
+  parameters, or native NASA ODF/TNF calibration records. Native standards-grade binary ODF/TNF
+  parsing and full DSN station calibration remain deeper standards work.
 - `examples/scenarios/leo_doppler.yaml` provides a checked-in local one-way Doppler synthesis,
   JSON/CSV product, and local residual-prediction fixture. `leo_radiometric_links.yaml` provides a
   checked-in iterative two-way/three-way radiometric synthesis fixture. `leo_radiometric_media.yaml`
