@@ -62,24 +62,34 @@ Implemented and protected:
 
 Still roadmap-level:
 
-- Production-grade variational covariance validation for drag/SRP/third-body dynamics and validated
-  production actuator/sensor attitude-control system models beyond the current deterministic bounded
-  quaternion-error PD plus sensor/actuator screening primitives.
+- Live backend validation campaigns for production-grade covariance behavior through drag, SRP, and
+  third-body dynamics. Suite finite-difference, local variational, Orekit finite-difference, Tudat
+  finite-difference, and Tudat native-variational construction products exist, but force-model by
+  force-model live confidence remains separate from local product-shape validation.
+- Flight-qualified actuator/sensor ACS modeling beyond the current deterministic bounded
+  quaternion-error PD plus sensor/actuator screening primitives. Current products are useful
+  screening diagnostics, not spacecraft-qualified hardware simulations.
 - Full native multi-motor RocketPy staging and full target-seeking multistage Dymos ascent
-  optimization beyond the current native pitch-control transcription.
+  optimization beyond the current RocketPy adapter boundary, suite-stage annotation, Dymos vertical
+  phase, and opt-in native pitch-control transcription.
 - Native Tudat variational-equation covariance propagation now has an explicit opt-in default
   construction boundary that builds the initial-state parameter set and reads TudatPy
   `state_transition_matrix_history` when the optional variational API is present. Default Tudat
-  covariance continues to use the suite finite-difference transition product.
-- Full standards-grade precession-nutation reductions beyond the current compact
-  `iau_2006_2000a_simplified` geodetic-station option, native standards-grade binary DSN ODF/TNF
-  parsing beyond the normalized CSV, strict KVN-style ODF/TNF tracking deck, and suite-owned
-  ASTRODSN1 binary tracking bridges plus truth-tagged station-bias calibration product, and
-  operational CCSDS support beyond current KVN TDM measurement
-  families, suite multi-leg radiometric TDM extension, OEM/OPM orbit-state and OPM covariance interchange, and AEM
-  quaternion attitude export/import.
-- Full differentiable OD estimator workflows beyond the current JAX research correction-loop and
-  covariance sensitivity products.
+  covariance continues to use the suite finite-difference transition product until live campaigns
+  prove the native variational path across the supported force-model set.
+- Standards-grade astrometry and tracking coverage beyond the current product boundaries: full
+  precession-nutation reductions beyond compact `iau_2006_2000a_simplified`, native NASA binary
+  DSN ODF/TNF parsing beyond normalized CSV, strict KVN-style tracking deck, and suite-owned
+  ASTRODSN1 bridge formats, plus operational CCSDS coverage beyond current KVN TDM families,
+  suite multi-leg radiometric TDM extension, OEM/OPM orbit-state and covariance interchange, and
+  AEM quaternion attitude interchange. ASTRODSN1 and the KVN/CSV tracking formats are suite-owned
+  bridges, not official binary ODF/TNF decoders.
+- DSN calibration depth beyond the current DSN-style media summary and truth-tagged station-bias
+  residual product. The suite can summarize measurements it owns; it does not yet solve official
+  station coordinate, clock, media, or native ODF/TNF station calibration parameters.
+- Operational differentiable OD services beyond the current JAX research correction-loop,
+  residual-sensitivity, and covariance-sensitivity products. Current JAX products are research
+  workflows, not operational OD service replacements.
 
 ## Goal Ledger
 
