@@ -352,6 +352,15 @@ def test_optimize_launch_dymos_runs_native_pitch_program_transcription(
     assert dymos_phase["pitch_program_optimization_scope"] == (
         "native_dymos_pitch_program_transcription"
     )
+    assert dymos_phase["target_objective"] == (
+        "minimize_final_normalized_target_insertion_error"
+    )
+    assert dymos_phase["target_score"] > 0.0
+    assert set(dymos_phase["target_score_terms"]) == {
+        "altitude",
+        "velocity",
+        "radial_velocity",
+    }
     contract = result.metadata["dymos_pitch_program_transcription_contract"]
     assert contract["execution_status"] == "executed"
     assert contract["phase_coupling"] == "native_dymos_pitch_control"
@@ -434,6 +443,10 @@ def test_live_dymos_pitch_program_optimization_executes_native_transcription() -
     assert result.metadata["dymos_phase"]["pitch_program_optimization_scope"] == (
         "native_dymos_pitch_program_transcription"
     )
+    assert result.metadata["dymos_phase"]["target_objective"] == (
+        "minimize_final_normalized_target_insertion_error"
+    )
+    assert result.metadata["dymos_phase"]["target_score"] >= 0.0
     contract = result.metadata["dymos_pitch_program_transcription_contract"]
     assert contract["execution_status"] == "executed"
     assert contract["phase_coupling"] == "native_dymos_pitch_control"

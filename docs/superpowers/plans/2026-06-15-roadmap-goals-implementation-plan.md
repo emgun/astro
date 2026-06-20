@@ -51,7 +51,8 @@ Implemented and protected:
   and a live-gated native Orekit OD bridge for geodetic range/range-rate records.
 - Optional RocketPy and Dymos/OpenMDAO launch backend gates, including configured RocketPy direct
   flight mapping, a stage-aware Dymos vertical-ascent phase transcription, and an opt-in native
-  Dymos pitch-control transcription over the suite pitch program.
+  Dymos pitch-control transcription over the suite pitch program with a normalized final
+  target-insertion objective.
 - Optional Tudat native two-body, J2 spherical-harmonic, configured high-order Earth spherical
   harmonic, atmospheric drag, cannonball SRP, and Sun/Moon point-mass third-body propagation
   cross-check runners, plus suite finite-difference covariance-history products through the
@@ -71,11 +72,11 @@ Still roadmap-level:
 - Flight-qualified actuator/sensor ACS modeling beyond the current deterministic bounded
   quaternion-error PD plus sensor/actuator screening primitives. Current products are useful
   screening diagnostics, not spacecraft-qualified hardware simulations.
-- Full native RocketPy multi-motor/staged-separation execution and full target-seeking multistage
-  Dymos ascent optimization beyond the current RocketPy direct-flight adapter, suite-stage
-  annotation, Dymos vertical phase, and opt-in native pitch-control transcription. The current
-  RocketPy 1.11 adapter fails closed for additional configured motors because RocketPy overwrites
-  earlier motors when `add_motor` is called more than once.
+- Full native RocketPy multi-motor/staged-separation execution and full multistage Dymos ascent
+  design optimization beyond the current RocketPy direct-flight adapter, suite-stage annotation,
+  Dymos vertical phase, and bounded native pitch-control target objective. The current RocketPy
+  1.11 adapter fails closed for additional configured motors because RocketPy overwrites earlier
+  motors when `add_motor` is called more than once.
 - Native Tudat variational-equation covariance propagation now has an explicit opt-in default
   construction boundary that builds the initial-state parameter set and reads TudatPy
   `state_transition_matrix_history` when the optional variational API is present. Default Tudat
@@ -335,7 +336,7 @@ Primary files:
 Status: first external-backend boundary implemented, first live RocketPy direct runner added,
 RocketPy multi-motor guard configuration added, RocketPy multistage suite-stage composition added,
 first live stage-aware Dymos/OpenMDAO phase transcription added, and opt-in native Dymos
-pitch-control transcription added. RocketPy and
+pitch-control target transcription added. RocketPy and
 Dymos/OpenMDAO optional runtime gates, smoke commands, launch
 backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured
 launch examples, configured solid RocketPy direct simulation, multistage suite stage-event/sample
@@ -344,12 +345,13 @@ fail-closed guard for additional configured motors, a RocketPy multistage adapte
 records the non-native composition scope, a neutral
 `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics,
 Dymos stage-aware vertical-ascent phase transcription, opt-in native Dymos pitch-control
-transcription, Dymos suite stage-plan metadata, pitch-program control-point metadata, optimized
-pitch-program schedule metadata, tuned point indices, a Dymos pitch-program transcription contract
-with per-stage control coverage, altitude, velocity, and radial-velocity target-insertion
-residual/tolerance assessment, and Dymos adapter optimization diagnostics are implemented. Full
-native RocketPy multi-motor/staged-separation execution and full target-seeking multistage Dymos
-ascent design optimization remain gated on deeper validated backend runners.
+transcription with a normalized final target-insertion objective, Dymos suite stage-plan metadata,
+pitch-program control-point metadata, optimized pitch-program schedule metadata, tuned point
+indices, a Dymos pitch-program transcription contract with per-stage control coverage, altitude,
+velocity, and radial-velocity target-insertion residual/tolerance assessment, target-score
+metadata, and Dymos adapter optimization diagnostics are implemented. Full native RocketPy
+multi-motor/staged-separation execution and full multistage Dymos ascent design optimization remain
+gated on deeper validated backend runners.
 
 Implemented slice:
 
@@ -383,11 +385,12 @@ Implemented slice:
 - `astro optimize-launch --backend dymos --dymos-mode pitch-program` runs a native Dymos
   pitch-control transcription over the suite pitch program, maps optimized control values back into
   the same suite launch-tuning product, and marks the pitch-program transcription contract as
-  executed.
+  executed. The phase objective minimizes a normalized final target-insertion score using altitude,
+  speed, and radial-velocity errors against the configured target orbit.
 - Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
   iteration count, candidate count, path-constraint summary, best score, target insertion
   residuals for altitude, velocity, and radial velocity, target-insertion tolerance assessment,
-  Dymos version, OpenMDAO version, phase
+  normalized target-score metadata, Dymos version, OpenMDAO version, phase
   duration, final altitude, final velocity, original and optimized pitch-program control-point
   schedules, tuned pitch point indices, explicit pitch-program optimization scope metadata, and
   optimizer message.
@@ -407,13 +410,12 @@ Definition of done:
   stage names, and stage-schedule completeness without claiming native RocketPy staged separation.
 - `astro optimize-launch --backend dymos` solves a stage-aware ascent optimization example through
   a bounded vertical-ascent Dymos phase model, and `--dymos-mode pitch-program` executes an opt-in
-  native Dymos pitch-control transcription.
+  native Dymos pitch-control transcription with a normalized final target-insertion objective.
 - Dymos/OpenMDAO adapter reports path constraints, pitch-program control points, tuned pitch point
   indices, optimized pitch-program control points, optimizer status, convergence diagnostics, and
   altitude, velocity, and radial-velocity target insertion residuals.
 - Dymos/OpenMDAO adapter reports the suite multistage plan and configured-burn coverage without
-  claiming the current simplified phase models are a full target-seeking multistage ascent design
-  optimizer.
+  claiming the current simplified phase models are a full multistage ascent design optimizer.
 - Launch validation includes deterministic direct-simulation cases and one small optimization case.
 - Launch-to-orbit handoff still produces a normal orbital `Scenario`.
 
@@ -569,13 +571,13 @@ skipped, `python -m ruff check .`, `python -m mypy`, and `python -m build`. Opti
 evidence is recorded in `docs/validation/live-backend-campaigns.md`: Orekit propagation,
 generic and high-fidelity covariance, and native OD passed with the explicit Homebrew OpenJDK/data
 environment; RocketPy configured launch examples passed and the additional-motor guard was added;
-Dymos default phase plus pitch-program
-transcription passed; the TudatPy 1.0 isolated conda campaign passed native propagation,
+Dymos default phase plus target-seeking pitch-program transcription passed; the TudatPy 1.0
+isolated conda campaign passed native propagation,
 high-fidelity covariance, native variational covariance, strict two-body comparison, and calibrated
 two-scenario comparison gates; and the JAX research promotion checklist passed live on this
 machine. These live results promote only the executed optional gates and do not change the
 remaining product boundaries for default Java-free CI, native RocketPy multi-motor/staged
-separation, full target-seeking multistage optimization, operational differentiable OD, or
+separation, full multistage Dymos ascent design optimization, operational differentiable OD, or
 standards-grade ephemeris authority.
 
 Definition of done:

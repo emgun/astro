@@ -89,8 +89,9 @@ original and optimized pitch-program control-point schedules, tuned point indice
 altitude, velocity, and radial-velocity target-insertion residual/tolerance assessment, and a flag
 showing that the Dymos phase duration covers the configured burn schedule. The opt-in
 `--dymos-mode pitch-program` path runs a native
-Dymos pitch-control transcription over the suite pitch program and marks the transcription contract
-as executed. Full target-seeking multistage Dymos ascent design optimization remains future work.
+Dymos pitch-control transcription over the suite pitch program, minimizes a normalized final
+target-insertion error, and marks the transcription contract as executed. Full multistage Dymos
+ascent design optimization beyond this bounded pitch-program target objective remains future work.
 
 Optional research backend smoke checks:
 
@@ -355,10 +356,11 @@ runs the stage-aware vertical phase, preserves the suite pitch-program tuning pr
 pitch-program control-point metadata, the optimized pitch-program schedule, tuned indices, path
 constraints, and a Dymos-ready pitch-program transcription contract with stage-phase control
 coverage. `--dymos-mode pitch-program` runs a native Dymos pitch-control transcription and maps the
-resulting control values back into the same suite product with `execution_status = "executed"`.
+resulting control values back into the same suite product with `execution_status = "executed"` and
+target-score metadata for the normalized final insertion objective.
 Both paths report target-insertion residuals against scenario tolerances, per-component
 within-tolerance status, and the weighted altitude/velocity/radial-velocity objective. The current
-suite still does not claim a full target-seeking multistage ascent design optimizer.
+suite still does not claim a full multistage ascent design optimizer.
 
 `astro report-tuned-launch` runs the current local end-to-end launch analysis: tune two pitch knots,
 propagate the tuned ascent, hand off insertion to an orbit scenario, propagate a short orbital arc,

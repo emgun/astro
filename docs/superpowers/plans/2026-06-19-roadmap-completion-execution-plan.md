@@ -479,7 +479,12 @@ python -m pytest tests/astro_backends/test_rocketpy_simulation.py::test_propagat
 # 2026-06-20: 1 passed in 0.28s, guarding RocketPy 1.11's one-motor limitation
 
 ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription -q
-# 2 passed, 2 OpenMDAO warnings
+# 2026-06-20: 2 passed, 2 OpenMDAO warnings in 2.23s; verifies the default Dymos phase
+# and native pitch-program transcription target-score metadata
+
+astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --dymos-mode pitch-program --output /tmp/astro-dymos-target-seeking-launch.json
+# 2026-06-20: wrote a suite launch optimization product with target_objective =
+# minimize_final_normalized_target_insertion_error and target_score = 1.1572999135341908
 
 JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" astro orekit-smoke
 # available true, orekit_jpype 13.1.5.0
