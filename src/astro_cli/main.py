@@ -9,6 +9,7 @@ import yaml
 
 from astro_backends.dymos import (
     optimize_launch_dymos,
+    run_dymos_multistage_pitch_program_optimization,
     run_dymos_pitch_program_optimization,
     run_dymos_smoke,
 )
@@ -969,7 +970,10 @@ def optimize_launch(
         str,
         typer.Option(
             "--dymos-mode",
-            help="Dymos optimization mode: phase or pitch-program.",
+            help=(
+                "Dymos optimization mode: phase, pitch-program, "
+                "or multistage-pitch-program."
+            ),
         ),
     ] = "phase",
 ) -> None:
@@ -994,6 +998,11 @@ def optimize_launch(
                 result = optimize_launch_dymos(
                     scenario,
                     optimizer_runner=run_dymos_pitch_program_optimization,
+                )
+            elif dymos_mode == "multistage-pitch-program":
+                result = optimize_launch_dymos(
+                    scenario,
+                    optimizer_runner=run_dymos_multistage_pitch_program_optimization,
                 )
             else:
                 raise UnsupportedBackendError(

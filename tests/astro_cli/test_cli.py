@@ -1361,6 +1361,49 @@ def test_optimize_launch_command_accepts_dymos_pitch_program_mode(
     assert payload["backend"] == "dymos"
 
 
+def test_optimize_launch_command_accepts_dymos_multistage_pitch_program_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    scenario_path = tmp_path / "pitch.yaml"
+    output = tmp_path / "optimization.json"
+    seen_runner_names: list[str | None] = []
+    _write_pitch_program_launch_scenario(scenario_path)
+
+    def fake_dymos(
+        scenario: LaunchScenario,
+        *,
+        optimizer_runner: object | None = None,
+    ) -> object:
+        seen_runner_names.append(getattr(optimizer_runner, "__name__", None))
+        return tune_pitch_program(
+            scenario,
+            point_indices=(2, 3),
+            iterations=1,
+        ).model_copy(update={"backend": "dymos"})
+
+    monkeypatch.setattr("astro_cli.main.optimize_launch_dymos", fake_dymos)
+
+    result = runner.invoke(
+        app,
+        [
+            "optimize-launch",
+            str(scenario_path),
+            "--backend",
+            "dymos",
+            "--dymos-mode",
+            "multistage-pitch-program",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert seen_runner_names == ["run_dymos_multistage_pitch_program_optimization"]
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["backend"] == "dymos"
+
+
 def test_report_tuned_launch_command_writes_json(tmp_path: Path) -> None:
     scenario_path = tmp_path / "pitch.yaml"
     output = tmp_path / "report.json"

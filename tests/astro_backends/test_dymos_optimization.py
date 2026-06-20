@@ -8,6 +8,7 @@ from astro_backends.dymos.optimization import (
     DymosPhaseSummary,
     DymosPitchProgramSummary,
     optimize_launch_dymos,
+    run_dymos_multistage_pitch_program_optimization,
     run_dymos_pitch_program_optimization,
 )
 from astro_backends.dymos.runtime import DymosRuntime
@@ -371,6 +372,103 @@ def test_optimize_launch_dymos_runs_native_pitch_program_transcription(
     assert result.metadata["dymos_tuned_pitch_point_indices"] == [2, 3]
 
 
+def test_optimize_launch_dymos_runs_native_multistage_pitch_program_transcription(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = make_pitch_program_launch_scenario()
+    seen_runtime: list[DymosRuntime] = []
+
+    def fake_multistage_solver(
+        candidate: LaunchScenario,
+        runtime: DymosRuntime,
+    ) -> DymosPitchProgramSummary:
+        assert candidate is scenario
+        seen_runtime.append(runtime)
+        return DymosPitchProgramSummary(
+            phase_model="multiphase_stage_pitch_program_ascent",
+            transcription="GaussLobatto",
+            num_segments=4,
+            order=3,
+            duration_s=120.0,
+            stage_count=2,
+            total_burn_duration_s=120.0,
+            final_altitude_km=156.0,
+            final_velocity_km_s=7.66,
+            final_radial_velocity_km_s=0.04,
+            final_horizontal_velocity_km_s=7.65,
+            final_downrange_km=490.0,
+            target_miss={
+                "altitude_miss_km": -4.0,
+                "velocity_miss_km_s": 0.04,
+            },
+            optimized_pitch_deg_by_point_index={2: 41.0, 3: 17.0},
+            optimizer_success=True,
+            optimizer_message="Optimization terminated successfully",
+            phase_count=2,
+            phase_topology="multiphase_stage_linked",
+            linked_state_names=("time", "h", "downrange", "vr", "vh"),
+            stage_phase_summaries=(
+                {
+                    "name": "stage-1",
+                    "phase_name": "stage_1",
+                    "duration_s": 70.0,
+                    "final_altitude_km": 28.0,
+                    "final_velocity_km_s": 1.8,
+                },
+                {
+                    "name": "stage-2",
+                    "phase_name": "stage_2",
+                    "duration_s": 50.0,
+                    "final_altitude_km": 156.0,
+                    "final_velocity_km_s": 7.66,
+                },
+            ),
+            source_backend="dymos_multistage_pitch_program",
+            pitch_program_optimization_coupling="native_dymos_multiphase_pitch_control",
+            pitch_program_optimization_scope="native_dymos_multiphase_stage_transcription",
+        )
+
+    monkeypatch.setattr(
+        "astro_backends.dymos.optimization._solve_dymos_multistage_pitch_program_phases",
+        fake_multistage_solver,
+    )
+
+    result = optimize_launch_dymos(
+        scenario,
+        runtime_loader=_fake_runtime,
+        optimizer_runner=run_dymos_multistage_pitch_program_optimization,
+    )
+
+    assert len(seen_runtime) == 1
+    assert result.backend == "dymos"
+    assert result.metadata["source_backend"] == "dymos_multistage_pitch_program"
+    dymos_phase = result.metadata["dymos_phase"]
+    assert dymos_phase["phase_model"] == "multiphase_stage_pitch_program_ascent"
+    assert dymos_phase["phase_count"] == 2
+    assert dymos_phase["phase_topology"] == "multiphase_stage_linked"
+    assert dymos_phase["linked_state_names"] == ("time", "h", "downrange", "vr", "vh")
+    assert dymos_phase["stage_phase_summaries"][0]["phase_name"] == "stage_1"
+    assert dymos_phase["stage_phase_summaries"][0]["duration_s"] == 70.0
+    assert dymos_phase["stage_phase_summaries"][1]["phase_name"] == "stage_2"
+    assert dymos_phase["stage_phase_summaries"][1]["duration_s"] == 50.0
+    assert dymos_phase["pitch_program_optimization_coupling"] == (
+        "native_dymos_multiphase_pitch_control"
+    )
+    assert dymos_phase["pitch_program_optimization_scope"] == (
+        "native_dymos_multiphase_stage_transcription"
+    )
+    contract = result.metadata["dymos_pitch_program_transcription_contract"]
+    assert contract["execution_status"] == "executed"
+    assert contract["phase_coupling"] == "native_dymos_multiphase_pitch_control"
+    assert contract["phase_topology"] == "multiphase_stage_linked"
+    assert contract["native_stage_phase_count"] == 2
+    assert contract["linked_state_names"] == ("time", "h", "downrange", "vr", "vh")
+    assert contract["optimized_control_points"][2]["pitch_deg"] == 41.0
+    assert contract["optimized_control_points"][2]["source"] == "dymos_pitch_program_control"
+    assert contract["optimized_control_points"][3]["pitch_deg"] == 17.0
+    assert contract["optimized_control_points"][3]["source"] == "dymos_pitch_program_control"
+
+
 @pytest.mark.dymos_live
 def test_live_dymos_optimization_returns_suite_product() -> None:
     if os.environ.get("ASTRO_RUN_DYMOS_LIVE") != "1":
@@ -456,3 +554,40 @@ def test_live_dymos_pitch_program_optimization_executes_native_transcription() -
     assert contract["optimized_control_points"][3]["source"] == (
         "dymos_pitch_program_control"
     )
+
+
+@pytest.mark.dymos_live
+def test_live_dymos_multistage_pitch_program_executes_native_multiphase() -> None:
+    if os.environ.get("ASTRO_RUN_DYMOS_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_DYMOS_LIVE=1 to run live Dymos launch optimization")
+    pytest.importorskip("dymos")
+    pytest.importorskip("openmdao")
+
+    scenario = load_launch_scenario(Path("examples/launch/pitch_program_two_stage.yaml"))
+
+    result = optimize_launch_dymos(
+        scenario,
+        optimizer_runner=run_dymos_multistage_pitch_program_optimization,
+    )
+
+    assert result.backend == "dymos"
+    assert result.metadata["source_backend"] == "dymos_multistage_pitch_program"
+    assert result.metadata["converged"] is True
+    dymos_phase = result.metadata["dymos_phase"]
+    assert dymos_phase["phase_model"] == "multiphase_stage_pitch_program_ascent"
+    assert dymos_phase["phase_count"] == 2
+    assert dymos_phase["phase_topology"] == "multiphase_stage_linked"
+    assert dymos_phase["linked_state_names"] == ("time", "h", "downrange", "vr", "vh")
+    assert len(dymos_phase["stage_phase_summaries"]) == 2
+    assert dymos_phase["stage_phase_summaries"][0]["duration_s"] == 70.0
+    assert dymos_phase["stage_phase_summaries"][1]["duration_s"] == 50.0
+    assert dymos_phase["target_objective"] == (
+        "minimize_final_normalized_target_insertion_error"
+    )
+    assert dymos_phase["target_score"] >= 0.0
+    contract = result.metadata["dymos_pitch_program_transcription_contract"]
+    assert contract["execution_status"] == "executed"
+    assert contract["phase_coupling"] == "native_dymos_multiphase_pitch_control"
+    assert contract["phase_topology"] == "multiphase_stage_linked"
+    assert contract["native_stage_phase_count"] == 2
+    assert contract["linked_state_names"] == ("time", "h", "downrange", "vr", "vh")

@@ -72,13 +72,16 @@ multistage path is a composition adapter, not a validated RocketPy staged-separa
 Dymos optimization currently supports a default stage-aware
 vertical-ascent phase transcription wrapped in the suite launch-tuning product, plus an opt-in
 native pitch-control transcription selected with `astro optimize-launch --backend dymos
---dymos-mode pitch-program`. Dymos products include suite stage-plan metadata, original and
-optimized pitch-program control-point schedules, tuned point indices, path constraints, a
+--dymos-mode pitch-program`, and a native linked multiphase variant selected with
+`--dymos-mode multistage-pitch-program`. Dymos products include suite stage-plan metadata, original
+and optimized pitch-program control-point schedules, tuned point indices, path constraints, a
 pitch-program transcription contract with per-stage control coverage, altitude, velocity, and
 radial-velocity target-insertion residual/tolerance assessment, target-score metadata for the
 normalized final insertion objective, and a coverage flag showing that the phase duration spans the
-configured burn schedule. Full multistage Dymos optimization still requires additional validation
-before it should be promoted beyond the adapter gate.
+configured burn schedule. The multiphase mode additionally records one Dymos phase per suite stage,
+linked time/altitude/downrange/radial-velocity/horizontal-velocity state continuity, stage
+durations, and per-stage final metrics. Full high-fidelity multistage Dymos optimization still
+requires additional validation before it should be promoted beyond the adapter gate.
 
 ## Research Backends
 

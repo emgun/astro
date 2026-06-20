@@ -2,6 +2,7 @@ from astro_backends.dymos.optimization import (
     DymosPhaseSummary,
     DymosPitchProgramSummary,
     optimize_launch_dymos,
+    run_dymos_multistage_pitch_program_optimization,
     run_dymos_phase_optimization,
     run_dymos_pitch_program_optimization,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "DymosPitchProgramSummary",
     "load_dymos_runtime",
     "optimize_launch_dymos",
+    "run_dymos_multistage_pitch_program_optimization",
     "run_dymos_phase_optimization",
     "run_dymos_pitch_program_optimization",
     "run_dymos_smoke",

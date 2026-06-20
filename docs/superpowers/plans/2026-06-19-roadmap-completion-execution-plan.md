@@ -488,6 +488,15 @@ astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dym
 # 2026-06-20: wrote a suite launch optimization product with target_objective =
 # minimize_final_normalized_target_insertion_error and target_score = 1.1572999135341908
 
+ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription tests/astro_backends/test_dymos_optimization.py::test_live_dymos_multistage_pitch_program_executes_native_multiphase -q
+# 2026-06-20: 3 passed, 3 OpenMDAO warnings in 2.13s; verifies default, single-phase
+# pitch-program, and linked multiphase stage-transcription Dymos products
+
+astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --dymos-mode multistage-pitch-program --output /tmp/astro-dymos-multistage-pitch-program-launch.json
+# 2026-06-20: wrote a suite launch optimization product with source_backend =
+# dymos_multistage_pitch_program, phase_count = 2, phase_topology = multiphase_stage_linked,
+# linked_state_names = time/h/downrange/vr/vh, and target_score = 1.0190604006894797
+
 JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" astro orekit-smoke
 # available true, orekit_jpype 13.1.5.0
 

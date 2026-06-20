@@ -60,6 +60,13 @@ class DymosPitchProgramSummary:
     optimized_pitch_deg_by_point_index: dict[int, float]
     optimizer_success: bool
     optimizer_message: str
+    phase_count: int = 1
+    phase_topology: str = "single_phase_stage_scheduled"
+    linked_state_names: tuple[str, ...] = ()
+    stage_phase_summaries: tuple[dict[str, Any], ...] = ()
+    source_backend: str = "dymos_pitch_program"
+    pitch_program_optimization_coupling: str = "native_dymos_pitch_control"
+    pitch_program_optimization_scope: str = "native_dymos_pitch_program_transcription"
 
     def to_metadata(self) -> dict[str, Any]:
         return asdict(self)
@@ -393,6 +400,18 @@ def _pitch_program_transcription_contract(
             scenario,
             tuned_pitch_point_indices=tuned_pitch_point_indices,
         ),
+    } | _pitch_program_phase_topology_metadata(dymos_phase)
+
+
+def _pitch_program_phase_topology_metadata(
+    dymos_phase: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if dymos_phase is None or "phase_topology" not in dymos_phase:
+        return {}
+    return {
+        "phase_topology": dymos_phase["phase_topology"],
+        "linked_state_names": dymos_phase.get("linked_state_names", ()),
+        "native_stage_phase_count": dymos_phase.get("phase_count"),
     }
 
 
@@ -569,6 +588,58 @@ def _pitch_program_ascent_ode_class(
             )
 
     return PitchProgramAscentODE
+
+
+def _stage_pitch_program_ascent_ode_class(
+    runtime: DymosRuntime,
+    *,
+    thrust_acceleration_m_s2: float,
+    target_altitude_m: float,
+    target_velocity_m_s: float,
+) -> type[Any]:
+    openmdao = runtime.openmdao_module
+    explicit_component = openmdao.ExplicitComponent
+
+    class StagePitchProgramAscentODE(explicit_component):  # type: ignore[misc, valid-type]
+        def initialize(self) -> None:
+            self.options.declare("num_nodes", types=int)
+
+        def setup(self) -> None:
+            num_nodes = self.options["num_nodes"]
+            self.add_input("t", val=np.zeros(num_nodes), units="s")
+            self.add_input("h", val=np.zeros(num_nodes), units="m")
+            self.add_input("vr", val=np.zeros(num_nodes), units="m/s")
+            self.add_input("vh", val=np.zeros(num_nodes), units="m/s")
+            self.add_input("pitch_deg", val=np.full(num_nodes, 90.0), units="deg")
+            self.add_output("h_dot", val=np.zeros(num_nodes), units="m/s")
+            self.add_output("downrange_dot", val=np.zeros(num_nodes), units="m/s")
+            self.add_output("vr_dot", val=np.zeros(num_nodes), units="m/s**2")
+            self.add_output("vh_dot", val=np.zeros(num_nodes), units="m/s**2")
+            self.add_output("speed", val=np.zeros(num_nodes), units="m/s")
+            self.add_output("target_score", val=np.zeros(num_nodes))
+            self.declare_partials("*", "*", method="fd")
+
+        def compute(self, inputs: Any, outputs: Any) -> None:
+            pitch_rad = np.deg2rad(np.asarray(inputs["pitch_deg"]))
+            vertical_velocity_m_s = np.asarray(inputs["vr"])
+            horizontal_velocity_m_s = np.asarray(inputs["vh"])
+            altitude_m = np.asarray(inputs["h"])
+            speed_m_s = np.sqrt(vertical_velocity_m_s**2 + horizontal_velocity_m_s**2)
+            outputs["h_dot"] = vertical_velocity_m_s
+            outputs["downrange_dot"] = horizontal_velocity_m_s
+            outputs["vr_dot"] = thrust_acceleration_m_s2 * np.sin(pitch_rad) - 9.80665
+            outputs["vh_dot"] = thrust_acceleration_m_s2 * np.cos(pitch_rad)
+            outputs["speed"] = speed_m_s
+            altitude_scale_m = max(abs(target_altitude_m), 1.0)
+            velocity_scale_m_s = max(abs(target_velocity_m_s), 1.0e-6)
+            altitude_error = (altitude_m - target_altitude_m) / altitude_scale_m
+            velocity_error = (speed_m_s - target_velocity_m_s) / velocity_scale_m_s
+            radial_velocity_error = vertical_velocity_m_s / velocity_scale_m_s
+            outputs["target_score"] = (
+                altitude_error**2 + velocity_error**2 + radial_velocity_error**2
+            )
+
+    return StagePitchProgramAscentODE
 
 
 def _driver_success_and_message(problem: Any) -> tuple[bool, str]:
@@ -760,8 +831,10 @@ def _pitch_program_summary_to_tuning_result(
         "dymos_phase": dymos_phase_metadata,
         "dymos_pitch_program_transcription_status": "executed",
         "pitch_program_control_source": "dymos_pitch_program_control",
-        "pitch_program_optimization_coupling": "native_dymos_pitch_control",
-        "pitch_program_optimization_scope": "native_dymos_pitch_program_transcription",
+        "pitch_program_optimization_coupling": (
+            summary.pitch_program_optimization_coupling
+        ),
+        "pitch_program_optimization_scope": summary.pitch_program_optimization_scope,
     }
     return baseline.model_copy(
         update={
@@ -773,7 +846,7 @@ def _pitch_program_summary_to_tuning_result(
                 scenario,
                 optimized_pitch_deg_by_point_index,
             ),
-            "backend": "dymos_pitch_program",
+            "backend": summary.source_backend,
             "radial_velocity_weight": 1.0,
             "metadata": metadata,
         }
@@ -931,6 +1004,288 @@ def _solve_dymos_pitch_program_phase(
     )
 
 
+def _state_units(state_name: str) -> str:
+    if state_name in {"h", "downrange"}:
+        return "m"
+    return "m/s"
+
+
+def _pitch_deg_at_time(scenario: LaunchScenario, time_s: float) -> float:
+    pitch_times_s = [point.time_s for point in scenario.guidance.pitch_program]
+    pitch_values_deg = [point.pitch_deg for point in scenario.guidance.pitch_program]
+    return float(np.interp(time_s, pitch_times_s, pitch_values_deg))
+
+
+def _pitch_control_guess_for_stage(
+    scenario: LaunchScenario,
+    stage: dict[str, float | str],
+) -> tuple[list[float], list[float]]:
+    start_s = float(stage["start_s"])
+    burnout_s = float(stage["burnout_s"])
+    internal_points = [
+        point.time_s
+        for point in scenario.guidance.pitch_program
+        if start_s < point.time_s < burnout_s
+    ]
+    times_s = [start_s, *internal_points, burnout_s]
+    return times_s, [_pitch_deg_at_time(scenario, time_s) for time_s in times_s]
+
+
+def _stage_state_guess(
+    initial_state: dict[str, float],
+    stage: dict[str, float | str],
+    scenario: LaunchScenario,
+) -> dict[str, tuple[float, float]]:
+    duration_s = float(stage["burnout_s"]) - float(stage["start_s"])
+    midpoint_s = float(stage["start_s"]) + 0.5 * duration_s
+    pitch_rad = np.deg2rad(_pitch_deg_at_time(scenario, midpoint_s))
+    thrust_acceleration_m_s2 = float(stage["thrust_acceleration_m_s2"])
+    vertical_acceleration_m_s2 = thrust_acceleration_m_s2 * np.sin(pitch_rad) - 9.80665
+    horizontal_acceleration_m_s2 = thrust_acceleration_m_s2 * np.cos(pitch_rad)
+    initial_h_m = initial_state["h"]
+    initial_downrange_m = initial_state["downrange"]
+    initial_vr_m_s = initial_state["vr"]
+    initial_vh_m_s = initial_state["vh"]
+    final_vr_m_s = initial_vr_m_s + vertical_acceleration_m_s2 * duration_s
+    final_vh_m_s = max(
+        0.0,
+        initial_vh_m_s + horizontal_acceleration_m_s2 * duration_s,
+    )
+    final_h_m = max(0.0, initial_h_m + 0.5 * (initial_vr_m_s + final_vr_m_s) * duration_s)
+    final_downrange_m = max(
+        0.0,
+        initial_downrange_m + 0.5 * (initial_vh_m_s + final_vh_m_s) * duration_s,
+    )
+    return {
+        "h": (initial_h_m, final_h_m),
+        "downrange": (initial_downrange_m, final_downrange_m),
+        "vr": (initial_vr_m_s, final_vr_m_s),
+        "vh": (initial_vh_m_s, final_vh_m_s),
+    }
+
+
+def _solve_dymos_multistage_pitch_program_phases(
+    scenario: LaunchScenario,
+    runtime: DymosRuntime,
+) -> DymosPitchProgramSummary:
+    if scenario.guidance.mode != "pitch_program":
+        raise ValueError("Dymos multistage optimization requires pitch_program guidance")
+
+    openmdao = runtime.openmdao_module
+    stage_schedule = _stage_acceleration_schedule(scenario)
+    target_altitude_m = scenario.target_orbit.altitude_km * 1000.0
+    target_velocity_m_s = _circular_velocity_km_s(scenario.target_orbit.altitude_km) * 1000.0
+    num_segments = 3
+    order = 3
+    linked_state_names = ("time", "h", "downrange", "vr", "vh")
+
+    problem = runtime.problem(model=openmdao.Group(), reports=False)
+    problem.driver = openmdao.ScipyOptimizeDriver()
+    problem.driver.options["optimizer"] = "SLSQP"
+    problem.driver.options["disp"] = False
+
+    trajectory = problem.model.add_subsystem("traj", runtime.trajectory())
+    phase_names: list[str] = []
+    phases_by_name: dict[str, Any] = {}
+    state_guess = {
+        "h": 0.0,
+        "downrange": 0.0,
+        "vr": 0.0,
+        "vh": 0.0,
+    }
+    phase_state_guesses: dict[str, dict[str, tuple[float, float]]] = {}
+
+    for stage_index, stage in enumerate(stage_schedule, start=1):
+        phase_name = f"stage_{stage_index}"
+        phase_names.append(phase_name)
+        phase = runtime.phase(
+            ode_class=_stage_pitch_program_ascent_ode_class(
+                runtime,
+                thrust_acceleration_m_s2=float(stage["thrust_acceleration_m_s2"]),
+                target_altitude_m=target_altitude_m,
+                target_velocity_m_s=target_velocity_m_s,
+            ),
+            transcription=runtime.transcription(num_segments=num_segments, order=order),
+        )
+        trajectory.add_phase(phase_name, phase)
+        phases_by_name[phase_name] = phase
+        is_first_phase = stage_index == 1
+        phase.set_time_options(
+            fix_initial=is_first_phase,
+            fix_duration=True,
+            initial_val=float(stage["start_s"]),
+            duration_val=float(stage["burnout_s"]) - float(stage["start_s"]),
+            targets=["t"],
+            units="s",
+        )
+        phase.add_state(
+            "h",
+            fix_initial=is_first_phase,
+            lower=0.0,
+            rate_source="h_dot",
+            targets=["h"],
+            units="m",
+        )
+        phase.add_state(
+            "downrange",
+            fix_initial=is_first_phase,
+            lower=0.0,
+            rate_source="downrange_dot",
+            targets=[],
+            units="m",
+        )
+        phase.add_state(
+            "vr",
+            fix_initial=is_first_phase,
+            rate_source="vr_dot",
+            targets=["vr"],
+            units="m/s",
+        )
+        phase.add_state(
+            "vh",
+            fix_initial=is_first_phase,
+            lower=0.0,
+            rate_source="vh_dot",
+            targets=["vh"],
+            units="m/s",
+        )
+        phase.add_control(
+            "pitch_deg",
+            opt=True,
+            lower=0.0,
+            upper=90.0,
+            units="deg",
+            targets=["pitch_deg"],
+            continuity=True,
+            rate_continuity=True,
+        )
+        stage_guess = _stage_state_guess(
+            state_guess,
+            stage,
+            scenario,
+        )
+        phase_state_guesses[phase_name] = stage_guess
+        state_guess = {name: values[1] for name, values in stage_guess.items()}
+
+    if len(phase_names) > 1:
+        trajectory.link_phases(
+            phase_names,
+            vars=linked_state_names,
+            connected=False,
+        )
+
+    final_phase = phases_by_name[phase_names[-1]]
+    final_phase.add_boundary_constraint("h", loc="final", lower=0.0, units="m")
+    final_phase.add_objective("target_score", loc="final", scaler=1.0)
+
+    problem.model.linear_solver = openmdao.DirectSolver()
+    problem.setup()
+    for phase_name, stage in zip(phase_names, stage_schedule, strict=True):
+        phase = phases_by_name[phase_name]
+        phase.set_time_val(
+            initial=float(stage["start_s"]),
+            duration=float(stage["burnout_s"]) - float(stage["start_s"]),
+            units="s",
+        )
+        guesses = phase_state_guesses[phase_name]
+        for state_name, values in guesses.items():
+            phase.set_state_val(state_name, list(values), units=_state_units(state_name))
+        pitch_times_s, pitch_values_deg = _pitch_control_guess_for_stage(scenario, stage)
+        phase.set_control_val(
+            "pitch_deg",
+            vals=pitch_values_deg,
+            time_vals=pitch_times_s,
+            units="deg",
+        )
+    problem.run_driver()
+
+    phase_times: list[np.ndarray[Any, Any]] = []
+    phase_pitches: list[np.ndarray[Any, Any]] = []
+    stage_phase_summaries: list[dict[str, Any]] = []
+    for phase_name, stage in zip(phase_names, stage_schedule, strict=True):
+        prefix = f"traj.{phase_name}.timeseries"
+        times_s = np.ravel(problem.get_val(f"{prefix}.time", units="s"))
+        altitudes_m = np.ravel(problem.get_val(f"{prefix}.h", units="m"))
+        downrange_m = np.ravel(problem.get_val(f"{prefix}.downrange", units="m"))
+        radial_velocities_m_s = np.ravel(problem.get_val(f"{prefix}.vr", units="m/s"))
+        horizontal_velocities_m_s = np.ravel(problem.get_val(f"{prefix}.vh", units="m/s"))
+        pitch_deg = np.ravel(problem.get_val(f"{prefix}.pitch_deg", units="deg"))
+        phase_times.append(times_s)
+        phase_pitches.append(pitch_deg)
+        final_radial_velocity_km_s = float(radial_velocities_m_s[-1] / 1000.0)
+        final_horizontal_velocity_km_s = float(horizontal_velocities_m_s[-1] / 1000.0)
+        stage_phase_summaries.append(
+            {
+                "name": str(stage["name"]),
+                "phase_name": phase_name,
+                "start_s": float(stage["start_s"]),
+                "duration_s": float(stage["burnout_s"]) - float(stage["start_s"]),
+                "burnout_s": float(stage["burnout_s"]),
+                "final_altitude_km": float(altitudes_m[-1] / 1000.0),
+                "final_velocity_km_s": sqrt(
+                    final_radial_velocity_km_s**2 + final_horizontal_velocity_km_s**2
+                ),
+                "final_radial_velocity_km_s": final_radial_velocity_km_s,
+                "final_horizontal_velocity_km_s": final_horizontal_velocity_km_s,
+                "final_downrange_km": float(downrange_m[-1] / 1000.0),
+            }
+        )
+
+    final_summary = stage_phase_summaries[-1]
+    final_altitude_km = float(final_summary["final_altitude_km"])
+    final_velocity_km_s = float(final_summary["final_velocity_km_s"])
+    final_radial_velocity_km_s = float(final_summary["final_radial_velocity_km_s"])
+    final_horizontal_velocity_km_s = float(final_summary["final_horizontal_velocity_km_s"])
+    target_miss = {
+        "altitude_miss_km": final_altitude_km - scenario.target_orbit.altitude_km,
+        "velocity_miss_km_s": final_velocity_km_s
+        - _circular_velocity_km_s(scenario.target_orbit.altitude_km),
+        "radial_velocity_miss_km_s": final_radial_velocity_km_s,
+    }
+    combined_times_s = np.concatenate(phase_times)
+    combined_pitch_deg = np.concatenate(phase_pitches)
+    sort_order = np.argsort(combined_times_s, kind="stable")
+    combined_times_s = combined_times_s[sort_order]
+    combined_pitch_deg = combined_pitch_deg[sort_order]
+    point_indices = _dymos_pitch_tuning_indices(scenario)
+    optimized_pitch_deg_by_point_index = {
+        point_index: float(
+            np.interp(
+                scenario.guidance.pitch_program[point_index].time_s,
+                combined_times_s,
+                combined_pitch_deg,
+            )
+        )
+        for point_index in point_indices
+    }
+    success, message = _driver_success_and_message(problem)
+    return DymosPitchProgramSummary(
+        phase_model="multiphase_stage_pitch_program_ascent",
+        transcription="GaussLobatto",
+        num_segments=num_segments,
+        order=order,
+        duration_s=_total_burn_duration_s(scenario),
+        stage_count=len(stage_schedule),
+        total_burn_duration_s=_total_burn_duration_s(scenario),
+        final_altitude_km=final_altitude_km,
+        final_velocity_km_s=final_velocity_km_s,
+        final_radial_velocity_km_s=final_radial_velocity_km_s,
+        final_horizontal_velocity_km_s=final_horizontal_velocity_km_s,
+        final_downrange_km=float(final_summary["final_downrange_km"]),
+        target_miss=target_miss,
+        optimized_pitch_deg_by_point_index=optimized_pitch_deg_by_point_index,
+        optimizer_success=success,
+        optimizer_message=message,
+        phase_count=len(phase_names),
+        phase_topology="multiphase_stage_linked",
+        linked_state_names=linked_state_names,
+        stage_phase_summaries=tuple(stage_phase_summaries),
+        source_backend="dymos_multistage_pitch_program",
+        pitch_program_optimization_coupling="native_dymos_multiphase_pitch_control",
+        pitch_program_optimization_scope="native_dymos_multiphase_stage_transcription",
+    )
+
+
 def run_dymos_phase_optimization(
     scenario: LaunchScenario,
     runtime: DymosRuntime,
@@ -951,6 +1306,17 @@ def run_dymos_pitch_program_optimization(
     runtime: DymosRuntime,
 ) -> LaunchPitchTuningResult:
     pitch_program_summary = _solve_dymos_pitch_program_phase(scenario, runtime)
+    return _pitch_program_summary_to_tuning_result(scenario, pitch_program_summary)
+
+
+def run_dymos_multistage_pitch_program_optimization(
+    scenario: LaunchScenario,
+    runtime: DymosRuntime,
+) -> LaunchPitchTuningResult:
+    pitch_program_summary = _solve_dymos_multistage_pitch_program_phases(
+        scenario,
+        runtime,
+    )
     return _pitch_program_summary_to_tuning_result(scenario, pitch_program_summary)
 
 

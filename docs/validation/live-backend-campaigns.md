@@ -3,7 +3,7 @@
 Last local smoke run: 2026-06-19 17:29:40 PDT on branch `codex/orbit-fd-od-mvp`
 at commit `9c7affb`.
 
-Last available live campaign run: 2026-06-20 11:30 PDT on branch `codex/orbit-fd-od-mvp`
+Last available live campaign run: 2026-06-20 11:47 PDT on branch `codex/orbit-fd-od-mvp`
 in the working tree recorded by this ledger update.
 
 This ledger records optional backend campaign evidence. A passing smoke command means the local
@@ -17,7 +17,7 @@ recorded as not-run live evidence, not as a failed required local release gate.
 | --- | --- | --- | --- |
 | Orekit | Available with explicit Homebrew OpenJDK environment | Passed propagation, generic/high-fidelity covariance, and native OD live gates | Orekit live propagation, covariance, and native OD claims are promoted for this machine only when the Java/data environment is configured. |
 | RocketPy | Available | Passed configured-example live gate; multi-motor config fails closed | RocketPy configured launch examples passed live validation on this machine, and additional configured motors are rejected because RocketPy 1.11 overwrites earlier motors. |
-| Dymos/OpenMDAO | Available | Passed live optimization gates | Dymos default phase and target-seeking pitch-program transcription live tests passed on this machine, without promoting a full multistage ascent design optimizer. |
+| Dymos/OpenMDAO | Available | Passed live optimization gates | Dymos default phase, target-seeking pitch-program transcription, and linked multiphase stage transcription live tests passed on this machine, without promoting a full high-fidelity multistage ascent design optimizer. |
 | TudatPy | Available in isolated conda env | Propagation/high-fidelity covariance/native-variational gates passed; strict multi-scenario comparison found a calibrated J2 tolerance boundary | Tudat live force-model products are promoted only with the recorded comparison tolerances and remain cross-check products, not the operational authority. |
 | JAX/JAXLIB | Available | Passed research promotion checklist | JAX research propagation, OD sensitivity, and research-estimate gates passed on this machine, but remain research workflows, not operational OD services. |
 
@@ -149,7 +149,7 @@ extra.
 Smoke command: `astro dymos-smoke`
 
 Live validation command:
-`ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription -q`
+`ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription tests/astro_backends/test_dymos_optimization.py::test_live_dymos_multistage_pitch_program_executes_native_multiphase -q`
 
 Current local status: available. The smoke command exited `0`.
 
@@ -165,15 +165,16 @@ Smoke output:
 }
 ```
 
-Roadmap claim allowed: Dymos/OpenMDAO default phase and native pitch-program transcription live
-tests pass on this machine. The native pitch-program path now minimizes a normalized final
-target-insertion error and records target-score metadata in the suite product.
+Roadmap claim allowed: Dymos/OpenMDAO default phase, native pitch-program transcription, and native
+linked multiphase stage transcription live tests pass on this machine. The native pitch-program
+paths minimize a normalized final target-insertion error and record target-score metadata in the
+suite product.
 
 Live validation result:
 
 ```text
-ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription -q
-2 passed, 2 OpenMDAO warnings in 2.23s
+ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription tests/astro_backends/test_dymos_optimization.py::test_live_dymos_multistage_pitch_program_executes_native_multiphase -q
+3 passed, 3 OpenMDAO warnings in 2.13s
 ```
 
 CLI target-seeking product check:
@@ -186,8 +187,21 @@ target_score: 1.1572999135341908
 target_score_terms: altitude=0.4847465458597893, velocity=0.6716775476699085, radial_velocity=0.0008758200044930763
 ```
 
-Roadmap claim not allowed: this does not promote the current Dymos products to a full multistage
-ascent design optimizer beyond the bounded pitch-program target objective.
+CLI linked multiphase product check:
+
+```text
+astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --dymos-mode multistage-pitch-program --output /tmp/astro-dymos-multistage-pitch-program-launch.json
+wrote launch optimization: /tmp/astro-dymos-multistage-pitch-program-launch.json
+source_backend: dymos_multistage_pitch_program
+phase_model: multiphase_stage_pitch_program_ascent
+phase_count: 2
+phase_topology: multiphase_stage_linked
+linked_state_names: time, h, downrange, vr, vh
+target_score: 1.0190604006894797
+```
+
+Roadmap claim not allowed: this does not promote the current Dymos products to a full high-fidelity
+multistage ascent design optimizer beyond the bounded linked pitch-program target objective.
 
 ## TudatPy
 
