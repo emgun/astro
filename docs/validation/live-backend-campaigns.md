@@ -15,10 +15,10 @@ recorded as not-run live evidence, not as a failed required local release gate.
 
 | Backend | Smoke status | Live gate status | Roadmap implication |
 | --- | --- | --- | --- |
-| Orekit | Available with explicit Homebrew OpenJDK environment | Passed propagation, covariance, and native OD live gates | Orekit live propagation, covariance, and native OD claims are promoted for this machine only when the Java/data environment is configured. |
+| Orekit | Available with explicit Homebrew OpenJDK environment | Passed propagation, generic/high-fidelity covariance, and native OD live gates | Orekit live propagation, covariance, and native OD claims are promoted for this machine only when the Java/data environment is configured. |
 | RocketPy | Available | Passed configured-example live gate | RocketPy configured launch examples passed live validation on this machine, without promoting native multi-motor staging. |
 | Dymos/OpenMDAO | Available | Passed live optimization gates | Dymos default phase and pitch-program transcription live tests passed on this machine, without promoting a full target-seeking multistage optimizer. |
-| TudatPy | Available in isolated conda env | Propagation/covariance/native-variational gates passed; strict multi-scenario comparison found a calibrated J2 tolerance boundary | Tudat live force-model products are promoted only with the recorded comparison tolerances and remain cross-check products, not the operational authority. |
+| TudatPy | Available in isolated conda env | Propagation/high-fidelity covariance/native-variational gates passed; strict multi-scenario comparison found a calibrated J2 tolerance boundary | Tudat live force-model products are promoted only with the recorded comparison tolerances and remain cross-check products, not the operational authority. |
 | JAX/JAXLIB | Available | Passed research promotion checklist | JAX research propagation, OD sensitivity, and research-estimate gates passed on this machine, but remain research workflows, not operational OD services. |
 
 ## Orekit
@@ -57,14 +57,17 @@ Smoke output:
 Run note: OpenJDK 26 emitted JPype restricted-native-access warnings during JVM startup; the smoke
 and live tests still exited successfully.
 
-Roadmap claim allowed: this machine completed the optional Orekit smoke, propagation, covariance,
-and native OD live gates with the explicit Java/data environment.
+Roadmap claim allowed: this machine completed the optional Orekit smoke, propagation,
+generic/high-fidelity covariance, and native OD live gates with the explicit Java/data environment.
 
 Live validation results:
 
 ```text
 ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_two_body_matches_local_reference tests/astro_backends/test_orekit_propagation.py::test_live_orekit_j2_matches_local_reference_scale tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product -q
 3 passed in 4.93s
+
+JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q
+1 passed in 5.90s
 
 ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_estimation.py::test_live_orekit_native_od_executes_batch_estimator -q
 1 passed in 5.51s
@@ -193,9 +196,9 @@ Smoke output:
 }
 ```
 
-Roadmap claim allowed: this machine completed Tudat native propagation, finite-difference
-covariance, native variational covariance, and calibrated comparison campaign execution in the
-isolated TudatPy 1.0.0 environment.
+Roadmap claim allowed: this machine completed Tudat native propagation, high-fidelity
+finite-difference covariance, native variational covariance, and calibrated comparison campaign
+execution in the isolated TudatPy 1.0.0 environment.
 
 Live validation results:
 
@@ -209,6 +212,9 @@ conda run -p /tmp/astro-tudat-live-env astro propagate examples/scenarios/leo_tu
 conda run -p /tmp/astro-tudat-live-env astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend tudat --output /tmp/astro-tudat-high-fidelity-covariance.json
 conda run -p /tmp/astro-tudat-live-env astro propagate examples/scenarios/leo_tudat_variational_covariance.yaml --backend tudat --output /tmp/astro-tudat-variational-covariance.json
 # all commands completed and wrote suite trajectory/covariance products
+
+ASTRO_RUN_TUDAT_LIVE=1 conda run -p /tmp/astro-tudat-live-env python -m pytest tests/astro_backends/test_tudat_propagation.py::test_live_tudat_high_fidelity_covariance_records_force_models -q
+1 passed in 6.72s
 
 conda run -p /tmp/astro-tudat-live-env astro compare-tudat-reference examples/scenarios/leo_two_body.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output /tmp/astro-tudat-reference-comparison.json
 # passed true; max position delta 0.0006172472620229077 km; max velocity delta 7.936198258437524e-07 km/s

@@ -73,6 +73,7 @@ JSON and treat the gate as not-run rather than failed or complete.
 - [ ] `astro propagate examples/scenarios/leo_covariance.yaml --backend orekit --output /tmp/astro-orekit-covariance.json`
 - [ ] `astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend orekit --output /tmp/astro-orekit-high-fidelity-covariance.json`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product -q`
+- [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_estimation.py::test_live_orekit_native_od_executes_batch_estimator -q`
 - [ ] `astro estimate-measurements <geodetic-range-rate-scenario.yaml> <measurements.json> --estimator orekit-native --output /tmp/astro-orekit-native-estimate.json`
 - [ ] `astro rocketpy-smoke`
@@ -90,6 +91,7 @@ JSON and treat the gate as not-run rather than failed or complete.
 - [ ] `astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend tudat --output /tmp/astro-tudat-third-body.json`
 - [ ] `astro propagate examples/scenarios/leo_tudat_high_order_gravity.yaml --backend tudat --output /tmp/astro-tudat-high-order-gravity.json`
 - [ ] `astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend tudat --output /tmp/astro-tudat-high-fidelity-covariance.json`
+- [ ] `ASTRO_RUN_TUDAT_LIVE=1 python -m pytest tests/astro_backends/test_tudat_propagation.py::test_live_tudat_high_fidelity_covariance_records_force_models -q`
 - [ ] `astro propagate examples/scenarios/leo_tudat_variational_covariance.yaml --backend tudat --output /tmp/astro-tudat-variational-covariance.json`
 - [ ] `python -m pytest tests/astro_backends/test_tudat_propagation.py::test_propagate_tudat_uses_default_native_variational_runner_when_requested -q`
 - [ ] `python -m pytest tests/astro_backends/test_tudat_propagation.py::test_propagate_tudat_uses_native_variational_runner_when_requested -q`

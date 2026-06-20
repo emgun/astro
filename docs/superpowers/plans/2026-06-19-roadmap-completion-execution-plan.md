@@ -463,7 +463,7 @@ Expected: no whitespace errors.
 Final local gate evidence from 2026-06-19:
 
 ```text
-python -m pytest -q  # 498 passed, 7 skipped
+python -m pytest -q  # 498 passed, 9 skipped
 python -m ruff check .  # passed
 python -m mypy  # passed
 python -m build  # built sdist and wheel successfully
@@ -484,6 +484,9 @@ JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt
 ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_two_body_matches_local_reference tests/astro_backends/test_orekit_propagation.py::test_live_orekit_j2_matches_local_reference_scale tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product -q
 # 3 passed
 
+JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q
+# 1 passed
+
 ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_estimation.py::test_live_orekit_native_od_executes_batch_estimator -q
 # 1 passed
 
@@ -492,6 +495,9 @@ conda run -p /tmp/astro-tudat-live-env astro tudat-smoke
 
 conda run -p /tmp/astro-tudat-live-env astro propagate examples/scenarios/leo_tudat_variational_covariance.yaml --backend tudat --output /tmp/astro-tudat-variational-covariance.json
 # wrote native variational covariance trajectory
+
+ASTRO_RUN_TUDAT_LIVE=1 conda run -p /tmp/astro-tudat-live-env python -m pytest tests/astro_backends/test_tudat_propagation.py::test_live_tudat_high_fidelity_covariance_records_force_models -q
+# 1 passed
 
 conda run -p /tmp/astro-tudat-live-env astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output /tmp/astro-tudat-reference-campaign-calibrated.json
 # passed true, 2 scenarios passed

@@ -301,8 +301,10 @@ process-noise term over each propagation sample interval. This is useful for pro
 first-order sensitivity screening. Tudat also accepts an explicit `tudat_variational` covariance
 transition model, which builds TudatPy variational equations when the optional variational API is
 available and keeps native variational products distinguishable from finite-difference products.
-Drag/SRP/third-body variational validation and externally validated production conjunction services
-remain future work.
+The optional live gates now execute high-fidelity finite-difference covariance through
+drag/SRP/third-body force models for Orekit and Tudat and verify force-model provenance plus
+covariance-history matrix invariants. Native variational cross-validation across those force models
+and externally validated production conjunction services remain future work.
 
 `astro screen-conjunction` compares two trajectory products at common sample epochs and writes a
 deterministic first-order screening result with time of closest approach, miss distance, relative

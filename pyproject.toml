@@ -60,6 +60,7 @@ markers = [
   "orekit_live: requires orekit-jpype, Java, and Orekit runtime support",
   "rocketpy_live: requires RocketPy and enables live RocketPy launch simulation checks",
   "dymos_live: requires Dymos/OpenMDAO and enables live Dymos launch optimization checks",
+  "tudat_live: requires TudatPy and enables live Tudat propagation/covariance checks",
 ]
 
 [tool.ruff]

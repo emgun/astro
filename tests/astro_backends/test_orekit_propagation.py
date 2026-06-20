@@ -12,6 +12,7 @@ from astro_core.errors import UnsupportedBackendError
 from astro_core.io import load_scenario
 from astro_core.models import ForceModelConfig, ForceModelName
 from astro_dynamics.local import propagate_local
+from tests.astro_backends.covariance_assertions import assert_covariance_history_invariants
 
 
 def test_orekit_unit_conversions_are_reversible() -> None:
@@ -341,6 +342,41 @@ def test_live_orekit_covariance_history_returns_suite_product() -> None:
     )
     assert trajectory.covariance_history[1].state_transition_matrix is not None
     assert np.all(np.isfinite(trajectory.covariance_history[-1].covariance))
+    assert_covariance_history_invariants(
+        trajectory,
+        scenario,
+        expected_covariance_model="orekit_finite_difference_state_transition",
+        expected_transition_model="orekit_finite_difference",
+    )
+
+
+@pytest.mark.orekit_live
+def test_live_orekit_high_fidelity_covariance_records_force_models() -> None:
+    if os.environ.get("ASTRO_RUN_OREKIT_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_OREKIT_LIVE=1 to run live Orekit covariance propagation")
+    pytest.importorskip("orekit_jpype")
+
+    scenario = load_scenario(Path("examples/scenarios/leo_orekit_high_fidelity_covariance.yaml"))
+    trajectory = propagate_orekit(scenario)
+
+    assert trajectory.backend == "orekit"
+    assert trajectory.metadata["covariance_transition_propagator"] == "NumericalPropagator"
+    assert trajectory.metadata["covariance_transition_force_models"] == [
+        "J2OnlyPerturbation",
+        "DragForce",
+        "SolarRadiationPressure",
+        "ThirdBodyAttraction(Sun)",
+        "ThirdBodyAttraction(Moon)",
+    ]
+    assert trajectory.covariance_history[1].metadata["transition_force_models"] == (
+        trajectory.metadata["covariance_transition_force_models"]
+    )
+    assert_covariance_history_invariants(
+        trajectory,
+        scenario,
+        expected_covariance_model="orekit_finite_difference_state_transition",
+        expected_transition_model="orekit_finite_difference",
+    )
 
 
 class _FakeFramesFactory:

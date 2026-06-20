@@ -1,3 +1,4 @@
+import os
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -16,6 +17,7 @@ from astro_core.models import (
     Trajectory,
 )
 from astro_dynamics.local import propagate_local
+from tests.astro_backends.covariance_assertions import assert_covariance_history_invariants
 
 
 def _fake_runtime() -> TudatRuntime:
@@ -395,6 +397,34 @@ def test_propagate_tudat_uses_native_variational_runner_when_requested(
     assert trajectory.metadata["native_variational_parameter_set"] == "initial_cartesian_state"
     assert trajectory.covariance_history[1].metadata["state_transition_model"] == (
         "tudat_native_variational"
+    )
+
+
+@pytest.mark.tudat_live
+def test_live_tudat_high_fidelity_covariance_records_force_models() -> None:
+    if os.environ.get("ASTRO_RUN_TUDAT_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_TUDAT_LIVE=1 to run live Tudat covariance propagation")
+    pytest.importorskip("tudatpy")
+
+    scenario = load_scenario("examples/scenarios/leo_orekit_high_fidelity_covariance.yaml")
+    trajectory = propagate_tudat(scenario)
+
+    assert trajectory.backend == "tudat"
+    assert trajectory.metadata["covariance_transition_force_models"] == [
+        "Earth spherical harmonic gravity 2x0",
+        "Earth aerodynamic drag",
+        "Sun cannonball solar radiation pressure",
+        "Sun point-mass third-body gravity",
+        "Moon point-mass third-body gravity",
+    ]
+    assert trajectory.covariance_history[1].metadata["transition_force_models"] == (
+        trajectory.metadata["covariance_transition_force_models"]
+    )
+    assert_covariance_history_invariants(
+        trajectory,
+        scenario,
+        expected_covariance_model="tudat_finite_difference_state_transition",
+        expected_transition_model="tudat_finite_difference",
     )
 
 
