@@ -320,7 +320,7 @@ git commit -m "feat: add station calibration residual diagnostics"
 - Modify as needed: `src/astro_od/dsn.py`
 - Modify as needed: `docs/validation-matrix.md`
 
-- [ ] **Step 1: Identify current parser failure modes**
+- [x] **Step 1: Identify current parser failure modes**
 
 Run:
 
@@ -330,7 +330,7 @@ python -m pytest tests/astro_od/test_dsn_tracking.py -q
 
 Expected: existing DSN bridge tests pass.
 
-- [ ] **Step 2: Add bridge-specific rejection tests**
+- [x] **Step 2: Add bridge-specific rejection tests**
 
 Add tests that prove malformed bridge records fail with actionable errors:
 
@@ -345,7 +345,7 @@ def test_load_dsn_binary_tracking_measurements_rejects_bad_magic(tmp_path: Path)
 
 Use the actual loader names from `src/astro_od/dsn.py`; do not invent public APIs.
 
-- [ ] **Step 3: Ensure source-format metadata stays explicit**
+- [x] **Step 3: Ensure source-format metadata stays explicit**
 
 Check that imported records include:
 
@@ -356,7 +356,7 @@ record.metadata["tracking_format"]
 
 Expected values must include the word `bridge` or otherwise clearly identify suite-owned interchange.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run:
 

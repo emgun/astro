@@ -1969,7 +1969,11 @@ def test_import_dsn_tracking_command_writes_measurement_json(tmp_path: Path) -> 
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["scenario_id"] == "dsn-demo"
     assert payload["metadata"]["source_format"] == "normalized_dsn_tracking_csv"
+    assert payload["metadata"]["source_format_scope"] == "suite_owned_bridge"
+    assert payload["metadata"]["tracking_bridge"] == "suite_owned_dsn_tracking_bridge"
+    assert payload["metadata"]["native_standards_decoder"] is False
     assert payload["measurements"][0]["measurement_type"] == "two_way_range"
+    assert payload["measurements"][0]["metadata"]["tracking_format"] == "odf"
     assert payload["measurements"][0]["metadata"]["dsn_tracking_format"] == "odf"
 
 
@@ -2009,7 +2013,11 @@ def test_import_dsn_binary_tracking_command_writes_measurement_json(tmp_path: Pa
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["scenario_id"] == "dsn-binary-demo"
     assert payload["metadata"]["source_format"] == "astro_dsn_binary_tracking"
+    assert payload["metadata"]["source_format_scope"] == "suite_owned_bridge"
+    assert payload["metadata"]["tracking_bridge"] == "suite_owned_dsn_tracking_bridge"
+    assert payload["metadata"]["native_standards_decoder"] is False
     assert payload["measurements"][0]["measurement_type"] == "two_way_range"
+    assert payload["measurements"][0]["metadata"]["tracking_format"] == "odf"
     assert payload["measurements"][0]["metadata"]["binary_record_index"] == 0
 
 
@@ -2031,8 +2039,12 @@ def test_import_dsn_kvn_tracking_command_writes_measurement_json(tmp_path: Path)
     payload = json.loads(output_path.read_text(encoding="utf-8"))
     assert payload["scenario_id"] == "dsn-kvn-demo"
     assert payload["metadata"]["source_format"] == "dsn_odf_tnf_kvn"
+    assert payload["metadata"]["source_format_scope"] == "suite_owned_bridge"
+    assert payload["metadata"]["tracking_bridge"] == "suite_owned_dsn_tracking_bridge"
+    assert payload["metadata"]["native_standards_decoder"] is False
     assert payload["metadata"]["tracking_formats"] == ["odf", "tnf"]
     assert payload["measurements"][0]["measurement_type"] == "two_way_range"
+    assert payload["measurements"][0]["metadata"]["tracking_format"] == "odf"
     assert payload["measurements"][0]["metadata"]["dsn_tracking_format"] == "odf"
 
 

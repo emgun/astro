@@ -53,6 +53,8 @@ DSN_BINARY_OBSERVABLE_TYPES = {
     7: ("doppler", MeasurementType.DOPPLER),
 }
 DSN_BINARY_UNITS = {1: "km", 2: "km/s", 3: "Hz", 4: "deg"}
+DSN_TRACKING_BRIDGE_SCOPE = "suite_owned_bridge"
+DSN_TRACKING_BRIDGE_NAME = "suite_owned_dsn_tracking_bridge"
 
 
 def load_dsn_tracking_measurements(path: Path | str) -> MeasurementProduct:
@@ -90,6 +92,9 @@ def load_dsn_tracking_measurements(path: Path | str) -> MeasurementProduct:
         measurements=records,
         metadata={
             "source_format": "normalized_dsn_tracking_csv",
+            "source_format_scope": DSN_TRACKING_BRIDGE_SCOPE,
+            "tracking_bridge": DSN_TRACKING_BRIDGE_NAME,
+            "native_standards_decoder": False,
             "tracking_formats": tracking_formats,
             "measurement_count": len(records),
         },
@@ -124,6 +129,9 @@ def load_dsn_binary_tracking_measurements(path: Path | str) -> MeasurementProduc
         measurements=records,
         metadata={
             "source_format": "astro_dsn_binary_tracking",
+            "source_format_scope": DSN_TRACKING_BRIDGE_SCOPE,
+            "tracking_bridge": DSN_TRACKING_BRIDGE_NAME,
+            "native_standards_decoder": False,
             "binary_format": "ASTRODSN1",
             "tracking_formats": tracking_formats,
             "measurement_count": len(records),
@@ -159,6 +167,9 @@ def load_dsn_kvn_tracking_measurements(path: Path | str) -> MeasurementProduct:
         measurements=records,
         metadata={
             "source_format": "dsn_odf_tnf_kvn",
+            "source_format_scope": DSN_TRACKING_BRIDGE_SCOPE,
+            "tracking_bridge": DSN_TRACKING_BRIDGE_NAME,
+            "native_standards_decoder": False,
             "tracking_formats": tracking_formats,
             "measurement_count": len(records),
             "dsn_tracking_version": _dsn_kvn_version(header),
@@ -197,6 +208,10 @@ def _dsn_tracking_record(
 
     metadata: dict[str, Any] = {
         "source_format": "normalized_dsn_tracking_csv",
+        "source_format_scope": DSN_TRACKING_BRIDGE_SCOPE,
+        "tracking_bridge": DSN_TRACKING_BRIDGE_NAME,
+        "native_standards_decoder": False,
+        "tracking_format": tracking_format,
         "dsn_tracking_format": tracking_format,
         "dsn_observable": observable,
         "dsn_scenario_id": _required_text(measurement_path, row_number, row, "scenario_id"),
@@ -412,6 +427,10 @@ def _dsn_kvn_tracking_record(
     tracking_format = segment_metadata["TRACKING_FORMAT"].lower()
     metadata: dict[str, Any] = {
         "source_format": "dsn_odf_tnf_kvn",
+        "source_format_scope": DSN_TRACKING_BRIDGE_SCOPE,
+        "tracking_bridge": DSN_TRACKING_BRIDGE_NAME,
+        "native_standards_decoder": False,
+        "tracking_format": tracking_format,
         "dsn_tracking_format": tracking_format,
         "dsn_observable": observable,
         "dsn_scenario_id": segment_metadata["SCENARIO_ID"],
@@ -539,8 +558,12 @@ def _dsn_binary_tracking_record(
     )
     metadata: dict[str, Any] = {
         "source_format": "astro_dsn_binary_tracking",
+        "source_format_scope": DSN_TRACKING_BRIDGE_SCOPE,
+        "tracking_bridge": DSN_TRACKING_BRIDGE_NAME,
+        "native_standards_decoder": False,
         "binary_format": "ASTRODSN1",
         "binary_record_index": record_index,
+        "tracking_format": tracking_format,
         "dsn_tracking_format": tracking_format,
         "dsn_observable": observable,
         "dsn_scenario_id": scenario_id,

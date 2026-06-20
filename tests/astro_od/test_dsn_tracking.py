@@ -32,9 +32,16 @@ def test_load_dsn_tracking_measurements_maps_normalized_odf_tnf_rows(
     assert product.scenario_id == "dsn-demo"
     assert len(product.measurements) == 2
     assert product.metadata["source_format"] == "normalized_dsn_tracking_csv"
+    assert product.metadata["source_format_scope"] == "suite_owned_bridge"
+    assert product.metadata["tracking_bridge"] == "suite_owned_dsn_tracking_bridge"
+    assert product.metadata["native_standards_decoder"] is False
     assert product.metadata["tracking_formats"] == ["odf", "tnf"]
     assert product.measurements[0].measurement_type is MeasurementType.TWO_WAY_RANGE
     assert product.measurements[0].observer == "DSS-14"
+    assert product.measurements[0].metadata["source_format_scope"] == "suite_owned_bridge"
+    assert product.measurements[0].metadata["tracking_bridge"] == "suite_owned_dsn_tracking_bridge"
+    assert product.measurements[0].metadata["native_standards_decoder"] is False
+    assert product.measurements[0].metadata["tracking_format"] == "odf"
     assert product.measurements[0].metadata["dsn_tracking_format"] == "odf"
     assert product.measurements[0].metadata["media_corrections_source"] == "calibrated-media"
     assert product.measurements[1].measurement_type is MeasurementType.THREE_WAY_RANGE_RATE
@@ -64,9 +71,16 @@ def test_load_dsn_kvn_tracking_measurements_maps_odf_tnf_segments() -> None:
     assert product.scenario_id == "dsn-kvn-demo"
     assert len(product.measurements) == 2
     assert product.metadata["source_format"] == "dsn_odf_tnf_kvn"
+    assert product.metadata["source_format_scope"] == "suite_owned_bridge"
+    assert product.metadata["tracking_bridge"] == "suite_owned_dsn_tracking_bridge"
+    assert product.metadata["native_standards_decoder"] is False
     assert product.metadata["dsn_tracking_version"] == "1.0"
     assert product.metadata["tracking_formats"] == ["odf", "tnf"]
     assert product.measurements[0].measurement_type is MeasurementType.TWO_WAY_RANGE
+    assert product.measurements[0].metadata["source_format_scope"] == "suite_owned_bridge"
+    assert product.measurements[0].metadata["tracking_bridge"] == "suite_owned_dsn_tracking_bridge"
+    assert product.measurements[0].metadata["native_standards_decoder"] is False
+    assert product.measurements[0].metadata["tracking_format"] == "odf"
     assert product.measurements[0].metadata["dsn_tracking_format"] == "odf"
     assert product.measurements[0].metadata["participant_path"] == "DSS-14,demo-sat,DSS-14"
     assert product.measurements[1].measurement_type is MeasurementType.THREE_WAY_RANGE_RATE
@@ -140,13 +154,55 @@ def test_load_dsn_binary_tracking_measurements_maps_fixed_records(tmp_path: Path
 
     assert product.scenario_id == "dsn-binary-demo"
     assert product.metadata["source_format"] == "astro_dsn_binary_tracking"
+    assert product.metadata["source_format_scope"] == "suite_owned_bridge"
+    assert product.metadata["tracking_bridge"] == "suite_owned_dsn_tracking_bridge"
+    assert product.metadata["native_standards_decoder"] is False
     assert product.metadata["tracking_formats"] == ["odf", "tnf"]
     assert product.measurements[0].measurement_type is MeasurementType.TWO_WAY_RANGE
     assert product.measurements[0].units == "km"
+    assert product.measurements[0].metadata["source_format_scope"] == "suite_owned_bridge"
+    assert product.measurements[0].metadata["tracking_bridge"] == "suite_owned_dsn_tracking_bridge"
+    assert product.measurements[0].metadata["native_standards_decoder"] is False
+    assert product.measurements[0].metadata["tracking_format"] == "odf"
     assert product.measurements[0].metadata["binary_record_index"] == 0
     assert product.measurements[1].measurement_type is MeasurementType.THREE_WAY_RANGE_RATE
     assert product.measurements[1].units == "km/s"
     assert product.measurements[1].metadata["transmitter"] == "DSS-14"
+
+
+def test_load_dsn_binary_tracking_measurements_rejects_bad_magic(tmp_path: Path) -> None:
+    path = tmp_path / "bad.bin"
+    path.write_bytes(b"NOTODF01")
+
+    with pytest.raises(InvalidMeasurementFileError, match="ASTRODSN1"):
+        load_dsn_binary_tracking_measurements(path)
+
+
+def test_load_dsn_binary_tracking_measurements_rejects_unsupported_codes(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "unsupported.bin"
+    path.write_bytes(
+        b"ASTRODSN1"
+        + pack("<I", 1)
+        + _binary_tracking_record(
+            tracking_format=99,
+            observable=3,
+            epoch_unix_s=1767225600,
+            value=12345.6,
+            sigma=0.01,
+            units=1,
+            scenario_id="dsn-binary-demo",
+            station="DSS-14",
+            spacecraft="demo-sat",
+            participant_path="DSS-14,demo-sat,DSS-14",
+            transmitter="",
+            media_source="binary-media",
+        )
+    )
+
+    with pytest.raises(InvalidMeasurementFileError, match="unsupported tracking"):
+        load_dsn_binary_tracking_measurements(path)
 
 
 def _binary_tracking_record(
