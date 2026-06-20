@@ -1,57 +1,65 @@
 # Release Checklist
 
-Date: 2026-06-15
+Date: 2026-06-20
 
 Use this checklist before tagging or publishing a release candidate.
 
+Latest merged-main evidence:
+
+- 2026-06-20: `main` fast-forwarded to `0fb9a87`.
+- 2026-06-20: `python -m pytest -q` passed with 505 passed, 11 skipped.
+- 2026-06-20: `python -m ruff check .`, `python -m mypy`, `git diff --check`, and
+  `python -m build` passed.
+- 2026-06-20: Required local CLI checklist passed 42 command gates on merged `main`.
+
 ## Required Local Gates
 
-- [ ] `python -m pytest -q`
-- [ ] `python -m ruff check .`
-- [ ] `python -m mypy`
-- [ ] `astro validate examples/scenarios/leo_two_body.yaml`
-- [ ] `astro propagate examples/scenarios/leo_two_body.yaml --backend local --output /tmp/astro-local-trajectory.json`
-- [ ] `astro propagate examples/scenarios/leo_eccentric_two_body.yaml --backend local --output /tmp/astro-eccentric-trajectory.json`
-- [ ] `astro propagate examples/scenarios/meo_two_body.yaml --backend local --output /tmp/astro-meo.json`
-- [ ] `astro propagate examples/scenarios/geo_two_body.yaml --backend local --output /tmp/astro-geo.json`
-- [ ] `astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output /tmp/astro-finite-burn.json`
-- [ ] `astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output /tmp/astro-velocity-aligned-burn.json`
-- [ ] `astro propagate examples/scenarios/leo_radial_burn.yaml --backend local --output /tmp/astro-radial-burn.json`
-- [ ] `astro propagate examples/scenarios/leo_covariance.yaml --backend local --output /tmp/astro-covariance.json`
-- [ ] `astro propagate examples/scenarios/leo_variational_covariance.yaml --backend local --output /tmp/astro-variational-covariance.json`
-- [ ] `astro propagate examples/scenarios/leo_j2_variational_covariance.yaml --backend local --output /tmp/astro-j2-variational-covariance.json`
-- [ ] `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv`
-- [ ] `astro export-trajectory /tmp/astro-local-trajectory.json --format oem --output /tmp/astro-local-trajectory.oem`
-- [ ] `astro export-trajectory /tmp/astro-local-trajectory.json --format opm --output /tmp/astro-local-state.opm`
-- [ ] `astro import-trajectory examples/trajectories/leo_initial_state.opm --format opm --scenario examples/scenarios/leo_two_body.yaml --output /tmp/astro-local-state-from-opm.json`
-- [ ] `astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output /tmp/astro-velocity-aligned-burn.json`
-- [ ] `astro export-trajectory /tmp/astro-velocity-aligned-burn.json --format aem --output /tmp/astro-attitude.aem`
-- [ ] `astro import-trajectory /tmp/astro-attitude.aem --format aem --scenario examples/scenarios/leo_velocity_aligned_burn.yaml --state-trajectory /tmp/astro-velocity-aligned-burn.json --output /tmp/astro-attitude-from-aem.json`
-- [ ] `astro propagate-attitude examples/attitude/rigid_body_torque.yaml --output /tmp/astro-attitude-dynamics.json`
-- [ ] `astro propagate-attitude examples/attitude/closed_loop_pd.yaml --output /tmp/astro-attitude-control.json`
-- [ ] `astro propagate-attitude examples/attitude/closed_loop_sensor_actuator.yaml --output /tmp/astro-attitude-sensor-actuator.json`
-- [ ] `astro screen-conjunction /tmp/astro-covariance.json /tmp/astro-covariance.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output /tmp/astro-conjunction-screening.json`
-- [ ] `astro assess-conjunction /tmp/astro-conjunction-screening.json --output /tmp/astro-conjunction-assessment.json`
-- [ ] `astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output /tmp/astro-measurements.json`
-- [ ] `astro synth-measurements examples/scenarios/leo_doppler.yaml --backend local --output /tmp/astro-doppler-measurements.json`
-- [ ] `astro export-measurements /tmp/astro-doppler-measurements.json --format tdm --output /tmp/astro-doppler-measurements.tdm`
-- [ ] `astro synth-measurements examples/scenarios/leo_radiometric_media.yaml --backend local --output /tmp/astro-radiometric-media.json`
-- [ ] `astro synth-measurements examples/scenarios/leo_radiometric_weather_frequency.yaml --backend local --output /tmp/astro-radiometric-weather-frequency.json`
-- [ ] `astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml --backend local --output /tmp/astro-dsn-calibration.json`
-- [ ] `astro export-measurements /tmp/astro-radiometric-weather-frequency.json --format tdm --output /tmp/astro-radiometric-weather-frequency.tdm`
-- [ ] `astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml --measurements /tmp/astro-radiometric-weather-frequency.tdm --format tdm --output /tmp/astro-dsn-calibration-from-tdm.json`
-- [ ] `astro import-dsn-tracking examples/measurements/dsn_tracking_normalized.csv --output /tmp/astro-dsn-tracking-measurements.json`
-- [ ] `astro import-dsn-kvn-tracking examples/measurements/dsn_tracking_kvn.txt --output /tmp/astro-dsn-kvn-tracking-measurements.json`
-- [ ] `python -m pytest tests/astro_od/test_dsn_tracking.py::test_load_dsn_binary_tracking_measurements_maps_fixed_records tests/astro_cli/test_cli.py::test_import_dsn_binary_tracking_command_writes_measurement_json -q`
-- [ ] `astro station-calibration examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --output /tmp/astro-station-calibration.json`
-- [ ] `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json`
-- [ ] `astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output /tmp/astro-topocentric-measurements.json`
-- [ ] `astro synth-measurements examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml --backend local --output /tmp/astro-geodetic-precession-nutation-measurements.json`
-- [ ] `astro estimate-measurements examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --backend local --output /tmp/astro-local-estimate.json`
-- [ ] `astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output /tmp/astro-launch.json`
-- [ ] `python -m pytest tests/astro_launch/test_launch_io.py::test_load_rocketpy_configured_launch_scenario -q`
-- [ ] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend local --point-indices 2,3 --iterations 1 --radial-velocity-weight 1 --output /tmp/astro-optimized-launch.json`
-- [ ] `astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 2 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output /tmp/astro-research.json`
+- [x] `python -m pytest -q`
+- [x] `python -m ruff check .`
+- [x] `python -m mypy`
+- [x] `astro validate examples/scenarios/leo_two_body.yaml`
+- [x] `astro propagate examples/scenarios/leo_two_body.yaml --backend local --output /tmp/astro-local-trajectory.json`
+- [x] `astro propagate examples/scenarios/leo_eccentric_two_body.yaml --backend local --output /tmp/astro-eccentric-trajectory.json`
+- [x] `astro propagate examples/scenarios/meo_two_body.yaml --backend local --output /tmp/astro-meo.json`
+- [x] `astro propagate examples/scenarios/geo_two_body.yaml --backend local --output /tmp/astro-geo.json`
+- [x] `astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output /tmp/astro-finite-burn.json`
+- [x] `astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output /tmp/astro-velocity-aligned-burn.json`
+- [x] `astro propagate examples/scenarios/leo_radial_burn.yaml --backend local --output /tmp/astro-radial-burn.json`
+- [x] `astro propagate examples/scenarios/leo_covariance.yaml --backend local --output /tmp/astro-covariance.json`
+- [x] `astro propagate examples/scenarios/leo_variational_covariance.yaml --backend local --output /tmp/astro-variational-covariance.json`
+- [x] `astro propagate examples/scenarios/leo_j2_variational_covariance.yaml --backend local --output /tmp/astro-j2-variational-covariance.json`
+- [x] `astro export-trajectory /tmp/astro-local-trajectory.json --format csv --output /tmp/astro-local-trajectory.csv`
+- [x] `astro export-trajectory /tmp/astro-local-trajectory.json --format oem --output /tmp/astro-local-trajectory.oem`
+- [x] `astro export-trajectory /tmp/astro-local-trajectory.json --format opm --output /tmp/astro-local-state.opm`
+- [x] `astro import-trajectory examples/trajectories/leo_initial_state.opm --format opm --scenario examples/scenarios/leo_two_body.yaml --output /tmp/astro-local-state-from-opm.json`
+- [x] `astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output /tmp/astro-velocity-aligned-burn.json`
+- [x] `astro export-trajectory /tmp/astro-velocity-aligned-burn.json --format aem --output /tmp/astro-attitude.aem`
+- [x] `astro import-trajectory /tmp/astro-attitude.aem --format aem --scenario examples/scenarios/leo_velocity_aligned_burn.yaml --state-trajectory /tmp/astro-velocity-aligned-burn.json --output /tmp/astro-attitude-from-aem.json`
+- [x] `astro propagate-attitude examples/attitude/rigid_body_torque.yaml --output /tmp/astro-attitude-dynamics.json`
+- [x] `astro propagate-attitude examples/attitude/closed_loop_pd.yaml --output /tmp/astro-attitude-control.json`
+- [x] `astro propagate-attitude examples/attitude/closed_loop_sensor_actuator.yaml --output /tmp/astro-attitude-sensor-actuator.json`
+- [x] `astro screen-conjunction /tmp/astro-covariance.json /tmp/astro-covariance.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output /tmp/astro-conjunction-screening.json`
+- [x] `astro assess-conjunction /tmp/astro-conjunction-screening.json --output /tmp/astro-conjunction-assessment.json`
+- [x] `astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output /tmp/astro-measurements.json`
+- [x] `astro synth-measurements examples/scenarios/leo_doppler.yaml --backend local --output /tmp/astro-doppler-measurements.json`
+- [x] `astro export-measurements /tmp/astro-doppler-measurements.json --format tdm --output /tmp/astro-doppler-measurements.tdm`
+- [x] `astro synth-measurements examples/scenarios/leo_radiometric_media.yaml --backend local --output /tmp/astro-radiometric-media.json`
+- [x] `astro synth-measurements examples/scenarios/leo_radiometric_weather_frequency.yaml --backend local --output /tmp/astro-radiometric-weather-frequency.json`
+- [x] `astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml --backend local --output /tmp/astro-dsn-calibration.json`
+- [x] `astro export-measurements /tmp/astro-radiometric-weather-frequency.json --format tdm --output /tmp/astro-radiometric-weather-frequency.tdm`
+- [x] `astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml --measurements /tmp/astro-radiometric-weather-frequency.tdm --format tdm --output /tmp/astro-dsn-calibration-from-tdm.json`
+- [x] `astro import-dsn-tracking examples/measurements/dsn_tracking_normalized.csv --output /tmp/astro-dsn-tracking-measurements.json`
+- [x] `astro import-dsn-kvn-tracking examples/measurements/dsn_tracking_kvn.txt --output /tmp/astro-dsn-kvn-tracking-measurements.json`
+- [x] `python -m pytest tests/astro_od/test_dsn_tracking.py::test_load_dsn_binary_tracking_measurements_maps_fixed_records tests/astro_cli/test_cli.py::test_import_dsn_binary_tracking_command_writes_measurement_json -q`
+- [x] `astro station-calibration examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --output /tmp/astro-station-calibration.json`
+- [x] `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json`
+- [x] `astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output /tmp/astro-topocentric-measurements.json`
+- [x] `astro synth-measurements examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml --backend local --output /tmp/astro-geodetic-precession-nutation-measurements.json`
+- [x] `astro estimate-measurements examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --backend local --output /tmp/astro-local-estimate.json`
+- [x] `astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output /tmp/astro-launch.json`
+- [x] `python -m pytest tests/astro_launch/test_launch_io.py::test_load_rocketpy_configured_launch_scenario -q`
+- [x] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend local --point-indices 2,3 --iterations 1 --radial-velocity-weight 1 --output /tmp/astro-optimized-launch.json`
+- [x] `astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 2 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output /tmp/astro-research.json`
 
 ## Optional Backend Gates
 
@@ -120,14 +128,14 @@ the message is actionable.
 
 ## Documentation Gates
 
-- [ ] README current-scope and command list match implemented behavior.
-- [ ] `docs/validation-matrix.md` reflects current command names and tolerances.
-- [ ] `docs/backend-installation.md` documents every optional extra and non-pip install caveat.
-- [ ] Roadmap plan statuses distinguish implemented product boundaries from live backend work that
+- [x] README current-scope and command list match implemented behavior.
+- [x] `docs/validation-matrix.md` reflects current command names and tolerances.
+- [x] `docs/backend-installation.md` documents every optional extra and non-pip install caveat.
+- [x] Roadmap plan statuses distinguish implemented product boundaries from live backend work that
   still requires external configuration.
 
 ## Packaging Gate
 
-- [ ] Build succeeds with `python -m build` when build tooling is installed.
-- [ ] Wheel metadata includes optional extras: `dev`, `orekit`, `launch`, `optimization`, and
+- [x] Build succeeds with `python -m build` when build tooling is installed.
+- [x] Wheel metadata includes optional extras: `dev`, `orekit`, `launch`, `optimization`, and
   `research`.
