@@ -550,11 +550,13 @@ matrix, release checklist, live backend campaign ledger, LEO/MEO/GEO examples, o
 semantics, and release packaging tooling are documented and locally verified.
 
 Current local release gate, run on 2026-06-19, passed `python -m pytest -q` with 495 passed and 7
-skipped, `python -m ruff check .`, `python -m mypy`, and `python -m build`. Optional smoke evidence
-is recorded in `docs/validation/live-backend-campaigns.md`: RocketPy, Dymos/OpenMDAO, and JAX/JAXLIB
-are runtime-available for attempting live campaigns on this machine; Orekit remains blocked on a
-Java runtime; TudatPy is not installed. These smoke results do not promote optional live validation
-claims by themselves.
+skipped, `python -m ruff check .`, `python -m mypy`, and `python -m build`. Optional backend
+evidence is recorded in `docs/validation/live-backend-campaigns.md`: RocketPy configured launch
+examples, Dymos default phase plus pitch-program transcription, and the JAX research promotion
+checklist passed live on this machine. Orekit remains blocked on a Java runtime; TudatPy is not
+installed. These live results promote only the executed optional gates and do not change the
+remaining product boundaries for native multi-motor staging, full target-seeking multistage
+optimization, operational differentiable OD, or unavailable Orekit/Tudat campaigns.
 
 Definition of done:
 
