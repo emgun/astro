@@ -1,0 +1,110 @@
+scenario_id: rocketpy-configured-multimotor-unsupported
+description: Unsupported RocketPy multi-motor guard fixture; RocketPy 1.11 overwrites earlier motors.
+epoch: '2026-01-01T00:00:00Z'
+time_scale: UTC
+frame: EME2000
+launch_site:
+  name: equator-pad
+  latitude_deg: 0.0
+  longitude_deg: 0.0
+  altitude_m: 0.0
+  body: earth
+vehicle:
+  name: mvp-single-stage-multimotor-solid
+  payload_mass_kg: 500.0
+  stages:
+    - name: stage-1
+      dry_mass_kg: 1200.0
+      propellant_mass_kg: 4500.0
+      engine:
+        name: booster
+        thrust_n: 160000.0
+        specific_impulse_s: 280.0
+      burn_duration_s: 70.0
+      reference_area_m2: 8.0
+      drag_coefficient: 0.35
+atmosphere:
+  model: exponential
+  sea_level_density_kg_m3: 1.225
+  scale_height_m: 8500.0
+guidance:
+  mode: pitch_program
+  pitch_program:
+    - time_s: 0.0
+      pitch_deg: 90.0
+    - time_s: 30.0
+      pitch_deg: 75.0
+    - time_s: 70.0
+      pitch_deg: 45.0
+    - time_s: 110.0
+      pitch_deg: 20.0
+    - time_s: 140.0
+      pitch_deg: 5.0
+rocketpy:
+  rail_length_m: 5.2
+  inclination_deg: 85.0
+  heading_deg: 90.0
+  rocket_radius_m: 0.31
+  rocket_mass_without_motor_kg: 145.0
+  rocket_inertia_without_motor_kg_m2:
+    - 45.0
+    - 45.0
+    - 1.2
+  rocket_center_of_mass_without_motor_m: 1.8
+  rocket_power_off_drag_coefficient: 0.5
+  rocket_power_on_drag_coefficient: 0.45
+  motor_thrust_source_n:
+    - [0.0, 0.0]
+    - [1.0, 25000.0]
+    - [3.0, 0.0]
+  motor_burn_time_s: 3.0
+  motor_dry_mass_kg: 28.0
+  motor_dry_inertia_kg_m2:
+    - 2.4
+    - 2.4
+    - 0.08
+  motor_position_m: -1.4
+  motor_center_of_dry_mass_position_m: -1.1
+  motor_nozzle_position_m: -1.9
+  motor_nozzle_radius_m: 0.075
+  motor_grain_number: 4
+  motor_grain_density_kg_m3: 1815.0
+  motor_grain_outer_radius_m: 0.12
+  motor_grain_initial_inner_radius_m: 0.045
+  motor_grain_initial_height_m: 0.42
+  motor_grain_separation_m: 0.012
+  motor_grains_center_of_mass_position_m: -0.8
+  additional_motors:
+    - name: strap-on
+      thrust_source_n:
+        - [0.0, 0.0]
+        - [0.5, 9000.0]
+        - [2.0, 0.0]
+      burn_time_s: 2.0
+      dry_mass_kg: 12.0
+      dry_inertia_kg_m2:
+        - 0.9
+        - 0.9
+        - 0.03
+      position_m: -1.2
+      center_of_dry_mass_position_m: -0.9
+      nozzle_position_m: -1.7
+      nozzle_radius_m: 0.04
+      grain_number: 2
+      grain_density_kg_m3: 1790.0
+      grain_outer_radius_m: 0.08
+      grain_initial_inner_radius_m: 0.025
+      grain_initial_height_m: 0.3
+      grain_separation_m: 0.01
+      grains_center_of_mass_position_m: -0.6
+  rail_button_upper_position_m: 0.7
+  rail_button_lower_position_m: -1.1
+  rail_button_angular_position_deg: 45.0
+target_orbit:
+  altitude_km: 160.0
+  inclination_deg: 0.0
+  altitude_tolerance_km: 10.0
+  velocity_tolerance_km_s: 0.1
+propagation:
+  duration_s: 140.0
+  step_s: 10.0

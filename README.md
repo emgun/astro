@@ -30,9 +30,11 @@ The current implementation slice covers:
   and JAX.
 
 Launch/ascent includes deliberately simple local vertical and pitch-program baselines plus a
-RocketPy direct-simulation path for explicitly configured single-stage solid rockets. Dymos/OpenMDAO
-is recognized as an optimization adapter boundary; its live phase transcription is currently a
-stage-aware vertical-ascent model rather than a full multistage optimal-control ascent solver.
+RocketPy direct-simulation path for explicitly configured single-motor solid rockets. The suite has
+a fail-closed guard fixture for additional RocketPy motors because RocketPy 1.11 overwrites earlier
+motors when `add_motor` is called more than once. Dymos/OpenMDAO is recognized as an optimization
+adapter boundary; its live phase transcription is currently a stage-aware vertical-ascent model
+rather than a full multistage optimal-control ascent solver.
 
 ## Setup
 
@@ -75,11 +77,12 @@ Dymos `>=1.13.1,<1.14`, and OpenMDAO `>=3.41,<3.42`.
 RocketPy and Dymos/OpenMDAO are behind explicit adapter gates. The current `rocketpy` launch path
 loads the optional runtime, requires explicit `rocketpy` vehicle/motor/flight configuration on the
 launch scenario, runs configured solid-rocket flights through RocketPy, preserves the
-`LaunchTrajectory` product boundary, and can annotate multistage suite scenarios with stage
+`LaunchTrajectory` product boundary, fails closed when additional RocketPy motors are configured
+because RocketPy 1.11 overwrites earlier motors, and can annotate multistage suite scenarios with stage
 events/samples reached by a single configured RocketPy flight, including metadata for whether the
 RocketPy solution covered the full suite stage schedule plus a multistage adapter contract that
 records the non-native composition scope. That multistage path is an adapter composition layer, not
-a validated multi-motor RocketPy staging solver. The default `dymos` launch optimization path runs a
+a validated RocketPy staged-separation solver. The default `dymos` launch optimization path runs a
 stage-aware Dymos/OpenMDAO vertical-ascent phase transcription and returns the existing
 `LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan metadata,
 original and optimized pitch-program control-point schedules, tuned point indices, path constraints,
@@ -326,6 +329,13 @@ vertical or pitch-program baseline, and writes a launch trajectory product with 
 events, dynamic pressure, acceleration, downrange, target miss metrics, and an `insertion_state`
 compatible with the shared `OrbitState` product. This local backend is a deterministic data-flow
 baseline, not a production launch simulator.
+
+With `--backend rocketpy`, `astro launch` requires explicit `scenario.rocketpy` configuration and
+runs a RocketPy direct flight for the validated single-motor adapter path. The checked
+`rocketpy_configured_multimotor_unsupported.yaml` fixture proves the suite can parse additional
+motor definitions but rejects them before simulation, because the installed RocketPy 1.11 API
+reports that only one motor per rocket is supported and later `add_motor` calls overwrite earlier
+motors.
 
 `astro sweep-launch-pitch` is the first launch targeting workflow. It varies one pitch-program knot,
 runs the local launch propagator for each candidate pitch angle, and writes a JSON product with

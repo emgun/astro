@@ -200,6 +200,67 @@ class LaunchPropagationConfig(AstroModel):
         return self
 
 
+class LaunchRocketPyMotorConfig(AstroModel):
+    name: str = Field(min_length=1)
+    thrust_source_n: tuple[tuple[FiniteFloat, FiniteFloat], ...] = Field(min_length=2)
+    burn_time_s: FiniteFloat = Field(gt=0.0)
+    dry_mass_kg: FiniteFloat = Field(ge=0.0)
+    dry_inertia_kg_m2: tuple[FiniteFloat, FiniteFloat, FiniteFloat]
+    position_m: FiniteFloat
+    center_of_dry_mass_position_m: FiniteFloat
+    nozzle_position_m: FiniteFloat
+    nozzle_radius_m: FiniteFloat = Field(gt=0.0)
+    grain_number: int = Field(ge=1)
+    grain_density_kg_m3: FiniteFloat = Field(gt=0.0)
+    grain_outer_radius_m: FiniteFloat = Field(gt=0.0)
+    grain_initial_inner_radius_m: FiniteFloat = Field(gt=0.0)
+    grain_initial_height_m: FiniteFloat = Field(gt=0.0)
+    grain_separation_m: FiniteFloat = Field(ge=0.0)
+    grains_center_of_mass_position_m: FiniteFloat
+
+    @field_validator(
+        "burn_time_s",
+        "dry_mass_kg",
+        "position_m",
+        "center_of_dry_mass_position_m",
+        "nozzle_position_m",
+        "nozzle_radius_m",
+        "grain_density_kg_m3",
+        "grain_outer_radius_m",
+        "grain_initial_inner_radius_m",
+        "grain_initial_height_m",
+        "grain_separation_m",
+        "grains_center_of_mass_position_m",
+        mode="before",
+    )
+    @classmethod
+    def scalar_inputs_must_be_numeric(cls, value: Any) -> Any:
+        return _numeric_scalar_input_must_be_number(value, "RocketPy motor scalar")
+
+    @model_validator(mode="after")
+    def validate_motor_geometry_and_curve(self) -> LaunchRocketPyMotorConfig:
+        thrust_times_s = [point[0] for point in self.thrust_source_n]
+        thrust_values_n = [point[1] for point in self.thrust_source_n]
+        if thrust_times_s[0] != 0.0:
+            raise ValueError("RocketPy motor thrust curve must start at t=0")
+        if not all(
+            previous_time < next_time
+            for previous_time, next_time in zip(thrust_times_s, thrust_times_s[1:], strict=False)
+        ):
+            raise ValueError(
+                "RocketPy motor thrust curve time_s values must be strictly increasing"
+            )
+        if any(thrust_n < 0.0 for thrust_n in thrust_values_n):
+            raise ValueError("RocketPy motor thrust curve thrust_n values must be non-negative")
+        if self.burn_time_s > thrust_times_s[-1]:
+            raise ValueError("RocketPy motor burn_time_s must not exceed thrust curve duration")
+        if self.grain_initial_inner_radius_m >= self.grain_outer_radius_m:
+            raise ValueError("RocketPy motor grain inner radius must be smaller than outer radius")
+        if self.nozzle_radius_m >= self.grain_outer_radius_m:
+            raise ValueError("RocketPy motor nozzle radius must be smaller than grain outer radius")
+        return self
+
+
 class LaunchRocketPyConfig(AstroModel):
     rail_length_m: FiniteFloat = Field(gt=0.0)
     inclination_deg: FiniteFloat = Field(ge=0.0, le=180.0)
@@ -228,6 +289,7 @@ class LaunchRocketPyConfig(AstroModel):
     rail_button_upper_position_m: FiniteFloat
     rail_button_lower_position_m: FiniteFloat
     rail_button_angular_position_deg: FiniteFloat = Field(ge=0.0, le=360.0, default=45.0)
+    additional_motors: tuple[LaunchRocketPyMotorConfig, ...] = Field(default_factory=tuple)
 
     @field_validator(
         "rail_length_m",

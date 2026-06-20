@@ -63,6 +63,19 @@ def test_load_rocketpy_single_stage_launch_scenario() -> None:
     assert scenario.rocketpy.motor_thrust_source_n[-1] == (3.0, 0.0)
 
 
+def test_load_rocketpy_multimotor_unsupported_guard_scenario() -> None:
+    scenario = load_launch_scenario(
+        Path("examples/launch/rocketpy_configured_multimotor_unsupported.yaml")
+    )
+
+    assert scenario.scenario_id == "rocketpy-configured-multimotor-unsupported"
+    assert len(scenario.vehicle.stages) == 1
+    assert scenario.rocketpy is not None
+    assert len(scenario.rocketpy.additional_motors) == 1
+    assert scenario.rocketpy.additional_motors[0].name == "strap-on"
+    assert scenario.rocketpy.additional_motors[0].position_m == -1.2
+
+
 def test_load_launch_trajectory_reads_json_product(tmp_path: Path) -> None:
     from astro_launch.io import load_launch_trajectory
 

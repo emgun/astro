@@ -71,9 +71,11 @@ Still roadmap-level:
 - Flight-qualified actuator/sensor ACS modeling beyond the current deterministic bounded
   quaternion-error PD plus sensor/actuator screening primitives. Current products are useful
   screening diagnostics, not spacecraft-qualified hardware simulations.
-- Full native multi-motor RocketPy staging and full target-seeking multistage Dymos ascent
-  optimization beyond the current RocketPy adapter boundary, suite-stage annotation, Dymos vertical
-  phase, and opt-in native pitch-control transcription.
+- Full native RocketPy multi-motor/staged-separation execution and full target-seeking multistage
+  Dymos ascent optimization beyond the current RocketPy direct-flight adapter, suite-stage
+  annotation, Dymos vertical phase, and opt-in native pitch-control transcription. The current
+  RocketPy 1.11 adapter fails closed for additional configured motors because RocketPy overwrites
+  earlier motors when `add_motor` is called more than once.
 - Native Tudat variational-equation covariance propagation now has an explicit opt-in default
   construction boundary that builds the initial-state parameter set and reads TudatPy
   `state_transition_matrix_history` when the optional variational API is present. Default Tudat
@@ -331,21 +333,23 @@ Primary files:
 ### Goal 4: Launch External Backends and Optimization
 
 Status: first external-backend boundary implemented, first live RocketPy direct runner added,
-RocketPy multistage suite-stage composition added, first live stage-aware Dymos/OpenMDAO phase
-transcription added, and opt-in native Dymos pitch-control transcription added. RocketPy and
+RocketPy multi-motor guard configuration added, RocketPy multistage suite-stage composition added,
+first live stage-aware Dymos/OpenMDAO phase transcription added, and opt-in native Dymos
+pitch-control transcription added. RocketPy and
 Dymos/OpenMDAO optional runtime gates, smoke commands, launch
 backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured
 launch examples, configured solid RocketPy direct simulation, multistage suite stage-event/sample
 annotation around one configured RocketPy flight, stage-schedule completeness metadata, a RocketPy
-multistage adapter contract that records the non-native composition scope, a neutral
+fail-closed guard for additional configured motors, a RocketPy multistage adapter contract that
+records the non-native composition scope, a neutral
 `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics,
 Dymos stage-aware vertical-ascent phase transcription, opt-in native Dymos pitch-control
 transcription, Dymos suite stage-plan metadata, pitch-program control-point metadata, optimized
 pitch-program schedule metadata, tuned point indices, a Dymos pitch-program transcription contract
 with per-stage control coverage, altitude, velocity, and radial-velocity target-insertion
 residual/tolerance assessment, and Dymos adapter optimization diagnostics are implemented. Full
-native multi-motor RocketPy staging and full target-seeking multistage Dymos ascent design
-optimization remain gated on deeper validated backend runners.
+native RocketPy multi-motor/staged-separation execution and full target-seeking multistage Dymos
+ascent design optimization remain gated on deeper validated backend runners.
 
 Implemented slice:
 
@@ -355,16 +359,20 @@ Implemented slice:
 - Optional backend imports have timeout diagnostics so Matplotlib/OpenMDAO/RocketPy import-time
   stalls report as backend-unavailable errors instead of hanging indefinitely.
 - `LaunchScenario.rocketpy` provides typed RocketPy vehicle/motor/flight configuration for the
-  backend-specific path, with validation for rail settings, thrust curves, motor inertia, motor
-  placement, and solid-motor grain geometry.
+  backend-specific path, with validation for rail settings, primary and additional motor thrust
+  curves, motor inertia, motor placement, and solid-motor grain geometry.
 - `examples/launch/rocketpy_configured_two_stage.yaml` provides a checked-in RocketPy configuration
-  fixture, and `examples/launch/rocketpy_configured_single_stage.yaml` provides the live direct-run
-  fixture.
+  fixture, `examples/launch/rocketpy_configured_single_stage.yaml` provides the live direct-run
+  fixture, and `examples/launch/rocketpy_configured_multimotor_unsupported.yaml` provides the
+  fail-closed additional-motor guard fixture.
 - `astro launch --backend rocketpy` runs a configured solid RocketPy flight when dependencies and
-  `scenario.rocketpy` configuration are available. For multistage suite scenarios, it annotates the
-  returned `LaunchTrajectory` with reached suite stage events and sample stage names around one
-  configured RocketPy flight, with metadata identifying the composition tradeoff and whether the
-  RocketPy solution covered the full suite stage schedule.
+  `scenario.rocketpy` configuration are available. It rejects additional configured solid motors
+  before simulation because RocketPy 1.11 overwrites earlier motors. For multistage suite scenarios,
+  it annotates the returned `LaunchTrajectory` with reached suite stage events and sample stage
+  names around one configured RocketPy flight, with metadata identifying the composition tradeoff
+  and whether the RocketPy solution covered the full suite stage schedule.
+- Additional-motor RocketPy configs now fail closed with an explicit `UnsupportedBackendError`
+  instead of emitting a misleading product after RocketPy overwrites the primary motor.
 - Multistage RocketPy products include an adapter contract that records the execution scope, suite
   stage names, schedule duration/completeness, one configured RocketPy flight, and explicit
   `native_multistage_execution = false` status.
@@ -396,7 +404,7 @@ Definition of done:
   installed and a scenario supplies RocketPy-specific vehicle/motor/flight configuration.
 - RocketPy adapter returns the existing `LaunchTrajectory` schema, not RocketPy-native objects.
 - RocketPy multistage suite composition reports reached stage ignition, burnout, separation, sample
-  stage names, and stage-schedule completeness without claiming native RocketPy multi-motor staging.
+  stage names, and stage-schedule completeness without claiming native RocketPy staged separation.
 - `astro optimize-launch --backend dymos` solves a stage-aware ascent optimization example through
   a bounded vertical-ascent Dymos phase model, and `--dymos-mode pitch-program` executes an opt-in
   native Dymos pitch-control transcription.
@@ -560,14 +568,15 @@ Current local release gate, run on 2026-06-19, passed `python -m pytest -q` with
 skipped, `python -m ruff check .`, `python -m mypy`, and `python -m build`. Optional backend
 evidence is recorded in `docs/validation/live-backend-campaigns.md`: Orekit propagation,
 generic and high-fidelity covariance, and native OD passed with the explicit Homebrew OpenJDK/data
-environment; RocketPy configured launch examples passed; Dymos default phase plus pitch-program
+environment; RocketPy configured launch examples passed and the additional-motor guard was added;
+Dymos default phase plus pitch-program
 transcription passed; the TudatPy 1.0 isolated conda campaign passed native propagation,
 high-fidelity covariance, native variational covariance, strict two-body comparison, and calibrated
 two-scenario comparison gates; and the JAX research promotion checklist passed live on this
 machine. These live results promote only the executed optional gates and do not change the
-remaining product boundaries for default Java-free CI, native multi-motor staging, full
-target-seeking multistage optimization, operational differentiable OD, or standards-grade ephemeris
-authority.
+remaining product boundaries for default Java-free CI, native RocketPy multi-motor/staged
+separation, full target-seeking multistage optimization, operational differentiable OD, or
+standards-grade ephemeris authority.
 
 Definition of done:
 

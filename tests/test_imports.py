@@ -115,6 +115,7 @@ def test_packages_import() -> None:
         "LaunchReportMetricDelta",
         "LaunchReportShortArcMetrics",
         "LaunchRocketPyConfig",
+        "LaunchRocketPyMotorConfig",
         "LaunchScenario",
         "LaunchSite",
         "LaunchStage",

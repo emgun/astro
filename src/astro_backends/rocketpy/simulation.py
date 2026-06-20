@@ -34,6 +34,7 @@ def _with_rocketpy_provenance(
     runtime: RocketPyRuntime,
     config: LaunchRocketPyConfig,
 ) -> LaunchTrajectory:
+    motor_names = _rocketpy_motor_names(config)
     metadata = {
         **trajectory.metadata,
         "adapter": "rocketpy",
@@ -43,6 +44,10 @@ def _with_rocketpy_provenance(
         "rocketpy_rail_length_m": config.rail_length_m,
         "rocketpy_inclination_deg": config.inclination_deg,
         "rocketpy_heading_deg": config.heading_deg,
+        "rocketpy_motor_count": len(motor_names),
+        "rocketpy_motor_names": motor_names,
+        "rocketpy_motor_positions_m": _rocketpy_motor_positions_m(config),
+        "rocketpy_native_multimotor_execution": len(motor_names) > 1,
     }
     return trajectory.model_copy(update={"backend": "rocketpy", "metadata": metadata})
 
@@ -57,28 +62,69 @@ def _build_environment(scenario: LaunchScenario, runtime: RocketPyRuntime) -> An
 
 
 def _build_solid_motor(config: LaunchRocketPyConfig, runtime: RocketPyRuntime) -> Any:
-    return runtime.solid_motor(
-        thrust_source=[
-            (float(time_s), float(thrust_n))
-            for time_s, thrust_n in config.motor_thrust_source_n
-        ],
-        dry_mass=config.motor_dry_mass_kg,
-        dry_inertia=config.motor_dry_inertia_kg_m2,
-        nozzle_radius=config.motor_nozzle_radius_m,
+    return _build_solid_motor_from_config(
+        runtime,
+        thrust_source_n=config.motor_thrust_source_n,
+        dry_mass_kg=config.motor_dry_mass_kg,
+        dry_inertia_kg_m2=config.motor_dry_inertia_kg_m2,
+        nozzle_radius_m=config.motor_nozzle_radius_m,
         grain_number=config.motor_grain_number,
-        grain_density=config.motor_grain_density_kg_m3,
-        grain_outer_radius=config.motor_grain_outer_radius_m,
-        grain_initial_inner_radius=config.motor_grain_initial_inner_radius_m,
-        grain_initial_height=config.motor_grain_initial_height_m,
-        grain_separation=config.motor_grain_separation_m,
-        grains_center_of_mass_position=config.motor_grains_center_of_mass_position_m,
-        center_of_dry_mass_position=config.motor_center_of_dry_mass_position_m,
-        nozzle_position=config.motor_nozzle_position_m,
-        burn_time=config.motor_burn_time_s,
+        grain_density_kg_m3=config.motor_grain_density_kg_m3,
+        grain_outer_radius_m=config.motor_grain_outer_radius_m,
+        grain_initial_inner_radius_m=config.motor_grain_initial_inner_radius_m,
+        grain_initial_height_m=config.motor_grain_initial_height_m,
+        grain_separation_m=config.motor_grain_separation_m,
+        grains_center_of_mass_position_m=config.motor_grains_center_of_mass_position_m,
+        center_of_dry_mass_position_m=config.motor_center_of_dry_mass_position_m,
+        nozzle_position_m=config.motor_nozzle_position_m,
+        burn_time_s=config.motor_burn_time_s,
     )
 
 
-def _build_rocket(config: LaunchRocketPyConfig, runtime: RocketPyRuntime, motor: Any) -> Any:
+def _build_solid_motor_from_config(
+    runtime: RocketPyRuntime,
+    *,
+    thrust_source_n: tuple[tuple[float, float], ...],
+    dry_mass_kg: float,
+    dry_inertia_kg_m2: tuple[float, float, float],
+    nozzle_radius_m: float,
+    grain_number: int,
+    grain_density_kg_m3: float,
+    grain_outer_radius_m: float,
+    grain_initial_inner_radius_m: float,
+    grain_initial_height_m: float,
+    grain_separation_m: float,
+    grains_center_of_mass_position_m: float,
+    center_of_dry_mass_position_m: float,
+    nozzle_position_m: float,
+    burn_time_s: float,
+) -> Any:
+    return runtime.solid_motor(
+        thrust_source=[
+            (float(time_s), float(thrust_n))
+            for time_s, thrust_n in thrust_source_n
+        ],
+        dry_mass=dry_mass_kg,
+        dry_inertia=dry_inertia_kg_m2,
+        nozzle_radius=nozzle_radius_m,
+        grain_number=grain_number,
+        grain_density=grain_density_kg_m3,
+        grain_outer_radius=grain_outer_radius_m,
+        grain_initial_inner_radius=grain_initial_inner_radius_m,
+        grain_initial_height=grain_initial_height_m,
+        grain_separation=grain_separation_m,
+        grains_center_of_mass_position=grains_center_of_mass_position_m,
+        center_of_dry_mass_position=center_of_dry_mass_position_m,
+        nozzle_position=nozzle_position_m,
+        burn_time=burn_time_s,
+    )
+
+
+def _build_rocket(
+    config: LaunchRocketPyConfig,
+    runtime: RocketPyRuntime,
+    motors: list[tuple[Any, float]],
+) -> Any:
     rocket = runtime.rocket(
         radius=config.rocket_radius_m,
         mass=config.rocket_mass_without_motor_kg,
@@ -87,13 +133,37 @@ def _build_rocket(config: LaunchRocketPyConfig, runtime: RocketPyRuntime, motor:
         power_on_drag=config.rocket_power_on_drag_coefficient,
         center_of_mass_without_motor=config.rocket_center_of_mass_without_motor_m,
     )
-    rocket.add_motor(motor, config.motor_position_m)
+    for motor, position_m in motors:
+        rocket.add_motor(motor, position_m)
     rocket.set_rail_buttons(
         upper_button_position=config.rail_button_upper_position_m,
         lower_button_position=config.rail_button_lower_position_m,
         angular_position=config.rail_button_angular_position_deg,
     )
     return rocket
+
+
+def _rocketpy_motor_names(config: LaunchRocketPyConfig) -> list[str]:
+    return ["primary", *[motor.name for motor in config.additional_motors]]
+
+
+def _rocketpy_motor_positions_m(config: LaunchRocketPyConfig) -> list[float]:
+    return [
+        config.motor_position_m,
+        *[motor.position_m for motor in config.additional_motors],
+    ]
+
+
+def _reject_unsupported_additional_motors(config: LaunchRocketPyConfig) -> None:
+    if not config.additional_motors:
+        return
+    names = ", ".join(motor.name for motor in config.additional_motors)
+    raise UnsupportedBackendError(
+        "RocketPy launch simulation supports only one motor per rocket in the validated "
+        "adapter; RocketPy 1.11 overwrites earlier motors when add_motor is called more "
+        f"than once. Remove scenario.rocketpy.additional_motors ({names}) or use the "
+        "local/suite model until a validated native multi-motor RocketPy API is available."
+    )
 
 
 def _build_flight(
@@ -354,6 +424,7 @@ def _trajectory_from_rocketpy_flight(
     is_multistage = len(scenario.vehicle.stages) > 1
     stage_schedule_duration_s = _stage_windows(scenario)[-1][2]
     stage_schedule_complete = sample_times_s[-1] >= stage_schedule_duration_s - 1.0e-9
+    motor_names = _rocketpy_motor_names(config)
     metadata: dict[str, Any] = {
         "model": (
             "rocketpy_configured_multistage_composition"
@@ -369,6 +440,10 @@ def _trajectory_from_rocketpy_flight(
         "rocketpy_stage_count": len(scenario.vehicle.stages),
         "rocketpy_stage_schedule_duration_s": stage_schedule_duration_s,
         "rocketpy_stage_schedule_complete": stage_schedule_complete,
+        "rocketpy_motor_count": len(motor_names),
+        "rocketpy_motor_names": motor_names,
+        "rocketpy_motor_positions_m": _rocketpy_motor_positions_m(config),
+        "rocketpy_native_multimotor_execution": len(motor_names) > 1,
         "rocketpy_composition": (
             "single_flight_suite_stage_schedule"
             if is_multistage
@@ -398,9 +473,10 @@ def run_rocketpy_flight(
     runtime: RocketPyRuntime,
     config: LaunchRocketPyConfig,
 ) -> LaunchTrajectory:
+    _reject_unsupported_additional_motors(config)
     environment = _build_environment(scenario, runtime)
-    motor = _build_solid_motor(config, runtime)
-    rocket = _build_rocket(config, runtime, motor)
+    motors = [(_build_solid_motor(config, runtime), config.motor_position_m)]
+    rocket = _build_rocket(config, runtime, motors)
     flight = _build_flight(
         scenario,
         config,
@@ -425,6 +501,7 @@ def propagate_launch_rocketpy(
             "vehicle, motor, and flight configuration; use --backend local for aggregate "
             "launch scenarios."
         )
+    _reject_unsupported_additional_motors(config)
     if flight_runner is None:
         flight_runner = run_rocketpy_flight
 

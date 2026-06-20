@@ -30,9 +30,9 @@ class _FakeRocketPyModel:
     def __init__(self, *, solution_end_s: float | None = None) -> None:
         self.solution_end_s = solution_end_s
         self.environment_kwargs: dict[str, Any] | None = None
-        self.motor_kwargs: dict[str, Any] | None = None
+        self.motor_kwargs: list[dict[str, Any]] = []
         self.rocket_kwargs: dict[str, Any] | None = None
-        self.motor_position_m: float | None = None
+        self.motor_positions_m: list[float] = []
         self.rail_buttons_kwargs: dict[str, Any] | None = None
         self.flight_kwargs: dict[str, Any] | None = None
 
@@ -45,7 +45,7 @@ class _FakeRocketPyModel:
 
         class SolidMotor:
             def __init__(self, **kwargs: Any) -> None:
-                model.motor_kwargs = kwargs
+                model.motor_kwargs.append(kwargs)
 
         class _TotalMass:
             def get_value_opt(self, time_s: float) -> float:
@@ -57,7 +57,7 @@ class _FakeRocketPyModel:
                 self.total_mass = _TotalMass()
 
             def add_motor(self, motor: SolidMotor, position: float) -> None:
-                model.motor_position_m = position
+                model.motor_positions_m.append(position)
 
             def set_rail_buttons(self, **kwargs: Any) -> None:
                 model.rail_buttons_kwargs = kwargs
@@ -126,6 +126,35 @@ def _rocketpy_config() -> LaunchRocketPyConfig:
         rail_button_upper_position_m=0.7,
         rail_button_lower_position_m=-1.1,
         rail_button_angular_position_deg=45.0,
+    )
+
+
+def _rocketpy_config_with_additional_motor() -> LaunchRocketPyConfig:
+    base = _rocketpy_config()
+    payload = base.model_dump()
+    payload.pop("additional_motors", None)
+    return LaunchRocketPyConfig(
+        **payload,
+        additional_motors=(
+            {
+                "name": "strap-on",
+                "thrust_source_n": ((0.0, 0.0), (0.5, 9000.0), (2.0, 0.0)),
+                "burn_time_s": 2.0,
+                "dry_mass_kg": 12.0,
+                "dry_inertia_kg_m2": (0.9, 0.9, 0.03),
+                "position_m": -1.2,
+                "center_of_dry_mass_position_m": -0.9,
+                "nozzle_position_m": -1.7,
+                "nozzle_radius_m": 0.04,
+                "grain_number": 2,
+                "grain_density_kg_m3": 1790.0,
+                "grain_outer_radius_m": 0.08,
+                "grain_initial_inner_radius_m": 0.025,
+                "grain_initial_height_m": 0.3,
+                "grain_separation_m": 0.01,
+                "grains_center_of_mass_position_m": -0.6,
+            },
+        ),
     )
 
 
@@ -240,22 +269,24 @@ def test_propagate_launch_rocketpy_runs_single_stage_solid_flight() -> None:
         "longitude": scenario.launch_site.longitude_deg,
         "elevation": scenario.launch_site.altitude_m,
     }
-    assert model.motor_kwargs == {
-        "thrust_source": [(0.0, 0.0), (1.0, 25000.0), (3.0, 0.0)],
-        "dry_mass": 28.0,
-        "dry_inertia": (2.4, 2.4, 0.08),
-        "nozzle_radius": 0.075,
-        "grain_number": 4,
-        "grain_density": 1815.0,
-        "grain_outer_radius": 0.12,
-        "grain_initial_inner_radius": 0.045,
-        "grain_initial_height": 0.42,
-        "grain_separation": 0.012,
-        "grains_center_of_mass_position": -0.8,
-        "center_of_dry_mass_position": -1.1,
-        "nozzle_position": -1.9,
-        "burn_time": 3.0,
-    }
+    assert model.motor_kwargs == [
+        {
+            "thrust_source": [(0.0, 0.0), (1.0, 25000.0), (3.0, 0.0)],
+            "dry_mass": 28.0,
+            "dry_inertia": (2.4, 2.4, 0.08),
+            "nozzle_radius": 0.075,
+            "grain_number": 4,
+            "grain_density": 1815.0,
+            "grain_outer_radius": 0.12,
+            "grain_initial_inner_radius": 0.045,
+            "grain_initial_height": 0.42,
+            "grain_separation": 0.012,
+            "grains_center_of_mass_position": -0.8,
+            "center_of_dry_mass_position": -1.1,
+            "nozzle_position": -1.9,
+            "burn_time": 3.0,
+        }
+    ]
     assert model.rocket_kwargs == {
         "radius": 0.31,
         "mass": 145.0,
@@ -264,7 +295,7 @@ def test_propagate_launch_rocketpy_runs_single_stage_solid_flight() -> None:
         "power_on_drag": 0.5,
         "center_of_mass_without_motor": 1.8,
     }
-    assert model.motor_position_m == -1.4
+    assert model.motor_positions_m == [-1.4]
     assert model.rail_buttons_kwargs == {
         "upper_button_position": 0.7,
         "lower_button_position": -1.1,
@@ -282,10 +313,26 @@ def test_propagate_launch_rocketpy_runs_single_stage_solid_flight() -> None:
     assert trajectory.backend == "rocketpy"
     assert trajectory.metadata["source_backend"] == "rocketpy_direct"
     assert trajectory.metadata["rocketpy_version"] == "1.11.0"
+    assert trajectory.metadata["rocketpy_motor_count"] == 1
+    assert trajectory.metadata["rocketpy_motor_names"] == ["primary"]
+    assert trajectory.metadata["rocketpy_native_multimotor_execution"] is False
     assert trajectory.samples[0].time_s == 0.0
     assert trajectory.samples[-1].time_s == scenario.propagation.duration_s
     assert trajectory.samples[-1].altitude_km == pytest.approx(2.8)
     assert trajectory.samples[-1].horizontal_velocity_km_s == pytest.approx(0.1004987562)
+
+
+def test_propagate_launch_rocketpy_rejects_additional_motors_until_backend_supports_them() -> None:
+    model = _FakeRocketPyModel()
+    scenario = _single_stage_scenario().model_copy(
+        update={"rocketpy": _rocketpy_config_with_additional_motor()}
+    )
+
+    with pytest.raises(UnsupportedBackendError, match="supports only one motor"):
+        propagate_launch_rocketpy(scenario, runtime_loader=model.runtime)
+
+    assert model.motor_kwargs == []
+    assert model.motor_positions_m == []
 
 
 def test_propagate_launch_rocketpy_stops_at_actual_solution_end() -> None:
