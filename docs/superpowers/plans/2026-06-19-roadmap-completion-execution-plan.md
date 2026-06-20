@@ -411,7 +411,7 @@ Docs must say these products are deterministic screening products, not flight-qu
 - Modify: `docs/release-checklist.md`
 - Modify: `docs/backend-installation.md` if command names drift.
 
-- [ ] **Step 1: Create live campaign ledger**
+- [x] **Step 1: Create live campaign ledger**
 
 Record each backend with:
 
@@ -426,7 +426,7 @@ Roadmap claim allowed:
 Roadmap claim not allowed:
 ```
 
-- [ ] **Step 2: Run available smoke gates**
+- [x] **Step 2: Run available smoke gates**
 
 Run:
 
@@ -440,7 +440,7 @@ astro jax-smoke
 
 If a command exits unavailable, capture the structured diagnostic in the ledger. Do not mark the live gate complete.
 
-- [ ] **Step 3: Verify docs**
+- [x] **Step 3: Verify docs**
 
 Run:
 

@@ -60,6 +60,8 @@ Run when the matching runtime is expected to be present:
 If a backend runtime is intentionally absent, capture the smoke command's structured unavailable
 JSON and treat the gate as not-run rather than failed or complete.
 
+- [ ] Record the optional backend campaign outcome in `docs/validation/live-backend-campaigns.md`
+  before promoting any optional live gate.
 - [ ] `astro orekit-smoke`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_two_body_matches_local_reference -v`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_j2_matches_local_reference_scale -v`
