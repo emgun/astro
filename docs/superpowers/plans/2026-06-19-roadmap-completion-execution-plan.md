@@ -389,6 +389,8 @@ ACS status reports tolerance miss/within_tolerance deterministically
 ACS actuator screening reports commanded-vs-applied torque tracking error plus actuator saturation
 and deadband fractions
 conjunction assessment distinguishes screening-only from operational-candidate
+ACS control readiness reports sampled first/settled within-tolerance timing without claiming
+flight qualification
 ```
 
 - [x] **Step 2: Verify local screening only**

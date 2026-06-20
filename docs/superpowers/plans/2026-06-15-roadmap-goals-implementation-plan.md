@@ -308,7 +308,8 @@ Definition of done:
   PD closed-loop control primitive, and opt-in deterministic sensor attitude/rate bias plus
   actuator scale/bias/deadband screening with per-sample measured-state, commanded-torque, and
   applied-control-torque provenance. Closed-loop products report configured pointing/rate
-  tolerances, final and max attitude/rate errors, pointing/rate margins, within-tolerance status,
+  tolerances, final and max attitude/rate errors, pointing/rate margins, sampled
+  first-within-tolerance and settled-within-tolerance readiness metrics, within-tolerance status,
   commanded-vs-applied torque tracking error, torque/actuator saturation counts and fractions, and
   actuator deadband counts and fractions.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.

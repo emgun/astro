@@ -291,10 +291,10 @@ state from scheduled torque commands or a bounded quaternion-error PD control la
 quaternion/rate/control-torque history. The closed-loop mode can optionally include deterministic
 sensor attitude/rate bias and actuator scale/bias/deadband screening metadata. Closed-loop products
 also report final/max attitude error, final/max angular-rate error, configured control tolerances,
-pointing/rate margins, within-tolerance status, commanded-vs-applied torque tracking error,
-torque/actuator saturation counts and fractions, and actuator deadband counts and fractions. This
-is an ACS product-wiring and sensitivity primitive, not a validated spacecraft actuator/sensor
-simulation.
+pointing/rate margins, sampled first-within-tolerance and settled-within-tolerance readiness
+metrics, within-tolerance status, commanded-vs-applied torque tracking error, torque/actuator
+saturation counts and fractions, and actuator deadband counts and fractions. This is an ACS
+product-wiring and sensitivity primitive, not a validated spacecraft actuator/sensor simulation.
 Local orbital propagation
 also annotates periapsis/apoapsis `TrajectoryEvent` records. For no-maneuver trajectories, apsides
 are root-located between propagation samples through radial-velocity bisection and include bracket,

@@ -170,9 +170,41 @@ def test_attitude_control_status_uses_configured_tolerances() -> None:
 
     result = propagate_rigid_body_attitude(config)
 
+    within_tolerance_samples = [
+        sample
+        for sample in result.samples
+        if sample.attitude_error_rad is not None
+        and sample.attitude_error_rad <= 0.2
+        and sample.angular_rate_error_norm_rad_s is not None
+        and sample.angular_rate_error_norm_rad_s <= 0.05
+    ]
+    settled_sample = next(
+        sample
+        for sample_index, sample in enumerate(result.samples)
+        if sample.attitude_error_rad is not None
+        and sample.angular_rate_error_norm_rad_s is not None
+        and all(
+            later.attitude_error_rad is not None
+            and later.attitude_error_rad <= 0.2
+            and later.angular_rate_error_norm_rad_s is not None
+            and later.angular_rate_error_norm_rad_s <= 0.05
+            for later in result.samples[sample_index:]
+        )
+    )
+
     assert result.metadata["attitude_control_status"] == "within_tolerance"
     assert result.metadata["pointing_tolerance_rad"] == 0.2
     assert result.metadata["angular_rate_tolerance_rad_s"] == 0.05
+    assert result.metadata["within_tolerance_sample_count"] == len(within_tolerance_samples)
+    assert result.metadata["within_tolerance_fraction"] == pytest.approx(
+        len(within_tolerance_samples) / len(result.samples)
+    )
+    assert result.metadata["first_within_tolerance_elapsed_s"] == pytest.approx(
+        within_tolerance_samples[0].elapsed_s
+    )
+    assert result.metadata["settled_within_tolerance_elapsed_s"] == pytest.approx(
+        settled_sample.elapsed_s
+    )
 
 
 def test_attitude_control_reports_saturation_and_deadband_samples() -> None:

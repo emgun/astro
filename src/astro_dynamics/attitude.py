@@ -329,10 +329,29 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
         control_sample_count = len(attitude_errors_rad)
         final_attitude_error_rad = attitude_errors_rad[-1]
         final_rate_error_rad_s = angular_rate_errors_rad_s[-1]
+        within_tolerance_flags = [
+            attitude_error_rad <= config.control.pointing_tolerance_rad
+            and angular_rate_error_rad_s <= config.control.angular_rate_tolerance_rad_s
+            for attitude_error_rad, angular_rate_error_rad_s in zip(
+                attitude_errors_rad,
+                angular_rate_errors_rad_s,
+                strict=True,
+            )
+        ]
+        within_tolerance_sample_count = sum(within_tolerance_flags)
+        first_within_tolerance_elapsed_s = _first_within_tolerance_elapsed_s(
+            within_tolerance_flags,
+            samples,
+        )
+        settled_within_tolerance_elapsed_s = _settled_within_tolerance_elapsed_s(
+            within_tolerance_flags,
+            samples,
+        )
         metadata.update(
             {
                 "attitude_dynamics_model": "diagonal_rigid_body_closed_loop_pd",
                 "control_model": "quaternion_error_pd",
+                "control_readiness_model": "sampled_pointing_and_rate_tolerance",
                 "control_saturation_enabled": True,
                 "target_body_to_inertial_quaternion": list(
                     config.control.target_body_to_inertial_quaternion
@@ -352,6 +371,12 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
                 "angular_rate_margin_rad_s": (
                     config.control.angular_rate_tolerance_rad_s - final_rate_error_rad_s
                 ),
+                "within_tolerance_sample_count": within_tolerance_sample_count,
+                "within_tolerance_fraction": (
+                    within_tolerance_sample_count / control_sample_count
+                ),
+                "first_within_tolerance_elapsed_s": first_within_tolerance_elapsed_s,
+                "settled_within_tolerance_elapsed_s": settled_within_tolerance_elapsed_s,
                 "control_torque_tracking_error_model": (
                     "applied_minus_commanded_control_torque"
                 ),
@@ -416,6 +441,26 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
         samples=tuple(samples),
         metadata=metadata,
     )
+
+
+def _first_within_tolerance_elapsed_s(
+    within_tolerance_flags: list[bool],
+    samples: list[AttitudeDynamicsSample],
+) -> float | None:
+    for index, within_tolerance in enumerate(within_tolerance_flags):
+        if within_tolerance:
+            return samples[index].elapsed_s
+    return None
+
+
+def _settled_within_tolerance_elapsed_s(
+    within_tolerance_flags: list[bool],
+    samples: list[AttitudeDynamicsSample],
+) -> float | None:
+    for index, within_tolerance in enumerate(within_tolerance_flags):
+        if within_tolerance and all(within_tolerance_flags[index:]):
+            return samples[index].elapsed_s
+    return None
 
 
 def _active_torque(config: RigidBodyAttitudeConfig, elapsed_s: float) -> np.ndarray[Any, Any]:
