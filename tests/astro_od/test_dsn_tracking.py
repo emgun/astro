@@ -178,20 +178,31 @@ def test_load_dsn_binary_tracking_measurements_rejects_bad_magic(tmp_path: Path)
         load_dsn_binary_tracking_measurements(path)
 
 
+@pytest.mark.parametrize(
+    ("tracking_format", "observable", "units"),
+    [
+        (99, 3, 1),
+        (1, 99, 1),
+        (1, 3, 99),
+    ],
+)
 def test_load_dsn_binary_tracking_measurements_rejects_unsupported_codes(
     tmp_path: Path,
+    tracking_format: int,
+    observable: int,
+    units: int,
 ) -> None:
     path = tmp_path / "unsupported.bin"
     path.write_bytes(
         b"ASTRODSN1"
         + pack("<I", 1)
         + _binary_tracking_record(
-            tracking_format=99,
-            observable=3,
+            tracking_format=tracking_format,
+            observable=observable,
             epoch_unix_s=1767225600,
             value=12345.6,
             sigma=0.01,
-            units=1,
+            units=units,
             scenario_id="dsn-binary-demo",
             station="DSS-14",
             spacecraft="demo-sat",
