@@ -17,7 +17,7 @@ recorded as not-run live evidence, not as a failed required local release gate.
 | --- | --- | --- | --- |
 | Orekit | Available with explicit Homebrew OpenJDK environment | Passed propagation, generic/high-fidelity covariance, and native OD live gates | Orekit live propagation, covariance, and native OD claims are promoted for this machine only when the Java/data environment is configured. |
 | RocketPy | Available | Passed configured-example live gate; multi-motor config fails closed | RocketPy configured launch examples passed live validation on this machine, and additional configured motors are rejected because RocketPy 1.11 overwrites earlier motors. |
-| Dymos/OpenMDAO | Available | Passed live optimization gates | Dymos default phase, target-seeking pitch-program transcription, and linked multiphase stage transcription with stage-local mass depletion live tests passed on this machine, without promoting a full high-fidelity multistage ascent design optimizer. |
+| Dymos/OpenMDAO | Available | Passed live optimization gates | Dymos default phase, target-seeking pitch-program transcription, and linked multiphase stage transcription with stage-local mass depletion and exponential-atmosphere drag live tests passed on this machine, without promoting a full high-fidelity multistage ascent design optimizer. |
 | TudatPy | Available in isolated conda env | Propagation/high-fidelity covariance/native-variational gates passed; strict multi-scenario comparison found a calibrated J2 tolerance boundary | Tudat live force-model products are promoted only with the recorded comparison tolerances and remain cross-check products, not the operational authority. |
 | JAX/JAXLIB | Available | Passed research promotion checklist | JAX research propagation, OD sensitivity, and research-estimate gates passed on this machine, but remain research workflows, not operational OD services. |
 
@@ -166,15 +166,15 @@ Smoke output:
 ```
 
 Roadmap claim allowed: Dymos/OpenMDAO default phase, native pitch-program transcription, and native
-linked multiphase stage transcription with stage-local mass depletion live tests pass on this
-machine. The native pitch-program paths minimize a normalized final target-insertion error and
-record target-score metadata in the suite product.
+linked multiphase stage transcription with stage-local mass depletion plus exponential-atmosphere
+quadratic drag live tests pass on this machine. The native pitch-program paths minimize a normalized
+final target-insertion error and record target-score metadata in the suite product.
 
 Live validation result:
 
 ```text
 ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription tests/astro_backends/test_dymos_optimization.py::test_live_dymos_multistage_pitch_program_executes_native_multiphase -q
-3 passed, 3 OpenMDAO warnings in 2.04s
+3 passed, 3 OpenMDAO warnings in 2.54s
 ```
 
 CLI target-seeking product check:
@@ -199,9 +199,12 @@ phase_topology: multiphase_stage_linked
 linked_state_names: time, h, downrange, vr, vh
 mass_model: stage_local_propellant_depletion_with_fixed_stage_initial_mass
 mass_state_linked: false
+aerodynamic_model: exponential_atmosphere_quadratic_drag
 stage_1_mass_kg: 7450.0 -> 3371.135148088287
 stage_2_mass_kg: 1750.0 -> 1183.4909927900399
-target_score: 0.7683617412541746
+stage_1_max_dynamic_pressure_pa: 31572.787937120804
+stage_2_max_dynamic_pressure_pa: 31304.21549259787
+target_score: 1.4414425719908899
 ```
 
 Roadmap claim not allowed: this does not promote the current Dymos products to a full high-fidelity

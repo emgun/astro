@@ -75,9 +75,9 @@ Still roadmap-level:
 - Full native RocketPy multi-motor/staged-separation execution and high-fidelity multistage Dymos
   ascent design optimization beyond the current RocketPy direct-flight adapter, suite-stage
   annotation, Dymos vertical phase, bounded native pitch-control target objective, native linked
-  stage-phase topology, and stage-local Dymos mass depletion. The current RocketPy 1.11 adapter
-  fails closed for additional configured motors because RocketPy overwrites earlier motors when
-  `add_motor` is called more than once.
+  stage-phase topology, stage-local Dymos mass depletion, and exponential-atmosphere Dymos drag.
+  The current RocketPy 1.11 adapter fails closed for additional configured motors because RocketPy
+  overwrites earlier motors when `add_motor` is called more than once.
 - Native Tudat variational-equation covariance propagation now has an explicit opt-in default
   construction boundary that builds the initial-state parameter set and reads TudatPy
   `state_transition_matrix_history` when the optional variational API is present. Default Tudat
@@ -339,8 +339,8 @@ Primary files:
 Status: first external-backend boundary implemented, first live RocketPy direct runner added,
 RocketPy multi-motor guard configuration added, RocketPy multistage suite-stage composition added,
 first live stage-aware Dymos/OpenMDAO phase transcription added, opt-in native Dymos
-pitch-control target transcription added, native linked Dymos stage-phase transcription added, and
-stage-local Dymos mass depletion added. RocketPy and
+pitch-control target transcription added, native linked Dymos stage-phase transcription added,
+stage-local Dymos mass depletion added, and exponential-atmosphere Dymos drag added. RocketPy and
 Dymos/OpenMDAO optional runtime gates, smoke commands, launch
 backend dispatch, typed RocketPy launch-scenario configuration, checked-in RocketPy-configured
 launch examples, configured solid RocketPy direct simulation, multistage suite stage-event/sample
@@ -350,10 +350,10 @@ records the non-native composition scope, a neutral
 `optimize-launch` command, compatible optional dependency pins, optional import timeout diagnostics,
 Dymos stage-aware vertical-ascent phase transcription, opt-in native Dymos pitch-control
 transcription with a normalized final target-insertion objective, native linked Dymos
-stage-phase transcription with stage-local propellant mass depletion, Dymos suite stage-plan
-metadata, pitch-program control-point metadata, optimized pitch-program schedule metadata, tuned
-point indices, a Dymos pitch-program transcription contract with per-stage control coverage,
-altitude, velocity, and radial-velocity target-insertion residual/tolerance assessment,
+stage-phase transcription with stage-local propellant mass depletion and exponential-atmosphere
+quadratic drag, Dymos suite stage-plan metadata, pitch-program control-point metadata, optimized
+pitch-program schedule metadata, tuned point indices, a Dymos pitch-program transcription contract
+with per-stage control coverage, altitude, velocity, and radial-velocity target-insertion residual/tolerance assessment,
 target-score metadata, and Dymos adapter optimization diagnostics are implemented. Full native
 RocketPy multi-motor/staged-separation execution and high-fidelity
 multistage Dymos ascent design optimization remain gated on deeper validated backend runners.
@@ -397,14 +397,16 @@ Implemented slice:
   downrange, radial velocity, and horizontal velocity continuity, and the same normalized final
   target-insertion objective on the final stage phase. Each phase also carries a stage-local mass
   state with engine mass-flow depletion; mass is fixed at stage entry and not linked across phases
-  because staging drops dry and residual mass.
+  because staging drops dry and residual mass. The phase ODE applies exponential-atmosphere
+  quadratic drag from the suite atmosphere, reference-area, and Cd fields.
 - Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
   iteration count, candidate count, path-constraint summary, best score, target insertion
   residuals for altitude, velocity, and radial velocity, target-insertion tolerance assessment,
   normalized target-score metadata, Dymos version, OpenMDAO version, phase
   duration, final altitude, final velocity, original and optimized pitch-program control-point
   schedules, tuned pitch point indices, explicit pitch-program optimization scope metadata, native
-  stage-phase topology and mass-usage metadata when selected, and optimizer message.
+  stage-phase topology, mass-usage metadata, and drag diagnostics when selected, and optimizer
+  message.
 - Dymos adapter results include a pitch-program transcription contract that records the pitch
   control name, bounds, optimized control points, tuned control indices, per-stage phase/control
   coverage, execution status, transcription name, and linked phase topology when selected so
@@ -424,7 +426,8 @@ Definition of done:
   a bounded vertical-ascent Dymos phase model, and `--dymos-mode pitch-program` executes an opt-in
   native Dymos pitch-control transcription with a normalized final target-insertion objective.
   `--dymos-mode multistage-pitch-program` executes an opt-in native linked stage-phase
-  transcription with stage-local mass depletion for the same simplified pitch-control model.
+  transcription with stage-local mass depletion and exponential-atmosphere drag for the same
+  simplified pitch-control model.
 - Dymos/OpenMDAO adapter reports path constraints, pitch-program control points, tuned pitch point
   indices, optimized pitch-program control points, optimizer status, convergence diagnostics, and
   altitude, velocity, and radial-velocity target insertion residuals.

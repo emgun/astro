@@ -70,6 +70,8 @@ class DymosPitchProgramSummary:
     mass_model: str | None = None
     mass_state_name: str | None = None
     mass_state_linked: bool | None = None
+    aerodynamic_model: str | None = None
+    atmosphere_model: str | None = None
 
     def to_metadata(self) -> dict[str, Any]:
         return asdict(self)
@@ -487,6 +489,8 @@ def _stage_acceleration_schedule(
                 "initial_mass_kg": mass_at_stage_start_kg,
                 "configured_propellant_mass_kg": stage.propellant_mass_kg,
                 "dry_mass_kg": stage.dry_mass_kg,
+                "reference_area_m2": stage.reference_area_m2,
+                "drag_coefficient": stage.drag_coefficient,
             }
         )
         mass_at_stage_start_kg -= stage.dry_mass_kg + stage.propellant_mass_kg
@@ -603,6 +607,11 @@ def _stage_pitch_program_ascent_ode_class(
     *,
     thrust_n: float,
     mass_flow_rate_kg_s: float,
+    reference_area_m2: float,
+    drag_coefficient: float,
+    atmosphere_model: str,
+    sea_level_density_kg_m3: float,
+    scale_height_m: float,
     target_altitude_m: float,
     target_velocity_m_s: float,
 ) -> type[Any]:
@@ -627,6 +636,8 @@ def _stage_pitch_program_ascent_ode_class(
             self.add_output("vh_dot", val=np.zeros(num_nodes), units="m/s**2")
             self.add_output("mass_dot", val=np.zeros(num_nodes), units="kg/s")
             self.add_output("speed", val=np.zeros(num_nodes), units="m/s")
+            self.add_output("dynamic_pressure", val=np.zeros(num_nodes), units="Pa")
+            self.add_output("drag_acceleration", val=np.zeros(num_nodes), units="m/s**2")
             self.add_output("target_score", val=np.zeros(num_nodes))
             self.declare_partials("*", "*", method="fd")
 
@@ -638,12 +649,37 @@ def _stage_pitch_program_ascent_ode_class(
             mass_kg = np.maximum(np.asarray(inputs["mass"]), 1.0e-9)
             thrust_acceleration_m_s2 = thrust_n / mass_kg
             speed_m_s = np.sqrt(vertical_velocity_m_s**2 + horizontal_velocity_m_s**2)
+            density_kg_m3 = _atmospheric_density_kg_m3(
+                atmosphere_model,
+                altitude_m,
+                sea_level_density_kg_m3=sea_level_density_kg_m3,
+                scale_height_m=scale_height_m,
+            )
+            dynamic_pressure_pa = 0.5 * density_kg_m3 * speed_m_s**2
+            drag_acceleration_m_s2 = (
+                dynamic_pressure_pa * drag_coefficient * reference_area_m2 / mass_kg
+            )
+            speed_scale_m_s = np.maximum(speed_m_s, 1.0e-9)
+            vertical_drag_m_s2 = drag_acceleration_m_s2 * (
+                vertical_velocity_m_s / speed_scale_m_s
+            )
+            horizontal_drag_m_s2 = drag_acceleration_m_s2 * (
+                horizontal_velocity_m_s / speed_scale_m_s
+            )
             outputs["h_dot"] = vertical_velocity_m_s
             outputs["downrange_dot"] = horizontal_velocity_m_s
-            outputs["vr_dot"] = thrust_acceleration_m_s2 * np.sin(pitch_rad) - 9.80665
-            outputs["vh_dot"] = thrust_acceleration_m_s2 * np.cos(pitch_rad)
+            outputs["vr_dot"] = (
+                thrust_acceleration_m_s2 * np.sin(pitch_rad)
+                - 9.80665
+                - vertical_drag_m_s2
+            )
+            outputs["vh_dot"] = (
+                thrust_acceleration_m_s2 * np.cos(pitch_rad) - horizontal_drag_m_s2
+            )
             outputs["mass_dot"] = -np.full_like(mass_kg, mass_flow_rate_kg_s)
             outputs["speed"] = speed_m_s
+            outputs["dynamic_pressure"] = dynamic_pressure_pa
+            outputs["drag_acceleration"] = drag_acceleration_m_s2
             altitude_scale_m = max(abs(target_altitude_m), 1.0)
             velocity_scale_m_s = max(abs(target_velocity_m_s), 1.0e-6)
             altitude_error = (altitude_m - target_altitude_m) / altitude_scale_m
@@ -654,6 +690,22 @@ def _stage_pitch_program_ascent_ode_class(
             )
 
     return StagePitchProgramAscentODE
+
+
+def _atmospheric_density_kg_m3(
+    atmosphere_model: str,
+    altitude_m: np.ndarray[Any, Any],
+    *,
+    sea_level_density_kg_m3: float,
+    scale_height_m: float,
+) -> np.ndarray[Any, Any]:
+    if atmosphere_model == "none":
+        return np.zeros_like(altitude_m, dtype=np.float64)
+    altitude_nonnegative_m = np.maximum(altitude_m, 0.0)
+    density_kg_m3: np.ndarray[Any, Any] = sea_level_density_kg_m3 * np.exp(
+        -altitude_nonnegative_m / scale_height_m
+    )
+    return density_kg_m3
 
 
 def _driver_success_and_message(problem: Any) -> tuple[bool, str]:
@@ -1125,6 +1177,11 @@ def _solve_dymos_multistage_pitch_program_phases(
                 runtime,
                 thrust_n=float(stage["thrust_n"]),
                 mass_flow_rate_kg_s=float(stage["mass_flow_rate_kg_s"]),
+                reference_area_m2=float(stage["reference_area_m2"]),
+                drag_coefficient=float(stage["drag_coefficient"]),
+                atmosphere_model=scenario.atmosphere.model,
+                sea_level_density_kg_m3=float(scenario.atmosphere.sea_level_density_kg_m3),
+                scale_height_m=float(scenario.atmosphere.scale_height_m),
                 target_altitude_m=target_altitude_m,
                 target_velocity_m_s=target_velocity_m_s,
             ),
@@ -1190,6 +1247,8 @@ def _solve_dymos_multistage_pitch_program_phases(
             continuity=True,
             rate_continuity=True,
         )
+        phase.add_timeseries_output("dynamic_pressure", units="Pa")
+        phase.add_timeseries_output("drag_acceleration", units="m/s**2")
         stage_guess = _stage_state_guess(
             state_guess,
             stage,
@@ -1241,6 +1300,12 @@ def _solve_dymos_multistage_pitch_program_phases(
         radial_velocities_m_s = np.ravel(problem.get_val(f"{prefix}.vr", units="m/s"))
         horizontal_velocities_m_s = np.ravel(problem.get_val(f"{prefix}.vh", units="m/s"))
         masses_kg = np.ravel(problem.get_val(f"{prefix}.mass", units="kg"))
+        dynamic_pressure_pa = np.ravel(
+            problem.get_val(f"{prefix}.dynamic_pressure", units="Pa")
+        )
+        drag_acceleration_m_s2 = np.ravel(
+            problem.get_val(f"{prefix}.drag_acceleration", units="m/s**2")
+        )
         pitch_deg = np.ravel(problem.get_val(f"{prefix}.pitch_deg", units="deg"))
         phase_times.append(times_s)
         phase_pitches.append(pitch_deg)
@@ -1263,6 +1328,10 @@ def _solve_dymos_multistage_pitch_program_phases(
                     stage["configured_propellant_mass_kg"]
                 ),
                 "mass_state_linked": False,
+                "reference_area_m2": float(stage["reference_area_m2"]),
+                "drag_coefficient": float(stage["drag_coefficient"]),
+                "max_dynamic_pressure_pa": float(np.max(dynamic_pressure_pa)),
+                "max_drag_acceleration_m_s2": float(np.max(drag_acceleration_m_s2)),
                 "final_altitude_km": float(altitudes_m[-1] / 1000.0),
                 "final_velocity_km_s": sqrt(
                     final_radial_velocity_km_s**2 + final_horizontal_velocity_km_s**2
@@ -1328,6 +1397,12 @@ def _solve_dymos_multistage_pitch_program_phases(
         mass_model="stage_local_propellant_depletion_with_fixed_stage_initial_mass",
         mass_state_name="mass",
         mass_state_linked=False,
+        aerodynamic_model=(
+            "none"
+            if scenario.atmosphere.model == "none"
+            else "exponential_atmosphere_quadratic_drag"
+        ),
+        atmosphere_model=scenario.atmosphere.model,
     )
 
 

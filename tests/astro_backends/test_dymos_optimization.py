@@ -583,6 +583,8 @@ def test_live_dymos_multistage_pitch_program_executes_native_multiphase() -> Non
     )
     assert dymos_phase["mass_state_name"] == "mass"
     assert dymos_phase["mass_state_linked"] is False
+    assert dymos_phase["aerodynamic_model"] == "exponential_atmosphere_quadratic_drag"
+    assert dymos_phase["atmosphere_model"] == scenario.atmosphere.model
     assert len(dymos_phase["stage_phase_summaries"]) == 2
     assert dymos_phase["stage_phase_summaries"][0]["duration_s"] == 70.0
     assert dymos_phase["stage_phase_summaries"][0]["initial_mass_kg"] == pytest.approx(
@@ -592,12 +594,16 @@ def test_live_dymos_multistage_pitch_program_executes_native_multiphase() -> Non
         dymos_phase["stage_phase_summaries"][0]["initial_mass_kg"]
     )
     assert dymos_phase["stage_phase_summaries"][0]["propellant_used_kg"] > 0.0
+    assert dymos_phase["stage_phase_summaries"][0]["max_dynamic_pressure_pa"] >= 0.0
+    assert dymos_phase["stage_phase_summaries"][0]["max_drag_acceleration_m_s2"] >= 0.0
     assert dymos_phase["stage_phase_summaries"][1]["duration_s"] == 50.0
     assert dymos_phase["stage_phase_summaries"][1]["initial_mass_kg"] == pytest.approx(
         scenario.vehicle.payload_mass_kg
         + scenario.vehicle.stages[1].dry_mass_kg
         + scenario.vehicle.stages[1].propellant_mass_kg
     )
+    assert dymos_phase["stage_phase_summaries"][1]["max_dynamic_pressure_pa"] >= 0.0
+    assert dymos_phase["stage_phase_summaries"][1]["max_drag_acceleration_m_s2"] >= 0.0
     assert dymos_phase["target_objective"] == (
         "minimize_final_normalized_target_insertion_error"
     )
