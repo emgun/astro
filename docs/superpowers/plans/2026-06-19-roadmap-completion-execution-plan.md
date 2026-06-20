@@ -379,7 +379,7 @@ Expected: all pass.
 - Modify tests in `tests/astro_dynamics/`
 - Modify docs in `docs/validation-matrix.md`
 
-- [ ] **Step 1: Add or tighten invariant tests**
+- [x] **Step 1: Add or tighten invariant tests**
 
 Target deterministic product properties:
 
@@ -389,7 +389,7 @@ ACS status reports tolerance miss/within_tolerance deterministically
 conjunction assessment distinguishes screening-only from operational-candidate
 ```
 
-- [ ] **Step 2: Verify local screening only**
+- [x] **Step 2: Verify local screening only**
 
 Run:
 
@@ -399,7 +399,7 @@ python -m pytest tests/astro_dynamics/test_attitude.py tests/astro_dynamics/test
 
 Expected: all pass without optional backends.
 
-- [ ] **Step 3: Update docs**
+- [x] **Step 3: Update docs**
 
 Docs must say these products are deterministic screening products, not flight-qualified ACS, production conjunction service, or drag/SRP/third-body production covariance validation.
 

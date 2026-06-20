@@ -7,7 +7,13 @@ import pytest
 
 from astro_core.constants import MU_EARTH_KM3_S2
 from astro_core.io import load_scenario
-from astro_core.models import ForceModelConfig, ForceModelName, Maneuver, Scenario
+from astro_core.models import (
+    CovarianceSample,
+    ForceModelConfig,
+    ForceModelName,
+    Maneuver,
+    Scenario,
+)
 from astro_dynamics.local import (
     acceleration_km_s2,
     derivative,
@@ -318,6 +324,8 @@ def test_propagate_local_generates_covariance_history_from_initial_covariance() 
     assert final_covariance.shape == (6, 6)
     assert final_transition.shape == (6, 6)
     assert final_accumulated_transition.shape == (6, 6)
+    for covariance_sample in trajectory.covariance_history:
+        _assert_covariance_sample_invariants(covariance_sample)
     np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-10)
     assert not np.allclose(final_covariance, np.array(initial_covariance))
     assert trajectory.metadata["covariance_model"] == "finite_difference_state_transition"
@@ -374,6 +382,8 @@ def test_propagate_local_supports_two_body_variational_covariance_model() -> Non
         variational_scenario.propagation.step_s
     )
     assert not np.allclose(final_transition, np.eye(6))
+    for covariance_sample in variational.covariance_history:
+        _assert_covariance_sample_invariants(covariance_sample)
     np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-10)
     np.testing.assert_allclose(final_covariance, reference_covariance, rtol=2.0e-3, atol=1.0e-6)
 
@@ -409,6 +419,8 @@ def test_propagate_local_supports_j2_variational_covariance_model() -> None:
     )
     assert "finite_difference_relative_step" not in variational.covariance_history[-1].metadata
     assert not np.allclose(final_transition, np.eye(6))
+    for covariance_sample in variational.covariance_history:
+        _assert_covariance_sample_invariants(covariance_sample)
     np.testing.assert_allclose(final_covariance, final_covariance.T, rtol=0.0, atol=1.0e-10)
     np.testing.assert_allclose(final_covariance, reference_covariance, rtol=5.0e-3, atol=1.0e-6)
 
@@ -477,6 +489,22 @@ def test_propagate_local_rejects_unsupported_local_force_model() -> None:
 
     with pytest.raises(ValueError, match=LOCAL_FORCE_MODEL_ERROR):
         propagate_local(unsupported_scenario)
+
+
+def _assert_covariance_sample_invariants(covariance_sample: CovarianceSample) -> None:
+    covariance = np.array(covariance_sample.covariance)
+    state_transition = np.array(covariance_sample.state_transition_matrix)
+    accumulated_state_transition = np.array(
+        covariance_sample.accumulated_state_transition_matrix
+    )
+    process_noise = np.array(covariance_sample.process_noise_covariance)
+
+    assert covariance.shape == (6, 6)
+    assert state_transition.shape == (6, 6)
+    assert accumulated_state_transition.shape == (6, 6)
+    assert process_noise.shape == (6, 6)
+    np.testing.assert_allclose(covariance, covariance.T, rtol=0.0, atol=1.0e-10)
+    np.testing.assert_allclose(process_noise, process_noise.T, rtol=0.0, atol=1.0e-20)
 
 
 def test_propagate_local_rejects_unsupported_high_fidelity_flags() -> None:

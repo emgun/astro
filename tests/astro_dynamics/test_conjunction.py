@@ -171,3 +171,31 @@ def test_assess_conjunction_screening_marks_geometry_only_result_as_screening_on
     assert report.probability_model is None
     assert report.checks[1].check_id == "collision_probability_available"
     assert report.checks[1].passed is False
+
+
+def test_assess_conjunction_screening_marks_clear_covariance_approach_candidate() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_covariance.yaml"))
+    primary = propagate_local(scenario)
+    secondary_state = scenario.initial_state.model_copy(
+        update={
+            "cartesian": scenario.initial_state.cartesian.model_copy(
+                update={"position_km": (7002.0, 0.0, 0.0)}
+            )
+        }
+    )
+    secondary = propagate_local(scenario.model_copy(update={"initial_state": secondary_state}))
+    screening = screen_conjunction(
+        primary,
+        secondary,
+        threshold_km=1.0,
+        hard_body_radius_km=0.02,
+        probability_method="integrated",
+    )
+
+    report = assess_conjunction_screening(screening)
+
+    assert report.assessment_status == "operational_candidate"
+    assert report.screening_status == "above_threshold"
+    assert report.has_collision_probability is True
+    assert report.probability_model == "encounter_plane_gaussian_integral"
+    assert [check.passed for check in report.checks] == [True, True, True]
