@@ -536,10 +536,18 @@ def test_propagate_attitude_command_writes_sensor_actuator_metrics(tmp_path: Pat
     assert payload["metadata"]["pointing_tolerance_rad"] == 0.1
     assert payload["metadata"]["angular_rate_tolerance_rad_s"] == 0.05
     assert payload["metadata"]["torque_saturation_sample_count"] == 0
+    assert payload["metadata"]["torque_saturation_fraction"] == 0.0
     assert payload["metadata"]["actuator_deadband_sample_count"] == 0
+    assert payload["metadata"]["actuator_deadband_fraction"] == 0.0
+    assert payload["metadata"]["actuator_saturation_sample_count"] == 0
+    assert payload["metadata"]["actuator_saturation_fraction"] == 0.0
+    assert payload["metadata"]["max_control_torque_tracking_error_norm_n_m"] > 0.0
+    assert payload["metadata"]["rms_control_torque_tracking_error_norm_n_m"] > 0.0
     assert payload["samples"][0]["attitude_error_rad"] > 0.0
+    assert payload["samples"][0]["control_torque_tracking_error_n_m"][2] != 0.0
     assert payload["samples"][0]["torque_saturated"] is False
     assert payload["samples"][0]["actuator_deadband_applied"] is False
+    assert payload["samples"][0]["actuator_saturated"] is False
 
 
 def test_export_trajectory_command_writes_aem(tmp_path: Path) -> None:

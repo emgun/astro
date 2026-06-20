@@ -278,7 +278,8 @@ conjunction screening assessment reports, and commanded-attitude
 trajectory samples for maneuvered local propagation, plus diagonal rigid-body torque, bounded
 quaternion-error PD, and deterministic sensor/actuator screening attitude-control propagation
 products with explicit final/max attitude-rate error metrics, tolerance status, saturation counts,
-and actuator deadband counts. The attitude-coupled finite-burn modes rotate thrust along
+pointing/rate margins, commanded-vs-applied torque tracking error, actuator saturation counts, and
+actuator deadband counts. The attitude-coupled finite-burn modes rotate thrust along
 instantaneous velocity or local radial directions and record body-to-inertial unit quaternion
 samples for the commanded body +X axis. Local orbital propagation annotates periapsis/apoapsis
 `TrajectoryEvent` records for
@@ -306,8 +307,9 @@ Definition of done:
   PD closed-loop control primitive, and opt-in deterministic sensor attitude/rate bias plus
   actuator scale/bias/deadband screening with per-sample measured-state, commanded-torque, and
   applied-control-torque provenance. Closed-loop products report configured pointing/rate
-  tolerances, final and max attitude/rate errors, within-tolerance status, torque saturation counts,
-  and actuator deadband counts.
+  tolerances, final and max attitude/rate errors, pointing/rate margins, within-tolerance status,
+  commanded-vs-applied torque tracking error, torque/actuator saturation counts and fractions, and
+  actuator deadband counts and fractions.
 - Monte Carlo hooks produce repeatable seeded ensembles for local and Orekit propagation.
 - Covariance-history products are schema-supported. Local propagation can populate them from a
   scenario initial covariance using finite-difference state transitions, for two-body scenarios

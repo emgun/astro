@@ -192,12 +192,14 @@ class AttitudeDynamicsSample(AstroModel):
     applied_torque_n_m: Vector3
     control_torque_n_m: Vector3 | None = None
     commanded_control_torque_n_m: Vector3 | None = None
+    control_torque_tracking_error_n_m: Vector3 | None = None
     measured_body_to_inertial_quaternion: Quaternion4 | None = None
     measured_angular_rate_rad_s: Vector3 | None = None
     attitude_error_rad: FiniteFloat | None = None
     angular_rate_error_norm_rad_s: FiniteFloat | None = None
     torque_saturated: bool | None = None
     actuator_deadband_applied: bool | None = None
+    actuator_saturated: bool | None = None
 
 
 class AttitudeDynamicsResult(AstroModel):
@@ -214,8 +216,10 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
     step_count = int(round(config.duration_s / config.step_s))
     attitude_errors_rad: list[float] = []
     angular_rate_errors_rad_s: list[float] = []
+    control_torque_tracking_error_norms_n_m: list[float] = []
     torque_saturation_count = 0
     actuator_deadband_count = 0
+    actuator_saturation_count = 0
 
     for step_index in range(step_count + 1):
         elapsed_s = step_index * config.step_s
@@ -235,18 +239,29 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
             measured_quaternion,
             measured_rate,
         )
-        control_torque, actuator_deadband_applied = _actuated_control_torque_diagnostics(
+        (
+            control_torque,
+            actuator_deadband_applied,
+            actuator_saturated,
+        ) = _actuated_control_torque_diagnostics(
             config.control,
             commanded_control_torque,
         )
+        control_torque_tracking_error = control_torque - commanded_control_torque
         if attitude_error_rad is not None:
             attitude_errors_rad.append(attitude_error_rad)
         if angular_rate_error_norm_rad_s is not None:
             angular_rate_errors_rad_s.append(angular_rate_error_norm_rad_s)
+        if config.control is not None:
+            control_torque_tracking_error_norms_n_m.append(
+                float(np.linalg.norm(control_torque_tracking_error))
+            )
         if torque_saturated:
             torque_saturation_count += 1
         if actuator_deadband_applied:
             actuator_deadband_count += 1
+        if actuator_saturated:
+            actuator_saturation_count += 1
         torque = feedforward_torque + control_torque
         samples.append(
             AttitudeDynamicsSample(
@@ -259,6 +274,11 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
                 ),
                 commanded_control_torque_n_m=(
                     _vector_tuple(commanded_control_torque)
+                    if config.control is not None
+                    else None
+                ),
+                control_torque_tracking_error_n_m=(
+                    _vector_tuple(control_torque_tracking_error)
                     if config.control is not None
                     else None
                 ),
@@ -277,6 +297,11 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
                 torque_saturated=torque_saturated if config.control is not None else None,
                 actuator_deadband_applied=(
                     actuator_deadband_applied
+                    if config.control is not None and config.control.actuator is not None
+                    else None
+                ),
+                actuator_saturated=(
+                    actuator_saturated
                     if config.control is not None and config.control.actuator is not None
                     else None
                 ),
@@ -301,6 +326,9 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
         "torque_command_count": len(config.torque_commands),
     }
     if config.control is not None:
+        control_sample_count = len(attitude_errors_rad)
+        final_attitude_error_rad = attitude_errors_rad[-1]
+        final_rate_error_rad_s = angular_rate_errors_rad_s[-1]
         metadata.update(
             {
                 "attitude_dynamics_model": "diagonal_rigid_body_closed_loop_pd",
@@ -314,16 +342,37 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
                 ),
                 "pointing_tolerance_rad": config.control.pointing_tolerance_rad,
                 "angular_rate_tolerance_rad_s": config.control.angular_rate_tolerance_rad_s,
-                "final_attitude_error_rad": attitude_errors_rad[-1],
-                "final_angular_rate_error_norm_rad_s": angular_rate_errors_rad_s[-1],
+                "final_attitude_error_rad": final_attitude_error_rad,
+                "final_angular_rate_error_norm_rad_s": final_rate_error_rad_s,
                 "max_attitude_error_rad": max(attitude_errors_rad),
                 "max_angular_rate_error_norm_rad_s": max(angular_rate_errors_rad_s),
+                "pointing_margin_rad": (
+                    config.control.pointing_tolerance_rad - final_attitude_error_rad
+                ),
+                "angular_rate_margin_rad_s": (
+                    config.control.angular_rate_tolerance_rad_s - final_rate_error_rad_s
+                ),
+                "control_torque_tracking_error_model": (
+                    "applied_minus_commanded_control_torque"
+                ),
+                "max_control_torque_tracking_error_norm_n_m": max(
+                    control_torque_tracking_error_norms_n_m
+                ),
+                "rms_control_torque_tracking_error_norm_n_m": sqrt(
+                    sum(
+                        error_norm * error_norm
+                        for error_norm in control_torque_tracking_error_norms_n_m
+                    )
+                    / len(control_torque_tracking_error_norms_n_m)
+                ),
                 "torque_saturation_sample_count": torque_saturation_count,
+                "torque_saturation_fraction": (
+                    torque_saturation_count / control_sample_count
+                ),
                 "attitude_control_status": (
                     "within_tolerance"
-                    if attitude_errors_rad[-1] <= config.control.pointing_tolerance_rad
-                    and angular_rate_errors_rad_s[-1]
-                    <= config.control.angular_rate_tolerance_rad_s
+                    if final_attitude_error_rad <= config.control.pointing_tolerance_rad
+                    and final_rate_error_rad_s <= config.control.angular_rate_tolerance_rad_s
                     else "miss"
                 ),
             }
@@ -348,6 +397,13 @@ def propagate_rigid_body_attitude(config: RigidBodyAttitudeConfig) -> AttitudeDy
                     ),
                     "actuator_deadband_n_m": list(config.control.actuator.deadband_n_m),
                     "actuator_deadband_sample_count": actuator_deadband_count,
+                    "actuator_deadband_fraction": (
+                        actuator_deadband_count / control_sample_count
+                    ),
+                    "actuator_saturation_sample_count": actuator_saturation_count,
+                    "actuator_saturation_fraction": (
+                        actuator_saturation_count / control_sample_count
+                    ),
                 }
             )
         if config.control.sensor is not None or config.control.actuator is not None:
@@ -436,9 +492,9 @@ def _attitude_sensor_measurement(
 def _actuated_control_torque_diagnostics(
     control: AttitudeControlConfig | None,
     commanded_torque_n_m: np.ndarray[Any, Any],
-) -> tuple[np.ndarray[Any, Any], bool]:
+) -> tuple[np.ndarray[Any, Any], bool, bool]:
     if control is None or control.actuator is None:
-        return commanded_torque_n_m, False
+        return commanded_torque_n_m, False, False
     actuator = control.actuator
     torque = commanded_torque_n_m * np.array(actuator.torque_scale, dtype=np.float64)
     torque = torque + np.array(actuator.torque_bias_n_m, dtype=np.float64)
@@ -448,13 +504,14 @@ def _actuated_control_torque_diagnostics(
     )
     torque = np.where(np.abs(torque) < deadband, 0.0, torque)
     max_torque = np.array(control.max_torque_n_m, dtype=np.float64)
+    actuator_saturated = bool(np.any(np.abs(torque) > max_torque + 1.0e-12))
     return np.array(
         [
             min(max(float(axis_torque), -float(limit)), float(limit))
             for axis_torque, limit in zip(torque, max_torque, strict=True)
         ],
         dtype=np.float64,
-    ), actuator_deadband_applied
+    ), actuator_deadband_applied, actuator_saturated
 
 
 def _delta_quaternion(rotation_vector_rad: np.ndarray[Any, Any]) -> np.ndarray[Any, Any]:

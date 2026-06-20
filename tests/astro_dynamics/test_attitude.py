@@ -124,18 +124,32 @@ def test_propagate_closed_loop_attitude_applies_sensor_and_actuator_screening() 
     )
     assert first_sample.commanded_control_torque_n_m == pytest.approx((0.0, 0.0, -0.1))
     assert first_sample.control_torque_n_m == pytest.approx((0.0, 0.0, -0.03))
+    assert first_sample.control_torque_tracking_error_n_m == pytest.approx(
+        (0.0, 0.0, 0.07)
+    )
     assert first_sample.applied_torque_n_m == pytest.approx((0.0, 0.0, -0.03))
     assert first_sample.attitude_error_rad == pytest.approx(0.02)
     assert first_sample.angular_rate_error_norm_rad_s == pytest.approx(0.1)
     assert first_sample.torque_saturated is False
     assert first_sample.actuator_deadband_applied is False
+    assert first_sample.actuator_saturated is False
     assert result.metadata["attitude_dynamics_model"] == (
         "diagonal_rigid_body_closed_loop_pd_sensor_actuator_screening"
     )
     assert result.metadata["attitude_sensor_model"] == "deterministic_bias"
     assert result.metadata["attitude_actuator_model"] == "deterministic_scale_bias_deadband"
+    assert result.metadata["control_torque_tracking_error_model"] == (
+        "applied_minus_commanded_control_torque"
+    )
+    assert result.metadata["max_control_torque_tracking_error_norm_n_m"] == pytest.approx(
+        0.07
+    )
     assert result.metadata["torque_saturation_sample_count"] == 0
+    assert result.metadata["torque_saturation_fraction"] == 0.0
     assert result.metadata["actuator_deadband_sample_count"] == 0
+    assert result.metadata["actuator_deadband_fraction"] == 0.0
+    assert result.metadata["actuator_saturation_sample_count"] == 0
+    assert result.metadata["actuator_saturation_fraction"] == 0.0
 
 
 def test_attitude_control_status_uses_configured_tolerances() -> None:
@@ -187,6 +201,43 @@ def test_attitude_control_reports_saturation_and_deadband_samples() -> None:
     assert result.samples[0].control_torque_n_m == pytest.approx((0.0, 0.0, 0.0))
     assert result.metadata["torque_saturation_sample_count"] >= 1
     assert result.metadata["actuator_deadband_sample_count"] >= 1
+
+
+def test_attitude_actuator_reports_post_actuator_saturation_and_tracking_error() -> None:
+    config = RigidBodyAttitudeConfig(
+        duration_s=1.0,
+        step_s=1.0,
+        inertia_kg_m2=(2.0, 2.0, 2.0),
+        control=AttitudeControlConfig(
+            target_body_to_inertial_quaternion=(1.0, 0.0, 0.0, 0.0),
+            proportional_gain_n_m_per_rad=(0.0, 0.0, 0.0),
+            derivative_gain_n_m_per_rad_s=(0.0, 0.0, 1.0),
+            max_torque_n_m=(0.0, 0.0, 0.05),
+            sensor=AttitudeSensorConfig(
+                angular_rate_bias_rad_s=(0.0, 0.0, -0.04),
+            ),
+            actuator=AttitudeActuatorConfig(
+                torque_scale=(1.0, 1.0, 3.0),
+                torque_bias_n_m=(0.0, 0.0, 0.0),
+                deadband_n_m=(0.0, 0.0, 0.0),
+            ),
+        ),
+    )
+
+    result = propagate_rigid_body_attitude(config)
+
+    first_sample = result.samples[0]
+    assert first_sample.torque_saturated is False
+    assert first_sample.actuator_saturated is True
+    assert first_sample.commanded_control_torque_n_m == pytest.approx((0.0, 0.0, 0.04))
+    assert first_sample.control_torque_n_m == pytest.approx((0.0, 0.0, 0.05))
+    assert first_sample.control_torque_tracking_error_n_m == pytest.approx(
+        (0.0, 0.0, 0.01)
+    )
+    assert result.metadata["actuator_saturation_sample_count"] >= 1
+    assert result.metadata["actuator_saturation_fraction"] > 0.0
+    assert result.metadata["max_control_torque_tracking_error_norm_n_m"] >= 0.01
+    assert result.metadata["rms_control_torque_tracking_error_norm_n_m"] > 0.0
 
 
 def test_attitude_actuator_config_rejects_negative_deadband() -> None:

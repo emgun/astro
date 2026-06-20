@@ -386,6 +386,8 @@ Target deterministic product properties:
 ```text
 covariance matrices stay symmetric within tolerance
 ACS status reports tolerance miss/within_tolerance deterministically
+ACS actuator screening reports commanded-vs-applied torque tracking error plus actuator saturation
+and deadband fractions
 conjunction assessment distinguishes screening-only from operational-candidate
 ```
 
