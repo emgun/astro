@@ -197,8 +197,8 @@ Smoke output:
 ```
 
 Roadmap claim allowed: this machine completed Tudat native propagation, high-fidelity
-finite-difference covariance, native variational covariance, and calibrated comparison campaign
-execution in the isolated TudatPy 1.0.0 environment.
+finite-difference covariance, high-fidelity native variational covariance, and calibrated
+comparison campaign execution in the isolated TudatPy 1.0.0 environment.
 
 Live validation results:
 
@@ -215,6 +215,9 @@ conda run -p /tmp/astro-tudat-live-env astro propagate examples/scenarios/leo_tu
 
 ASTRO_RUN_TUDAT_LIVE=1 conda run -p /tmp/astro-tudat-live-env python -m pytest tests/astro_backends/test_tudat_propagation.py::test_live_tudat_high_fidelity_covariance_records_force_models -q
 1 passed in 6.72s
+
+ASTRO_RUN_TUDAT_LIVE=1 conda run -p /tmp/astro-tudat-live-env python -m pytest tests/astro_backends/test_tudat_propagation.py::test_live_tudat_native_variational_covariance_records_force_models -q
+1 passed in 3.04s
 
 conda run -p /tmp/astro-tudat-live-env astro compare-tudat-reference examples/scenarios/leo_two_body.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output /tmp/astro-tudat-reference-comparison.json
 # passed true; max position delta 0.0006172472620229077 km; max velocity delta 7.936198258437524e-07 km/s

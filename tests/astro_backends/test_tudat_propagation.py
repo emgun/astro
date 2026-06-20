@@ -428,6 +428,48 @@ def test_live_tudat_high_fidelity_covariance_records_force_models() -> None:
     )
 
 
+@pytest.mark.tudat_live
+def test_live_tudat_native_variational_covariance_records_force_models() -> None:
+    if os.environ.get("ASTRO_RUN_TUDAT_LIVE") != "1":
+        pytest.skip("set ASTRO_RUN_TUDAT_LIVE=1 to run live Tudat covariance propagation")
+    pytest.importorskip("tudatpy")
+
+    scenario = load_scenario("examples/scenarios/leo_tudat_variational_covariance.yaml")
+    trajectory = propagate_tudat(scenario)
+
+    assert trajectory.backend == "tudat"
+    assert trajectory.metadata["covariance_native_variational_runner"] == "default_tudatpy"
+    assert (
+        trajectory.metadata["native_variational_parameter_api"]
+        == "tudatpy.dynamics.parameters_setup"
+    )
+    assert trajectory.metadata["native_variational_solver"] == (
+        "create_variational_equations_solver"
+    )
+    assert trajectory.metadata["native_variational_transition_history"] == (
+        "state_transition_matrix_history"
+    )
+    assert trajectory.metadata["native_variational_sample_count"] == (
+        scenario.propagation.sample_count
+    )
+    assert trajectory.metadata["covariance_transition_force_models"] == [
+        "Earth spherical harmonic gravity 2x0",
+        "Earth aerodynamic drag",
+        "Sun cannonball solar radiation pressure",
+        "Sun point-mass third-body gravity",
+        "Moon point-mass third-body gravity",
+    ]
+    assert trajectory.covariance_history[1].metadata["transition_force_models"] == (
+        trajectory.metadata["covariance_transition_force_models"]
+    )
+    assert_covariance_history_invariants(
+        trajectory,
+        scenario,
+        expected_covariance_model="tudat_native_variational_equations",
+        expected_transition_model="tudat_native_variational",
+    )
+
+
 def test_propagate_tudat_returns_suite_product_with_fake_runner() -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml")
     seen_runtime: list[TudatRuntime] = []

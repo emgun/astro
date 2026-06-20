@@ -463,7 +463,7 @@ Expected: no whitespace errors.
 Final local gate evidence from 2026-06-19:
 
 ```text
-python -m pytest -q  # 498 passed, 9 skipped
+python -m pytest -q  # 498 passed, 10 skipped
 python -m ruff check .  # passed
 python -m mypy  # passed
 python -m build  # built sdist and wheel successfully
@@ -497,6 +497,9 @@ conda run -p /tmp/astro-tudat-live-env astro propagate examples/scenarios/leo_tu
 # wrote native variational covariance trajectory
 
 ASTRO_RUN_TUDAT_LIVE=1 conda run -p /tmp/astro-tudat-live-env python -m pytest tests/astro_backends/test_tudat_propagation.py::test_live_tudat_high_fidelity_covariance_records_force_models -q
+# 1 passed
+
+ASTRO_RUN_TUDAT_LIVE=1 conda run -p /tmp/astro-tudat-live-env python -m pytest tests/astro_backends/test_tudat_propagation.py::test_live_tudat_native_variational_covariance_records_force_models -q
 # 1 passed
 
 conda run -p /tmp/astro-tudat-live-env astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output /tmp/astro-tudat-reference-campaign-calibrated.json

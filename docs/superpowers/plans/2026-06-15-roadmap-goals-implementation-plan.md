@@ -64,9 +64,10 @@ Still roadmap-level:
 
 - External production-grade covariance certification through drag, SRP, and third-body dynamics.
   Live Orekit and Tudat high-fidelity finite-difference covariance gates now verify force-model
-  provenance and covariance-history matrix invariants, but external production validation and
-  native variational cross-validation across the supported force-model set remain separate from
-  local product-shape validation.
+  provenance and covariance-history matrix invariants. A live Tudat native variational covariance
+  gate now verifies the same high-fidelity drag/SRP/third-body scenario through TudatPy
+  `parameters_setup`, but external production validation remains separate from local product-shape
+  validation.
 - Flight-qualified actuator/sensor ACS modeling beyond the current deterministic bounded
   quaternion-error PD plus sensor/actuator screening primitives. Current products are useful
   screening diagnostics, not spacecraft-qualified hardware simulations.
@@ -76,8 +77,8 @@ Still roadmap-level:
 - Native Tudat variational-equation covariance propagation now has an explicit opt-in default
   construction boundary that builds the initial-state parameter set and reads TudatPy
   `state_transition_matrix_history` when the optional variational API is present. Default Tudat
-  covariance continues to use the suite finite-difference transition product until live campaigns
-  prove the native variational path across the supported force-model set.
+  covariance continues to use the suite finite-difference transition product, while the explicit
+  `tudat_variational` scenario is now live-gated for the current high-fidelity force-model set.
 - Standards-grade astrometry and tracking coverage beyond the current product boundaries: full
   precession-nutation reductions beyond compact `iau_2006_2000a_simplified`, native NASA binary
   DSN ODF/TNF parsing beyond normalized CSV, strict KVN-style tracking deck, and suite-owned
@@ -453,7 +454,8 @@ two-body/J2/high-order-gravity/drag/SRP/third-body propagation, finite-differenc
 native variational covariance, strict two-body reference comparison, and a calibrated two-scenario
 two-body/J2 comparison boundary. Live high-fidelity finite-difference covariance gates now verify
 drag/SRP/third-body force-model provenance and covariance-history matrix invariants for both Orekit
-and Tudat. Standards-grade JAX ephemeris services, operational-grade
+and Tudat, and the live Tudat native variational covariance gate verifies the same force-model
+provenance through TudatPy `parameters_setup`. Standards-grade JAX ephemeris services, operational-grade
 differentiable OD estimator workflows, and production authority beyond the documented optional
 backend tolerances remain gated on validated runner implementations.
 
@@ -554,7 +556,7 @@ Status: implemented for the current roadmap pass. README, backend installation g
 matrix, release checklist, live backend campaign ledger, LEO/MEO/GEO examples, optional smoke-gate
 semantics, and release packaging tooling are documented and locally verified.
 
-Current local release gate, run on 2026-06-19, passed `python -m pytest -q` with 498 passed and 9
+Current local release gate, run on 2026-06-19, passed `python -m pytest -q` with 498 passed and 10
 skipped, `python -m ruff check .`, `python -m mypy`, and `python -m build`. Optional backend
 evidence is recorded in `docs/validation/live-backend-campaigns.md`: Orekit propagation,
 generic and high-fidelity covariance, and native OD passed with the explicit Homebrew OpenJDK/data

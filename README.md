@@ -303,8 +303,10 @@ transition model, which builds TudatPy variational equations when the optional v
 available and keeps native variational products distinguishable from finite-difference products.
 The optional live gates now execute high-fidelity finite-difference covariance through
 drag/SRP/third-body force models for Orekit and Tudat and verify force-model provenance plus
-covariance-history matrix invariants. Native variational cross-validation across those force models
-and externally validated production conjunction services remain future work.
+covariance-history matrix invariants. The Tudat native variational live gate also executes the same
+high-fidelity drag/SRP/third-body scenario through TudatPy `parameters_setup` and verifies the same
+suite covariance-history invariants. Externally validated production conjunction services remain
+future work.
 
 `astro screen-conjunction` compares two trajectory products at common sample epochs and writes a
 deterministic first-order screening result with time of closest approach, miss distance, relative
