@@ -502,11 +502,12 @@ Implemented slice:
   selected Tudat force model. This is an adapter-level cross-check product, not native Tudat
   variational-equation propagation.
 - `astro compare-tudat-reference` runs Tudat and a reference backend on the same scenario, then
-  writes max/RMS/final position and velocity deltas, tolerance pass/fail status, and Tudat
-  runner/force-model provenance.
+  writes max/RMS/final position and velocity deltas, tolerance ratios, signed tolerance margins,
+  limiting metric, tolerance pass/fail status, and Tudat runner/force-model provenance.
 - `astro compare-tudat-campaign` runs the same calibrated Tudat-vs-reference comparison across
   multiple scenarios and writes a suite campaign product with scenario pass/fail counts, worst-case
-  position/velocity deltas, per-scenario comparison records, and campaign provenance.
+  position/velocity deltas, failed scenario IDs, worst-scenario limiting diagnostics, per-scenario
+  comparison records, and campaign provenance.
 - `astro research-propagate --backend local` runs seeded local ensembles.
 - `astro research-propagate --backend jax` runs vectorized two-body and J2 RK4 seeded ensembles and
   returns suite `MonteCarloResult` products.

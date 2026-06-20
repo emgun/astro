@@ -119,8 +119,10 @@ product. Tudat can also consume configured Earth spherical harmonic degree/order
 finite-difference covariance-history products by propagating perturbed Tudat states through the
 selected Tudat force model. `astro compare-tudat-reference` writes calibrated position/velocity
 tolerance metrics against a reference backend so live Tudat force-model runs can be promoted only
-when their deltas are explicit. `astro compare-tudat-campaign` aggregates multiple calibrated
-Tudat-vs-reference scenario comparisons into one pass/fail campaign product for release gates.
+when their deltas are explicit; the product records tolerance ratios, signed margins, and the
+limiting metric. `astro compare-tudat-campaign` aggregates multiple calibrated Tudat-vs-reference
+scenario comparisons into one pass/fail campaign product for release gates and identifies failed
+scenarios plus the worst limiting scenario.
 `covariance_state_transition_model: tudat_variational` is an opt-in native variational construction
 path for Tudat-backed covariance products. With TudatPy 1.0, the suite uses
 `tudatpy.dynamics.parameters_setup` and `tudatpy.dynamics.simulator` to build an

@@ -276,7 +276,8 @@ conda run -p /tmp/astro-tudat-live-env astro compare-tudat-campaign examples/sce
 # passed false; two-body passed, J2 exceeded the strict tolerance at 0.009359857626803657 km and 2.8680360453393343e-05 km/s
 
 conda run -p /tmp/astro-tudat-live-env astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output /tmp/astro-tudat-reference-campaign-calibrated.json
-# passed true; 2 scenarios passed, 0 failed
+# passed true; 2 scenarios passed, 0 failed; worst_scenario_id=leo-j2,
+# limiting_metric=velocity, limiting_tolerance_ratio=0.9560120151131114
 ```
 
 Roadmap claim not allowed: the strict two-scenario Tudat-vs-local comparison is not green at

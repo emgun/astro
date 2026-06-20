@@ -88,6 +88,47 @@ def _rms(values: FloatArray) -> float:
     return float(np.sqrt(np.mean(values * values)))
 
 
+def _tolerance_ratio(value: float, tolerance: float) -> float:
+    return value / tolerance
+
+
+def _validate_positive_tolerances(
+    position_tolerance_km: float,
+    velocity_tolerance_km_s: float,
+) -> None:
+    if position_tolerance_km <= 0.0 or velocity_tolerance_km_s <= 0.0:
+        raise ValueError("Tudat comparison position and velocity tolerances must be positive")
+
+
+def _limiting_metric(position_ratio: float, velocity_ratio: float) -> str:
+    if np.isclose(position_ratio, velocity_ratio):
+        return "position_velocity_tie"
+    if position_ratio > velocity_ratio:
+        return "position"
+    return "velocity"
+
+
+def _comparison_tolerance_metadata(
+    *,
+    max_position_delta_km: float,
+    max_velocity_delta_km_s: float,
+    position_tolerance_km: float,
+    velocity_tolerance_km_s: float,
+) -> dict[str, float | str]:
+    position_ratio = _tolerance_ratio(max_position_delta_km, position_tolerance_km)
+    velocity_ratio = _tolerance_ratio(max_velocity_delta_km_s, velocity_tolerance_km_s)
+    return {
+        "position_tolerance_ratio": position_ratio,
+        "velocity_tolerance_ratio": velocity_ratio,
+        "limiting_tolerance_ratio": max(position_ratio, velocity_ratio),
+        "limiting_metric": _limiting_metric(position_ratio, velocity_ratio),
+        "position_tolerance_margin_km": position_tolerance_km - max_position_delta_km,
+        "velocity_tolerance_margin_km_s": (
+            velocity_tolerance_km_s - max_velocity_delta_km_s
+        ),
+    }
+
+
 def compare_tudat_to_reference(
     scenario: Scenario,
     *,
@@ -97,6 +138,7 @@ def compare_tudat_to_reference(
     tudat_runner: TrajectoryRunner = propagate_tudat,
     reference_runner: TrajectoryRunner | None = None,
 ) -> TudatReferenceComparison:
+    _validate_positive_tolerances(position_tolerance_km, velocity_tolerance_km_s)
     candidate = tudat_runner(scenario)
     reference = (
         _reference_runner_for_backend(reference_backend)(scenario)
@@ -131,6 +173,12 @@ def compare_tudat_to_reference(
         ),
         metadata={
             "workflow": "tudat_reference_comparison",
+            **_comparison_tolerance_metadata(
+                max_position_delta_km=max_position_delta_km,
+                max_velocity_delta_km_s=max_velocity_delta_km_s,
+                position_tolerance_km=position_tolerance_km,
+                velocity_tolerance_km_s=velocity_tolerance_km_s,
+            ),
             "candidate_force_model": candidate.force_model.model_dump(mode="json"),
             "reference_force_model": reference.force_model.model_dump(mode="json"),
             "tudat_runner": candidate.metadata.get("tudat_runner"),
@@ -165,6 +213,10 @@ def compare_tudat_campaign(
     )
     passed_count = sum(1 for comparison in comparisons if comparison.passed)
     failed_count = len(comparisons) - passed_count
+    worst_comparison = max(
+        comparisons,
+        key=lambda comparison: float(comparison.metadata["limiting_tolerance_ratio"]),
+    )
     return TudatReferenceComparisonCampaign(
         campaign_id="tudat-reference-campaign",
         reference_backend=reference_backend,
@@ -182,6 +234,14 @@ def compare_tudat_campaign(
         metadata={
             "workflow": "tudat_reference_comparison_campaign",
             "scenario_ids": [scenario.scenario_id for scenario in scenarios],
+            "failed_scenario_ids": [
+                comparison.scenario_id for comparison in comparisons if not comparison.passed
+            ],
+            "worst_scenario_id": worst_comparison.scenario_id,
+            "limiting_metric": worst_comparison.metadata["limiting_metric"],
+            "limiting_tolerance_ratio": worst_comparison.metadata[
+                "limiting_tolerance_ratio"
+            ],
             "position_tolerance_km": position_tolerance_km,
             "velocity_tolerance_km_s": velocity_tolerance_km_s,
         },

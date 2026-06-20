@@ -77,6 +77,12 @@ def test_compare_tudat_to_reference_reports_calibrated_deltas() -> None:
     assert result.rms_velocity_delta_km_s == pytest.approx(0.001)
     assert result.final_velocity_delta_km_s == pytest.approx(0.001)
     assert result.passed is True
+    assert result.metadata["position_tolerance_ratio"] == pytest.approx(0.5)
+    assert result.metadata["velocity_tolerance_ratio"] == pytest.approx(0.5)
+    assert result.metadata["limiting_tolerance_ratio"] == pytest.approx(0.5)
+    assert result.metadata["limiting_metric"] == "position_velocity_tie"
+    assert result.metadata["position_tolerance_margin_km"] == pytest.approx(0.1)
+    assert result.metadata["velocity_tolerance_margin_km_s"] == pytest.approx(0.001)
     assert result.metadata["tudat_runner"] == "native_two_body"
     assert result.metadata["tudat_force_models"] == ["Earth point-mass gravity"]
 
@@ -100,6 +106,30 @@ def test_compare_tudat_to_reference_fails_when_tolerance_is_exceeded() -> None:
     assert result.passed is False
     assert result.max_position_delta_km > result.position_tolerance_km
     assert result.max_velocity_delta_km_s > result.velocity_tolerance_km_s
+    assert result.metadata["position_tolerance_ratio"] == pytest.approx(2.0)
+    assert result.metadata["velocity_tolerance_ratio"] == pytest.approx(2.0)
+    assert result.metadata["limiting_tolerance_ratio"] == pytest.approx(2.0)
+    assert result.metadata["limiting_metric"] == "position_velocity_tie"
+    assert result.metadata["position_tolerance_margin_km"] == pytest.approx(-0.05)
+    assert result.metadata["velocity_tolerance_margin_km_s"] == pytest.approx(-0.0005)
+
+
+def test_compare_tudat_to_reference_requires_positive_tolerances() -> None:
+    scenario = _short_scenario()
+
+    with pytest.raises(ValueError, match="position and velocity tolerances must be positive"):
+        compare_tudat_to_reference(
+            scenario,
+            reference_backend="local",
+            position_tolerance_km=0.0,
+            velocity_tolerance_km_s=0.001,
+            tudat_runner=lambda candidate: _offset_trajectory(
+                candidate,
+                position_offset_km=0.0,
+                velocity_offset_km_s=0.0,
+            ),
+            reference_runner=propagate_local,
+        )
 
 
 def test_compare_tudat_to_reference_requires_time_aligned_samples() -> None:
@@ -146,6 +176,10 @@ def test_compare_tudat_campaign_aggregates_scenario_results() -> None:
     assert result.passed is False
     assert result.max_position_delta_km == pytest.approx(0.25)
     assert result.max_velocity_delta_km_s == pytest.approx(0.001)
+    assert result.metadata["failed_scenario_ids"] == ["leo-two-body-campaign-second"]
+    assert result.metadata["worst_scenario_id"] == "leo-two-body-campaign-second"
+    assert result.metadata["limiting_metric"] == "position"
+    assert result.metadata["limiting_tolerance_ratio"] == pytest.approx(1.25)
     assert [comparison.scenario_id for comparison in result.comparisons] == [
         first.scenario_id,
         second.scenario_id,

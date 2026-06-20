@@ -132,6 +132,11 @@ astro compare-tudat-reference examples/scenarios/leo_two_body.yaml --reference-b
 astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output /tmp/astro-tudat-reference-campaign-calibrated.json
 ```
 
+Comparison products include per-scenario tolerance ratios, signed position/velocity margins, and
+the limiting metric. Campaign products also identify failed scenario IDs, the worst scenario, and
+the campaign limiting tolerance ratio so calibrated live gates are easier to diagnose without
+changing the pass/fail threshold.
+
 ## Smoke Command Semantics
 
 Smoke commands return JSON and use these exit codes:

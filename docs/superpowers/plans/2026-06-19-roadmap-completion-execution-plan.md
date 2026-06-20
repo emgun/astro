@@ -529,7 +529,11 @@ ASTRO_RUN_TUDAT_LIVE=1 conda run -p /tmp/astro-tudat-live-env python -m pytest t
 # 1 passed
 
 conda run -p /tmp/astro-tudat-live-env astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output /tmp/astro-tudat-reference-campaign-calibrated.json
-# passed true, 2 scenarios passed
+# passed true, 2 scenarios passed. The comparison product now also reports tolerance ratios and
+# signed margins, and the campaign product reports failed scenario IDs, worst_scenario_id,
+# limiting_metric, and limiting_tolerance_ratio diagnostics. 2026-06-20 live JSON reported
+# worst_scenario_id = leo-j2, limiting_metric = velocity, and limiting_tolerance_ratio =
+# 0.9560120151131114.
 
 JAX release-checklist research propagation, OD sensitivity, and research-estimate commands
 # all completed and wrote /tmp/astro-jax-*.json products
