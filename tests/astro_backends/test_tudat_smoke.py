@@ -42,3 +42,22 @@ def test_run_tudat_smoke_reports_available_module(monkeypatch: pytest.MonkeyPatc
     assert result.available is True
     assert result.version == "1.0.0"
     assert "available" in result.message
+
+
+def test_run_tudat_smoke_accepts_conda_module_without_distribution_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_version(_distribution: str) -> str:
+        raise PackageNotFoundError
+
+    monkeypatch.setattr("astro_backends.tudat.runtime.version", missing_version)
+    monkeypatch.setattr(
+        "astro_backends.tudat.runtime.import_module",
+        lambda _module_name: SimpleNamespace(__version__="1.0.0"),
+    )
+
+    result = run_tudat_smoke()
+
+    assert result.available is True
+    assert result.version == "1.0.0"
+    assert "available" in result.message

@@ -46,3 +46,39 @@ def test_load_tudat_runtime_returns_module(monkeypatch: pytest.MonkeyPatch) -> N
     assert runtime.package == "tudatpy"
     assert runtime.package_version == "1.0.0"
     assert runtime.module is tudat_module
+
+
+def test_load_tudat_runtime_accepts_conda_module_without_distribution_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_version(_distribution: str) -> str:
+        raise PackageNotFoundError
+
+    tudat_module = SimpleNamespace(__version__="1.0.0")
+    monkeypatch.setattr("astro_backends.tudat.runtime.version", missing_version)
+    monkeypatch.setattr(
+        "astro_backends.tudat.runtime.import_module",
+        lambda _module_name: tudat_module,
+    )
+
+    runtime = load_tudat_runtime()
+
+    assert runtime.package == "tudatpy"
+    assert runtime.package_version == "1.0.0"
+    assert runtime.module is tudat_module
+
+
+def test_load_tudat_runtime_strict_preserves_missing_distribution_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_version(_distribution: str) -> str:
+        raise PackageNotFoundError
+
+    monkeypatch.setattr("astro_backends.tudat.runtime.version", missing_version)
+    monkeypatch.setattr(
+        "astro_backends.tudat.runtime.import_module",
+        lambda _module_name: SimpleNamespace(__version__="1.0.0"),
+    )
+
+    with pytest.raises(PackageNotFoundError):
+        load_tudat_runtime(strict=True)

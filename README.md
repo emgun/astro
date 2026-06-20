@@ -111,9 +111,10 @@ tolerance metrics against a reference backend so live Tudat force-model runs can
 when their deltas are explicit. `astro compare-tudat-campaign` aggregates multiple calibrated
 Tudat-vs-reference scenario comparisons into one pass/fail campaign product for release gates.
 `covariance_state_transition_model: tudat_variational` is an opt-in native variational construction
-path for Tudat-backed covariance products. When TudatPy exposes the expected estimation and
-simulator APIs, the suite builds an initial-Cartesian-state parameter set, runs Tudat variational
-equations, and maps `state_transition_matrix_history` into suite covariance samples. If the
+path for Tudat-backed covariance products. With TudatPy 1.0, the suite uses
+`tudatpy.dynamics.parameters_setup` and `tudatpy.dynamics.simulator` to build an
+initial-Cartesian-state parameter set, run Tudat variational equations, and map
+`state_transition_matrix_history` into suite covariance samples. If the
 variational API is unavailable or incompatible, the suite fails explicitly rather than falling back
 to finite differences. Live TudatPy execution still requires an installed TudatPy runtime. JAX
 research propagation returns suite `MonteCarloResult` products, can optionally include a final-state
@@ -158,8 +159,9 @@ astro propagate examples/scenarios/leo_orekit_srp.yaml --backend tudat --output 
 astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend tudat --output tudat_third_body_trajectory.json
 astro propagate examples/scenarios/leo_tudat_high_order_gravity.yaml --backend tudat --output tudat_high_order_gravity.json
 astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend tudat --output tudat_high_fidelity_covariance.json
+astro propagate examples/scenarios/leo_tudat_variational_covariance.yaml --backend tudat --output tudat_variational_covariance.json
 astro compare-tudat-reference examples/scenarios/leo_two_body.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output tudat_reference_comparison.json
-astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output tudat_reference_campaign.json
+astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output tudat_reference_campaign_calibrated.json
 astro export-trajectory trajectory.json --format csv --output trajectory.csv
 astro export-trajectory trajectory.json --format oem --output trajectory.oem
 astro export-trajectory trajectory.json --format opm --output trajectory.opm

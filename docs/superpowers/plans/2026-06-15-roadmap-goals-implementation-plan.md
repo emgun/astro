@@ -447,11 +447,12 @@ range/range-rate plus inertial and topocentric angles, and a
 Nyx/ANISE evaluation gate are
 implemented. The JAX research estimator now uses backtracking Gauss-Newton step acceptance for
 range/range-rate, inertial right-ascension/declination, and topocentric azimuth/elevation OD
-products. Live TudatPy variational equation
-construction and broader calibrated live comparison campaigns beyond the current
-two-body/J2/high-order-gravity/drag/SRP/third-body runner and Tudat-vs-reference comparison product,
-standards-grade JAX ephemeris services and operational-grade differentiable OD estimator workflows
-remain gated on validated runner implementations.
+products. The live TudatPy 1.0 campaign now covers native
+two-body/J2/high-order-gravity/drag/SRP/third-body propagation, finite-difference covariance,
+native variational covariance, strict two-body reference comparison, and a calibrated two-scenario
+two-body/J2 comparison boundary. Standards-grade JAX ephemeris services, operational-grade
+differentiable OD estimator workflows, and production authority beyond the documented optional
+backend tolerances remain gated on validated runner implementations.
 
 Implemented slice:
 
@@ -511,8 +512,9 @@ Definition of done:
   `astro compare-tudat-reference` and
   `astro compare-tudat-campaign` write calibrated reference-delta products for single-scenario and
   multi-scenario live Tudat validation. Native Tudat variational equations now have a suite-owned
-  construction boundary; full live production confidence remains gated on an installed TudatPy
-  runtime and force-model-by-force-model validation.
+  TudatPy 1.0 construction boundary through `tudatpy.dynamics.parameters_setup`; full production
+  confidence remains gated on the documented live tolerances and force-model-by-force-model
+  validation.
 - `astro research-propagate --backend jax` runs seeded two-body and J2 batch propagation plus
   screening-only `orekit_high_fidelity`, configured degree/order high-order gravity provenance,
   drag, SRP, analytic Sun/Moon third-body, and configured third-body ephemeris sample force flags
@@ -549,14 +551,17 @@ Status: implemented for the current roadmap pass. README, backend installation g
 matrix, release checklist, live backend campaign ledger, LEO/MEO/GEO examples, optional smoke-gate
 semantics, and release packaging tooling are documented and locally verified.
 
-Current local release gate, run on 2026-06-19, passed `python -m pytest -q` with 495 passed and 7
+Current local release gate, run on 2026-06-19, passed `python -m pytest -q` with 498 passed and 7
 skipped, `python -m ruff check .`, `python -m mypy`, and `python -m build`. Optional backend
-evidence is recorded in `docs/validation/live-backend-campaigns.md`: RocketPy configured launch
-examples, Dymos default phase plus pitch-program transcription, and the JAX research promotion
-checklist passed live on this machine. Orekit remains blocked on a Java runtime; TudatPy is not
-installed. These live results promote only the executed optional gates and do not change the
-remaining product boundaries for native multi-motor staging, full target-seeking multistage
-optimization, operational differentiable OD, or unavailable Orekit/Tudat campaigns.
+evidence is recorded in `docs/validation/live-backend-campaigns.md`: Orekit propagation,
+covariance, and native OD passed with the explicit Homebrew OpenJDK/data environment; RocketPy
+configured launch examples passed; Dymos default phase plus pitch-program transcription passed; the
+TudatPy 1.0 isolated conda campaign passed native propagation, covariance, native variational
+covariance, strict two-body comparison, and calibrated two-scenario comparison gates; and the JAX
+research promotion checklist passed live on this machine. These live results promote only the
+executed optional gates and do not change the remaining product boundaries for default Java-free
+CI, native multi-motor staging, full target-seeking multistage optimization, operational
+differentiable OD, or standards-grade ephemeris authority.
 
 Definition of done:
 

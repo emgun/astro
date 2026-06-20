@@ -39,6 +39,15 @@ _SUPPORTED_TUDAT_HIGH_FIDELITY_FLAGS = {
     "solar_radiation_pressure",
     "third_body_gravity",
 }
+_LOADED_SPICE_MODULE_IDS: set[int] = set()
+
+
+def _load_standard_spice_kernels_once(spice: Any) -> None:
+    module_id = id(spice)
+    if module_id in _LOADED_SPICE_MODULE_IDS:
+        return
+    spice.load_standard_kernels()
+    _LOADED_SPICE_MODULE_IDS.add(module_id)
 
 
 def _load_tudat_propagation_api() -> dict[str, Any]:
@@ -55,15 +64,29 @@ def _load_tudat_propagation_api() -> dict[str, Any]:
 
 
 def _load_tudat_variational_api() -> dict[str, Any]:
+    simulator_module_name = "tudatpy.dynamics.simulator"
     try:
+        parameters_setup = import_module("tudatpy.dynamics.parameters_setup")
         return {
-            "estimation_setup": import_module("tudatpy.dynamics.estimation_setup"),
-            "simulator": import_module("tudatpy.dynamics.simulator"),
+            "parameters_setup": parameters_setup,
+            "create_parameter_set": parameters_setup.create_parameter_set,
+            "simulator": import_module(simulator_module_name),
+            "parameter_setup_source": "tudatpy.dynamics.parameters_setup",
         }
-    except (ImportError, KeyError) as exc:
-        raise UnsupportedBackendError(
-            f"TudatPy variational API import failed: {exc}"
-        ) from exc
+    except (ImportError, KeyError, AttributeError) as current_api_exc:
+        try:
+            legacy_estimation_setup = import_module("tudatpy.dynamics.estimation_setup")
+            return {
+                "parameters_setup": legacy_estimation_setup.parameter,
+                "create_parameter_set": legacy_estimation_setup.create_parameter_set,
+                "simulator": import_module(simulator_module_name),
+                "parameter_setup_source": "tudatpy.dynamics.estimation_setup",
+            }
+        except (ImportError, KeyError, AttributeError) as legacy_api_exc:
+            raise UnsupportedBackendError(
+                "TudatPy variational API import failed: "
+                f"{current_api_exc}; legacy fallback failed: {legacy_api_exc}"
+            ) from legacy_api_exc
 
 
 def _validate_default_tudat_scenario(scenario: Scenario) -> None:
@@ -472,9 +495,10 @@ def _run_tudat_native_variational_covariance(
     propagation_setup = propagation_api["propagation_setup"]
     simulator = variational_api["simulator"]
     time_representation = propagation_api["time_representation"]
-    estimation_setup = variational_api["estimation_setup"]
+    parameters_setup = variational_api["parameters_setup"]
+    create_parameter_set = variational_api["create_parameter_set"]
 
-    spice.load_standard_kernels()
+    _load_standard_spice_kernels_once(spice)
     global_frame_origin = "Earth"
     global_frame_orientation = "J2000"
     body_settings = environment_setup.get_default_body_settings(
@@ -520,11 +544,11 @@ def _run_tudat_native_variational_covariance(
         propagator=propagation_setup.propagator.cowell,
     )
     try:
-        parameter_settings = estimation_setup.parameter.initial_states(
+        parameter_settings = parameters_setup.initial_states(
             propagator_settings,
             bodies,
         )
-        parameters_to_estimate = estimation_setup.create_parameter_set(
+        parameters_to_estimate = create_parameter_set(
             parameter_settings,
             bodies,
             propagator_settings,
@@ -609,6 +633,7 @@ def _run_tudat_native_variational_covariance(
     return covariance_history, {
         "covariance_native_variational_runner": "default_tudatpy",
         "native_variational_parameter_set": "initial_cartesian_state",
+        "native_variational_parameter_api": variational_api["parameter_setup_source"],
         "native_variational_solver": "create_variational_equations_solver",
         "native_variational_transition_history": "state_transition_matrix_history",
         "native_variational_sample_count": len(covariance_history),
@@ -762,7 +787,7 @@ def _propagate_tudat_default(scenario: Scenario, runtime: TudatRuntime) -> Traje
     simulator = api["simulator"]
     time_representation = api["time_representation"]
 
-    spice.load_standard_kernels()
+    _load_standard_spice_kernels_once(spice)
     global_frame_origin = "Earth"
     global_frame_orientation = "J2000"
     body_settings = environment_setup.get_default_body_settings(

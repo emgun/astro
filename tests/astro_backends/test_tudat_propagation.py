@@ -78,6 +78,7 @@ def test_propagate_tudat_runs_default_two_body_with_fake_tudat_modules(
 ) -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml")
     fake_modules = _FakeTudatModules()
+    monkeypatch.setattr("astro_backends.tudat.propagation._LOADED_SPICE_MODULE_IDS", set())
     monkeypatch.setattr(
         "astro_backends.tudat.propagation.import_module",
         fake_modules.import_module,
@@ -272,6 +273,7 @@ def test_propagate_tudat_populates_covariance_history_with_fake_tudat_modules(
     assert final_transition.shape == (6, 6)
     assert not np.allclose(final_transition, np.eye(6))
     assert final_process_noise[0, 0] > 0.0
+    assert fake_modules.spice.load_standard_kernels_call_count == 1
 
 
 def test_propagate_tudat_requires_native_variational_runner_when_requested(
@@ -317,12 +319,16 @@ def test_propagate_tudat_uses_default_native_variational_runner_when_requested(
 
     trajectory = propagate_tudat(scenario, runtime_loader=_fake_runtime)
 
-    assert fake_modules.estimation_setup.parameter.initial_state_settings is not None
-    assert fake_modules.estimation_setup.created_parameter_settings is not None
+    assert fake_modules.parameters_setup.initial_state_settings is not None
+    assert fake_modules.parameters_setup.created_parameter_settings is not None
     assert fake_modules.simulator.variational_solver_created is True
     assert trajectory.metadata["covariance_model"] == "tudat_native_variational_equations"
     assert trajectory.metadata["covariance_native_variational_runner"] == "default_tudatpy"
     assert trajectory.metadata["native_variational_parameter_set"] == "initial_cartesian_state"
+    assert (
+        trajectory.metadata["native_variational_parameter_api"]
+        == "tudatpy.dynamics.parameters_setup"
+    )
     assert trajectory.metadata["native_variational_solver"] == "create_variational_equations_solver"
     assert trajectory.covariance_history[0].metadata["state_transition_model"] == "identity"
     assert trajectory.covariance_history[1].metadata["state_transition_model"] == (
@@ -446,9 +452,11 @@ class _FakeDateTime:
 class _FakeSpice:
     def __init__(self) -> None:
         self.standard_kernels_loaded = False
+        self.load_standard_kernels_call_count = 0
 
     def load_standard_kernels(self) -> None:
         self.standard_kernels_loaded = True
+        self.load_standard_kernels_call_count += 1
 
 
 class _FakeBody:
@@ -743,6 +751,38 @@ class _FakeEstimationSetup:
         }
 
 
+class _FakeParametersSetup:
+    initial_state_settings: dict[str, object] | None = None
+    created_parameter_settings: dict[str, object] | None = None
+
+    @classmethod
+    def initial_states(
+        cls,
+        propagator_settings: dict[str, object],
+        bodies: _FakeBodies,
+    ) -> dict[str, object]:
+        cls.initial_state_settings = {
+            "type": "initial_states",
+            "propagator": propagator_settings,
+            "body_count": len(bodies._bodies),
+        }
+        return cls.initial_state_settings
+
+    @classmethod
+    def create_parameter_set(
+        cls,
+        parameter_settings: dict[str, object],
+        bodies: _FakeBodies,
+        propagator_settings: dict[str, object],
+    ) -> dict[str, object]:
+        cls.created_parameter_settings = parameter_settings
+        return {
+            "parameter_settings": parameter_settings,
+            "body_count": len(bodies._bodies),
+            "propagator": propagator_settings,
+        }
+
+
 class _FakeTudatModules:
     def __init__(self, *, include_variational_api: bool = False) -> None:
         self.spice = _FakeSpice()
@@ -750,6 +790,9 @@ class _FakeTudatModules:
         self.environment_setup.requested_bodies = []
         self.environment_setup.aerodynamic_interfaces = {}
         self.environment_setup.radiation_pressure_targets = {}
+        self.parameters_setup = _FakeParametersSetup
+        self.parameters_setup.initial_state_settings = None
+        self.parameters_setup.created_parameter_settings = None
         self.estimation_setup = _FakeEstimationSetup
         self.estimation_setup.parameter.initial_state_settings = None
         self.estimation_setup.created_parameter_settings = None
@@ -763,7 +806,7 @@ class _FakeTudatModules:
             "tudatpy.astro.time_representation": SimpleNamespace(DateTime=_FakeDateTime),
         }
         if include_variational_api:
-            self.modules["tudatpy.dynamics.estimation_setup"] = self.estimation_setup
+            self.modules["tudatpy.dynamics.parameters_setup"] = self.parameters_setup
 
     def import_module(self, module_name: str) -> Any:
         return self.modules[module_name]

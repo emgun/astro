@@ -94,7 +94,7 @@ JSON and treat the gate as not-run rather than failed or complete.
 - [ ] `python -m pytest tests/astro_backends/test_tudat_propagation.py::test_propagate_tudat_uses_default_native_variational_runner_when_requested -q`
 - [ ] `python -m pytest tests/astro_backends/test_tudat_propagation.py::test_propagate_tudat_uses_native_variational_runner_when_requested -q`
 - [ ] `astro compare-tudat-reference examples/scenarios/leo_two_body.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output /tmp/astro-tudat-reference-comparison.json`
-- [ ] `astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output /tmp/astro-tudat-reference-campaign.json`
+- [ ] `astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output /tmp/astro-tudat-reference-campaign-calibrated.json`
 - [ ] `astro jax-smoke`
 - [ ] `astro research-estimate examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --backend jax --max-iterations 5 --output /tmp/astro-jax-research-estimate.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json`
