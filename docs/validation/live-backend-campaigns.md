@@ -16,7 +16,7 @@ recorded as not-run live evidence, not as a failed required local release gate.
 | Backend | Smoke status | Live gate status | Roadmap implication |
 | --- | --- | --- | --- |
 | Orekit | Available with explicit Homebrew OpenJDK environment | Passed propagation, generic/high-fidelity covariance, and native OD live gates | Orekit live propagation, covariance, and native OD claims are promoted for this machine only when the Java/data environment is configured. |
-| RocketPy | Available | Passed configured-example live gate; multi-motor config fails closed | RocketPy configured launch examples passed live validation on this machine, and additional configured motors are rejected because RocketPy 1.11 overwrites earlier motors. |
+| RocketPy | Available | Passed configured-example live gate; multi-motor config fails closed | RocketPy configured launch examples passed live validation on this machine, and additional configured motors are rejected because the loaded `Rocket.add_motor` API overwrites earlier motors. |
 | Dymos/OpenMDAO | Available | Passed live optimization gates | Dymos default phase, target-seeking pitch-program transcription, and linked multiphase stage transcription with stage-local mass depletion and exponential-atmosphere drag live tests passed on this machine, without promoting a full high-fidelity multistage ascent design optimizer. |
 | TudatPy | Available in isolated conda env | Propagation/high-fidelity covariance/native-variational gates passed; strict multi-scenario comparison found a calibrated J2 tolerance boundary | Tudat live force-model products are promoted only with the recorded comparison tolerances and remain cross-check products, not the operational authority. |
 | JAX/JAXLIB | Available | Passed research promotion checklist | JAX research propagation, OD sensitivity, and research-estimate gates passed on this machine, but remain research workflows, not operational OD services. |
@@ -129,15 +129,15 @@ python -m pytest tests/astro_backends/test_rocketpy_simulation.py::test_propagat
 1 passed in 0.28s
 
 astro launch examples/launch/rocketpy_configured_multimotor_unsupported.yaml --backend rocketpy --output /tmp/astro-rocketpy-multimotor-launch.json
-RocketPy launch simulation supports only one motor per rocket in the validated adapter; RocketPy 1.11 overwrites earlier motors when add_motor is called more than once. Remove scenario.rocketpy.additional_motors (strap-on) or use the local/suite model until a validated native multi-motor RocketPy API is available.
+RocketPy launch simulation supports only one motor per rocket in the validated adapter; installed RocketPy 1.11.0 exposes Rocket.add_motor as a single-motor setter that overwrites the earlier motor when called more than once. Remove scenario.rocketpy.additional_motors (strap-on) or use the local/suite model until a validated native multi-motor RocketPy API is available.
 exit=2
 ```
 
 Roadmap claim not allowed: this does not promote native RocketPy staged separation, dropped dry mass,
 coast/reignite stage transitions, changing vehicle geometry, or production launch certification
 beyond the checked configured-example adapter boundary. It also does not promote native RocketPy
-multi-motor direct flight on RocketPy 1.11, because the installed API reports that only one motor per
-rocket is supported and later `add_motor` calls overwrite earlier motors.
+multi-motor direct flight with the loaded RocketPy API, because `Rocket.add_motor` behaves as a
+single-motor setter and later calls overwrite earlier motors.
 
 ## Dymos/OpenMDAO
 

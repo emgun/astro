@@ -76,8 +76,8 @@ Still roadmap-level:
   ascent design optimization beyond the current RocketPy direct-flight adapter, suite-stage
   annotation, Dymos vertical phase, bounded native pitch-control target objective, native linked
   stage-phase topology, stage-local Dymos mass depletion, and exponential-atmosphere Dymos drag.
-  The current RocketPy 1.11 adapter fails closed for additional configured motors because RocketPy
-  overwrites earlier motors when `add_motor` is called more than once.
+  The current RocketPy adapter fails closed for additional configured motors because the loaded
+  `Rocket.add_motor` API overwrites earlier motors when called more than once.
 - Native Tudat variational-equation covariance propagation now has an explicit opt-in default
   construction boundary that builds the initial-state parameter set and reads TudatPy
   `state_transition_matrix_history` when the optional variational API is present. Default Tudat
@@ -375,7 +375,7 @@ Implemented slice:
   fail-closed additional-motor guard fixture.
 - `astro launch --backend rocketpy` runs a configured solid RocketPy flight when dependencies and
   `scenario.rocketpy` configuration are available. It rejects additional configured solid motors
-  before simulation because RocketPy 1.11 overwrites earlier motors. For multistage suite scenarios,
+  before simulation because the loaded `Rocket.add_motor` API overwrites earlier motors. For multistage suite scenarios,
   it annotates the returned `LaunchTrajectory` with reached suite stage events and sample stage
   names around one configured RocketPy flight, with metadata identifying the composition tradeoff
   and whether the RocketPy solution covered the full suite stage schedule.

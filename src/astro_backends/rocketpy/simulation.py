@@ -154,15 +154,20 @@ def _rocketpy_motor_positions_m(config: LaunchRocketPyConfig) -> list[float]:
     ]
 
 
-def _reject_unsupported_additional_motors(config: LaunchRocketPyConfig) -> None:
+def _reject_unsupported_additional_motors(
+    config: LaunchRocketPyConfig,
+    *,
+    rocketpy_version: str,
+) -> None:
     if not config.additional_motors:
         return
     names = ", ".join(motor.name for motor in config.additional_motors)
     raise UnsupportedBackendError(
         "RocketPy launch simulation supports only one motor per rocket in the validated "
-        "adapter; RocketPy 1.11 overwrites earlier motors when add_motor is called more "
-        f"than once. Remove scenario.rocketpy.additional_motors ({names}) or use the "
-        "local/suite model until a validated native multi-motor RocketPy API is available."
+        f"adapter; installed RocketPy {rocketpy_version} exposes Rocket.add_motor as a "
+        "single-motor setter that overwrites the earlier motor when called more than once. "
+        f"Remove scenario.rocketpy.additional_motors ({names}) or use the local/suite "
+        "model until a validated native multi-motor RocketPy API is available."
     )
 
 
@@ -473,7 +478,10 @@ def run_rocketpy_flight(
     runtime: RocketPyRuntime,
     config: LaunchRocketPyConfig,
 ) -> LaunchTrajectory:
-    _reject_unsupported_additional_motors(config)
+    _reject_unsupported_additional_motors(
+        config,
+        rocketpy_version=runtime.package_version,
+    )
     environment = _build_environment(scenario, runtime)
     motors = [(_build_solid_motor(config, runtime), config.motor_position_m)]
     rocket = _build_rocket(config, runtime, motors)
@@ -501,7 +509,10 @@ def propagate_launch_rocketpy(
             "vehicle, motor, and flight configuration; use --backend local for aggregate "
             "launch scenarios."
         )
-    _reject_unsupported_additional_motors(config)
+    _reject_unsupported_additional_motors(
+        config,
+        rocketpy_version=runtime.package_version,
+    )
     if flight_runner is None:
         flight_runner = run_rocketpy_flight
 

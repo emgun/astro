@@ -480,7 +480,7 @@ ASTRO_RUN_ROCKETPY_LIVE=1 python -m pytest tests/astro_backends/test_rocketpy_si
 # 2026-06-20: 1 passed in 1.62s for the single-stage and two-stage adapter fixtures
 
 python -m pytest tests/astro_backends/test_rocketpy_simulation.py::test_propagate_launch_rocketpy_rejects_additional_motors_until_backend_supports_them -q
-# 2026-06-20: 1 passed in 0.28s, guarding RocketPy 1.11's one-motor limitation
+# 2026-06-20: 1 passed in 0.28s, guarding Rocket.add_motor's one-motor setter behavior
 
 ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription -q
 # 2026-06-20: 2 passed, 2 OpenMDAO warnings in 2.23s; verifies the default Dymos phase

@@ -67,7 +67,7 @@ configured single-motor solid rockets and can annotate multistage suite scenario
 events/samples reached by one configured RocketPy flight, with metadata for whether the RocketPy
 solution covered the full suite stage schedule plus a multistage adapter contract that records the
 non-native composition scope. Additional RocketPy motors are parsed but rejected before simulation
-because RocketPy 1.11 overwrites earlier motors when `add_motor` is called more than once. That
+because the loaded `Rocket.add_motor` API overwrites earlier motors when called more than once. That
 multistage path is a composition adapter, not a validated RocketPy staged-separation solver. Live
 Dymos optimization currently supports a default stage-aware
 vertical-ascent phase transcription wrapped in the suite launch-tuning product, plus an opt-in

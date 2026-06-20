@@ -328,11 +328,26 @@ def test_propagate_launch_rocketpy_rejects_additional_motors_until_backend_suppo
         update={"rocketpy": _rocketpy_config_with_additional_motor()}
     )
 
-    with pytest.raises(UnsupportedBackendError, match="supports only one motor"):
+    with pytest.raises(UnsupportedBackendError) as exc_info:
         propagate_launch_rocketpy(scenario, runtime_loader=model.runtime)
 
+    message = str(exc_info.value)
+    assert "supports only one motor" in message
+    assert "installed RocketPy 1.11.0" in message
+    assert "overwrites the earlier motor" in message
     assert model.motor_kwargs == []
     assert model.motor_positions_m == []
+
+
+def test_propagate_launch_rocketpy_multimotor_guard_uses_loaded_runtime_version() -> None:
+    scenario = _single_stage_scenario().model_copy(
+        update={"rocketpy": _rocketpy_config_with_additional_motor()}
+    )
+
+    with pytest.raises(UnsupportedBackendError) as exc_info:
+        propagate_launch_rocketpy(scenario, runtime_loader=_fake_runtime)
+
+    assert "installed RocketPy 1.12.1" in str(exc_info.value)
 
 
 def test_propagate_launch_rocketpy_stops_at_actual_solution_end() -> None:

@@ -1,5 +1,5 @@
 scenario_id: rocketpy-configured-multimotor-unsupported
-description: Unsupported RocketPy multi-motor guard fixture; RocketPy 1.11 overwrites earlier motors.
+description: Unsupported RocketPy multi-motor guard fixture; Rocket.add_motor overwrites earlier motors.
 epoch: '2026-01-01T00:00:00Z'
 time_scale: UTC
 frame: EME2000

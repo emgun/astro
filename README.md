@@ -31,8 +31,8 @@ The current implementation slice covers:
 
 Launch/ascent includes deliberately simple local vertical and pitch-program baselines plus a
 RocketPy direct-simulation path for explicitly configured single-motor solid rockets. The suite has
-a fail-closed guard fixture for additional RocketPy motors because RocketPy 1.11 overwrites earlier
-motors when `add_motor` is called more than once. Dymos/OpenMDAO is recognized as an optimization
+a fail-closed guard fixture for additional RocketPy motors because the loaded `Rocket.add_motor` API
+overwrites earlier motors when called more than once. Dymos/OpenMDAO is recognized as an optimization
 adapter boundary; its live phase transcription is currently a stage-aware vertical-ascent model
 rather than a full multistage optimal-control ascent solver.
 
@@ -78,7 +78,7 @@ RocketPy and Dymos/OpenMDAO are behind explicit adapter gates. The current `rock
 loads the optional runtime, requires explicit `rocketpy` vehicle/motor/flight configuration on the
 launch scenario, runs configured solid-rocket flights through RocketPy, preserves the
 `LaunchTrajectory` product boundary, fails closed when additional RocketPy motors are configured
-because RocketPy 1.11 overwrites earlier motors, and can annotate multistage suite scenarios with stage
+because the loaded `Rocket.add_motor` API overwrites earlier motors, and can annotate multistage suite scenarios with stage
 events/samples reached by a single configured RocketPy flight, including metadata for whether the
 RocketPy solution covered the full suite stage schedule plus a multistage adapter contract that
 records the non-native composition scope. That multistage path is an adapter composition layer, not
@@ -345,9 +345,8 @@ baseline, not a production launch simulator.
 With `--backend rocketpy`, `astro launch` requires explicit `scenario.rocketpy` configuration and
 runs a RocketPy direct flight for the validated single-motor adapter path. The checked
 `rocketpy_configured_multimotor_unsupported.yaml` fixture proves the suite can parse additional
-motor definitions but rejects them before simulation, because the installed RocketPy 1.11 API
-reports that only one motor per rocket is supported and later `add_motor` calls overwrite earlier
-motors.
+motor definitions but rejects them before simulation, because the loaded `Rocket.add_motor` API
+behaves as a one-motor setter and later calls overwrite earlier motors.
 
 `astro sweep-launch-pitch` is the first launch targeting workflow. It varies one pitch-program knot,
 runs the local launch propagator for each candidate pitch angle, and writes a JSON product with
