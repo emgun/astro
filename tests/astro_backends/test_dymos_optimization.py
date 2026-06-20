@@ -578,9 +578,26 @@ def test_live_dymos_multistage_pitch_program_executes_native_multiphase() -> Non
     assert dymos_phase["phase_count"] == 2
     assert dymos_phase["phase_topology"] == "multiphase_stage_linked"
     assert dymos_phase["linked_state_names"] == ("time", "h", "downrange", "vr", "vh")
+    assert dymos_phase["mass_model"] == (
+        "stage_local_propellant_depletion_with_fixed_stage_initial_mass"
+    )
+    assert dymos_phase["mass_state_name"] == "mass"
+    assert dymos_phase["mass_state_linked"] is False
     assert len(dymos_phase["stage_phase_summaries"]) == 2
     assert dymos_phase["stage_phase_summaries"][0]["duration_s"] == 70.0
+    assert dymos_phase["stage_phase_summaries"][0]["initial_mass_kg"] == pytest.approx(
+        scenario.vehicle.initial_mass_kg
+    )
+    assert dymos_phase["stage_phase_summaries"][0]["final_mass_kg"] < (
+        dymos_phase["stage_phase_summaries"][0]["initial_mass_kg"]
+    )
+    assert dymos_phase["stage_phase_summaries"][0]["propellant_used_kg"] > 0.0
     assert dymos_phase["stage_phase_summaries"][1]["duration_s"] == 50.0
+    assert dymos_phase["stage_phase_summaries"][1]["initial_mass_kg"] == pytest.approx(
+        scenario.vehicle.payload_mass_kg
+        + scenario.vehicle.stages[1].dry_mass_kg
+        + scenario.vehicle.stages[1].propellant_mass_kg
+    )
     assert dymos_phase["target_objective"] == (
         "minimize_final_normalized_target_insertion_error"
     )

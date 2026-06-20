@@ -67,6 +67,9 @@ class DymosPitchProgramSummary:
     source_backend: str = "dymos_pitch_program"
     pitch_program_optimization_coupling: str = "native_dymos_pitch_control"
     pitch_program_optimization_scope: str = "native_dymos_pitch_program_transcription"
+    mass_model: str | None = None
+    mass_state_name: str | None = None
+    mass_state_linked: bool | None = None
 
     def to_metadata(self) -> dict[str, Any]:
         return asdict(self)
@@ -479,6 +482,11 @@ def _stage_acceleration_schedule(
                 "burnout_s": burnout_s,
                 "thrust_acceleration_m_s2": thrust_acceleration_m_s2,
                 "acceleration_m_s2": acceleration_m_s2,
+                "thrust_n": stage.engine.thrust_n,
+                "mass_flow_rate_kg_s": stage.engine.mass_flow_rate_kg_s,
+                "initial_mass_kg": mass_at_stage_start_kg,
+                "configured_propellant_mass_kg": stage.propellant_mass_kg,
+                "dry_mass_kg": stage.dry_mass_kg,
             }
         )
         mass_at_stage_start_kg -= stage.dry_mass_kg + stage.propellant_mass_kg
@@ -593,7 +601,8 @@ def _pitch_program_ascent_ode_class(
 def _stage_pitch_program_ascent_ode_class(
     runtime: DymosRuntime,
     *,
-    thrust_acceleration_m_s2: float,
+    thrust_n: float,
+    mass_flow_rate_kg_s: float,
     target_altitude_m: float,
     target_velocity_m_s: float,
 ) -> type[Any]:
@@ -610,11 +619,13 @@ def _stage_pitch_program_ascent_ode_class(
             self.add_input("h", val=np.zeros(num_nodes), units="m")
             self.add_input("vr", val=np.zeros(num_nodes), units="m/s")
             self.add_input("vh", val=np.zeros(num_nodes), units="m/s")
+            self.add_input("mass", val=np.ones(num_nodes), units="kg")
             self.add_input("pitch_deg", val=np.full(num_nodes, 90.0), units="deg")
             self.add_output("h_dot", val=np.zeros(num_nodes), units="m/s")
             self.add_output("downrange_dot", val=np.zeros(num_nodes), units="m/s")
             self.add_output("vr_dot", val=np.zeros(num_nodes), units="m/s**2")
             self.add_output("vh_dot", val=np.zeros(num_nodes), units="m/s**2")
+            self.add_output("mass_dot", val=np.zeros(num_nodes), units="kg/s")
             self.add_output("speed", val=np.zeros(num_nodes), units="m/s")
             self.add_output("target_score", val=np.zeros(num_nodes))
             self.declare_partials("*", "*", method="fd")
@@ -624,11 +635,14 @@ def _stage_pitch_program_ascent_ode_class(
             vertical_velocity_m_s = np.asarray(inputs["vr"])
             horizontal_velocity_m_s = np.asarray(inputs["vh"])
             altitude_m = np.asarray(inputs["h"])
+            mass_kg = np.maximum(np.asarray(inputs["mass"]), 1.0e-9)
+            thrust_acceleration_m_s2 = thrust_n / mass_kg
             speed_m_s = np.sqrt(vertical_velocity_m_s**2 + horizontal_velocity_m_s**2)
             outputs["h_dot"] = vertical_velocity_m_s
             outputs["downrange_dot"] = horizontal_velocity_m_s
             outputs["vr_dot"] = thrust_acceleration_m_s2 * np.sin(pitch_rad) - 9.80665
             outputs["vh_dot"] = thrust_acceleration_m_s2 * np.cos(pitch_rad)
+            outputs["mass_dot"] = -np.full_like(mass_kg, mass_flow_rate_kg_s)
             outputs["speed"] = speed_m_s
             altitude_scale_m = max(abs(target_altitude_m), 1.0)
             velocity_scale_m_s = max(abs(target_velocity_m_s), 1.0e-6)
@@ -1005,6 +1019,8 @@ def _solve_dymos_pitch_program_phase(
 
 
 def _state_units(state_name: str) -> str:
+    if state_name == "mass":
+        return "kg"
     if state_name in {"h", "downrange"}:
         return "m"
     return "m/s"
@@ -1046,6 +1062,8 @@ def _stage_state_guess(
     initial_downrange_m = initial_state["downrange"]
     initial_vr_m_s = initial_state["vr"]
     initial_vh_m_s = initial_state["vh"]
+    initial_mass_kg = float(stage["initial_mass_kg"])
+    mass_flow_rate_kg_s = float(stage["mass_flow_rate_kg_s"])
     final_vr_m_s = initial_vr_m_s + vertical_acceleration_m_s2 * duration_s
     final_vh_m_s = max(
         0.0,
@@ -1061,6 +1079,10 @@ def _stage_state_guess(
         "downrange": (initial_downrange_m, final_downrange_m),
         "vr": (initial_vr_m_s, final_vr_m_s),
         "vh": (initial_vh_m_s, final_vh_m_s),
+        "mass": (
+            initial_mass_kg,
+            max(1.0e-9, initial_mass_kg - mass_flow_rate_kg_s * duration_s),
+        ),
     }
 
 
@@ -1101,7 +1123,8 @@ def _solve_dymos_multistage_pitch_program_phases(
         phase = runtime.phase(
             ode_class=_stage_pitch_program_ascent_ode_class(
                 runtime,
-                thrust_acceleration_m_s2=float(stage["thrust_acceleration_m_s2"]),
+                thrust_n=float(stage["thrust_n"]),
+                mass_flow_rate_kg_s=float(stage["mass_flow_rate_kg_s"]),
                 target_altitude_m=target_altitude_m,
                 target_velocity_m_s=target_velocity_m_s,
             ),
@@ -1148,6 +1171,14 @@ def _solve_dymos_multistage_pitch_program_phases(
             rate_source="vh_dot",
             targets=["vh"],
             units="m/s",
+        )
+        phase.add_state(
+            "mass",
+            fix_initial=True,
+            lower=1.0e-9,
+            rate_source="mass_dot",
+            targets=["mass"],
+            units="kg",
         )
         phase.add_control(
             "pitch_deg",
@@ -1209,11 +1240,14 @@ def _solve_dymos_multistage_pitch_program_phases(
         downrange_m = np.ravel(problem.get_val(f"{prefix}.downrange", units="m"))
         radial_velocities_m_s = np.ravel(problem.get_val(f"{prefix}.vr", units="m/s"))
         horizontal_velocities_m_s = np.ravel(problem.get_val(f"{prefix}.vh", units="m/s"))
+        masses_kg = np.ravel(problem.get_val(f"{prefix}.mass", units="kg"))
         pitch_deg = np.ravel(problem.get_val(f"{prefix}.pitch_deg", units="deg"))
         phase_times.append(times_s)
         phase_pitches.append(pitch_deg)
         final_radial_velocity_km_s = float(radial_velocities_m_s[-1] / 1000.0)
         final_horizontal_velocity_km_s = float(horizontal_velocities_m_s[-1] / 1000.0)
+        initial_mass_kg = float(masses_kg[0])
+        final_mass_kg = float(masses_kg[-1])
         stage_phase_summaries.append(
             {
                 "name": str(stage["name"]),
@@ -1221,6 +1255,14 @@ def _solve_dymos_multistage_pitch_program_phases(
                 "start_s": float(stage["start_s"]),
                 "duration_s": float(stage["burnout_s"]) - float(stage["start_s"]),
                 "burnout_s": float(stage["burnout_s"]),
+                "initial_mass_kg": initial_mass_kg,
+                "final_mass_kg": final_mass_kg,
+                "propellant_used_kg": max(0.0, initial_mass_kg - final_mass_kg),
+                "mass_flow_rate_kg_s": float(stage["mass_flow_rate_kg_s"]),
+                "configured_propellant_mass_kg": float(
+                    stage["configured_propellant_mass_kg"]
+                ),
+                "mass_state_linked": False,
                 "final_altitude_km": float(altitudes_m[-1] / 1000.0),
                 "final_velocity_km_s": sqrt(
                     final_radial_velocity_km_s**2 + final_horizontal_velocity_km_s**2
@@ -1283,6 +1325,9 @@ def _solve_dymos_multistage_pitch_program_phases(
         source_backend="dymos_multistage_pitch_program",
         pitch_program_optimization_coupling="native_dymos_multiphase_pitch_control",
         pitch_program_optimization_scope="native_dymos_multiphase_stage_transcription",
+        mass_model="stage_local_propellant_depletion_with_fixed_stage_initial_mass",
+        mass_state_name="mass",
+        mass_state_linked=False,
     )
 
 

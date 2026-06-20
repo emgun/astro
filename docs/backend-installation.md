@@ -80,8 +80,10 @@ radial-velocity target-insertion residual/tolerance assessment, target-score met
 normalized final insertion objective, and a coverage flag showing that the phase duration spans the
 configured burn schedule. The multiphase mode additionally records one Dymos phase per suite stage,
 linked time/altitude/downrange/radial-velocity/horizontal-velocity state continuity, stage
-durations, and per-stage final metrics. Full high-fidelity multistage Dymos optimization still
-requires additional validation before it should be promoted beyond the adapter gate.
+durations, stage-local propellant mass depletion, and per-stage final metrics. Mass is fixed at
+each stage initial condition and not linked across phases because the suite staging boundary drops
+dry and residual mass. Full high-fidelity multistage Dymos optimization still requires additional
+validation before it should be promoted beyond the adapter gate.
 
 ## Research Backends
 
