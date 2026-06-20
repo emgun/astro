@@ -546,7 +546,15 @@ Tradeoff:
 ### Goal 6: Release Packaging, Documentation, and Validation Matrix
 
 Status: implemented for the current roadmap pass. README, backend installation guide, validation
-matrix, release checklist, LEO/MEO/GEO examples, and optional smoke-gate semantics are documented.
+matrix, release checklist, live backend campaign ledger, LEO/MEO/GEO examples, optional smoke-gate
+semantics, and release packaging tooling are documented and locally verified.
+
+Current local release gate, run on 2026-06-19, passed `python -m pytest -q` with 495 passed and 7
+skipped, `python -m ruff check .`, `python -m mypy`, and `python -m build`. Optional smoke evidence
+is recorded in `docs/validation/live-backend-campaigns.md`: RocketPy, Dymos/OpenMDAO, and JAX/JAXLIB
+are runtime-available for attempting live campaigns on this machine; Orekit remains blocked on a
+Java runtime; TudatPy is not installed. These smoke results do not promote optional live validation
+claims by themselves.
 
 Definition of done:
 
@@ -556,6 +564,10 @@ Definition of done:
 - Validation matrix lists local, Orekit, launch, OD, and research tolerances.
 - Example scenarios cover LEO, MEO, GEO, OD, local launch, and backend-specific smoke workflows.
 - A release checklist confirms tests, lint, type checking, CLI smoke commands, and optional live checks.
+- The live backend campaign ledger records optional backend smoke outcomes and claim boundaries
+  before any live gate is promoted.
+- The development extra includes the `build` frontend so `python -m build` is a reproducible release
+  packaging gate.
 
 Primary files:
 

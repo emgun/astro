@@ -452,10 +452,19 @@ Expected: no whitespace errors.
 
 ## Final Release Gate
 
-- [ ] Run `python -m pytest -q`.
-- [ ] Run `python -m ruff check .`.
-- [ ] Run `python -m mypy`.
-- [ ] Run `python -m build` if build tooling is installed.
-- [ ] Update this plan's checkboxes to reflect completed tasks.
-- [ ] Update the roadmap status in `docs/superpowers/plans/2026-06-15-roadmap-goals-implementation-plan.md`.
-- [ ] Commit final docs/status changes.
+- [x] Run `python -m pytest -q`.
+- [x] Run `python -m ruff check .`.
+- [x] Run `python -m mypy`.
+- [x] Run `python -m build` if build tooling is installed.
+- [x] Update this plan's checkboxes to reflect completed tasks.
+- [x] Update the roadmap status in `docs/superpowers/plans/2026-06-15-roadmap-goals-implementation-plan.md`.
+- [x] Commit final docs/status changes.
+
+Final local gate evidence from 2026-06-19:
+
+```text
+python -m pytest -q  # 495 passed, 7 skipped
+python -m ruff check .  # passed
+python -m mypy  # passed
+python -m build  # built sdist and wheel successfully
+```
