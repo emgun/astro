@@ -397,16 +397,18 @@ Implemented slice:
   downrange, radial velocity, and horizontal velocity continuity, and the same normalized final
   target-insertion objective on the final stage phase. Each phase also carries a stage-local mass
   state with engine mass-flow depletion; mass is fixed at stage entry and not linked across phases
-  because staging drops dry and residual mass. The phase ODE applies exponential-atmosphere
-  quadratic drag from the suite atmosphere, reference-area, and Cd fields.
+  because staging drops dry and residual mass. The product records transition events with
+  pre-separation mass, post-separation mass, dropped dry mass, and dropped residual propellant. The
+  phase ODE applies exponential-atmosphere quadratic drag from the suite atmosphere, reference-area,
+  and Cd fields.
 - Dymos adapter results preserve suite tuning products and add optimizer status, convergence flag,
   iteration count, candidate count, path-constraint summary, best score, target insertion
   residuals for altitude, velocity, and radial velocity, target-insertion tolerance assessment,
   normalized target-score metadata, Dymos version, OpenMDAO version, phase
   duration, final altitude, final velocity, original and optimized pitch-program control-point
   schedules, tuned pitch point indices, explicit pitch-program optimization scope metadata, native
-  stage-phase topology, mass-usage metadata, and drag diagnostics when selected, and optimizer
-  message.
+  stage-phase topology, mass-usage and stage-transition mass-event metadata, drag diagnostics when
+  selected, and optimizer message.
 - Dymos adapter results include a pitch-program transcription contract that records the pitch
   control name, bounds, optimized control points, tuned control indices, per-stage phase/control
   coverage, execution status, transcription name, and linked phase topology when selected so
@@ -426,8 +428,8 @@ Definition of done:
   a bounded vertical-ascent Dymos phase model, and `--dymos-mode pitch-program` executes an opt-in
   native Dymos pitch-control transcription with a normalized final target-insertion objective.
   `--dymos-mode multistage-pitch-program` executes an opt-in native linked stage-phase
-  transcription with stage-local mass depletion and exponential-atmosphere drag for the same
-  simplified pitch-control model.
+  transcription with stage-local mass depletion, explicit stage-transition mass events, and
+  exponential-atmosphere drag for the same simplified pitch-control model.
 - Dymos/OpenMDAO adapter reports path constraints, pitch-program control points, tuned pitch point
   indices, optimized pitch-program control points, optimizer status, convergence diagnostics, and
   altitude, velocity, and radial-velocity target insertion residuals.

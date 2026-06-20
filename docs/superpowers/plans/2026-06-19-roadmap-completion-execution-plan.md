@@ -489,10 +489,10 @@ astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dym
 # minimize_final_normalized_target_insertion_error and target_score = 1.1572999135341908
 
 ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription tests/astro_backends/test_dymos_optimization.py::test_live_dymos_multistage_pitch_program_executes_native_multiphase -q
-# 2026-06-20: 3 passed, 3 OpenMDAO warnings in 2.54s; verifies default, single-phase
+# 2026-06-20: 3 passed, 3 OpenMDAO warnings in 2.40s; verifies default, single-phase
 # pitch-program, and linked multiphase stage-transcription Dymos products. The multiphase
-# live test was extended with stage-local mass depletion and exponential-atmosphere drag metadata,
-# then rechecked at 1 passed, 1 OpenMDAO warning in 1.56s.
+# live test was extended with stage-local mass depletion, exponential-atmosphere drag metadata, and
+# stage-transition mass-event metadata, then rechecked at 1 passed, 1 OpenMDAO warning in 2.67s.
 
 astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --dymos-mode multistage-pitch-program --output /tmp/astro-dymos-multistage-pitch-program-launch.json
 # 2026-06-20: wrote a suite launch optimization product with source_backend =
@@ -500,7 +500,9 @@ astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dym
 # linked_state_names = time/h/downrange/vr/vh, mass_model =
 # stage_local_propellant_depletion_with_fixed_stage_initial_mass, aerodynamic_model =
 # exponential_atmosphere_quadratic_drag, stage max dynamic pressures of 31572.787937120804 Pa
-# and 31304.21549259787 Pa, and target_score = 1.4414425719908899
+# and 31304.21549259787 Pa, a stage-1 -> stage-2 transition mass drop of
+# 1621.1351480882872 kg including 1200.0 kg dry mass and 421.1351480882872 kg
+# residual propellant, and target_score = 1.4414425719908899
 
 JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" astro orekit-smoke
 # available true, orekit_jpype 13.1.5.0

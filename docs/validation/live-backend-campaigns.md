@@ -167,14 +167,16 @@ Smoke output:
 
 Roadmap claim allowed: Dymos/OpenMDAO default phase, native pitch-program transcription, and native
 linked multiphase stage transcription with stage-local mass depletion plus exponential-atmosphere
-quadratic drag live tests pass on this machine. The native pitch-program paths minimize a normalized
-final target-insertion error and record target-score metadata in the suite product.
+quadratic drag live tests pass on this machine. The multiphase product also records explicit
+stage-transition mass events for dropped dry and residual mass. The native pitch-program paths
+minimize a normalized final target-insertion error and record target-score metadata in the suite
+product.
 
 Live validation result:
 
 ```text
 ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription tests/astro_backends/test_dymos_optimization.py::test_live_dymos_multistage_pitch_program_executes_native_multiphase -q
-3 passed, 3 OpenMDAO warnings in 2.54s
+3 passed, 3 OpenMDAO warnings in 2.40s
 ```
 
 CLI target-seeking product check:
@@ -202,6 +204,7 @@ mass_state_linked: false
 aerodynamic_model: exponential_atmosphere_quadratic_drag
 stage_1_mass_kg: 7450.0 -> 3371.135148088287
 stage_2_mass_kg: 1750.0 -> 1183.4909927900399
+stage_transition_mass_event: stage-1 -> stage-2, dropped_mass_kg=1621.1351480882872, dropped_dry_mass_kg=1200.0, dropped_residual_propellant_kg=421.1351480882872
 stage_1_max_dynamic_pressure_pa: 31572.787937120804
 stage_2_max_dynamic_pressure_pa: 31304.21549259787
 target_score: 1.4414425719908899

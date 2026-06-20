@@ -64,6 +64,7 @@ class DymosPitchProgramSummary:
     phase_topology: str = "single_phase_stage_scheduled"
     linked_state_names: tuple[str, ...] = ()
     stage_phase_summaries: tuple[dict[str, Any], ...] = ()
+    stage_transition_mass_events: tuple[dict[str, Any], ...] = ()
     source_backend: str = "dymos_pitch_program"
     pitch_program_optimization_coupling: str = "native_dymos_pitch_control"
     pitch_program_optimization_scope: str = "native_dymos_pitch_program_transcription"
@@ -1138,6 +1139,41 @@ def _stage_state_guess(
     }
 
 
+def _stage_transition_mass_events(
+    stage_schedule: list[dict[str, float | str]],
+    stage_phase_summaries: list[dict[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    events: list[dict[str, Any]] = []
+    for index in range(len(stage_phase_summaries) - 1):
+        from_summary = stage_phase_summaries[index]
+        to_summary = stage_phase_summaries[index + 1]
+        from_stage = stage_schedule[index]
+        pre_separation_mass_kg = float(from_summary["final_mass_kg"])
+        post_separation_mass_kg = float(to_summary["initial_mass_kg"])
+        dropped_mass_kg = pre_separation_mass_kg - post_separation_mass_kg
+        dropped_dry_mass_kg = float(from_stage["dry_mass_kg"])
+        events.append(
+            {
+                "from_stage": str(from_summary["name"]),
+                "to_stage": str(to_summary["name"]),
+                "from_phase_name": str(from_summary["phase_name"]),
+                "to_phase_name": str(to_summary["phase_name"]),
+                "transition_time_s": float(from_summary["burnout_s"]),
+                "pre_separation_mass_kg": pre_separation_mass_kg,
+                "post_separation_mass_kg": post_separation_mass_kg,
+                "dropped_mass_kg": dropped_mass_kg,
+                "dropped_dry_mass_kg": dropped_dry_mass_kg,
+                "dropped_residual_propellant_kg": max(
+                    0.0,
+                    dropped_mass_kg - dropped_dry_mass_kg,
+                ),
+                "mass_linked_across_transition": False,
+                "mass_discontinuity_mode": "stage_separation_drop",
+            }
+        )
+    return tuple(events)
+
+
 def _solve_dymos_multistage_pitch_program_phases(
     scenario: LaunchScenario,
     runtime: DymosRuntime,
@@ -1391,6 +1427,10 @@ def _solve_dymos_multistage_pitch_program_phases(
         phase_topology="multiphase_stage_linked",
         linked_state_names=linked_state_names,
         stage_phase_summaries=tuple(stage_phase_summaries),
+        stage_transition_mass_events=_stage_transition_mass_events(
+            stage_schedule,
+            stage_phase_summaries,
+        ),
         source_backend="dymos_multistage_pitch_program",
         pitch_program_optimization_coupling="native_dymos_multiphase_pitch_control",
         pitch_program_optimization_scope="native_dymos_multiphase_stage_transcription",

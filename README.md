@@ -95,9 +95,10 @@ multistage-pitch-program` splits that simplified pitch-control model into one li
 vehicle stage, links time, altitude, downrange, radial velocity, and horizontal velocity across
 stage boundaries, models stage-local propellant mass depletion, applies exponential-atmosphere
 quadratic drag from suite area/Cd fields, and records native stage-phase topology plus mass/aero
-metadata. Mass is not linked across stage phases because staging drops dry and residual mass. Full
-high-fidelity multistage Dymos ascent design optimization beyond this bounded linked-phase target
-objective remains future work.
+metadata. It also records stage-transition mass events that expose pre-separation mass,
+post-separation mass, dropped dry mass, and dropped residual propellant. Mass is not linked across
+stage phases because staging drops dry and residual mass. Full high-fidelity multistage Dymos
+ascent design optimization beyond this bounded linked-phase target objective remains future work.
 
 Optional research backend smoke checks:
 
@@ -368,7 +369,7 @@ resulting control values back into the same suite product with `execution_status
 target-score metadata for the normalized final insertion objective. `--dymos-mode
 multistage-pitch-program` runs a native linked multiphase variant with one Dymos phase per suite
 stage and records phase topology, linked states, stage durations, stage-local mass depletion,
-exponential-atmosphere drag diagnostics, and per-stage final metrics.
+stage-transition mass events, exponential-atmosphere drag diagnostics, and per-stage final metrics.
 All Dymos paths report target-insertion residuals against scenario tolerances, per-component
 within-tolerance status, and the weighted altitude/velocity/radial-velocity objective. The current
 suite still does not claim a full high-fidelity multistage ascent design optimizer.

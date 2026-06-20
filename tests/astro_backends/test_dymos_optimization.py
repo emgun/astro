@@ -412,6 +412,8 @@ def test_optimize_launch_dymos_runs_native_multistage_pitch_program_transcriptio
                     "name": "stage-1",
                     "phase_name": "stage_1",
                     "duration_s": 70.0,
+                    "initial_mass_kg": 7450.0,
+                    "final_mass_kg": 3371.135148088287,
                     "final_altitude_km": 28.0,
                     "final_velocity_km_s": 1.8,
                 },
@@ -419,8 +421,26 @@ def test_optimize_launch_dymos_runs_native_multistage_pitch_program_transcriptio
                     "name": "stage-2",
                     "phase_name": "stage_2",
                     "duration_s": 50.0,
+                    "initial_mass_kg": 1750.0,
+                    "final_mass_kg": 1183.4909927900399,
                     "final_altitude_km": 156.0,
                     "final_velocity_km_s": 7.66,
+                },
+            ),
+            stage_transition_mass_events=(
+                {
+                    "from_stage": "stage-1",
+                    "to_stage": "stage-2",
+                    "from_phase_name": "stage_1",
+                    "to_phase_name": "stage_2",
+                    "transition_time_s": 70.0,
+                    "pre_separation_mass_kg": 3371.135148088287,
+                    "post_separation_mass_kg": 1750.0,
+                    "dropped_mass_kg": 1621.135148088287,
+                    "dropped_dry_mass_kg": 1200.0,
+                    "dropped_residual_propellant_kg": 421.1351480882868,
+                    "mass_linked_across_transition": False,
+                    "mass_discontinuity_mode": "stage_separation_drop",
                 },
             ),
             source_backend="dymos_multistage_pitch_program",
@@ -451,6 +471,21 @@ def test_optimize_launch_dymos_runs_native_multistage_pitch_program_transcriptio
     assert dymos_phase["stage_phase_summaries"][0]["duration_s"] == 70.0
     assert dymos_phase["stage_phase_summaries"][1]["phase_name"] == "stage_2"
     assert dymos_phase["stage_phase_summaries"][1]["duration_s"] == 50.0
+    transition_events = dymos_phase["stage_transition_mass_events"]
+    assert len(transition_events) == 1
+    assert transition_events[0]["from_stage"] == "stage-1"
+    assert transition_events[0]["to_stage"] == "stage-2"
+    assert transition_events[0]["pre_separation_mass_kg"] == pytest.approx(
+        3371.135148088287
+    )
+    assert transition_events[0]["post_separation_mass_kg"] == pytest.approx(1750.0)
+    assert transition_events[0]["dropped_mass_kg"] == pytest.approx(1621.135148088287)
+    assert transition_events[0]["dropped_dry_mass_kg"] == pytest.approx(1200.0)
+    assert transition_events[0]["dropped_residual_propellant_kg"] == pytest.approx(
+        421.1351480882868
+    )
+    assert transition_events[0]["mass_linked_across_transition"] is False
+    assert transition_events[0]["mass_discontinuity_mode"] == "stage_separation_drop"
     assert dymos_phase["pitch_program_optimization_coupling"] == (
         "native_dymos_multiphase_pitch_control"
     )
@@ -602,6 +637,29 @@ def test_live_dymos_multistage_pitch_program_executes_native_multiphase() -> Non
         + scenario.vehicle.stages[1].dry_mass_kg
         + scenario.vehicle.stages[1].propellant_mass_kg
     )
+    transition_events = dymos_phase["stage_transition_mass_events"]
+    assert len(transition_events) == 1
+    assert transition_events[0]["from_stage"] == "stage-1"
+    assert transition_events[0]["to_stage"] == "stage-2"
+    assert transition_events[0]["transition_time_s"] == pytest.approx(70.0)
+    assert transition_events[0]["pre_separation_mass_kg"] == pytest.approx(
+        dymos_phase["stage_phase_summaries"][0]["final_mass_kg"]
+    )
+    assert transition_events[0]["post_separation_mass_kg"] == pytest.approx(
+        dymos_phase["stage_phase_summaries"][1]["initial_mass_kg"]
+    )
+    assert transition_events[0]["dropped_mass_kg"] == pytest.approx(
+        transition_events[0]["pre_separation_mass_kg"]
+        - transition_events[0]["post_separation_mass_kg"]
+    )
+    assert transition_events[0]["dropped_dry_mass_kg"] == pytest.approx(
+        scenario.vehicle.stages[0].dry_mass_kg
+    )
+    assert transition_events[0]["dropped_residual_propellant_kg"] == pytest.approx(
+        transition_events[0]["dropped_mass_kg"] - scenario.vehicle.stages[0].dry_mass_kg
+    )
+    assert transition_events[0]["mass_linked_across_transition"] is False
+    assert transition_events[0]["mass_discontinuity_mode"] == "stage_separation_drop"
     assert dymos_phase["stage_phase_summaries"][1]["max_dynamic_pressure_pa"] >= 0.0
     assert dymos_phase["stage_phase_summaries"][1]["max_drag_acceleration_m_s2"] >= 0.0
     assert dymos_phase["target_objective"] == (
