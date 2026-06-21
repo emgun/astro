@@ -3,7 +3,6 @@ from pathlib import Path
 
 from astro_assistant.models import ArtifactKind, WorkflowArtifact
 
-
 _JSON_KINDS = {
     ArtifactKind.MEASUREMENTS_JSON,
     ArtifactKind.ESTIMATE_JSON,
