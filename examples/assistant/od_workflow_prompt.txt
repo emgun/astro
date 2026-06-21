@@ -1,0 +1,1 @@
+Run the local orbit-determination demo, export the generated measurements as TDM, estimate the initial state, and write a trace.
