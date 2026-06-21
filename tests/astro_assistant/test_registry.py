@@ -2,9 +2,8 @@ from typing import Any
 
 import pytest
 
-from astro_assistant.models import AstroToolName, WorkflowStep
+from astro_assistant.models import AstroToolName, RiskLevel, WorkflowStep
 from astro_assistant.registry import build_command_spec
-
 
 SCENARIO_PATH = "examples/scenarios/leo_two_station_od.yaml"
 MEASUREMENTS_PATH = "/tmp/astro-assistant/measurements.json"
@@ -18,7 +17,7 @@ def test_validate_scenario_command_spec() -> None:
         tool=AstroToolName.VALIDATE_SCENARIO,
         description="Validate scenario.",
         inputs={"scenario_path": SCENARIO_PATH},
-        risk="read_only",
+        risk=RiskLevel.READ_ONLY,
     )
 
     command = build_command_spec(step, cwd="/workspace")
@@ -42,7 +41,7 @@ def test_synth_measurements_command_spec_records_output_write() -> None:
             "backend": "local",
             "output": MEASUREMENTS_PATH,
         },
-        risk="writes_artifacts",
+        risk=RiskLevel.WRITES_ARTIFACTS,
     )
 
     command = build_command_spec(step, cwd="/workspace")
@@ -70,7 +69,7 @@ def test_export_measurements_command_spec_records_output_write() -> None:
             "format": "tdm",
             "output": TDM_PATH,
         },
-        risk="writes_artifacts",
+        risk=RiskLevel.WRITES_ARTIFACTS,
     )
 
     command = build_command_spec(step, cwd="/workspace")
@@ -99,7 +98,7 @@ def test_estimate_measurements_command_spec_records_output_write() -> None:
             "backend": "local",
             "output": ESTIMATE_PATH,
         },
-        risk="writes_artifacts",
+        risk=RiskLevel.WRITES_ARTIFACTS,
     )
 
     command = build_command_spec(step, cwd="/workspace")
@@ -154,7 +153,7 @@ def test_build_command_spec_rejects_missing_required_inputs(
         tool=tool,
         description="Missing input.",
         inputs=inputs,
-        risk="writes_artifacts",
+        risk=RiskLevel.WRITES_ARTIFACTS,
     )
 
     with pytest.raises(ValueError, match=f"missing_input requires string input {missing_key!r}"):
@@ -170,7 +169,7 @@ def test_build_command_spec_rejects_empty_or_non_string_required_input(
         tool=AstroToolName.VALIDATE_SCENARIO,
         description="Bad required input.",
         inputs={"scenario_path": bad_value},
-        risk="read_only",
+        risk=RiskLevel.READ_ONLY,
     )
 
     with pytest.raises(
@@ -212,7 +211,7 @@ def test_build_command_spec_rejects_empty_optional_inputs(
         tool=tool,
         description="Bad optional input.",
         inputs=inputs,
-        risk="writes_artifacts",
+        risk=RiskLevel.WRITES_ARTIFACTS,
     )
 
     with pytest.raises(ValueError, match=f"bad_optional requires string input {optional_key!r}"):
