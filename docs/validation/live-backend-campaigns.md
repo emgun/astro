@@ -1,15 +1,36 @@
 # Live Backend Campaign Ledger
 
-Last local smoke run: 2026-06-19 17:29:40 PDT on branch `codex/orbit-fd-od-mvp`
-at commit `9c7affb`.
+Last local smoke run: 2026-06-20 17:50 PDT on branch `codex/roadmap-finish-state`
+at commit `870cb13`.
 
 Last available live campaign run: 2026-06-20 11:52 PDT on branch `codex/orbit-fd-od-mvp`
-in the working tree recorded by this ledger update.
+in the working tree recorded by this ledger update. The optional smoke refresh above confirms the
+same optional runtimes import on the current main-equivalent checkout, but it does not rerun every
+live campaign gate.
 
 This ledger records optional backend campaign evidence. A passing smoke command means the local
 runtime can be imported and the minimal API gate passed. It does not by itself complete live
 propagation, OD, launch, optimization, covariance, or research validation. Unavailable smoke JSON is
 recorded as not-run live evidence, not as a failed required local release gate.
+
+Current optional smoke refresh:
+
+```text
+JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" astro orekit-smoke
+# available true, orekit_jpype 13.1.5.0
+
+astro rocketpy-smoke
+# available true, RocketPy 1.11.0
+
+astro dymos-smoke
+# available true, Dymos 1.13.1, OpenMDAO 3.41.0
+
+conda run -p /tmp/astro-tudat-live-env astro tudat-smoke
+# available true, TudatPy 1.0.0
+
+astro jax-smoke
+# available true, JAX 0.7.1, jaxlib 0.7.1
+```
 
 ## Campaign Summary
 

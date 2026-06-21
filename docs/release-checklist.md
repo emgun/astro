@@ -7,10 +7,14 @@ Use this checklist before tagging or publishing a release candidate.
 Latest merged-main evidence:
 
 - 2026-06-20: `main` fast-forwarded to `0fb9a87`.
+- 2026-06-20: Release evidence recorded on `main` at `870cb13`.
 - 2026-06-20: `python -m pytest -q` passed with 505 passed, 11 skipped.
 - 2026-06-20: `python -m ruff check .`, `python -m mypy`, `git diff --check`, and
   `python -m build` passed.
 - 2026-06-20: Required local CLI checklist passed 42 command gates on merged `main`.
+- 2026-06-20 17:50 PDT: Optional backend smoke refresh passed on current checkout for Orekit,
+  RocketPy, Dymos/OpenMDAO, TudatPy, and JAX. These smoke checks do not replace optional live
+  propagation, launch, optimization, covariance, or OD campaign gates.
 
 ## Required Local Gates
 
@@ -68,9 +72,9 @@ Run when the matching runtime is expected to be present:
 If a backend runtime is intentionally absent, capture the smoke command's structured unavailable
 JSON and treat the gate as not-run rather than failed or complete.
 
-- [ ] Record the optional backend campaign outcome in `docs/validation/live-backend-campaigns.md`
+- [x] Record the optional backend campaign outcome in `docs/validation/live-backend-campaigns.md`
   before promoting any optional live gate.
-- [ ] `astro orekit-smoke`
+- [x] `astro orekit-smoke`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_two_body_matches_local_reference -v`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_j2_matches_local_reference_scale -v`
 - [ ] `astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend orekit --output /tmp/astro-orekit-high-fidelity.json`
@@ -84,16 +88,16 @@ JSON and treat the gate as not-run rather than failed or complete.
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_estimation.py::test_live_orekit_native_od_executes_batch_estimator -q`
 - [ ] `astro estimate-measurements <geodetic-range-rate-scenario.yaml> <measurements.json> --estimator orekit-native --output /tmp/astro-orekit-native-estimate.json`
-- [ ] `astro rocketpy-smoke`
+- [x] `astro rocketpy-smoke`
 - [ ] `astro launch examples/launch/rocketpy_configured_single_stage.yaml --backend rocketpy --output /tmp/astro-rocketpy-launch.json`
 - [ ] `python -m pytest tests/astro_backends/test_rocketpy_simulation.py::test_propagate_launch_rocketpy_rejects_additional_motors_until_backend_supports_them -q`
 - [ ] `ASTRO_RUN_ROCKETPY_LIVE=1 python -m pytest tests/astro_backends/test_rocketpy_simulation.py::test_live_rocketpy_configured_launch_examples_return_suite_products -q`
-- [ ] `astro dymos-smoke`
+- [x] `astro dymos-smoke`
 - [ ] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --output /tmp/astro-dymos-optimized-launch.json`
 - [ ] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --dymos-mode pitch-program --output /tmp/astro-dymos-pitch-program-launch.json`
 - [ ] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --dymos-mode multistage-pitch-program --output /tmp/astro-dymos-multistage-pitch-program-launch.json`
 - [ ] `ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription tests/astro_backends/test_dymos_optimization.py::test_live_dymos_multistage_pitch_program_executes_native_multiphase -q`
-- [ ] `astro tudat-smoke`
+- [x] `astro tudat-smoke`
 - [ ] `astro propagate examples/scenarios/leo_two_body.yaml --backend tudat --output /tmp/astro-tudat-two-body.json`
 - [ ] `astro propagate examples/scenarios/leo_j2.yaml --backend tudat --output /tmp/astro-tudat-j2.json`
 - [ ] `astro propagate examples/scenarios/leo_orekit_drag.yaml --backend tudat --output /tmp/astro-tudat-drag.json`
@@ -108,7 +112,7 @@ JSON and treat the gate as not-run rather than failed or complete.
 - [ ] `python -m pytest tests/astro_backends/test_tudat_propagation.py::test_propagate_tudat_uses_native_variational_runner_when_requested -q`
 - [ ] `astro compare-tudat-reference examples/scenarios/leo_two_body.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output /tmp/astro-tudat-reference-comparison.json`
 - [ ] `astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output /tmp/astro-tudat-reference-campaign-calibrated.json`
-- [ ] `astro jax-smoke`
+- [x] `astro jax-smoke`
 - [ ] `astro research-estimate examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --backend jax --max-iterations 5 --output /tmp/astro-jax-research-estimate.json`
 - [ ] `astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output /tmp/astro-angle-measurements.json`
 - [ ] `astro research-od-sensitivity examples/scenarios/leo_two_station_angles.yaml /tmp/astro-angle-measurements.json --backend jax --output /tmp/astro-jax-angle-sensitivity.json`

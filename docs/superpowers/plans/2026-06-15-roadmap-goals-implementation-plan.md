@@ -588,9 +588,12 @@ Status: implemented for the current roadmap pass. README, backend installation g
 matrix, release checklist, live backend campaign ledger, LEO/MEO/GEO examples, optional smoke-gate
 semantics, and release packaging tooling are documented and locally verified.
 
-Current local release gate, run on 2026-06-19, passed `python -m pytest -q` with 498 passed and 10
-skipped, `python -m ruff check .`, `python -m mypy`, and `python -m build`. Optional backend
-evidence is recorded in `docs/validation/live-backend-campaigns.md`: Orekit propagation,
+Current local release gate, run on 2026-06-20 from the Code checkout, passed
+`python -m pytest -q` with 505 passed and 11 skipped, `python -m ruff check .`,
+`python -m mypy`, `git diff --check`, `python -m build`, and the required local CLI release
+checklist. The current optional smoke refresh passed for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy,
+and JAX. Optional live backend evidence is recorded in `docs/validation/live-backend-campaigns.md`:
+Orekit propagation,
 generic and high-fidelity covariance, and native OD passed with the explicit Homebrew OpenJDK/data
 environment; RocketPy configured launch examples passed and the additional-motor guard was added;
 Dymos default phase, target-seeking pitch-program transcription, and linked multiphase
