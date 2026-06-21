@@ -1,3 +1,5 @@
+import re
+
 from astro_assistant.models import (
     ArtifactKind,
     AstroToolName,
@@ -7,13 +9,23 @@ from astro_assistant.models import (
     WorkflowStep,
 )
 
+UNSUPPORTED_PROMPT_MESSAGE = "deterministic planner currently supports the local OD demo only"
+
 
 class DeterministicPlanner:
     def plan(self, prompt: str) -> AstroWorkflowPlan:
         normalized = prompt.lower()
-        if "od" not in normalized and "orbit determination" not in normalized:
-            raise ValueError("deterministic planner currently supports the local OD demo only")
+        if not _matches_local_od_intent(normalized):
+            raise ValueError(UNSUPPORTED_PROMPT_MESSAGE)
         return local_od_demo_plan(prompt)
+
+
+def _matches_local_od_intent(normalized_prompt: str) -> bool:
+    return (
+        re.search(r"\bod\b", normalized_prompt) is not None
+        or "orbit determination" in normalized_prompt
+        or "orbit-determination" in normalized_prompt
+    )
 
 
 def local_od_demo_plan(user_intent: str) -> AstroWorkflowPlan:
