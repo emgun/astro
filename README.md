@@ -544,5 +544,6 @@ python -m mypy
 Additional release and backend documentation:
 
 - [Validation matrix](docs/validation-matrix.md)
+- [Assistant workflows](docs/assistant-workflows.md)
 - [Backend installation guide](docs/backend-installation.md)
 - [Release checklist](docs/release-checklist.md)
