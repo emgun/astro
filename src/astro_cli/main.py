@@ -7,6 +7,8 @@ from typing import Annotated
 import typer
 import yaml
 
+from astro_assistant.executor import WorkflowExecutor
+from astro_assistant.planner import DeterministicPlanner
 from astro_backends.dymos import (
     optimize_launch_dymos,
     run_dymos_multistage_pitch_program_optimization,
@@ -288,6 +290,50 @@ def _with_measurement_file_metadata(
         "measurement_format": measurement_format,
         "measurement_count": measurement_count,
     }
+
+
+@app.command("ask")
+def ask_assistant(
+    prompt: Annotated[str, typer.Argument(help="Natural language assistant request.")],
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Compile and print the workflow without executing it."),
+    ] = False,
+    execute: Annotated[
+        bool,
+        typer.Option("--execute", help="Evaluate the workflow for execution."),
+    ] = False,
+    approved: Annotated[
+        bool,
+        typer.Option("--approved", help="Approve execution of artifact-writing workflows."),
+    ] = False,
+    trace_output: Annotated[
+        Path | None,
+        typer.Option("--trace-output", help="Write the assistant trace JSON to a file."),
+    ] = None,
+) -> None:
+    planner = DeterministicPlanner()
+    try:
+        plan = planner.plan(prompt)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    effective_dry_run = dry_run or not execute
+    trace = WorkflowExecutor().run(
+        plan,
+        dry_run=effective_dry_run,
+        approved=approved,
+        cwd=str(Path.cwd()),
+    )
+    payload = trace.model_dump_json(indent=2)
+    if trace_output is not None:
+        _write_text_or_exit(trace_output, payload, "assistant trace")
+    typer.echo(payload)
+    if trace.warnings:
+        for warning in trace.warnings:
+            typer.echo(warning, err=True)
+        raise typer.Exit(code=2)
 
 
 @app.command()
