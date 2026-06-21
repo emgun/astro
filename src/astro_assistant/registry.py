@@ -97,4 +97,8 @@ _BUILDERS: dict[AstroToolName, Callable[[WorkflowStep, str | None], CommandSpec]
 
 
 def build_command_spec(step: WorkflowStep, cwd: str | None = None) -> CommandSpec:
-    return _BUILDERS[step.tool](step, cwd)
+    try:
+        builder = _BUILDERS[step.tool]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported Astro tool {step.tool!r}") from exc
+    return builder(step, cwd)
