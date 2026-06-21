@@ -1,7 +1,13 @@
 import subprocess
 from collections.abc import Callable, Sequence
+from pathlib import Path
 
-from astro_assistant.models import AstroWorkflowPlan, StepExecutionResult, WorkflowTrace
+from astro_assistant.models import (
+    AstroWorkflowPlan,
+    StepExecutionResult,
+    WorkflowArtifact,
+    WorkflowTrace,
+)
 from astro_assistant.policy import evaluate_plan
 from astro_assistant.registry import build_command_spec
 from astro_assistant.validators import validate_artifact
@@ -18,6 +24,15 @@ def subprocess_runner(argv: Sequence[str], cwd: str | None) -> tuple[int, str, s
         check=False,
     )
     return completed.returncode, completed.stdout, completed.stderr
+
+
+def _artifact_for_validation(
+    artifact: WorkflowArtifact, cwd: str | None
+) -> WorkflowArtifact:
+    artifact_path = Path(artifact.path)
+    if cwd is None or artifact_path.is_absolute():
+        return artifact
+    return artifact.model_copy(update={"path": str(Path(cwd) / artifact_path)})
 
 
 class WorkflowExecutor:
@@ -48,7 +63,8 @@ class WorkflowExecutor:
                 command_spec.argv, command_spec.cwd
             )
             validation_passed = returncode == 0 and all(
-                validate_artifact(artifact) for artifact in step.outputs
+                validate_artifact(_artifact_for_validation(artifact, command_spec.cwd))
+                for artifact in step.outputs
             )
             trace.results.append(
                 StepExecutionResult(
