@@ -25,6 +25,19 @@ def test_assistant_ask_requires_approval_for_execution() -> None:
     )
 
 
+def test_assistant_ask_execute_wins_over_dry_run_flag() -> None:
+    result = runner.invoke(
+        app,
+        ["ask", "Run the local OD demo", "--dry-run", "--execute"],
+    )
+
+    assert result.exit_code == 2
+    assert (
+        "execution requires approval" in result.stdout
+        or "execution requires approval" in result.stderr
+    )
+
+
 def test_assistant_ask_writes_trace_file(tmp_path: Path) -> None:
     trace_path = tmp_path / "trace.json"
 

@@ -319,7 +319,7 @@ def ask_assistant(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
 
-    effective_dry_run = dry_run or not execute
+    effective_dry_run = not execute
     trace = WorkflowExecutor().run(
         plan,
         dry_run=effective_dry_run,
