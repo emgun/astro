@@ -9,9 +9,10 @@ UNSUPPORTED_PROMPT_MESSAGE = "deterministic planner currently supports the local
 def test_deterministic_planner_builds_local_od_workflow() -> None:
     planner = DeterministicPlanner()
     scenario_path = "examples/scenarios/leo_two_station_od.yaml"
-    measurements_json = "/tmp/astro-assistant/measurements.json"
-    measurements_tdm = "/tmp/astro-assistant/measurements.tdm"
-    estimate_json = "/tmp/astro-assistant/estimate.json"
+    artifact_dir = "/tmp/astro-assistant/leo_two_station_od"
+    measurements_json = f"{artifact_dir}/measurements.json"
+    measurements_tdm = f"{artifact_dir}/measurements.tdm"
+    estimate_json = f"{artifact_dir}/estimate.json"
 
     plan = planner.plan("Run the local OD demo and export TDM")
 
@@ -74,6 +75,44 @@ def test_deterministic_planner_accepts_local_orbit_determination_demo() -> None:
     )
 
     assert plan.plan_id == "local-od-demo"
+
+
+def test_deterministic_planner_binds_requested_supported_scenario() -> None:
+    planner = DeterministicPlanner()
+
+    plan = planner.plan(
+        "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml "
+        "and export TDM."
+    )
+
+    assert plan.steps[0].inputs["scenario_path"] == (
+        "examples/scenarios/leo_two_station_angles.yaml"
+    )
+    assert plan.steps[1].inputs["scenario_path"] == (
+        "examples/scenarios/leo_two_station_angles.yaml"
+    )
+    assert plan.steps[3].inputs["scenario_path"] == (
+        "examples/scenarios/leo_two_station_angles.yaml"
+    )
+    assert plan.steps[1].inputs["output"] == (
+        "/tmp/astro-assistant/leo_two_station_angles/measurements.json"
+    )
+    assert plan.steps[2].inputs["output"] == (
+        "/tmp/astro-assistant/leo_two_station_angles/measurements.tdm"
+    )
+    assert plan.steps[3].inputs["output"] == (
+        "/tmp/astro-assistant/leo_two_station_angles/estimate.json"
+    )
+
+
+def test_deterministic_planner_resolves_supported_scenario_alias() -> None:
+    planner = DeterministicPlanner()
+
+    plan = planner.plan("Run the local OD workflow for radiometric media")
+
+    assert plan.steps[0].inputs["scenario_path"] == (
+        "examples/scenarios/leo_radiometric_media.yaml"
+    )
 
 
 @pytest.mark.parametrize(

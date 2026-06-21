@@ -328,11 +328,20 @@ def ask_assistant(
     )
     payload = trace.model_dump_json(indent=2)
     if trace_output is not None:
+        try:
+            trace_output.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            typer.echo(f"could not write assistant trace {trace_output}: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
         _write_text_or_exit(trace_output, payload, "assistant trace")
     typer.echo(payload)
+    if not trace.verification.passed:
+        for diagnostic in trace.verification.diagnostics:
+            typer.echo(diagnostic.message, err=True)
     if trace.warnings:
         for warning in trace.warnings:
             typer.echo(warning, err=True)
+    if not trace.verification.passed or trace.warnings:
         raise typer.Exit(code=2)
 
 
