@@ -21,11 +21,14 @@ class DeterministicPlanner:
 
 
 def _matches_local_od_intent(normalized_prompt: str) -> bool:
-    return (
+    has_od_intent = (
         re.search(r"\bod\b", normalized_prompt) is not None
         or "orbit determination" in normalized_prompt
         or "orbit-determination" in normalized_prompt
     )
+    has_local_demo_signal = re.search(r"\b(local|demo)\b", normalized_prompt) is not None
+
+    return has_od_intent and has_local_demo_signal
 
 
 def local_od_demo_plan(user_intent: str) -> AstroWorkflowPlan:
