@@ -1,8 +1,10 @@
 # Astro Suite
 
-Astro Suite is a Python flight dynamics project for scenario validation, local reference
-propagation, launch/ascent sanity cases, synthetic orbit-determination measurements, batch OD,
-and backend adapters.
+Astro Suite is a Python flight dynamics project for verifiable AI-assisted mission workflows,
+scenario validation, deterministic propagation, synthetic orbit-determination measurements, batch
+OD, launch/ascent sanity cases, and backend adapters. Its assistant layer compiles natural-language
+mission-analysis intent into typed, reviewable workflow plans; allow-listed Astro commands compute,
+artifact validators check outputs, and JSON traces make runs auditable.
 
 ## Current Scope
 
