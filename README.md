@@ -1,14 +1,12 @@
 # Astro Suite
 
-Astro Suite is a Python flight-dynamics sandbox for verifiable mission-analysis workflows. It
-combines deterministic astrodynamics tools with a bounded assistant layer that turns natural-language
-intent into typed workflow plans, allow-listed CLI commands, declared artifacts, and verification
+Astro Suite is a Python flight-dynamics toolkit for verifiable mission-analysis workflows. It
+combines deterministic astrodynamics tools with an assistant layer that turns natural-language
+requests into typed workflow plans, allow-listed CLI commands, declared artifacts, and verification
 traces.
 
-The important idea is not "an LLM doing astrodynamics." The model stays at the interface layer:
-
 ```text
-natural language intent -> typed plan -> allow-listed commands -> deterministic artifacts -> checks
+request -> typed plan -> allow-listed commands -> deterministic artifacts -> verification trace
 ```
 
 ## What It Does
@@ -19,11 +17,11 @@ natural language intent -> typed plan -> allow-listed commands -> deterministic 
 - Runs local least-squares OD with rank and convergence checks.
 - Runs deterministic launch/ascent baselines, launch pitch tuning, and launch-to-orbit handoff.
 - Provides optional adapter boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, and JAX.
-- Exposes a constrained assistant workflow for scenario-bound local OD requests.
+- Exposes assistant workflows for scenario-bound local OD requests.
 
 Astro Suite owns the public product boundaries: scenarios, trajectories, measurements, estimates,
-launch reports, backend metadata, and assistant traces. External engines are adapters, not hidden
-sources of truth.
+launch reports, backend metadata, and assistant traces. External engines are integrated through
+explicit adapter boundaries.
 
 ## Install
 
@@ -83,9 +81,9 @@ astro propagate /tmp/astro-insertion.yaml \
 
 ## Assistant Workflow
 
-The assistant layer is deliberately constrained. It compiles supported local OD requests into a
-typed plan, checks scenario support, keeps paths inside the allowed example boundary, emits
-structured support classifications, and fails closed when a prompt or scenario is unsupported.
+The assistant layer compiles supported local OD requests into typed plans, validates scenario
+support, keeps paths within supported examples, emits structured support classifications,
+and requires explicit approval before execution.
 
 Check whether a request is supported:
 
@@ -119,7 +117,7 @@ cross-checks, research workflows, and adapter experiments:
 
 - Orekit: operational-style propagation and OD adapter boundary.
 - RocketPy: explicitly configured launch simulations.
-- Dymos/OpenMDAO: bounded launch optimization transcriptions.
+- Dymos/OpenMDAO: launch optimization transcriptions.
 - TudatPy: propagation and covariance cross-checks.
 - JAX: differentiable research propagation and OD sensitivity workflows.
 
@@ -133,8 +131,6 @@ astro tudat-smoke
 astro jax-smoke
 ```
 
-These are optional runtime gates, not claims of flight qualification.
-
 ## Repository Map
 
 - `src/astro_core`: shared scenario, state, trajectory, and error models.
@@ -145,7 +141,7 @@ These are optional runtime gates, not claims of flight qualification.
 - `src/astro_assistant`: typed assistant plans, policy, verification, and artifact validation.
 - `src/astro_cli`: the `astro` command line interface.
 - `examples/`: runnable scenarios, launch cases, measurements, and assistant prompts.
-- `docs/`: validation, backend, release, assistant, and research notes.
+- `docs/`: validation, backend, assistant, and research notes.
 
 ## Verification
 
@@ -162,15 +158,6 @@ Useful docs:
 - [Assistant Workflows](docs/assistant-workflows.md)
 - [Assistant MCP Contract](docs/assistant-mcp-contract.md)
 - [Backend Installation](docs/backend-installation.md)
-- [Current State](docs/current-state.md)
-- [Release Checklist](docs/release-checklist.md)
-
-## Safety Scope
-
-Astro Suite is a deterministic mission-analysis and research codebase. It is not flight software,
-does not claim flight qualification, and should not be used as spacecraft command authority. The
-assistant interface is intentionally constrained to typed plans, allow-listed commands, approval
-gates, and artifact validators.
 
 ## License
 
