@@ -55,6 +55,20 @@ class WritingJsonRunner:
         return 0, "ok", ""
 
 
+class ParentDirectoryCheckingJsonRunner:
+    def __init__(self, payload: str = "{}") -> None:
+        self.payload = payload
+        self.calls: list[tuple[Sequence[str], str | None]] = []
+
+    def __call__(self, argv: Sequence[str], cwd: str | None) -> tuple[int, str, str]:
+        self.calls.append((argv, cwd))
+        output = argv[argv.index("--output") + 1]
+        output_path = Path(cwd or ".") / output
+        assert output_path.parent.exists()
+        output_path.write_text(self.payload, encoding="utf-8")
+        return 0, "ok", ""
+
+
 def _read_only_plan(step_count: int = 1) -> AstroWorkflowPlan:
     return AstroWorkflowPlan(
         plan_id="read-only-demo",
@@ -155,6 +169,21 @@ def test_artifact_validation_resolves_relative_outputs_against_command_cwd(
     assert trace.results[0].validation_passed is True
 
 
+def test_executor_creates_write_parent_directories_before_running_commands(
+    tmp_path: Path,
+) -> None:
+    plan = _relative_artifact_plan()
+    runner = ParentDirectoryCheckingJsonRunner(payload='{"measurements": []}')
+    executor = WorkflowExecutor(command_runner=runner)
+
+    trace = executor.run(plan, dry_run=False, approved=True, cwd=str(tmp_path))
+
+    assert len(runner.calls) == 1
+    assert (tmp_path / "outputs/measurements_0.json").exists()
+    assert len(trace.results) == 1
+    assert trace.results[0].validation_passed is True
+
+
 def test_execution_stops_after_nonzero_return_code() -> None:
     plan = _read_only_plan(step_count=3)
     runner = FailingOnSecondCallRunner()
@@ -201,3 +230,24 @@ def test_command_runner_is_not_called_when_execution_does_not_run(
     trace = executor.run(plan, dry_run=dry_run, approved=approved, cwd="/workspace")
 
     assert trace.results == []
+
+
+def test_execution_blocks_when_plan_verification_fails() -> None:
+    plan = local_od_demo_plan("Run the local OD demo")
+    tampered = plan.model_copy(
+        update={
+            "user_intent": (
+                "Run local OD on examples/scenarios/leo_two_station_angles.yaml"
+            )
+        }
+    )
+    executor = WorkflowExecutor(command_runner=UnexpectedRunner())
+
+    trace = executor.run(tampered, dry_run=False, approved=True, cwd="/workspace")
+
+    assert trace.results == []
+    assert trace.verification.passed is False
+    assert any(
+        "requested scenario" in diagnostic.message
+        for diagnostic in trace.verification.diagnostics
+    )

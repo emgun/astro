@@ -26,6 +26,8 @@ The current implementation slice covers:
 - Synthetic range, range-rate, one-way Doppler, iterative linearized two-way/three-way range and
   range-rate, inertial right ascension, declination, azimuth, and elevation measurement generation.
 - Local SciPy batch least-squares orbit determination with rank and convergence checks.
+- Verifiable assistant workflows that compile local OD requests into scenario-bound, allow-listed
+  command plans with deterministic verification and JSON traces.
 - CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
   measurements, synthetic OD, measurement-file OD ingest/export, and research propagation.
 - Optional backend smoke gates and product boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy,
@@ -205,6 +207,10 @@ astro compare-tuned-launch-reports tuned_launch_report_baseline.json tuned_launc
 astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
 astro propagate insertion.yaml --backend local --output insertion_trajectory.json
 astro import-earth-orientation examples/eop/finals2000A_excerpt.txt --format iers-finals --source finals2000A-example --output earth_orientation.json
+astro verify-assistant "Run local OD on leo_two_station_topocentric.yaml"
+astro ask "Run the local OD demo" --dry-run
+astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --dry-run
+astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --execute --approved --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output measurements.json
 astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend orekit --output orekit_measurements.json
 astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output angle_measurements.json

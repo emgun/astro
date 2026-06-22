@@ -64,9 +64,23 @@ class StepExecutionResult(BaseModel):
     validation_passed: bool
 
 
+class VerificationDiagnostic(BaseModel):
+    code: str
+    message: str
+    severity: str = "error"
+
+
+class VerificationResult(BaseModel):
+    passed: bool
+    diagnostics: list[VerificationDiagnostic] = Field(default_factory=list)
+
+
 class WorkflowTrace(BaseModel):
     plan: AstroWorkflowPlan
     dry_run: bool
     command_specs: list[CommandSpec]
+    verification: VerificationResult = Field(
+        default_factory=lambda: VerificationResult(passed=True)
+    )
     results: list[StepExecutionResult] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

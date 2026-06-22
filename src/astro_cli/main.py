@@ -8,7 +8,10 @@ import typer
 import yaml
 
 from astro_assistant.executor import WorkflowExecutor
+from astro_assistant.models import VerificationDiagnostic, VerificationResult
 from astro_assistant.planner import DeterministicPlanner
+from astro_assistant.scenarios import resolve_local_od_scenario
+from astro_assistant.verification import verify_plan
 from astro_backends.dymos import (
     optimize_launch_dymos,
     run_dymos_multistage_pitch_program_optimization,
@@ -328,11 +331,71 @@ def ask_assistant(
     )
     payload = trace.model_dump_json(indent=2)
     if trace_output is not None:
+        try:
+            trace_output.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            typer.echo(f"could not write assistant trace {trace_output}: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
         _write_text_or_exit(trace_output, payload, "assistant trace")
     typer.echo(payload)
+    if not trace.verification.passed:
+        for diagnostic in trace.verification.diagnostics:
+            typer.echo(diagnostic.message, err=True)
     if trace.warnings:
         for warning in trace.warnings:
             typer.echo(warning, err=True)
+    if not trace.verification.passed or trace.warnings:
+        raise typer.Exit(code=2)
+
+
+@app.command("verify-assistant")
+def verify_assistant(
+    prompt: Annotated[str, typer.Argument(help="Natural language assistant request.")],
+) -> None:
+    planner = DeterministicPlanner()
+    try:
+        plan = planner.plan(prompt)
+    except ValueError as exc:
+        verification = VerificationResult(
+            passed=False,
+            diagnostics=[
+                VerificationDiagnostic(
+                    code="unsupported_prompt",
+                    message=str(exc),
+                )
+            ],
+        )
+        typer.echo(
+            json.dumps(
+                {
+                    "supported": False,
+                    "plan_id": None,
+                    "scenario_path": None,
+                    "scenario_id": None,
+                    "artifact_dir": None,
+                    "verification": verification.model_dump(mode="json"),
+                },
+                indent=2,
+            )
+        )
+        raise typer.Exit(code=2) from exc
+
+    resolved = resolve_local_od_scenario(prompt)
+    verification = verify_plan(plan)
+    typer.echo(
+        json.dumps(
+            {
+                "supported": verification.passed,
+                "plan_id": plan.plan_id,
+                "scenario_path": resolved.path,
+                "scenario_id": resolved.scenario_id,
+                "artifact_dir": resolved.artifact_dir,
+                "verification": verification.model_dump(mode="json"),
+            },
+            indent=2,
+        )
+    )
+    if not verification.passed:
         raise typer.Exit(code=2)
 
 

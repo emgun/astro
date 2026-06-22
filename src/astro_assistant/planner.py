@@ -8,6 +8,7 @@ from astro_assistant.models import (
     WorkflowArtifact,
     WorkflowStep,
 )
+from astro_assistant.scenarios import resolve_local_od_scenario
 
 UNSUPPORTED_PROMPT_MESSAGE = "deterministic planner currently supports the local OD demo only"
 
@@ -32,20 +33,21 @@ def _matches_local_od_intent(normalized_prompt: str) -> bool:
 
 
 def local_od_demo_plan(user_intent: str) -> AstroWorkflowPlan:
-    scenario_path = "examples/scenarios/leo_two_station_od.yaml"
-    measurements_json = "/tmp/astro-assistant/measurements.json"
-    measurements_tdm = "/tmp/astro-assistant/measurements.tdm"
-    estimate_json = "/tmp/astro-assistant/estimate.json"
+    scenario = resolve_local_od_scenario(user_intent)
+    scenario_path = scenario.path
+    measurements_json = f"{scenario.artifact_dir}/measurements.json"
+    measurements_tdm = f"{scenario.artifact_dir}/measurements.tdm"
+    estimate_json = f"{scenario.artifact_dir}/estimate.json"
 
     return AstroWorkflowPlan(
         plan_id="local-od-demo",
-        title="Local Orbit Determination Demo",
+        title=f"Local Orbit Determination Demo: {scenario.scenario_id}",
         user_intent=user_intent,
         steps=[
             WorkflowStep(
                 step_id="validate_scenario",
                 tool=AstroToolName.VALIDATE_SCENARIO,
-                description="Validate the checked-in two-station OD scenario.",
+                description=f"Validate the checked-in scenario {scenario.scenario_id}.",
                 inputs={"scenario_path": scenario_path},
                 outputs=[WorkflowArtifact(path=scenario_path, kind=ArtifactKind.SCENARIO)],
                 risk=RiskLevel.READ_ONLY,
