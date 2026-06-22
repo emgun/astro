@@ -1,557 +1,169 @@
 # Astro Suite
 
-Astro Suite is a Python flight dynamics project for verifiable AI-assisted mission workflows,
-scenario validation, deterministic propagation, synthetic orbit-determination measurements, batch
-OD, launch/ascent sanity cases, and backend adapters. Its assistant layer compiles natural-language
-mission-analysis intent into typed, reviewable workflow plans; allow-listed Astro commands compute,
-artifact validators check outputs, and JSON traces make runs auditable.
+Astro Suite is a Python flight-dynamics sandbox for verifiable mission-analysis workflows. It
+combines deterministic astrodynamics tools with a bounded assistant layer that turns natural-language
+intent into typed workflow plans, allow-listed CLI commands, declared artifacts, and verification
+traces.
 
-## Current Scope
+The important idea is not "an LLM doing astrodynamics." The model stays at the interface layer:
 
-The current implementation slice covers:
+```text
+natural language intent -> typed plan -> allow-listed commands -> deterministic artifacts -> checks
+```
 
-- Pydantic scenario validation from YAML.
-- Local two-body and J2 reference propagation with deterministic provenance metadata.
-- Flight-dynamics trajectory product fields for events, impulsive and finite-burn maneuvers, and
-  covariance history, plus local commanded-attitude samples for maneuvered trajectories, local
-  rigid-body torque and closed-loop PD attitude-control propagation,
-  finite-difference covariance propagation with optional acceleration process noise, per-sample
-  state-transition/process-noise products, CSV and CCSDS OEM ephemeris export/import, CCSDS OPM
-  single-state export/import, CCSDS AEM attitude export, and seeded initial-state Monte Carlo
-  propagation.
-- Local launch/ascent reference propagation with vertical and pitch-program guidance, staged mass
-  depletion, drag, events, and launch-to-orbit insertion handoff.
-- Launch pitch-program sweep, two-knot tuning, and tuned launch-to-orbit reporting over repeated
-  local ascent/orbit propagations, batch ranking, and report-to-report comparison.
-- Synthetic range, range-rate, one-way Doppler, iterative linearized two-way/three-way range and
-  range-rate, inertial right ascension, declination, azimuth, and elevation measurement generation.
-- Local SciPy batch least-squares orbit determination with rank and convergence checks.
-- Verifiable assistant workflows that compile local OD requests into scenario-bound, allow-listed
-  command plans with deterministic verification and JSON traces.
-- CLI workflows for validation, propagation, launch, launch-to-orbit handoff, synthetic
-  measurements, synthetic OD, measurement-file OD ingest/export, and research propagation.
-- Optional backend smoke gates and product boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy,
-  and JAX.
+## What It Does
 
-Launch/ascent includes deliberately simple local vertical and pitch-program baselines plus a
-RocketPy direct-simulation path for explicitly configured single-motor solid rockets. The suite has
-a fail-closed guard fixture for additional RocketPy motors because the loaded `Rocket.add_motor` API
-overwrites earlier motors when called more than once. Dymos/OpenMDAO is recognized as an optimization
-adapter boundary; its live phase transcription is currently a stage-aware vertical-ascent model
-rather than a full multistage optimal-control ascent solver.
+- Validates YAML mission scenarios with Pydantic models.
+- Propagates local two-body, J2, maneuvered, covariance, conjunction, and attitude workflows.
+- Generates, imports, exports, and estimates orbit-determination measurements.
+- Runs local least-squares OD with rank and convergence checks.
+- Runs deterministic launch/ascent baselines, launch pitch tuning, and launch-to-orbit handoff.
+- Provides optional adapter boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, and JAX.
+- Exposes a constrained assistant workflow for scenario-bound local OD requests.
 
-## Setup
+Astro Suite owns the public product boundaries: scenarios, trajectories, measurements, estimates,
+launch reports, backend metadata, and assistant traces. External engines are adapters, not hidden
+sources of truth.
+
+## Install
 
 ```bash
 python -m pip install -e '.[dev]'
 ```
 
-Optional Orekit wrapper smoke and propagation support:
+Optional backend extras are installed separately:
 
 ```bash
 python -m pip install -e '.[orekit]'
-export JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home
-export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
-export ASTRO_OREKIT_DATA_PATH="$HOME/.orekit/orekit-data.zip"
-astro orekit-smoke
-astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
-```
-
-If `orekit-jpype`, Java, or Orekit data are not configured, `astro orekit-smoke` exits nonzero with
-structured JSON explaining the missing piece. The runtime checks `ASTRO_OREKIT_DATA_PATH`,
-`OREKIT_DATA_PATH`, then `~/.orekit/orekit-data.zip` for Orekit data. `astro propagate --backend
-orekit` currently supports two-body propagation through Orekit's Keplerian propagator, J2 through
-Orekit's numerical propagator with `J2OnlyPerturbation`, and `orekit_high_fidelity` as the numerical
-propagation expansion path. Atmospheric drag is available through Orekit `DragForce` with
-`SimpleExponentialAtmosphere` and `IsotropicDrag`; solar radiation pressure is available through
-Orekit `SolarRadiationPressure` and `IsotropicRadiationSingleCoefficient`; third-body gravity is
-available through Orekit `ThirdBodyAttraction` for the Sun and Moon.
-
-Optional launch backend smoke checks:
-
-```bash
 python -m pip install -e '.[launch,optimization]'
-astro rocketpy-smoke
-astro dymos-smoke
-```
-
-These extras are pinned to NumPy-1-compatible backend lines: RocketPy `>=1.11,<1.12`,
-Dymos `>=1.13.1,<1.14`, and OpenMDAO `>=3.41,<3.42`.
-
-RocketPy and Dymos/OpenMDAO are behind explicit adapter gates. The current `rocketpy` launch path
-loads the optional runtime, requires explicit `rocketpy` vehicle/motor/flight configuration on the
-launch scenario, runs configured solid-rocket flights through RocketPy, preserves the
-`LaunchTrajectory` product boundary, fails closed when additional RocketPy motors are configured
-because the loaded `Rocket.add_motor` API overwrites earlier motors, and can annotate multistage suite scenarios with stage
-events/samples reached by a single configured RocketPy flight, including metadata for whether the
-RocketPy solution covered the full suite stage schedule plus a multistage adapter contract that
-records the non-native composition scope. That multistage path is an adapter composition layer, not
-a validated RocketPy staged-separation solver. The default `dymos` launch optimization path runs a
-stage-aware Dymos/OpenMDAO vertical-ascent phase transcription and returns the existing
-`LaunchPitchTuningResult` product with explicit phase diagnostics, suite stage-plan metadata,
-original and optimized pitch-program control-point schedules, tuned point indices, path constraints,
-altitude, velocity, and radial-velocity target-insertion residual/tolerance assessment, and a flag
-showing that the Dymos phase duration covers the configured burn schedule. The opt-in
-`--dymos-mode pitch-program` path runs a native
-Dymos pitch-control transcription over the suite pitch program, minimizes a normalized final
-target-insertion error, and marks the transcription contract as executed. `--dymos-mode
-multistage-pitch-program` splits that simplified pitch-control model into one linked Dymos phase per
-vehicle stage, links time, altitude, downrange, radial velocity, and horizontal velocity across
-stage boundaries, models stage-local propellant mass depletion, applies exponential-atmosphere
-quadratic drag from suite area/Cd fields, and records native stage-phase topology plus mass/aero
-metadata. It also records stage-transition mass events that expose pre-separation mass,
-post-separation mass, dropped dry mass, and dropped residual propellant. Mass is not linked across
-stage phases because staging drops dry and residual mass. Full high-fidelity multistage Dymos
-ascent design optimization beyond this bounded linked-phase target objective remains future work.
-
-Optional research backend smoke checks:
-
-```bash
 python -m pip install -e '.[research]'
-astro tudat-smoke
-astro jax-smoke
 ```
 
-Tudat and JAX are optional research/cross-check boundaries. TudatPy is not currently assumed to be
-available from PyPI on every platform, so its smoke command reports installation state without
-promising a pip-only install path. When TudatPy is installed, `astro propagate --backend tudat`
-runs native two-body Earth point-mass, J2 spherical-harmonic, atmospheric drag, cannonball SRP, and
-Sun/Moon point-mass third-body cross-checks using Tudat environment/body setup, fixed-step RK4, and
-Cowell translational propagation, then maps the state history back into the suite `Trajectory`
-product. Tudat can also consume configured Earth spherical harmonic degree/order settings for
-`orekit_high_fidelity` scenarios. Tudat trajectories with an initial covariance can populate suite
-finite-difference covariance-history products by propagating perturbed Tudat states through the
-selected Tudat force model. `astro compare-tudat-reference` writes calibrated position/velocity
-tolerance metrics against a reference backend so live Tudat force-model runs can be promoted only
-when their deltas are explicit; the product records tolerance ratios, signed margins, and the
-limiting metric. `astro compare-tudat-campaign` aggregates multiple calibrated Tudat-vs-reference
-scenario comparisons into one pass/fail campaign product for release gates and identifies failed
-scenarios plus the worst limiting scenario.
-`covariance_state_transition_model: tudat_variational` is an opt-in native variational construction
-path for Tudat-backed covariance products. With TudatPy 1.0, the suite uses
-`tudatpy.dynamics.parameters_setup` and `tudatpy.dynamics.simulator` to build an
-initial-Cartesian-state parameter set, run Tudat variational equations, and map
-`state_transition_matrix_history` into suite covariance samples. If the
-variational API is unavailable or incompatible, the suite fails explicitly rather than falling back
-to finite differences. Live TudatPy execution still requires an installed TudatPy runtime. JAX
-research propagation returns suite `MonteCarloResult` products, can optionally include a final-state
-transition sensitivity matrix, maps `scenario.initial_covariance` to a final covariance through that
-transition when available, and supports differentiable screening approximations for
-`orekit_high_fidelity`, configured degree/order high-order gravity metadata through a J2 baseline,
-atmospheric drag, solar radiation pressure, analytic circular Sun/Moon third-body gravity flags, and
-configured third-body ephemeris sample screening. Its research OD
-estimator uses backtracking Gauss-Newton corrections over normalized residual/Jacobian products so
-range/range-rate, inertial angle, and topocentric azimuth/elevation workflows can share the same
-product boundary. Those JAX force flags are explicitly research products, not operational
-ephemerides; standards-grade third-body ephemeris handling remains an Orekit/Tudat-grade integration
-task.
+Backend runtimes may also need system setup, data files, or platform-specific installs. See
+[Backend Installation](docs/backend-installation.md).
 
-## Commands
+## Quick Start
+
+Validate and propagate a local orbit scenario:
 
 ```bash
 astro validate examples/scenarios/leo_two_body.yaml
-astro propagate examples/scenarios/leo_two_body.yaml --backend local --output trajectory.json
-astro propagate examples/scenarios/leo_eccentric_two_body.yaml --backend local --output eccentric_trajectory.json
-astro propagate examples/scenarios/meo_two_body.yaml --backend local --output meo_trajectory.json
-astro propagate examples/scenarios/geo_two_body.yaml --backend local --output geo_trajectory.json
-astro propagate examples/scenarios/leo_j2.yaml --backend local --output j2_trajectory.json
-astro propagate examples/scenarios/leo_finite_burn.yaml --backend local --output finite_burn_trajectory.json
-astro propagate examples/scenarios/leo_velocity_aligned_burn.yaml --backend local --output velocity_aligned_burn_trajectory.json
-astro propagate examples/scenarios/leo_radial_burn.yaml --backend local --output radial_burn_trajectory.json
-astro propagate examples/scenarios/leo_covariance.yaml --backend local --output covariance_trajectory.json
-astro propagate examples/scenarios/leo_variational_covariance.yaml --backend local --output variational_covariance_trajectory.json
-astro propagate examples/scenarios/leo_j2_variational_covariance.yaml --backend local --output j2_variational_covariance_trajectory.json
-astro propagate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_trajectory.json
-astro propagate examples/scenarios/leo_j2.yaml --backend orekit --output orekit_j2_trajectory.json
-astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend orekit --output orekit_high_fidelity_trajectory.json
-astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --output orekit_drag_trajectory.json
-astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output orekit_srp_trajectory.json
-astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output orekit_third_body_trajectory.json
-astro propagate examples/scenarios/leo_orekit_high_order_gravity.yaml --backend orekit --output orekit_high_order_gravity.json
-astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend orekit --output orekit_high_fidelity_covariance.json
-astro propagate examples/scenarios/leo_two_body.yaml --backend tudat --output tudat_two_body_trajectory.json
-astro propagate examples/scenarios/leo_j2.yaml --backend tudat --output tudat_j2_trajectory.json
-astro propagate examples/scenarios/leo_orekit_drag.yaml --backend tudat --output tudat_drag_trajectory.json
-astro propagate examples/scenarios/leo_orekit_srp.yaml --backend tudat --output tudat_srp_trajectory.json
-astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend tudat --output tudat_third_body_trajectory.json
-astro propagate examples/scenarios/leo_tudat_high_order_gravity.yaml --backend tudat --output tudat_high_order_gravity.json
-astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend tudat --output tudat_high_fidelity_covariance.json
-astro propagate examples/scenarios/leo_tudat_variational_covariance.yaml --backend tudat --output tudat_variational_covariance.json
-astro compare-tudat-reference examples/scenarios/leo_two_body.yaml --reference-backend local --position-tolerance-km 0.001 --velocity-tolerance-km-s 0.000001 --output tudat_reference_comparison.json
-astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output tudat_reference_campaign_calibrated.json
-astro export-trajectory trajectory.json --format csv --output trajectory.csv
-astro export-trajectory trajectory.json --format oem --output trajectory.oem
-astro export-trajectory trajectory.json --format opm --output trajectory.opm
-astro export-trajectory attitude_trajectory.json --format aem --output attitude_trajectory.aem
-astro import-trajectory trajectory.oem --format oem --scenario examples/scenarios/leo_two_body.yaml --output imported_trajectory.json
-astro import-trajectory examples/trajectories/leo_initial_state.opm --format opm --scenario examples/scenarios/leo_two_body.yaml --output imported_opm_trajectory.json
-astro import-trajectory attitude_trajectory.aem --format aem --scenario examples/scenarios/leo_velocity_aligned_burn.yaml --state-trajectory attitude_state_trajectory.json --output imported_attitude_trajectory.json
-astro screen-conjunction primary_trajectory.json secondary_trajectory.json --threshold-km 1.0 --hard-body-radius-km 0.02 --probability-method integrated --output conjunction_screening.json
-astro assess-conjunction conjunction_screening.json --output conjunction_assessment.json
-astro propagate-attitude examples/attitude/rigid_body_torque.yaml --output attitude_dynamics.json
-astro propagate-attitude examples/attitude/closed_loop_pd.yaml --output attitude_control.json
-astro propagate-attitude examples/attitude/closed_loop_sensor_actuator.yaml --output attitude_sensor_actuator.json
-astro monte-carlo examples/scenarios/leo_two_body.yaml --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --backend local --output monte_carlo.json
+astro propagate examples/scenarios/leo_two_body.yaml --backend local --output /tmp/astro-trajectory.json
+```
+
+Generate measurements and run local OD:
+
+```bash
+astro synth-measurements examples/scenarios/leo_two_station_od.yaml \
+  --backend local \
+  --output /tmp/astro-measurements.json
+
+astro estimate-measurements examples/scenarios/leo_two_station_od.yaml \
+  /tmp/astro-measurements.json \
+  --backend local \
+  --output /tmp/astro-estimate.json
+```
+
+Run a launch/ascent baseline and hand off to orbit propagation:
+
+```bash
+astro launch examples/launch/pitch_program_two_stage.yaml \
+  --backend local \
+  --output /tmp/astro-launch.json
+
+astro handoff-launch /tmp/astro-launch.json \
+  --output /tmp/astro-insertion.yaml \
+  --duration-s 600 \
+  --step-s 60
+
+astro propagate /tmp/astro-insertion.yaml \
+  --backend local \
+  --output /tmp/astro-insertion-trajectory.json
+```
+
+## Assistant Workflow
+
+The assistant layer is deliberately constrained. It compiles supported local OD requests into a
+typed plan, checks scenario support, keeps paths inside the allowed example boundary, emits
+structured support classifications, and fails closed when a prompt or scenario is unsupported.
+
+Check whether a request is supported:
+
+```bash
+astro verify-assistant "Run local OD on leo_two_station_topocentric.yaml"
+```
+
+Preview a plan without executing it:
+
+```bash
+astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." \
+  --dry-run
+```
+
+Execute only with explicit approval:
+
+```bash
+astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." \
+  --execute \
+  --approved \
+  --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json
+```
+
+See [Assistant Workflows](docs/assistant-workflows.md) for the support codes, policy gates, and
+trace contract.
+
+## Optional Backends
+
+The default examples use deterministic local implementations. Optional backends are available for
+cross-checks, research workflows, and adapter experiments:
+
+- Orekit: operational-style propagation and OD adapter boundary.
+- RocketPy: explicitly configured launch simulations.
+- Dymos/OpenMDAO: bounded launch optimization transcriptions.
+- TudatPy: propagation and covariance cross-checks.
+- JAX: differentiable research propagation and OD sensitivity workflows.
+
+Smoke checks:
+
+```bash
+astro orekit-smoke
 astro rocketpy-smoke
 astro dymos-smoke
 astro tudat-smoke
 astro jax-smoke
-astro launch examples/launch/vertical_two_stage.yaml --backend local --output launch.json
-astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output pitch_launch.json
-astro sweep-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-index 3 --pitch-deg-values 10,20,30 --output pitch_sweep.json
-astro tune-launch-pitch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --initial-span-deg 10 --iterations 2 --output pitch_tuning.json --tuned-scenario-output tuned_pitch_program.yaml
-astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend local --point-indices 2,3 --iterations 2 --output launch_optimization.json
-astro report-tuned-launch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --initial-span-deg 10 --iterations 2 --orbit-duration-s 600 --orbit-step-s 60 --output tuned_launch_report.json
-astro batch-report-tuned-launch examples/launch/pitch_program_two_stage.yaml --point-indices 2,3 --iterations-values 1,2,3 --initial-span-deg 10 --orbit-duration-s 600 --orbit-step-s 60 --output tuned_launch_batch.json
-astro compare-tuned-launch-reports tuned_launch_report_baseline.json tuned_launch_report_candidate.json --output tuned_launch_comparison.json
-astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
-astro propagate insertion.yaml --backend local --output insertion_trajectory.json
-astro import-earth-orientation examples/eop/finals2000A_excerpt.txt --format iers-finals --source finals2000A-example --output earth_orientation.json
-astro verify-assistant "Run local OD on leo_two_station_topocentric.yaml"
-astro ask "Run the local OD demo" --dry-run
-astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --dry-run
-astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --execute --approved --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json
-astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend local --output measurements.json
-astro synth-measurements examples/scenarios/leo_two_station_od.yaml --backend orekit --output orekit_measurements.json
-astro synth-measurements examples/scenarios/leo_two_station_angles.yaml --backend local --output angle_measurements.json
-astro synth-measurements examples/scenarios/leo_two_station_topocentric.yaml --backend local --output topocentric_measurements.json
-astro synth-measurements examples/scenarios/leo_geodetic_topocentric.yaml --backend local --output geodetic_topocentric_measurements.json
-astro synth-measurements examples/scenarios/leo_geodetic_eop_topocentric.yaml --backend local --output geodetic_eop_topocentric_measurements.json
-astro synth-measurements examples/scenarios/leo_geodetic_eop_table_topocentric.yaml --backend local --output geodetic_eop_table_topocentric_measurements.json
-astro synth-measurements examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml --backend local --output geodetic_precession_nutation_measurements.json
-astro synth-measurements examples/scenarios/leo_doppler.yaml --backend local --output doppler_measurements.json
-astro export-measurements measurements.json --format csv --output measurements.csv
-astro export-measurements measurements.json --format tdm --output measurements.tdm
-astro station-calibration examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --output station_calibration.json
-astro estimate examples/scenarios/leo_two_body.yaml --backend local --output estimate.json
-astro estimate examples/scenarios/leo_two_body.yaml --backend orekit --output orekit_estimate.json
-astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend local --output estimate.json
-astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --backend orekit --output orekit_estimate.json
-astro estimate-measurements examples/scenarios/leo_two_station_od.yaml measurements.json --estimator orekit-native --output orekit_native_estimate.json
-astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 4 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output research_propagation.json
-astro research-propagate examples/scenarios/leo_orekit_drag.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_drag_research.json
-astro research-propagate examples/scenarios/leo_orekit_srp.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_srp_research.json
-astro research-propagate examples/scenarios/leo_jax_high_order_gravity_research.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_high_order_research.json
-astro research-propagate examples/scenarios/leo_jax_third_body_research.yaml --backend jax --cases 1 --position-sigma-km 0 --velocity-sigma-km-s 0 --seed 7 --output jax_third_body_research.json
-astro research-od-sensitivity examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --output od_sensitivity.json
-astro research-od-sensitivity examples/scenarios/leo_two_station_angles.yaml angle_measurements.json --backend jax --output angle_od_sensitivity.json
-astro research-od-sensitivity examples/scenarios/leo_two_station_topocentric.yaml topocentric_measurements.json --backend jax --output topocentric_od_sensitivity.json
-astro research-estimate examples/scenarios/leo_two_station_od.yaml measurements.json --backend jax --max-iterations 5 --output research_estimate.json
-astro research-estimate examples/scenarios/leo_two_station_angles.yaml angle_measurements.json --backend jax --max-iterations 8 --output angle_research_estimate.json
-astro research-estimate examples/scenarios/leo_two_station_topocentric.yaml topocentric_measurements.json --backend jax --max-iterations 8 --output topocentric_research_estimate.json
-astro orekit-smoke
 ```
 
-`astro estimate` is an MVP synthetic demonstration workflow. It keeps the source scenario unchanged,
-adds in-memory demo geometry for observability, generates synthetic measurements, perturbs the
-initial state as an estimate seed, and records that provenance in the output metadata. The `--backend`
-option selects the propagation backend used for synthetic truth generation and residual propagation.
-With `--backend orekit`, the suite estimator uses Orekit-backed propagation when the optional Orekit
-runtime is installed. The Orekit backend also includes a native OD construction bridge that maps
-suite geodetic range/range-rate records into Orekit `Range`/`RangeRate` measurements and a
-`BatchLSEstimator` object. The bridge can execute the native estimator and map the estimated state,
-residuals, RMS, covariance, and iteration diagnostics into the suite `EstimateResult` model. Use
-`astro estimate-measurements --estimator orekit-native` to select that bridge explicitly. It remains
-limited to geodetic range/range-rate records and still depends on a live Java/Orekit runtime and
-data context. Orekit covariance extraction can be singular on short or weakly observed arcs; when
-that happens the suite returns a zero covariance fallback with `covariance_status = "unavailable"`
-and the backend error recorded in metadata instead of treating the fallback as a valid covariance.
+These are optional runtime gates, not claims of flight qualification.
 
-`astro export-trajectory` converts suite trajectory JSON into a CSV ephemeris table, a CCSDS OEM
-KVN text product containing UTC epochs plus Cartesian position and velocity samples in km and km/s,
-an OPM KVN single-state orbit message, or a CCSDS AEM KVN quaternion attitude product for
-trajectories with commanded attitude samples. `astro import-trajectory --format oem` converts a
-CCSDS OEM KVN text product back into a suite `Trajectory`; `--format opm` imports an OPM orbit
-message as a one-sample suite `Trajectory` and maps an optional OPM covariance block into one
-suite `CovarianceSample`. Both require `--scenario` because those products do not encode the suite
-force model. The importers are intentionally strict: UTC time system, EME2000 reference frame, and
-Earth center are required. `astro import-trajectory --format aem` attaches
-CCSDS AEM KVN quaternion attitude rows to a state-bearing suite trajectory supplied with
-`--state-trajectory` because AEM is attitude-only.
-It validates UTC, EME2000 frame A, quaternion attitude type, and `QC Q1 Q2 Q3` quaternion order.
-`astro monte-carlo` runs a seeded initial-state ensemble by perturbing the scenario's
-Cartesian state and propagating each case through the selected backend. This is a repeatable product
-workflow for uncertainty screening; conjunction readiness still depends on the screening and
-assessment products below.
+## Repository Map
 
-Local covariance propagation accepts an optional `initial_covariance` and
-`covariance_process_noise_acceleration_km_s2`. The default `covariance_state_transition_model` is
-`finite_difference`, preserving the existing force-model and maneuver compatibility. Two-body
-scenarios without maneuvers may opt into `two_body_variational`, which integrates the state
-transition matrix with the analytic two-body acceleration Jacobian. J2 scenarios without maneuvers
-may opt into `j2_variational`, which integrates the state transition matrix with a finite-difference
-J2 acceleration Jacobian. Both variational paths store per-step plus accumulated state-transition
-matrices in the trajectory product.
-
-Local orbital propagation accepts an optional `maneuvers` schedule on `Scenario`. Impulsive
-maneuvers apply their full `delta_v_km_s` at the maneuver epoch; finite burns apply the configured
-total delta-v as constant inertial acceleration over `duration_s`, or use optional
-`thrust_vector_n` plus `specific_impulse_s` to integrate thrust-vector acceleration with mass
-depletion. Trajectory samples include `mass_kg`, and maneuver start/end events preserve maneuver
-metadata. Thrust-vector finite burns default to inertial direction; setting
-`thrust_direction_mode` to `velocity_aligned` rotates the thrust magnitude along the instantaneous
-velocity direction. `radial_outward` and `radial_inward` rotate the thrust magnitude along the
-instantaneous local radial direction. Maneuvered local trajectories also include per-sample
-`AttitudeState` products with a body-to-inertial unit quaternion that points the spacecraft body +X
-axis along the commanded thrust direction during active thrust-vector burns. These are commanded
-pointing products. `astro propagate-attitude` separately propagates a diagonal rigid-body attitude
-state from scheduled torque commands or a bounded quaternion-error PD control law and writes
-quaternion/rate/control-torque history. The closed-loop mode can optionally include deterministic
-sensor attitude/rate bias and actuator scale/bias/deadband screening metadata. Closed-loop products
-also report final/max attitude error, final/max angular-rate error, configured control tolerances,
-pointing/rate margins, sampled first-within-tolerance and settled-within-tolerance readiness
-metrics, within-tolerance status, commanded-vs-applied torque tracking error, torque/actuator
-saturation counts and fractions, and actuator deadband counts and fractions. This is an ACS
-product-wiring and sensitivity primitive, not a validated spacecraft actuator/sensor simulation.
-Local orbital propagation
-also annotates periapsis/apoapsis `TrajectoryEvent` records. For no-maneuver trajectories, apsides
-are root-located between propagation samples through radial-velocity bisection and include bracket,
-elapsed time, radius, and radial-velocity metadata. Maneuvered trajectories keep sample-safe apsis
-annotation because thrust discontinuities need maneuver-aware event isolation.
-
-Local and Orekit propagation also accept an optional `initial_covariance` 6x6 matrix. When present,
-the backend emits a `covariance_history` sample at each trajectory epoch using a finite-difference
-state transition. The local backend computes finite differences through its deterministic RK4
-reference dynamics; the Orekit backend computes finite differences by rebuilding and propagating
-perturbed Orekit states through the selected Orekit propagator and force model, including the
-high-fidelity drag/SRP/third-body flags when they are enabled. Orekit covariance metadata records
-the transition propagator and force-model list so high-fidelity covariance products remain auditable.
-Each covariance sample can carry the per-step `state_transition_matrix`, the
-`accumulated_state_transition_matrix` from the initial epoch, the `process_noise_covariance` applied
-for that step, and metadata naming the model and step size. The optional
-`covariance_process_noise_acceleration_km_s2` field adds a simple per-axis white-acceleration
-process-noise term over each propagation sample interval. This is useful for product wiring and
-first-order sensitivity screening. Tudat also accepts an explicit `tudat_variational` covariance
-transition model, which builds TudatPy variational equations when the optional variational API is
-available and keeps native variational products distinguishable from finite-difference products.
-The optional live gates now execute high-fidelity finite-difference covariance through
-drag/SRP/third-body force models for Orekit and Tudat and verify force-model provenance plus
-covariance-history matrix invariants. The Tudat native variational live gate also executes the same
-high-fidelity drag/SRP/third-body scenario through TudatPy `parameters_setup` and verifies the same
-suite covariance-history invariants. Externally validated production conjunction services remain
-future work.
-
-`astro screen-conjunction` compares two trajectory products at common sample epochs and writes a
-deterministic first-order screening result with time of closest approach, miss distance, relative
-speed, threshold status, and relative-state metadata. When both trajectories carry covariance
-history at TCA and `--hard-body-radius-km` is supplied, it also writes a bounded encounter-plane
-probability estimate. The default `integrated` method numerically integrates the 2D Gaussian over
-the hard-body disk with Gauss-Legendre polar quadrature; `--probability-method density` preserves the
-faster local-density-times-area screening approximation. `astro assess-conjunction` reads a saved
-screening product and writes a conservative readiness report that marks geometry-only results as
-`screening_only`, close approaches as `requires_review`, and covariance-backed above-threshold
-integrated-probability results as `operational_candidate`. This is useful for covariance-aware
-screening and review workflow routing, but it is not a full externally validated production
-conjunction service.
-
-`astro launch` is the launch/ascent MVP workflow. It loads a launch scenario, runs the local
-vertical or pitch-program baseline, and writes a launch trajectory product with samples, stage
-events, dynamic pressure, acceleration, downrange, target miss metrics, and an `insertion_state`
-compatible with the shared `OrbitState` product. This local backend is a deterministic data-flow
-baseline, not a production launch simulator.
-
-With `--backend rocketpy`, `astro launch` requires explicit `scenario.rocketpy` configuration and
-runs a RocketPy direct flight for the validated single-motor adapter path. The checked
-`rocketpy_configured_multimotor_unsupported.yaml` fixture proves the suite can parse additional
-motor definitions but rejects them before simulation, because the loaded `Rocket.add_motor` API
-behaves as a one-motor setter and later calls overwrite earlier motors.
-
-`astro sweep-launch-pitch` is the first launch targeting workflow. It varies one pitch-program knot,
-runs the local launch propagator for each candidate pitch angle, and writes a JSON product with
-altitude miss, velocity miss, radial-velocity miss, weighted score, final downrange, and the best
-case. It is a transparent grid sweep rather than an optimizer; that keeps the target-miss contract
-clear before adding Dymos, OpenMDAO, or RocketPy-backed targeting.
-
-`astro tune-launch-pitch` is the first multi-knot targeting workflow. It varies two pitch-program
-knots on a deterministic 3x3 grid, shrinks the search span each iteration, writes a JSON trace of
-every evaluated candidate, and can write the best tuned `LaunchScenario` back to YAML. This is still
-a coarse-to-fine targeting analysis tool, not a production optimizer.
-
-`astro optimize-launch` is the neutral launch optimization entry point. With `--backend local`, it
-uses the current pitch-program tuner and writes the same `LaunchPitchTuningResult` product. With
-`--backend dymos`, it loads the optional Dymos/OpenMDAO runtime. The default `--dymos-mode phase`
-runs the stage-aware vertical phase, preserves the suite pitch-program tuning product, and records
-pitch-program control-point metadata, the optimized pitch-program schedule, tuned indices, path
-constraints, and a Dymos-ready pitch-program transcription contract with stage-phase control
-coverage. `--dymos-mode pitch-program` runs a native Dymos pitch-control transcription and maps the
-resulting control values back into the same suite product with `execution_status = "executed"` and
-target-score metadata for the normalized final insertion objective. `--dymos-mode
-multistage-pitch-program` runs a native linked multiphase variant with one Dymos phase per suite
-stage and records phase topology, linked states, stage durations, stage-local mass depletion,
-stage-transition mass events, exponential-atmosphere drag diagnostics, and per-stage final metrics.
-All Dymos paths report target-insertion residuals against scenario tolerances, per-component
-within-tolerance status, and the weighted altitude/velocity/radial-velocity objective. The current
-suite still does not claim a full high-fidelity multistage ascent design optimizer.
-
-`astro report-tuned-launch` runs the current local end-to-end launch analysis: tune two pitch knots,
-propagate the tuned ascent, hand off insertion to an orbit scenario, propagate a short orbital arc,
-and write one JSON product with the component products plus insertion and short-arc target metrics.
-The report also includes pass/fail assessment gates using the target orbit's configured altitude,
-velocity, and radial-velocity tolerances, with named checks for insertion and short-arc misses.
-It is a deterministic report over local baselines, not a substitute for high-fidelity ascent design.
-
-`astro batch-report-tuned-launch` runs the tuned launch report workflow for multiple iteration
-counts and ranks the resulting reports by normalized assessment error: the sum of absolute check
-misses divided by their configured tolerances. It is a deterministic tuning-depth comparison table,
-not a new optimizer.
-
-`astro compare-tuned-launch-reports` compares two saved tuned launch report JSON products without
-rerunning analysis. It writes signed deltas and absolute-error improvement for insertion and
-short-arc target misses, plus pass/fail changes between the baseline and candidate reports.
-
-`astro handoff-launch` converts a launch trajectory product into a normal orbital propagation
-scenario initialized from `LaunchTrajectory.insertion_state`. The generated YAML is intentionally
-plain `Scenario` input, so the next step is the existing `astro propagate` command rather than a
-special launch-aware propagation path.
-
-`astro synth-measurements` and `astro estimate-measurements` both accept `--backend local` or
-`--backend orekit`. The explicit ingest workflow loads a scenario plus a JSON, CSV, or CCSDS
-Tracking Data Message (TDM) measurement file, then estimates from the caller-provided station
-geometry and measurement records without adding demo geometry. JSON and CSV can carry the suite's
-range, range-rate, one-way Doppler in Hz, iterative linearized two-way/three-way range and range-rate,
-inertial right-ascension/declination, and local-horizon azimuth/elevation records. Doppler uses the
-scenario's `doppler_transmit_frequency_hz` to convert line-of-sight range rate into a
-received-frequency shift. Two-way and three-way range-like observables use iterative vacuum
-light-time over a linearized spacecraft state and carry `participant_path`/`transmitter` metadata,
-uplink/downlink light-time diagnostics, transmit/reflection/receive offsets, and an explicit
-media-corrections marker. Scenarios may set `radiometric_media_uplink_delay_km` and
-`radiometric_media_downlink_delay_km` for configured constant range-delay corrections, or set
-`radiometric_media_model: weather_frequency` to apply a configured surface-weather troposphere
-delay plus first-order TEC/frequency ionosphere group delay with per-leg elevation mapping.
-`radiometric_media_source` and the component delays are preserved in measurement metadata.
-`astro dsn-calibration` turns those generated radiometric records into an auditable DSN-style media
-calibration summary product with per-record leg delays, elevation diagnostics, and aggregate delay
-statistics. This is a calibration product over the suite's supported radiometric primitives, not a
-full binary DSN ODF/TNF standards pipeline. `astro station-calibration` summarizes
-per-station/per-measurement-type residual biases from suite measurement records carrying `truth`
-metadata. It reports grouped residual statistics and sigma-normalized diagnostics for auditability;
-it does not solve station coordinates, clock terms, media parameters, or native NASA ODF/TNF
-station calibration records. `astro import-dsn-tracking`
-ingests a normalized CSV bridge for ODF/TNF-style DSN tracking rows into normal suite measurement
-JSON with format provenance, `astro import-dsn-kvn-tracking` ingests strict DSN ODF/TNF
-KVN-style tracking decks with per-segment metadata, and `astro import-dsn-binary-tracking` ingests
-the suite-owned `ASTRODSN1` fixed-record binary tracking bridge. These are suite-owned bridge
-formats, not a full binary NASA ODF/TNF standards pipeline. Angle records use degrees.
-Ground stations can be supplied either as fixed
-`position_eci_km` vectors or as WGS-84 geodetic `latitude_deg`, `longitude_deg`, and `altitude_km`
-coordinates. Geodetic stations are rotated into the inertial measurement frame at each measurement
-epoch using a deterministic UTC sidereal-time model by default. Scenarios may also provide fixed
-`earth_orientation` values with `ut1_minus_utc_s`, `polar_motion_x_arcsec`,
-`polar_motion_y_arcsec`, and a `source` label, or a `samples` table with timestamped values that
-are linearly interpolated per measurement epoch. These values drive an approximate EOP-aware
-Earth-fixed to inertial correction for geodetic station pointing. Scenarios can also set
-`precession_nutation_model: iau_2006_2000a_simplified` for a compact deterministic
-precession/nutation correction in the geodetic station reduction. This supports explicit fixed EOP
-values, simple tabulated interpolation, compact precession/nutation, and
-`astro import-earth-orientation --format iers-finals` conversion from IERS finals/finals2000A-style
-rows into suite Earth-orientation JSON. It is not a full standards-grade IERS/IAU reduction. JSON inputs
-match the output of `astro synth-measurements`; CSV and TDM inputs are auto-detected by `.csv` and
-`.tdm` extensions or can be forced with `--format csv` / `--format tdm`.
-
-`astro export-measurements` converts suite JSON measurement files into JSON, CSV, or TDM products.
-JSON and CSV preserve all supported suite measurement types, including one-way Doppler in Hz and
-two-way/three-way radiometric metadata. TDM export supports range, range-rate, explicit
-two-way/three-way range/range-rate, one-way Hz Doppler through a suite
-`ASTRO_MEASUREMENT_TYPE = doppler_hz` metadata extension, right-ascension/declination, and
-azimuth/elevation records. The example files under
-`examples/measurements/` are generated from `leo_two_station_od.yaml` and cover all three
-range/range-rate ingest/export formats.
-
-`astro research-propagate` is the research backend entry point for seeded propagation ensembles.
-With `--backend local`, it runs the deterministic Monte Carlo workflow. With `--backend jax`, it
-loads the optional JAX runtime and runs vectorized RK4 ensembles for two-body, J2, and
-screening-only `orekit_high_fidelity` scenarios, including configured high-order gravity
-degree/order metadata on a J2 baseline plus research approximations for atmospheric drag, solar
-radiation pressure, analytic circular Sun/Moon third-body gravity, and configured third-body
-ephemeris samples. With
-`--include-sensitivities`, the JAX path adds a nominal final-state transition matrix computed
-through JAX autodiff to the `MonteCarloResult` metadata. When the scenario carries
-`initial_covariance`, it also records the propagated final covariance using
-`P_final = Phi * P_initial * Phi^T`. Third-body JAX products record either
-`third_body_ephemeris_model = "analytic_circular_sun_moon_screening"` or
-`"configured_ephemeris_samples_screening"` so callers do not mistake the screening approximation for
-operational ephemeris-backed Orekit/Tudat semantics.
-
-`astro research-od-sensitivity --backend jax` loads an explicit measurement file and writes an
-`OdSensitivityResult` containing normalized OD residuals and the residual Jacobian with respect to
-the initial Cartesian state, plus the normalized-residual normal matrix and inverse-normal
-covariance diagnostic. This is the first differentiable OD primitive for range/range-rate, inertial
-right-ascension/declination, and local-horizon azimuth/elevation workflows; it currently supports
-two-body/J2 force models and measurement epochs aligned with propagation samples. Right ascension
-and azimuth residuals use wrapped degrees so 0/360 degree crossings stay continuous.
-Topocentric angular sensitivity metadata records a horizontal-norm floor because azimuth is
-geometrically undefined and elevation derivatives are singular at exact zenith/nadir passes.
-`astro research-estimate --backend jax` runs a research Gauss-Newton
-correction loop over the same JAX residual/Jacobian model and writes the suite `EstimateResult`
-product with normalized-residual metadata for range/range-rate, inertial RA/Dec, and topocentric
-az/el workflows. It is a differentiable OD workflow for screening and method development, not a
-replacement for the deterministic local estimator or native Orekit OD.
-
-CSV inputs use one row per measurement with these required columns:
-
-```csv
-scenario_id,measurement_type,epoch,observer,observed_object,value,sigma,units
-```
-
-The optional `metadata_json` column can carry a JSON object for row-level metadata. Valid units are
-`km`, `km/s`, `Hz`, and `deg`, depending on measurement type. The
-`leo_two_station_od.yaml` example includes two stations because the one-station propagation example
-is intentionally under-observed for six-state OD.
-`examples/scenarios/leo_radiometric_links.yaml` demonstrates two-way and three-way radiometric
-measurement synthesis with explicit uplink/downlink station metadata and vacuum light-time
-diagnostics. `examples/scenarios/leo_radiometric_media.yaml` adds configured constant media range
-delays to the same product family. `examples/scenarios/leo_radiometric_weather_frequency.yaml`
-adds configured pressure, temperature, humidity, TEC, carrier frequency, and elevation mapping
-metadata for weather/frequency-dependent media corrections.
-
-```bash
-astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml \
-  --backend local \
-  --output /tmp/astro-dsn-calibration.json
-
-astro export-measurements /tmp/astro-radiometric-weather-frequency.json \
-  --format tdm \
-  --output /tmp/astro-radiometric-weather-frequency.tdm
-astro dsn-calibration examples/scenarios/leo_radiometric_weather_frequency.yaml \
-  --measurements /tmp/astro-radiometric-weather-frequency.tdm \
-  --format tdm \
-  --output /tmp/astro-dsn-calibration-from-tdm.json
-
-astro import-dsn-tracking examples/measurements/dsn_tracking_normalized.csv \
-  --output /tmp/astro-dsn-tracking-measurements.json
-astro import-dsn-kvn-tracking examples/measurements/dsn_tracking_kvn.txt \
-  --output /tmp/astro-dsn-kvn-tracking-measurements.json
-python -m pytest tests/astro_od/test_dsn_tracking.py::test_load_dsn_binary_tracking_measurements_maps_fixed_records \
-  tests/astro_cli/test_cli.py::test_import_dsn_binary_tracking_command_writes_measurement_json -q
-astro station-calibration examples/scenarios/leo_two_station_od.yaml \
-  examples/measurements/leo_two_station_od_measurements.json \
-  --output /tmp/astro-station-calibration.json
-```
-
-TDM ingest currently supports KVN-formatted sequential segments with `TIME_SYSTEM = UTC`,
-`PARTICIPANT_n`, `PATH`, `RANGE` in `km`, `DOPPLER_INSTANTANEOUS` or `DOPPLER_INTEGRATED` mapped
-to range-rate measurements in `km/s`, and `ANGLE_1`/`ANGLE_2` records in `deg`. Segments with
-`ASTRO_MEASUREMENT_TYPE = two_way` or `three_way` preserve the suite's explicit multi-leg
-radiometric types without reinterpreting legacy TDM files that omit the extension. Segments with
-`ASTRO_MEASUREMENT_TYPE = doppler_hz` preserve suite one-way Doppler records in `Hz` with
-`DOPPLER_UNITS = Hz` and optional `DOPPLER_SIGMA_HZ`. Angle segments use
-`ANGLE_TYPE = RADEC` for right ascension/declination and `ANGLE_TYPE = AZEL` for
-azimuth/elevation. TDM does not provide the suite's scenario identifier or estimator sigmas
-directly, so an optional segment-level `SCENARIO_ID` extension is checked when present, and the
-parser uses default sigmas of `0.01 km` for range, `1e-5 km/s` for range-rate, `0.1 Hz` for
-suite Doppler, and `0.001 deg` for angles.
+- `src/astro_core`: shared scenario, state, trajectory, and error models.
+- `src/astro_dynamics`: local propagation, covariance, attitude, maneuvers, and conjunction tools.
+- `src/astro_od`: measurement generation, import/export, calibration, and estimation.
+- `src/astro_launch`: launch/ascent models, local propagation, handoff, tuning, and reporting.
+- `src/astro_backends`: optional engine adapters and smoke checks.
+- `src/astro_assistant`: typed assistant plans, policy, verification, and artifact validation.
+- `src/astro_cli`: the `astro` command line interface.
+- `examples/`: runnable scenarios, launch cases, measurements, and assistant prompts.
+- `docs/`: validation, backend, release, assistant, and research notes.
 
 ## Verification
 
 ```bash
-python -m pytest -v
 python -m ruff check .
 python -m mypy
+python -m pytest -q
+python -m build
 ```
 
-## License
+Useful docs:
 
-Astro Suite is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
+- [Validation Matrix](docs/validation-matrix.md)
+- [Assistant Workflows](docs/assistant-workflows.md)
+- [Assistant MCP Contract](docs/assistant-mcp-contract.md)
+- [Backend Installation](docs/backend-installation.md)
+- [Current State](docs/current-state.md)
+- [Release Checklist](docs/release-checklist.md)
 
 ## Safety Scope
 
@@ -560,9 +172,6 @@ does not claim flight qualification, and should not be used as spacecraft comman
 assistant interface is intentionally constrained to typed plans, allow-listed commands, approval
 gates, and artifact validators.
 
-Additional release and backend documentation:
+## License
 
-- [Validation matrix](docs/validation-matrix.md)
-- [Assistant workflows](docs/assistant-workflows.md)
-- [Backend installation guide](docs/backend-installation.md)
-- [Release checklist](docs/release-checklist.md)
+Astro Suite is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
