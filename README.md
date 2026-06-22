@@ -549,6 +549,17 @@ python -m ruff check .
 python -m mypy
 ```
 
+## License
+
+Astro Suite is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
+
+## Safety Scope
+
+Astro Suite is a deterministic mission-analysis and research codebase. It is not flight software,
+does not claim flight qualification, and should not be used as spacecraft command authority. The
+assistant interface is intentionally constrained to typed plans, allow-listed commands, approval
+gates, and artifact validators.
+
 Additional release and backend documentation:
 
 - [Validation matrix](docs/validation-matrix.md)

@@ -211,6 +211,7 @@ def test_verify_assistant_reports_supported_scenario() -> None:
     assert report["plan_id"] == "local-od-demo"
     assert report["scenario_path"] == "examples/scenarios/leo_two_station_topocentric.yaml"
     assert report["artifact_dir"] == "/tmp/astro-assistant/leo_two_station_topocentric"
+    assert report["classification"]["code"] == "supported"
     assert report["verification"]["passed"] is True
     assert report["verification"]["diagnostics"] == []
 
@@ -227,8 +228,23 @@ def test_verify_assistant_reports_unsupported_scenario() -> None:
     assert result.exit_code == 2
     report = json.loads(result.stdout)
     assert report["supported"] is False
-    assert report["scenario_path"] is None
+    assert report["scenario_path"] == "examples/scenarios/leo_orekit_high_fidelity.yaml"
+    assert report["classification"]["code"] == "optional_backend"
     assert report["verification"]["passed"] is False
-    assert "could not resolve a supported local OD scenario" in (
-        report["verification"]["diagnostics"][0]["message"]
+    assert "optional backend" in report["verification"]["diagnostics"][0]["message"]
+
+
+def test_verify_assistant_reports_rank_deficient_geometry() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "verify-assistant",
+            "Run local orbit determination on examples/scenarios/leo_two_body.yaml",
+        ],
     )
+
+    assert result.exit_code == 2
+    report = json.loads(result.stdout)
+    assert report["supported"] is False
+    assert report["classification"]["code"] == "rank_deficient_geometry"
+    assert "rank deficient" in report["classification"]["message"]

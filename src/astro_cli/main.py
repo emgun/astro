@@ -7,10 +7,10 @@ from typing import Annotated
 import typer
 import yaml
 
+from astro_assistant.capabilities import LocalODSupportReport, classify_local_od_support
 from astro_assistant.executor import WorkflowExecutor
 from astro_assistant.models import VerificationDiagnostic, VerificationResult
 from astro_assistant.planner import DeterministicPlanner
-from astro_assistant.scenarios import resolve_local_od_scenario
 from astro_assistant.verification import verify_plan
 from astro_backends.dymos import (
     optimize_launch_dymos,
@@ -352,51 +352,64 @@ def ask_assistant(
 def verify_assistant(
     prompt: Annotated[str, typer.Argument(help="Natural language assistant request.")],
 ) -> None:
-    planner = DeterministicPlanner()
-    try:
-        plan = planner.plan(prompt)
-    except ValueError as exc:
+    classification = classify_local_od_support(prompt)
+    if not classification.supported:
         verification = VerificationResult(
             passed=False,
             diagnostics=[
                 VerificationDiagnostic(
-                    code="unsupported_prompt",
-                    message=str(exc),
+                    code=classification.code,
+                    message=classification.message,
                 )
             ],
         )
         typer.echo(
             json.dumps(
-                {
-                    "supported": False,
-                    "plan_id": None,
-                    "scenario_path": None,
-                    "scenario_id": None,
-                    "artifact_dir": None,
-                    "verification": verification.model_dump(mode="json"),
-                },
+                _assistant_verification_report(
+                    classification=classification,
+                    plan_id=None,
+                    verification=verification,
+                ),
                 indent=2,
             )
         )
-        raise typer.Exit(code=2) from exc
+        raise typer.Exit(code=2)
 
-    resolved = resolve_local_od_scenario(prompt)
+    planner = DeterministicPlanner()
+    plan = planner.plan(prompt)
     verification = verify_plan(plan)
     typer.echo(
         json.dumps(
-            {
-                "supported": verification.passed,
-                "plan_id": plan.plan_id,
-                "scenario_path": resolved.path,
-                "scenario_id": resolved.scenario_id,
-                "artifact_dir": resolved.artifact_dir,
-                "verification": verification.model_dump(mode="json"),
-            },
+            _assistant_verification_report(
+                classification=classification,
+                plan_id=plan.plan_id,
+                verification=verification,
+            ),
             indent=2,
         )
     )
     if not verification.passed:
         raise typer.Exit(code=2)
+
+
+def _assistant_verification_report(
+    *,
+    classification: LocalODSupportReport,
+    plan_id: str | None,
+    verification: VerificationResult,
+) -> dict[str, object]:
+    return {
+        "supported": classification.supported and verification.passed,
+        "plan_id": plan_id,
+        "scenario_path": classification.scenario_path,
+        "scenario_id": classification.scenario_id,
+        "artifact_dir": classification.artifact_dir,
+        "classification": {
+            "code": classification.code,
+            "message": classification.message,
+        },
+        "verification": verification.model_dump(mode="json"),
+    }
 
 
 @app.command()

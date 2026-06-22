@@ -45,6 +45,16 @@ than the one requested in the prompt.
 fastest way to see which scenario was resolved, where artifacts would be written, and which
 deterministic verification diagnostics would block execution.
 
+Unsupported-scenario reports classify the blocker instead of returning only a generic rejection.
+Current classifier codes include:
+
+- `path_policy`: the requested path is outside the allowed example-scenario boundary.
+- `optional_backend`: the scenario requires an optional or high-fidelity backend outside local OD.
+- `missing_measurements`: the scenario cannot generate measurement records for local OD.
+- `rank_deficient_geometry`: the generated OD geometry cannot estimate a full six-state solution.
+- `unsupported_local_model`: local propagation or estimation rejected the scenario configuration.
+- `unsupported_prompt`: the prompt is outside the current local OD workflow.
+
 ## Safety Boundaries
 
 - Plans are typed Pydantic models.
