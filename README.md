@@ -207,6 +207,7 @@ astro compare-tuned-launch-reports tuned_launch_report_baseline.json tuned_launc
 astro handoff-launch launch.json --output insertion.yaml --duration-s 600 --step-s 60
 astro propagate insertion.yaml --backend local --output insertion_trajectory.json
 astro import-earth-orientation examples/eop/finals2000A_excerpt.txt --format iers-finals --source finals2000A-example --output earth_orientation.json
+astro verify-assistant "Run local OD on leo_two_station_topocentric.yaml"
 astro ask "Run the local OD demo" --dry-run
 astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --dry-run
 astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --execute --approved --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json

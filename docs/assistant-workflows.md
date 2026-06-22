@@ -13,6 +13,7 @@ commands generate and validate the artifacts.
 The first workflow is scenario-parameterized local orbit determination:
 
 ```bash
+astro verify-assistant "Run local OD on leo_two_station_topocentric.yaml"
 astro ask "Run the local OD demo" --dry-run
 astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --dry-run
 astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --execute --approved --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json
@@ -39,6 +40,10 @@ Supported local OD scenario paths:
 
 Unsupported scenarios fail closed. The planner must not silently substitute a different scenario
 than the one requested in the prompt.
+
+`astro verify-assistant` emits a JSON support report without executing workflow commands. It is the
+fastest way to see which scenario was resolved, where artifacts would be written, and which
+deterministic verification diagnostics would block execution.
 
 ## Safety Boundaries
 

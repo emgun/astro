@@ -197,3 +197,38 @@ def test_assistant_ask_unsupported_scenario_exits_with_resolver_error() -> None:
 
     assert result.exit_code == 2
     assert "could not resolve a supported local OD scenario" in result.stderr
+
+
+def test_verify_assistant_reports_supported_scenario() -> None:
+    result = runner.invoke(
+        app,
+        ["verify-assistant", "Run local OD on leo_two_station_topocentric.yaml"],
+    )
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["supported"] is True
+    assert report["plan_id"] == "local-od-demo"
+    assert report["scenario_path"] == "examples/scenarios/leo_two_station_topocentric.yaml"
+    assert report["artifact_dir"] == "/tmp/astro-assistant/leo_two_station_topocentric"
+    assert report["verification"]["passed"] is True
+    assert report["verification"]["diagnostics"] == []
+
+
+def test_verify_assistant_reports_unsupported_scenario() -> None:
+    result = runner.invoke(
+        app,
+        [
+            "verify-assistant",
+            "Run local orbit determination on examples/scenarios/leo_orekit_high_fidelity.yaml",
+        ],
+    )
+
+    assert result.exit_code == 2
+    report = json.loads(result.stdout)
+    assert report["supported"] is False
+    assert report["scenario_path"] is None
+    assert report["verification"]["passed"] is False
+    assert "could not resolve a supported local OD scenario" in (
+        report["verification"]["diagnostics"][0]["message"]
+    )
