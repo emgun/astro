@@ -30,9 +30,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "build>=1.2",
-  "mypy>=1.10",
+  "mypy>=1.11,<1.12",
   "pytest>=8.2",
   "ruff>=0.5",
+  "types-PyYAML>=6.0",
 ]
 orekit = [
   "orekit-jpype>=13.1",

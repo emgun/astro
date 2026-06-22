@@ -26,3 +26,12 @@ def test_public_package_metadata_declares_license_and_classifiers() -> None:
         "classifiers"
     ]
     assert "Topic :: Scientific/Engineering :: Astronomy" in pyproject["project"]["classifiers"]
+
+
+def test_dev_dependencies_keep_ci_type_checking_stable() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+
+    dev_dependencies = pyproject["project"]["optional-dependencies"]["dev"]
+
+    assert "mypy>=1.11,<1.12" in dev_dependencies
+    assert "types-PyYAML>=6.0" in dev_dependencies
