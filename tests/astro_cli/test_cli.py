@@ -5,7 +5,6 @@ from struct import pack
 
 import pytest
 import yaml
-from typer.testing import CliRunner
 
 from astro_backends.dymos import DymosSmokeResult
 from astro_backends.jax import JaxSmokeResult
@@ -35,9 +34,10 @@ from astro_launch.targeting import tune_pitch_program
 from astro_od.estimation import estimate_initial_state
 from astro_od.io import dump_measurements_tdm, load_measurements
 from astro_od.measurements import generate_synthetic_measurements
+from tests.astro_cli.helpers import make_cli_runner
 from tests.astro_launch.helpers import make_launch_scenario, make_pitch_program_launch_scenario
 
-runner = CliRunner(mix_stderr=False)
+runner = make_cli_runner()
 
 
 def _observable_scenario() -> Scenario:

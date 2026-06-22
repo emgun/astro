@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
 
 from astro_assistant.models import (
     AstroWorkflowPlan,
@@ -14,8 +13,9 @@ from astro_assistant.models import (
 from astro_assistant.policy import evaluate_plan
 from astro_assistant.registry import build_command_spec
 from astro_cli.main import app
+from tests.astro_cli.helpers import make_cli_runner
 
-runner = CliRunner(mix_stderr=False)
+runner = make_cli_runner()
 
 
 @dataclass(frozen=True)
