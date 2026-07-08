@@ -61,4 +61,4 @@ def _site_position_eci_km(site: GroundSiteConfig, elapsed_s: float) -> tuple[flo
 
 def _unit(vector: tuple[float, float, float]) -> tuple[float, float, float]:
     norm = sqrt(sum(component * component for component in vector))
-    return tuple(component / norm for component in vector)
+    return (vector[0] / norm, vector[1] / norm, vector[2] / norm)

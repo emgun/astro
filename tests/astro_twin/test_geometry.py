@@ -1,6 +1,12 @@
 from datetime import UTC, datetime
 
-from astro_core.models import CartesianState, ForceModelConfig, ForceModelName, Trajectory, TrajectorySample
+from astro_core.models import (
+    CartesianState,
+    ForceModelConfig,
+    ForceModelName,
+    Trajectory,
+    TrajectorySample,
+)
 from astro_twin.geometry import build_geometry_timeline
 
 

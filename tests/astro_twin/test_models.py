@@ -95,7 +95,10 @@ def test_digital_twin_scenario_rejects_unknown_link_site() -> None:
     payload = scenario.model_dump()
     payload["links"][0]["ground_site"] = "missing"
 
-    with pytest.raises(ValidationError, match="link ground_site must name a configured ground site"):
+    with pytest.raises(
+        ValidationError,
+        match="link ground_site must name a configured ground site",
+    ):
         DigitalTwinScenario.model_validate(payload)
 
 
