@@ -35,7 +35,17 @@ def test_run_constellation_twin_returns_fleet_result() -> None:
     }
     assert len(result.access_summaries) == 1
     assert result.access_summaries[0].ground_site == "equator-eci"
+    assert result.access_summaries[0].total_access_duration_s == 300.0
+    assert result.access_summaries[0].coverage_fraction == 0.5
+    assert result.access_summaries[0].longest_gap_s == 300.0
     assert result.access_summaries[0].max_simultaneous_spacecraft == 2
+    member_access_by_name = {
+        member.member_name: member.result.access_windows for member in result.members
+    }
+    assert member_access_by_name["plane-a"][0].start_s == 0.0
+    assert member_access_by_name["plane-a"][0].end_s == 240.0
+    assert member_access_by_name["plane-b"][0].start_s == 0.0
+    assert member_access_by_name["plane-b"][0].end_s == 300.0
     assert len(result.link_summaries) == 1
     assert result.link_summaries[0].ground_site == "equator-eci"
     assert result.link_summaries[0].total_data_volume_mbit > 0.0

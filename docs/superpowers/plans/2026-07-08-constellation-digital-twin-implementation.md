@@ -39,7 +39,7 @@ Non-goals for this branch:
 - Create `src/astro_twin/constellation.py`: runner and deterministic aggregation helpers.
 - Create `src/astro_twin/constellation_io.py`: YAML/JSON loaders, result loader/writer, and summary formatter.
 - Modify `src/astro_cli/main.py`: add `astro run-constellation-twin`.
-- Create `examples/scenarios/leo_two_body_phase_60deg.yaml`: phased member orbit example.
+- Create `examples/scenarios/leo_two_body_phase_minus_4deg.yaml`: phased member orbit example.
 - Create `examples/twin/leo_observer_plane_a.yaml`: member A twin scenario.
 - Create `examples/twin/leo_observer_plane_b.yaml`: member B twin scenario.
 - Create `examples/twin/constellation_leo_observers.yaml`: constellation scenario.
@@ -882,7 +882,7 @@ git commit -m "Add constellation twin aggregation"
 
 **Files:**
 - Modify: `src/astro_twin/constellation.py`
-- Create: `examples/scenarios/leo_two_body_phase_60deg.yaml`
+- Create: `examples/scenarios/leo_two_body_phase_minus_4deg.yaml`
 - Create: `examples/twin/leo_observer_plane_a.yaml`
 - Create: `examples/twin/leo_observer_plane_b.yaml`
 - Create: `examples/twin/constellation_leo_observers.yaml`
@@ -914,13 +914,13 @@ def test_run_constellation_twin_returns_fleet_result() -> None:
 
 - [ ] **Step 2: Add reference example files**
 
-Create `examples/scenarios/leo_two_body_phase_60deg.yaml`:
+Create `examples/scenarios/leo_two_body_phase_minus_4deg.yaml`:
 
 ```yaml
-scenario_id: leo-two-body-phase-60deg
-description: Deterministic phased LEO two-body propagation example for constellation twin tests.
+scenario_id: leo-two-body-phase-minus-4deg
+description: Deterministic slightly phased LEO two-body propagation example for constellation twin tests.
 spacecraft:
-  name: demo-sat-phase-60
+  name: demo-sat-phase-minus-4
   mass_kg: 120.0
   area_m2: 2.5
   drag_coefficient: 2.2
@@ -932,8 +932,8 @@ initial_state:
   central_body: earth
   representation: cartesian
   cartesian:
-    position_km: [3500.0, 6062.177826491071, 0.0]
-    velocity_km_s: [-6.49519052838329, 3.75, 1.0]
+    position_km: [6982.948351818769, -488.2953162088771, 0.0]
+    velocity_km_s: [0.5231735530809398, 7.481730376948682, 1.0]
 force_model:
   gravity: two_body
 propagation:
@@ -1017,7 +1017,7 @@ Create `examples/twin/leo_observer_plane_b.yaml`:
 
 ```yaml
 scenario_id: leo-observer-plane-b
-orbit_scenario: examples/scenarios/leo_two_body_phase_60deg.yaml
+orbit_scenario: examples/scenarios/leo_two_body_phase_minus_4deg.yaml
 spacecraft:
   name: ObserverSat-B
   dry_mass_kg: 120.0
@@ -1235,7 +1235,7 @@ Expected: all constellation tests pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/astro_twin/constellation.py examples/scenarios/leo_two_body_phase_60deg.yaml examples/twin/leo_observer_plane_a.yaml examples/twin/leo_observer_plane_b.yaml examples/twin/constellation_leo_observers.yaml tests/astro_twin/test_constellation_runner.py
+git add src/astro_twin/constellation.py examples/scenarios/leo_two_body_phase_minus_4deg.yaml examples/twin/leo_observer_plane_a.yaml examples/twin/leo_observer_plane_b.yaml examples/twin/constellation_leo_observers.yaml tests/astro_twin/test_constellation_runner.py
 git commit -m "Add constellation twin runner and examples"
 ```
 

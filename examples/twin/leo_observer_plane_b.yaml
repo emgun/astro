@@ -1,5 +1,5 @@
 scenario_id: leo-observer-plane-b
-orbit_scenario: examples/scenarios/leo_two_body_phase_60deg.yaml
+orbit_scenario: examples/scenarios/leo_two_body_phase_minus_4deg.yaml
 spacecraft:
   name: ObserverSat-B
   dry_mass_kg: 120.0
