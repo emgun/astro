@@ -1,0 +1,10 @@
+scenario_id: leo-observers
+members:
+  - name: plane-a
+    twin_scenario: examples/twin/leo_observer_plane_a.yaml
+  - name: plane-b
+    twin_scenario: examples/twin/leo_observer_plane_b.yaml
+coverage_requirements:
+  - ground_site: equator-eci
+    minimum_coverage_fraction: 0.25
+    maximum_revisit_gap_s: 300.0

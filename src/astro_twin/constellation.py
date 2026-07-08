@@ -3,12 +3,17 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from math import isfinite
 
+from astro_core.errors import InvalidScenarioError
 from astro_twin.constellation_models import (
     ConstellationCoverageRequirement,
+    ConstellationTwinResult,
+    ConstellationTwinScenario,
     FleetAccessSummary,
     FleetLinkSummary,
     MemberLinkSummary,
+    MemberTwinResult,
 )
+from astro_twin.io import load_twin_scenario
 from astro_twin.models import (
     AccessWindow,
     DesignMargin,
@@ -16,6 +21,114 @@ from astro_twin.models import (
     LinkBudgetWindow,
     TwinMarginStatus,
 )
+from astro_twin.runner import run_digital_twin
+
+_CONSTELLATION_DESIGN_SCREENING_WARNING = (
+    "Constellation digital twin v1 is deterministic design-screening evidence "
+    "for architecture trades, not operational constellation coverage authority."
+)
+
+
+def run_constellation_twin(
+    scenario: ConstellationTwinScenario,
+) -> ConstellationTwinResult:
+    """Run each member twin and aggregate deterministic fleet screening evidence."""
+    member_results: list[MemberTwinResult] = []
+    member_access_windows: dict[str, tuple[AccessWindow, ...]] = {}
+    member_link_windows: dict[str, tuple[LinkBudgetWindow, ...]] = {}
+    member_limiting_margins: dict[str, DesignMargin] = {}
+    configured_ground_sites: set[str] = set()
+    analysis_starts_s: list[float] = []
+    analysis_ends_s: list[float] = []
+    warnings = [_CONSTELLATION_DESIGN_SCREENING_WARNING]
+
+    for member in scenario.members:
+        member_scenario = load_twin_scenario(member.twin_scenario)
+        configured_ground_sites.update(site.name for site in member_scenario.ground_sites)
+        member_result = run_digital_twin(member_scenario)
+        if not member_result.geometry:
+            raise InvalidScenarioError(
+                f"Constellation member {member.name} produced no geometry samples"
+            )
+
+        analysis_starts_s.append(member_result.geometry[0].elapsed_s)
+        analysis_ends_s.append(member_result.geometry[-1].elapsed_s)
+        member_results.append(
+            MemberTwinResult(member_name=member.name, result=member_result)
+        )
+        member_access_windows[member.name] = member_result.access_windows
+        member_link_windows[member.name] = member_result.link_windows
+        member_limiting_margins[member.name] = (
+            member_result.margin_report.limiting_margin
+        )
+        warnings.extend(member_result.warnings)
+
+    _validate_coverage_requirement_sites(scenario, configured_ground_sites)
+    analysis_start_s = max(analysis_starts_s)
+    analysis_end_s = min(analysis_ends_s)
+    if analysis_end_s <= analysis_start_s:
+        raise InvalidScenarioError(
+            "Constellation member geometry timelines do not overlap"
+        )
+
+    access_summaries = aggregate_access_summaries(
+        member_access_windows=member_access_windows,
+        analysis_start_s=analysis_start_s,
+        analysis_end_s=analysis_end_s,
+    )
+    link_summaries, member_link_summaries = aggregate_link_summaries(
+        member_link_windows=member_link_windows,
+        analysis_start_s=analysis_start_s,
+        analysis_end_s=analysis_end_s,
+    )
+    fleet_margin_report = build_fleet_margin_report(
+        access_summaries=access_summaries,
+        link_summaries=link_summaries,
+        coverage_requirements=scenario.coverage_requirements,
+        member_limiting_margins=member_limiting_margins,
+    )
+    return ConstellationTwinResult(
+        scenario_id=scenario.scenario_id,
+        members=tuple(member_results),
+        access_summaries=access_summaries,
+        link_summaries=link_summaries,
+        member_link_summaries=member_link_summaries,
+        fleet_margin_report=fleet_margin_report,
+        metadata={
+            "analysis_window_s": {
+                "start_s": analysis_start_s,
+                "end_s": analysis_end_s,
+            }
+        },
+        warnings=_deduplicate_warnings(warnings),
+    )
+
+
+def _validate_coverage_requirement_sites(
+    scenario: ConstellationTwinScenario,
+    configured_ground_sites: set[str],
+) -> None:
+    missing_sites = sorted(
+        requirement.ground_site
+        for requirement in scenario.coverage_requirements
+        if requirement.ground_site not in configured_ground_sites
+    )
+    if missing_sites:
+        raise InvalidScenarioError(
+            "Constellation coverage requirements reference unconfigured ground sites: "
+            + ", ".join(missing_sites)
+        )
+
+
+def _deduplicate_warnings(warnings: Iterable[str]) -> list[str]:
+    unique_warnings: list[str] = []
+    seen: set[str] = set()
+    for warning in warnings:
+        if warning in seen:
+            continue
+        seen.add(warning)
+        unique_warnings.append(warning)
+    return unique_warnings
 
 
 def aggregate_access_summaries(
