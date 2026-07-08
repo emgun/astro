@@ -45,3 +45,33 @@ def load_twin_result(path: Path | str) -> DigitalTwinResult:
         return DigitalTwinResult.model_validate(raw)
     except ValidationError as exc:
         raise InvalidScenarioError(f"Twin result file {result_path} is invalid: {exc}") from exc
+
+
+def format_twin_summary(result: DigitalTwinResult) -> str:
+    min_soc = min(sample.battery_soc_fraction for sample in result.power)
+    link_margin = (
+        min(window.worst_ebn0_margin_db for window in result.link_windows)
+        if result.link_windows
+        else None
+    )
+    lines = [
+        f"Digital twin: {result.scenario_id}",
+        f"Workflow: {result.workflow}",
+        f"Samples: {len(result.geometry)}",
+        f"Minimum battery SOC: {min_soc:.3f}",
+        f"Access windows: {len(result.access_windows)}",
+        (
+            f"Worst link margin dB: {link_margin:.3f}"
+            if link_margin is not None
+            else "Worst link margin dB: unavailable"
+        ),
+        (
+            "Limiting margin: "
+            f"{result.margin_report.limiting_margin.name} = "
+            f"{result.margin_report.limiting_margin.margin:.3f}"
+        ),
+    ]
+    if result.warnings:
+        lines.append("Warnings:")
+        lines.extend(f"- {warning}" for warning in result.warnings)
+    return "\n".join(lines)

@@ -229,6 +229,28 @@ def test_propagate_command_writes_json(tmp_path: Path) -> None:
     assert len(payload["samples"]) == 11
 
 
+def test_run_twin_command_writes_json_and_summary(tmp_path: Path) -> None:
+    output = tmp_path / "twin.json"
+    summary = tmp_path / "twin.txt"
+
+    result = runner.invoke(
+        app,
+        [
+            "run-twin",
+            "examples/twin/leo_observer.yaml",
+            "--output",
+            str(output),
+            "--summary-output",
+            str(summary),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["workflow"] == "integrated_digital_twin_v1"
+    assert "Limiting margin:" in summary.read_text(encoding="utf-8")
+
+
 def test_export_trajectory_command_writes_csv(tmp_path: Path) -> None:
     trajectory_path = tmp_path / "trajectory.json"
     output = tmp_path / "trajectory.csv"

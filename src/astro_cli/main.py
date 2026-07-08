@@ -84,6 +84,8 @@ from astro_od.io import (
     resolve_measurement_format,
 )
 from astro_od.measurements import generate_synthetic_measurements
+from astro_twin.io import format_twin_summary, load_twin_scenario
+from astro_twin.runner import run_digital_twin
 
 app = typer.Typer(help="Astro Suite flight dynamics workflows.")
 
@@ -556,6 +558,39 @@ def propagate(
     else:
         _write_text_or_exit(output, payload, "trajectory")
         typer.echo(f"wrote trajectory: {output}")
+
+
+@app.command("run-twin")
+def run_twin(
+    scenario_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Digital twin scenario YAML path."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Write digital twin JSON result.")],
+    summary_output: Annotated[
+        Path | None,
+        typer.Option("--summary-output", help="Write a concise text summary."),
+    ] = None,
+) -> None:
+    """Run the deterministic single-spacecraft digital twin workflow."""
+    try:
+        scenario = load_twin_scenario(scenario_path)
+        result = run_digital_twin(scenario)
+    except InvalidScenarioError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "digital twin result")
+    typer.echo(f"wrote digital twin result: {output}")
+    if summary_output is not None:
+        summary_output.parent.mkdir(parents=True, exist_ok=True)
+        _write_text_or_exit(
+            summary_output,
+            format_twin_summary(result),
+            "digital twin summary",
+        )
+        typer.echo(f"wrote digital twin summary: {summary_output}")
 
 
 @app.command("compare-tudat-reference")
