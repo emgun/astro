@@ -63,3 +63,22 @@ python -m pytest tests/astro_twin -q
 
 The gate validates the package-level models and deterministic subsystem products without requiring
 Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, JAX, or any external provider.
+
+## Constellation Twin
+
+The constellation twin workflow runs multiple single-spacecraft twin scenarios and aggregates fleet
+access, revisit, link-budget, data-volume, and margin evidence.
+
+```bash
+astro run-constellation-twin examples/twin/constellation_leo_observers.yaml \
+  --output /tmp/astro-constellation-twin.json \
+  --summary-output /tmp/astro-constellation-twin.txt
+```
+
+The checked-in reference runs two LEO observer members against `equator-eci`, embeds each member's
+suite-owned `DigitalTwinResult`, and returns fleet access/link summaries plus member and fleet
+margin evidence.
+
+The v1 constellation product is deterministic design-screening evidence. It is not operational
+coverage authority, contact scheduling, spectrum coordination, collision avoidance, or constellation
+optimization.
