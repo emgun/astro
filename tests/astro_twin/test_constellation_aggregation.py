@@ -110,6 +110,39 @@ def test_aggregate_link_summaries_groups_by_site_and_member() -> None:
     )
 
 
+def test_aggregate_link_summaries_sorts_members_by_name() -> None:
+    _fleet, members = aggregate_link_summaries(
+        member_link_windows={
+            "plane-b": (
+                LinkBudgetWindow(
+                    link_name="xband-b",
+                    ground_site="equator-eci",
+                    start_s=120.0,
+                    end_s=180.0,
+                    duration_s=60.0,
+                    worst_ebn0_margin_db=2.0,
+                    data_volume_mbit=120.0,
+                ),
+            ),
+            "plane-a": (
+                LinkBudgetWindow(
+                    link_name="xband-a",
+                    ground_site="equator-eci",
+                    start_s=0.0,
+                    end_s=60.0,
+                    duration_s=60.0,
+                    worst_ebn0_margin_db=4.0,
+                    data_volume_mbit=120.0,
+                ),
+            ),
+        },
+        analysis_start_s=0.0,
+        analysis_end_s=600.0,
+    )
+
+    assert [member.member_name for member in members] == ["plane-a", "plane-b"]
+
+
 def test_build_fleet_margin_report_uses_coverage_link_and_member_margins() -> None:
     access_summaries = aggregate_access_summaries(
         member_access_windows={"plane-a": ()},
@@ -224,6 +257,29 @@ def test_aggregation_clips_windows_to_analysis_interval() -> None:
     )
 
 
+def test_link_proration_uses_window_timestamps_not_declared_duration() -> None:
+    link_summaries, member_summaries = aggregate_link_summaries(
+        member_link_windows={
+            "plane-a": (
+                LinkBudgetWindow(
+                    link_name="xband-a",
+                    ground_site="equator-eci",
+                    start_s=0.0,
+                    end_s=100.0,
+                    duration_s=200.0,
+                    worst_ebn0_margin_db=4.0,
+                    data_volume_mbit=200.0,
+                ),
+            ),
+        },
+        analysis_start_s=50.0,
+        analysis_end_s=100.0,
+    )
+
+    assert link_summaries[0].total_data_volume_mbit == 100.0
+    assert member_summaries[0].total_data_volume_mbit == 100.0
+
+
 def test_build_fleet_margin_report_flags_missing_site_link_margin() -> None:
     access_summaries = aggregate_access_summaries(
         member_access_windows={
@@ -313,3 +369,54 @@ def test_build_fleet_margin_report_adds_default_coverage_for_access_sites() -> N
     assert coverage_margin.status is TwinMarginStatus.PASS
     assert link_margin.value == 4.0
     assert link_margin.status is TwinMarginStatus.PASS
+
+
+def test_build_fleet_margin_report_breaks_limiting_margin_ties_by_name() -> None:
+    access_summaries = aggregate_access_summaries(
+        member_access_windows={
+            "plane-a": (
+                AccessWindow(
+                    ground_site="equator-eci",
+                    start_s=300.0,
+                    end_s=600.0,
+                    duration_s=300.0,
+                    max_elevation_deg=80.0,
+                    min_range_km=700.0,
+                ),
+            )
+        },
+        analysis_start_s=0.0,
+        analysis_end_s=600.0,
+    )
+    link_summaries, _ = aggregate_link_summaries(
+        member_link_windows={
+            "plane-a": (
+                LinkBudgetWindow(
+                    link_name="xband-a",
+                    ground_site="equator-eci",
+                    start_s=300.0,
+                    end_s=360.0,
+                    duration_s=60.0,
+                    worst_ebn0_margin_db=0.0,
+                    data_volume_mbit=120.0,
+                ),
+            ),
+        },
+        analysis_start_s=0.0,
+        analysis_end_s=600.0,
+    )
+
+    report = build_fleet_margin_report(
+        access_summaries=access_summaries,
+        link_summaries=link_summaries,
+        coverage_requirements=(
+            ConstellationCoverageRequirement(
+                ground_site="equator-eci",
+                minimum_coverage_fraction=0.0,
+                maximum_revisit_gap_s=300.0,
+            ),
+        ),
+        member_limiting_margins={},
+    )
+
+    assert report.limiting_margin.name == "fleet_link_margin_db_equator-eci"

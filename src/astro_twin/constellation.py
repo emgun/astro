@@ -101,8 +101,11 @@ def aggregate_link_summaries(
 
             clipped_start_s, clipped_end_s = clipped
             clipped_duration_s = clipped_end_s - clipped_start_s
+            window_duration_s = window.end_s - window.start_s
+            if window_duration_s <= 0.0:
+                continue
             data_volume_mbit = (
-                window.data_volume_mbit * clipped_duration_s / window.duration_s
+                window.data_volume_mbit * clipped_duration_s / window_duration_s
             )
             fleet_data_by_site[window.ground_site] = (
                 fleet_data_by_site.get(window.ground_site, 0.0) + data_volume_mbit
@@ -131,7 +134,7 @@ def aggregate_link_summaries(
             total_data_volume_mbit=member_data[member_name],
             worst_ebn0_margin_db=member_worst[member_name],
         )
-        for member_name in member_data
+        for member_name in sorted(member_data)
     )
     return fleet_summaries, member_summaries
 
@@ -342,11 +345,11 @@ def _status(margin: float, warn_threshold: float) -> TwinMarginStatus:
     return TwinMarginStatus.PASS
 
 
-def _limiting_key(margin: DesignMargin) -> tuple[int, float]:
+def _limiting_key(margin: DesignMargin) -> tuple[int, float, str]:
     severity = {
         TwinMarginStatus.FAIL: 0,
         TwinMarginStatus.WARN: 1,
         TwinMarginStatus.PASS: 2,
     }[margin.status]
     normalizer = abs(margin.threshold) if margin.threshold != 0.0 else 1.0
-    return severity, margin.margin / normalizer
+    return severity, margin.margin / normalizer, margin.name
