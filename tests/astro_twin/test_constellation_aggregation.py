@@ -143,6 +143,11 @@ def test_build_fleet_margin_report_uses_coverage_link_and_member_margins() -> No
         },
     )
 
+    margin_by_name = {margin.name: margin for margin in report.margins}
+    assert "fleet_coverage_fraction_equator-eci" in margin_by_name
+    assert "fleet_longest_gap_s_equator-eci" in margin_by_name
+    assert "fleet_link_margin_db_equator-eci" in margin_by_name
+    assert "member_plane-a_mass_margin_fraction" in margin_by_name
     assert report.limiting_margin.name == "fleet_coverage_fraction_equator-eci"
     assert report.limiting_margin.status is TwinMarginStatus.FAIL
 
@@ -253,6 +258,58 @@ def test_build_fleet_margin_report_flags_missing_site_link_margin() -> None:
     link_margin = next(
         margin
         for margin in report.margins
-        if margin.name == "fleet_link_margin_equator-eci"
+        if margin.name == "fleet_link_margin_db_equator-eci"
     )
     assert link_margin.status is TwinMarginStatus.FAIL
+
+
+def test_build_fleet_margin_report_adds_default_coverage_for_access_sites() -> None:
+    access_summaries = aggregate_access_summaries(
+        member_access_windows={
+            "plane-a": (
+                AccessWindow(
+                    ground_site="equator-eci",
+                    start_s=0.0,
+                    end_s=300.0,
+                    duration_s=300.0,
+                    max_elevation_deg=80.0,
+                    min_range_km=700.0,
+                ),
+            )
+        },
+        analysis_start_s=0.0,
+        analysis_end_s=600.0,
+    )
+    link_summaries, _ = aggregate_link_summaries(
+        member_link_windows={
+            "plane-a": (
+                LinkBudgetWindow(
+                    link_name="xband-a",
+                    ground_site="equator-eci",
+                    start_s=0.0,
+                    end_s=60.0,
+                    duration_s=60.0,
+                    worst_ebn0_margin_db=4.0,
+                    data_volume_mbit=120.0,
+                ),
+            ),
+        },
+        analysis_start_s=0.0,
+        analysis_end_s=600.0,
+    )
+
+    report = build_fleet_margin_report(
+        access_summaries=access_summaries,
+        link_summaries=link_summaries,
+        coverage_requirements=(),
+        member_limiting_margins={},
+    )
+
+    margin_by_name = {margin.name: margin for margin in report.margins}
+    coverage_margin = margin_by_name["fleet_coverage_fraction_equator-eci"]
+    link_margin = margin_by_name["fleet_link_margin_db_equator-eci"]
+    assert coverage_margin.value == 0.5
+    assert coverage_margin.threshold == 0.0
+    assert coverage_margin.status is TwinMarginStatus.PASS
+    assert link_margin.value == 4.0
+    assert link_margin.status is TwinMarginStatus.PASS

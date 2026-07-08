@@ -145,25 +145,32 @@ def build_fleet_margin_report(
     """Build a deterministic fleet margin report from aggregated twin evidence."""
     access_by_site = {summary.ground_site: summary for summary in access_summaries}
     link_by_site = {summary.ground_site: summary for summary in link_summaries}
-    requirements = tuple(coverage_requirements)
+    requirements_by_site = {
+        requirement.ground_site: requirement for requirement in coverage_requirements
+    }
 
     margins: list[DesignMargin] = []
-    for requirement in requirements:
-        access_summary = access_by_site.get(requirement.ground_site)
+    coverage_sites = set(access_by_site) | set(requirements_by_site)
+    for ground_site in sorted(coverage_sites):
+        requirement = requirements_by_site.get(ground_site)
+        access_summary = access_by_site.get(ground_site)
+        coverage_threshold = (
+            requirement.minimum_coverage_fraction if requirement is not None else 0.0
+        )
         coverage_fraction = (
             access_summary.coverage_fraction if access_summary is not None else 0.0
         )
-        coverage_margin = coverage_fraction - requirement.minimum_coverage_fraction
+        coverage_margin = coverage_fraction - coverage_threshold
         margins.append(
             DesignMargin(
-                name=f"fleet_coverage_fraction_{requirement.ground_site}",
+                name=f"fleet_coverage_fraction_{ground_site}",
                 value=coverage_fraction,
-                threshold=requirement.minimum_coverage_fraction,
+                threshold=coverage_threshold,
                 margin=coverage_margin,
                 status=_status(coverage_margin, warn_threshold=0.05),
             )
         )
-        if requirement.maximum_revisit_gap_s is not None:
+        if requirement is not None and requirement.maximum_revisit_gap_s is not None:
             longest_gap_s = (
                 access_summary.longest_gap_s
                 if access_summary is not None
@@ -172,7 +179,7 @@ def build_fleet_margin_report(
             revisit_margin_s = requirement.maximum_revisit_gap_s - longest_gap_s
             margins.append(
                 DesignMargin(
-                    name=f"fleet_revisit_gap_{requirement.ground_site}",
+                    name=f"fleet_longest_gap_s_{ground_site}",
                     value=longest_gap_s,
                     threshold=requirement.maximum_revisit_gap_s,
                     margin=revisit_margin_s,
@@ -183,7 +190,7 @@ def build_fleet_margin_report(
     represented_sites = (
         set(access_by_site)
         | set(link_by_site)
-        | {requirement.ground_site for requirement in requirements}
+        | set(requirements_by_site)
     )
     for ground_site in sorted(represented_sites):
         margins.append(_link_margin(ground_site, link_by_site.get(ground_site)))
@@ -300,7 +307,7 @@ def _link_margin(
 ) -> DesignMargin:
     if link_summary is None or link_summary.worst_ebn0_margin_db is None:
         return DesignMargin(
-            name=f"fleet_link_margin_{ground_site}",
+            name=f"fleet_link_margin_db_{ground_site}",
             value=0.0,
             threshold=0.0,
             margin=-1.0,
@@ -309,7 +316,7 @@ def _link_margin(
 
     margin_db = link_summary.worst_ebn0_margin_db
     return DesignMargin(
-        name=f"fleet_link_margin_{ground_site}",
+        name=f"fleet_link_margin_db_{ground_site}",
         value=margin_db,
         threshold=0.0,
         margin=margin_db,
