@@ -150,6 +150,14 @@ def _write_text_or_exit(output: Path, payload: str, product_name: str) -> None:
         raise typer.Exit(code=2) from exc
 
 
+def _ensure_parent_or_exit(output: Path, product_name: str) -> None:
+    try:
+        output.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        typer.echo(f"could not create {product_name} parent {output.parent}: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+
 def _parse_pitch_deg_values_or_exit(pitch_deg_values: str) -> list[float]:
     raw_values = [raw_value.strip() for raw_value in pitch_deg_values.split(",")]
     if not pitch_deg_values.strip() or any(raw_value == "" for raw_value in raw_values):
@@ -585,11 +593,11 @@ def run_twin(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
 
-    output.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_parent_or_exit(output, "digital twin result")
     _write_text_or_exit(output, result.model_dump_json(indent=2), "digital twin result")
     typer.echo(f"wrote digital twin result: {output}")
     if summary_output is not None:
-        summary_output.parent.mkdir(parents=True, exist_ok=True)
+        _ensure_parent_or_exit(summary_output, "digital twin summary")
         _write_text_or_exit(
             summary_output,
             format_twin_summary(result),
@@ -621,7 +629,7 @@ def run_constellation_twin_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
 
-    output.parent.mkdir(parents=True, exist_ok=True)
+    _ensure_parent_or_exit(output, "constellation digital twin result")
     _write_text_or_exit(
         output,
         result.model_dump_json(indent=2),
@@ -630,7 +638,7 @@ def run_constellation_twin_command(
     typer.echo(f"wrote constellation digital twin result: {output}")
 
     if summary_output is not None:
-        summary_output.parent.mkdir(parents=True, exist_ok=True)
+        _ensure_parent_or_exit(summary_output, "constellation digital twin summary")
         _write_text_or_exit(
             summary_output,
             format_constellation_summary(result),
