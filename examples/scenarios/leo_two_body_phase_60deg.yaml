@@ -1,7 +1,7 @@
-scenario_id: leo-two-body-phase-60deg
-description: Deterministic phased LEO two-body propagation example for constellation twin tests.
+scenario_id: leo-two-body-phase-minus-4deg
+description: Deterministic slightly phased LEO two-body propagation example for constellation twin tests.
 spacecraft:
-  name: demo-sat-phase-60
+  name: demo-sat-phase-minus-4
   mass_kg: 120.0
   area_m2: 2.5
   drag_coefficient: 2.2
@@ -13,8 +13,8 @@ initial_state:
   central_body: earth
   representation: cartesian
   cartesian:
-    position_km: [3500.0, 6062.177826491071, 0.0]
-    velocity_km_s: [-6.49519052838329, 3.75, 1.0]
+    position_km: [6982.948351818769, -488.2953162088771, 0.0]
+    velocity_km_s: [0.5231735530809398, 7.481730376948682, 1.0]
 force_model:
   gravity: two_body
 propagation:

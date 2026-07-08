@@ -41,10 +41,16 @@ def run_constellation_twin(
     analysis_starts_s: list[float] = []
     analysis_ends_s: list[float] = []
     warnings = [_CONSTELLATION_DESIGN_SCREENING_WARNING]
+    loaded_member_scenarios = []
 
     for member in scenario.members:
         member_scenario = load_twin_scenario(member.twin_scenario)
         configured_ground_sites.update(site.name for site in member_scenario.ground_sites)
+        loaded_member_scenarios.append((member, member_scenario))
+
+    _validate_coverage_requirement_sites(scenario, configured_ground_sites)
+
+    for member, member_scenario in loaded_member_scenarios:
         member_result = run_digital_twin(member_scenario)
         if not member_result.geometry:
             raise InvalidScenarioError(
@@ -63,7 +69,6 @@ def run_constellation_twin(
         )
         warnings.extend(member_result.warnings)
 
-    _validate_coverage_requirement_sites(scenario, configured_ground_sites)
     analysis_start_s = max(analysis_starts_s)
     analysis_end_s = min(analysis_ends_s)
     if analysis_end_s <= analysis_start_s:
