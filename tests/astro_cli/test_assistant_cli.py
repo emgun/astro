@@ -125,6 +125,61 @@ def test_assistant_ask_writes_trace_file(tmp_path: Path) -> None:
     assert json.loads(trace_path.read_text(encoding="utf-8")) == json.loads(result.stdout)
 
 
+def test_assistant_ask_writes_report_file(tmp_path: Path) -> None:
+    report_path = tmp_path / "report.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "ask",
+            "Run the local OD demo",
+            "--dry-run",
+            "--report-output",
+            str(report_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert report_path.exists()
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["workflow_id"] == "local-od-demo"
+    assert report["verification_passed"] is True
+    assert report["executed_step_count"] == 0
+
+
+def test_assistant_ask_writes_report_summary_file(tmp_path: Path) -> None:
+    summary_path = tmp_path / "report.txt"
+
+    result = runner.invoke(
+        app,
+        [
+            "ask",
+            "Run the local OD demo",
+            "--dry-run",
+            "--report-summary-output",
+            str(summary_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert summary_path.exists()
+    assert summary_path.read_text(encoding="utf-8").splitlines() == [
+        "Workflow: local-od-demo",
+        "Title: Local Orbit Determination Demo: leo-two-station-od",
+        "Scenario: examples/scenarios/leo_two_station_od.yaml",
+        "Mode: dry-run",
+        "Verification: passed",
+        "Steps: 0/4 executed",
+        "Artifacts: 4 declared, 0 validated",
+        "Measurements: unavailable",
+        "TDM lines: unavailable",
+        "Estimate: unavailable",
+        "Jacobian rank: unavailable",
+        "Residuals: unavailable",
+        "Warnings: none",
+    ]
+
+
 def test_assistant_ask_creates_trace_output_parent_directories(tmp_path: Path) -> None:
     trace_path = tmp_path / "nested" / "trace.json"
 

@@ -104,11 +104,15 @@ Execute only with explicit approval:
 astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." \
   --execute \
   --approved \
-  --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json
+  --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json \
+  --report-output /tmp/astro-assistant/leo_two_station_angles/report.json \
+  --report-summary-output /tmp/astro-assistant/leo_two_station_angles/report.txt
 ```
 
 See [Assistant Workflows](docs/assistant-workflows.md) for the support codes, policy gates, and
-trace contract.
+trace contract. The local OD workflow pack manifest is in
+`examples/workflows/local_od/manifest.yaml`; its checked-in golden prompt fixtures are in
+`examples/workflows/local_od/golden_prompts.yaml`.
 
 ## Optional Backends
 

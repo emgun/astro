@@ -16,13 +16,22 @@ The first workflow is scenario-parameterized local orbit determination:
 astro verify-assistant "Run local OD on leo_two_station_topocentric.yaml"
 astro ask "Run the local OD demo" --dry-run
 astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --dry-run
-astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --execute --approved --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json
+astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --execute --approved --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json --report-output /tmp/astro-assistant/leo_two_station_angles/report.json --report-summary-output /tmp/astro-assistant/leo_two_station_angles/report.txt
 ```
 
 The default demo validates `examples/scenarios/leo_two_station_od.yaml`. Explicit supported
 scenario paths or aliases bind the same workflow to the requested scenario, synthesize local
 measurements, export TDM, estimate the initial state, and record a trace under a scenario-specific
-artifact directory.
+artifact directory. Execution can also write a JSON workflow report and concise text summary
+covering the verified plan, executed steps, declared artifacts, measurement count, TDM line count,
+estimate convergence, iteration count, RMS, Jacobian rank, residual count, and max absolute
+residual.
+
+The workflow-pack manifest lives at `examples/workflows/local_od/manifest.yaml`. It records the
+supported scenarios, required step order, artifact kinds, report metrics, policy boundaries, and
+golden prompt fixture path for this first supported workflow. The prompt fixtures live at
+`examples/workflows/local_od/golden_prompts.yaml` and are replayed in tests so every supported
+scenario keeps a stable prompt-to-plan binding.
 
 Supported local OD scenario paths:
 
@@ -63,6 +72,9 @@ Current classifier codes include:
   export format, and declared artifacts before execution.
 - Execution defaults to dry-run.
 - Artifact-writing execution requires `--approved`.
+- `--report-output` writes a product-level JSON workflow report. `--report-summary-output` writes a
+  concise text view over the same report. Dry-run reports do not read stale artifacts from previous
+  executions.
 - Optional backends are blocked in this first assistant slice.
 - A future agentic verifier may generate extra challenge checks, but deterministic validators remain
   the execution authority.

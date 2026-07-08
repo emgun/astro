@@ -11,6 +11,7 @@ from astro_assistant.capabilities import LocalODSupportReport, classify_local_od
 from astro_assistant.executor import WorkflowExecutor
 from astro_assistant.models import VerificationDiagnostic, VerificationResult
 from astro_assistant.planner import DeterministicPlanner
+from astro_assistant.reports import build_workflow_report, format_workflow_report
 from astro_assistant.verification import verify_plan
 from astro_backends.dymos import (
     optimize_launch_dymos,
@@ -314,6 +315,17 @@ def ask_assistant(
         Path | None,
         typer.Option("--trace-output", help="Write the assistant trace JSON to a file."),
     ] = None,
+    report_output: Annotated[
+        Path | None,
+        typer.Option("--report-output", help="Write a workflow report JSON to a file."),
+    ] = None,
+    report_summary_output: Annotated[
+        Path | None,
+        typer.Option(
+            "--report-summary-output",
+            help="Write a human-readable workflow report summary to a file.",
+        ),
+    ] = None,
 ) -> None:
     planner = DeterministicPlanner()
     try:
@@ -337,6 +349,30 @@ def ask_assistant(
             typer.echo(f"could not write assistant trace {trace_output}: {exc}", err=True)
             raise typer.Exit(code=2) from exc
         _write_text_or_exit(trace_output, payload, "assistant trace")
+    report = (
+        build_workflow_report(trace)
+        if report_output is not None or report_summary_output is not None
+        else None
+    )
+    if report_output is not None and report is not None:
+        report_payload = report.model_dump_json(indent=2)
+        try:
+            report_output.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            typer.echo(f"could not write assistant report {report_output}: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+        _write_text_or_exit(report_output, report_payload, "assistant report")
+    if report_summary_output is not None and report is not None:
+        report_summary = format_workflow_report(report)
+        try:
+            report_summary_output.parent.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            typer.echo(
+                f"could not write assistant report summary {report_summary_output}: {exc}",
+                err=True,
+            )
+            raise typer.Exit(code=2) from exc
+        _write_text_or_exit(report_summary_output, report_summary, "assistant report summary")
     typer.echo(payload)
     if not trace.verification.passed:
         for diagnostic in trace.verification.diagnostics:

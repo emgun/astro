@@ -1,6 +1,6 @@
 # Astro Suite Current State
 
-Date: 2026-06-20 17:50 PDT
+Date: 2026-07-07 00:00 PDT
 
 ## Canonical Workspace
 
@@ -28,9 +28,10 @@ explicit provenance and claim boundaries.
 
 ## Current Roadmap Decision
 
-The current suite-owned roadmap pass is release-ready for the implemented product surfaces. The
-remaining roadmap text is no longer a local implementation backlog for this pass; it is a set of
-explicit non-claims and future external validation campaigns.
+The previous suite-owned roadmap pass is release-ready for the implemented product surfaces. The
+new active roadmap scope is the Verifiable OD Workflow Pack: turn the supported local OD assistant
+path into a complete flagship workflow with a manifest, typed plan, allow-listed commands,
+deterministic artifacts, workflow report, and replayable trace.
 
 Implemented and verified in the current pass:
 
@@ -40,6 +41,15 @@ Implemented and verified in the current pass:
 - Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, and JAX runtime gates and adapter boundaries.
 - Required local release checklist and packaging gate.
 - Optional live backend campaign ledger with clear environment and claim boundaries.
+- Verifiable OD Workflow Pack slices: `examples/workflows/local_od/manifest.yaml`,
+  `examples/workflows/local_od/golden_prompts.yaml`, `astro ask --report-output`,
+  `astro ask --report-summary-output`,
+  workflow-report metrics for measurement count, TDM line count, estimate convergence, iteration
+  count, RMS, Jacobian rank, residual count, and max residual, plus golden prompt regression checks
+  across every supported local OD scenario.
+- OD workflow pack branch release-readiness pass: focused assistant tests, real CLI execution with
+  trace/JSON/text report artifacts, `ruff`, `mypy`, full `pytest`, packaging tests,
+  `git diff --check`, and `python -m build` passed locally on `codex/od-workflow-pack`.
 
 Post-MVP / external-campaign items:
 
@@ -58,12 +68,11 @@ Post-MVP / external-campaign items:
 | ID | Status | Lane | Owner | Scope | Acceptance |
 | --- | --- | --- | --- | --- | --- |
 | roadmap-finish-state | done | decide/verify | steward | `docs/current-state.md`, release and live-ledger docs | State file records canonical workspace, release readiness, optional smoke evidence, and remaining post-MVP boundaries. |
+| verifiable-od-workflow-pack | review-ready | productize/verify | steward | `src/astro_assistant`, `examples/workflows/local_od`, assistant docs and validation matrix | Local OD workflow has a manifest, golden prompt fixtures, JSON and text report outputs, focused tests, real CLI execution evidence, and a local release-readiness pass. |
 
 ## Next Best Paths
 
-1. Tag or push a release candidate from `/Users/emerygunselman/Code/astro` once the user provides
+1. Stage and commit the OD workflow pack branch if the user wants this branch preserved as a
+   discrete change set.
+2. Tag or push a release candidate from `/Users/emerygunselman/Code/astro` once the user provides
    the desired remote/tag policy.
-2. Run a fresh optional live-backend campaign only when those claims need promotion for a specific
-   machine or release candidate.
-3. Start a new roadmap cycle only after choosing one external-campaign scope, such as official DSN
-   fixtures, production covariance validation criteria, or native RocketPy staged-flight support.

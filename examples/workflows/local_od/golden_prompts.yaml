@@ -1,0 +1,59 @@
+workflow_id: local-od-demo
+default_prompt: Run the local OD demo
+default_scenario: examples/scenarios/leo_two_station_od.yaml
+fixtures:
+  - id: leo-doppler
+    scenario_id: leo-doppler
+    scenario_path: examples/scenarios/leo_doppler.yaml
+    artifact_dir: /tmp/astro-assistant/leo_doppler
+    prompt: Run local orbit determination on examples/scenarios/leo_doppler.yaml and export TDM.
+  - id: leo-geodetic-eop-table-topocentric
+    scenario_id: leo-geodetic-eop-table-topocentric
+    scenario_path: examples/scenarios/leo_geodetic_eop_table_topocentric.yaml
+    artifact_dir: /tmp/astro-assistant/leo_geodetic_eop_table_topocentric
+    prompt: Run local orbit determination on examples/scenarios/leo_geodetic_eop_table_topocentric.yaml and export TDM.
+  - id: leo-geodetic-eop-topocentric
+    scenario_id: leo-geodetic-eop-topocentric
+    scenario_path: examples/scenarios/leo_geodetic_eop_topocentric.yaml
+    artifact_dir: /tmp/astro-assistant/leo_geodetic_eop_topocentric
+    prompt: Run local orbit determination on examples/scenarios/leo_geodetic_eop_topocentric.yaml and export TDM.
+  - id: leo-geodetic-precession-nutation-topocentric
+    scenario_id: leo-geodetic-precession-nutation-topocentric
+    scenario_path: examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml
+    artifact_dir: /tmp/astro-assistant/leo_geodetic_precession_nutation_topocentric
+    prompt: Run local orbit determination on examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml and export TDM.
+  - id: leo-geodetic-topocentric
+    scenario_id: leo-geodetic-topocentric
+    scenario_path: examples/scenarios/leo_geodetic_topocentric.yaml
+    artifact_dir: /tmp/astro-assistant/leo_geodetic_topocentric
+    prompt: Run local orbit determination on examples/scenarios/leo_geodetic_topocentric.yaml and export TDM.
+  - id: leo-radiometric-links
+    scenario_id: leo-radiometric-links
+    scenario_path: examples/scenarios/leo_radiometric_links.yaml
+    artifact_dir: /tmp/astro-assistant/leo_radiometric_links
+    prompt: Run local orbit determination on examples/scenarios/leo_radiometric_links.yaml and export TDM.
+  - id: leo-radiometric-media
+    scenario_id: leo-radiometric-media
+    scenario_path: examples/scenarios/leo_radiometric_media.yaml
+    artifact_dir: /tmp/astro-assistant/leo_radiometric_media
+    prompt: Run local orbit determination on examples/scenarios/leo_radiometric_media.yaml and export TDM.
+  - id: leo-radiometric-weather-frequency
+    scenario_id: leo-radiometric-weather-frequency
+    scenario_path: examples/scenarios/leo_radiometric_weather_frequency.yaml
+    artifact_dir: /tmp/astro-assistant/leo_radiometric_weather_frequency
+    prompt: Run local orbit determination on examples/scenarios/leo_radiometric_weather_frequency.yaml and export TDM.
+  - id: leo-two-station-angles
+    scenario_id: leo-two-station-angles
+    scenario_path: examples/scenarios/leo_two_station_angles.yaml
+    artifact_dir: /tmp/astro-assistant/leo_two_station_angles
+    prompt: Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM.
+  - id: leo-two-station-od
+    scenario_id: leo-two-station-od
+    scenario_path: examples/scenarios/leo_two_station_od.yaml
+    artifact_dir: /tmp/astro-assistant/leo_two_station_od
+    prompt: Run local orbit determination on examples/scenarios/leo_two_station_od.yaml and export TDM.
+  - id: leo-two-station-topocentric
+    scenario_id: leo-two-station-topocentric
+    scenario_path: examples/scenarios/leo_two_station_topocentric.yaml
+    artifact_dir: /tmp/astro-assistant/leo_two_station_topocentric
+    prompt: Run local orbit determination on examples/scenarios/leo_two_station_topocentric.yaml and export TDM.
