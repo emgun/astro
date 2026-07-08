@@ -12,4 +12,6 @@ def test_run_digital_twin_returns_integrated_result() -> None:
     assert len(result.power) == len(result.geometry)
     assert len(result.thermal) == len(result.geometry)
     assert len(result.adcs) == len(result.geometry)
+    assert result.access_windows
+    assert result.link_windows
     assert result.margin_report.limiting_margin.name

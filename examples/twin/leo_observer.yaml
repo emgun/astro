@@ -4,7 +4,7 @@ spacecraft:
   name: ObserverSat
   dry_mass_kg: 120.0
   payload_mass_kg: 25.0
-  propellant_mass_kg: 5.0
+  propellant_mass_kg: 45.0
   mass_margin_fraction_required: 0.2
 power:
   solar_array_area_m2: 2.4
@@ -32,14 +32,14 @@ adcs:
   max_torque_n_m: 0.08
   required_slew_torque_n_m: 0.03
 ground_sites:
-  - name: goldstone
-    latitude_deg: 35.2472
-    longitude_deg: -116.7933
-    altitude_m: 1000.0
+  - name: equator-eci
+    latitude_deg: 0.0
+    longitude_deg: 0.0
+    altitude_m: 0.0
     minimum_elevation_deg: 10.0
 links:
   - name: xband-downlink
-    ground_site: goldstone
+    ground_site: equator-eci
     frequency_ghz: 8.4
     eirp_dbw: 18.0
     receiver_g_over_t_db_k: 22.0
