@@ -62,6 +62,7 @@ packages = [
   "src/astro_backends",
   "src/astro_cli",
   "src/astro_assistant",
+  "src/astro_twin",
 ]
 
 [tool.pytest.ini_options]
@@ -93,4 +94,5 @@ packages = [
   "astro_backends",
   "astro_cli",
   "astro_assistant",
+  "astro_twin",
 ]
