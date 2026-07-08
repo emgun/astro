@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
+from astro_core.errors import InvalidScenarioError
 from astro_twin.constellation_io import (
     format_constellation_summary,
     load_constellation_twin_result,
@@ -49,12 +51,8 @@ def test_load_constellation_twin_scenario_rejects_non_mapping(
     path = tmp_path / "bad.yaml"
     path.write_text("- not-a-mapping\n", encoding="utf-8")
 
-    try:
+    with pytest.raises(InvalidScenarioError, match="must contain a mapping"):
         load_constellation_twin_scenario(path)
-    except Exception as exc:
-        assert "must contain a mapping" in str(exc)
-    else:
-        raise AssertionError("expected invalid scenario error")
 
 
 def test_write_load_and_format_constellation_result(tmp_path: Path) -> None:
@@ -98,3 +96,49 @@ def test_write_load_and_format_constellation_result(tmp_path: Path) -> None:
     assert "Constellation twin: leo-observers" in summary
     assert "Limiting fleet margin:" in summary
     assert "screening only" in summary
+
+
+def test_write_constellation_twin_result_wraps_write_errors(
+    tmp_path: Path,
+) -> None:
+    result = ConstellationTwinResult(
+        scenario_id="leo-observers",
+        members=(),
+        access_summaries=(),
+        link_summaries=(),
+        member_link_summaries=(),
+        fleet_margin_report=DesignMarginReport(
+            margins=(
+                DesignMargin(
+                    name="fleet_link_margin_db_equator-eci",
+                    value=3.0,
+                    threshold=0.0,
+                    margin=3.0,
+                    status=TwinMarginStatus.WARN,
+                ),
+            ),
+            limiting_margin=DesignMargin(
+                name="fleet_link_margin_db_equator-eci",
+                value=3.0,
+                threshold=0.0,
+                margin=3.0,
+                status=TwinMarginStatus.WARN,
+            ),
+        ),
+    )
+
+    with pytest.raises(
+        InvalidScenarioError,
+        match="Could not write constellation twin result",
+    ):
+        write_constellation_twin_result(tmp_path, result)
+
+
+def test_load_constellation_twin_result_rejects_non_object_json(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "result.json"
+    path.write_text("[]\n", encoding="utf-8")
+
+    with pytest.raises(InvalidScenarioError, match="must contain a JSON object"):
+        load_constellation_twin_result(path)

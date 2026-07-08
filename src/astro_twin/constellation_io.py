@@ -44,10 +44,16 @@ def write_constellation_twin_result(
     path: Path | str,
     result: ConstellationTwinResult,
 ) -> None:
-    Path(path).write_text(
-        result.model_dump_json(indent=2) + "\n",
-        encoding="utf-8",
-    )
+    result_path = Path(path)
+    try:
+        result_path.write_text(
+            result.model_dump_json(indent=2) + "\n",
+            encoding="utf-8",
+        )
+    except (OSError, UnicodeError) as exc:
+        raise InvalidScenarioError(
+            f"Could not write constellation twin result {result_path}: {exc}"
+        ) from exc
 
 
 def load_constellation_twin_result(path: Path | str) -> ConstellationTwinResult:
