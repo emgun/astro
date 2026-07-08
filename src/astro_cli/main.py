@@ -84,6 +84,11 @@ from astro_od.io import (
     resolve_measurement_format,
 )
 from astro_od.measurements import generate_synthetic_measurements
+from astro_twin.constellation import run_constellation_twin
+from astro_twin.constellation_io import (
+    format_constellation_summary,
+    load_constellation_twin_scenario,
+)
 from astro_twin.io import format_twin_summary, load_twin_scenario
 from astro_twin.runner import run_digital_twin
 
@@ -591,6 +596,47 @@ def run_twin(
             "digital twin summary",
         )
         typer.echo(f"wrote digital twin summary: {summary_output}")
+
+
+@app.command("run-constellation-twin")
+def run_constellation_twin_command(
+    scenario_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Constellation twin scenario YAML path."),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Write constellation digital twin JSON result."),
+    ],
+    summary_output: Annotated[
+        Path | None,
+        typer.Option("--summary-output", help="Write a concise constellation text summary."),
+    ] = None,
+) -> None:
+    """Run the deterministic constellation digital twin workflow."""
+    try:
+        scenario = load_constellation_twin_scenario(scenario_path)
+        result = run_constellation_twin(scenario)
+    except InvalidScenarioError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    _write_text_or_exit(
+        output,
+        result.model_dump_json(indent=2),
+        "constellation digital twin result",
+    )
+    typer.echo(f"wrote constellation digital twin result: {output}")
+
+    if summary_output is not None:
+        summary_output.parent.mkdir(parents=True, exist_ok=True)
+        _write_text_or_exit(
+            summary_output,
+            format_constellation_summary(result),
+            "constellation digital twin summary",
+        )
+        typer.echo(f"wrote constellation digital twin summary: {summary_output}")
 
 
 @app.command("compare-tudat-reference")

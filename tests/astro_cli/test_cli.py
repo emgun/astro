@@ -251,6 +251,31 @@ def test_run_twin_command_writes_json_and_summary(tmp_path: Path) -> None:
     assert "Limiting margin:" in summary.read_text(encoding="utf-8")
 
 
+def test_run_constellation_twin_command_writes_json_and_summary(tmp_path: Path) -> None:
+    output = tmp_path / "constellation-twin.json"
+    summary = tmp_path / "constellation-twin.txt"
+
+    result = runner.invoke(
+        app,
+        [
+            "run-constellation-twin",
+            "examples/twin/constellation_leo_observers.yaml",
+            "--output",
+            str(output),
+            "--summary-output",
+            str(summary),
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["workflow"] == "constellation_digital_twin_v1"
+    assert len(payload["members"]) == 2
+    summary_text = summary.read_text(encoding="utf-8")
+    assert "Constellation twin: leo-observers" in summary_text
+    assert "Limiting fleet margin:" in summary_text
+
+
 def test_export_trajectory_command_writes_csv(tmp_path: Path) -> None:
     trajectory_path = tmp_path / "trajectory.json"
     output = tmp_path / "trajectory.csv"
