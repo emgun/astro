@@ -80,11 +80,13 @@ def run_constellation_twin(
         member_access_windows=member_access_windows,
         analysis_start_s=analysis_start_s,
         analysis_end_s=analysis_end_s,
+        ground_sites=configured_ground_sites,
     )
     link_summaries, member_link_summaries = aggregate_link_summaries(
         member_link_windows=member_link_windows,
         analysis_start_s=analysis_start_s,
         analysis_end_s=analysis_end_s,
+        ground_sites=configured_ground_sites,
     )
     fleet_margin_report = build_fleet_margin_report(
         access_summaries=access_summaries,
@@ -140,12 +142,13 @@ def aggregate_access_summaries(
     member_access_windows: Mapping[str, Iterable[AccessWindow]],
     analysis_start_s: float,
     analysis_end_s: float,
+    ground_sites: Iterable[str] = (),
 ) -> tuple[FleetAccessSummary, ...]:
     """Summarize fleet-level access over the shared analysis interval."""
     _validate_analysis_interval(analysis_start_s, analysis_end_s)
     analysis_duration_s = analysis_end_s - analysis_start_s
     intervals_by_site: dict[str, list[tuple[float, float, str]]] = {}
-    sites: set[str] = set()
+    sites: set[str] = set(ground_sites)
 
     for member_name, windows in member_access_windows.items():
         for window in windows:
@@ -194,10 +197,11 @@ def aggregate_link_summaries(
     member_link_windows: Mapping[str, Iterable[LinkBudgetWindow]],
     analysis_start_s: float,
     analysis_end_s: float,
+    ground_sites: Iterable[str] = (),
 ) -> tuple[tuple[FleetLinkSummary, ...], tuple[MemberLinkSummary, ...]]:
     """Summarize downlink volume and worst link margin over the shared interval."""
     _validate_analysis_interval(analysis_start_s, analysis_end_s)
-    sites: set[str] = set()
+    sites: set[str] = set(ground_sites)
     fleet_data_by_site: dict[str, float] = {}
     fleet_worst_by_site: dict[str, float | None] = {}
     member_data: dict[str, float] = {}

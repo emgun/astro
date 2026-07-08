@@ -161,8 +161,9 @@ This avoids overstating coverage from members that were not propagated over the 
 
 ### Access Union
 
-For each ground site, collect all member access windows and clip them to the common analysis window.
-Compute a timeline of access-change events:
+For each configured or otherwise represented ground site, collect all member access windows and clip
+them to the common analysis window. Configured sites with no access windows remain present with zero
+coverage and an analysis-window-length revisit gap. Compute a timeline of access-change events:
 
 - `+1` when a member access starts
 - `-1` when a member access ends
@@ -173,10 +174,10 @@ analysis-window end count as revisit gaps.
 
 ### Link Summary
 
-For each ground site, sum every member link-window data volume clipped to the common analysis
-window. The worst link margin is the minimum `worst_ebn0_margin_db` among available windows. If no
-link windows exist for a ground site, the worst link margin is `None` and the fleet margin report
-adds a failing `fleet_link_margin_db` margin.
+For each configured or otherwise represented ground site, sum every member link-window data volume
+clipped to the common analysis window. The worst link margin is the minimum `worst_ebn0_margin_db`
+among available windows. If no link windows exist for a ground site, the worst link margin is `None`
+and the fleet margin report adds a failing `fleet_link_margin_db` margin.
 
 ### Fleet Margins
 
@@ -234,7 +235,7 @@ The runner should raise `InvalidScenarioError` for:
 - duplicate member names
 - duplicate coverage requirements for the same ground site
 - member scenario load failures
-- coverage requirements that name no ground site present in any member result
+- coverage requirements that name no ground site configured by any member scenario
 - no common analysis window
 - a member result with no geometry samples
 

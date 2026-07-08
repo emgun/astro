@@ -115,6 +115,56 @@ def test_run_constellation_twin_validates_requirement_sites_before_running_membe
         constellation.run_constellation_twin(scenario)
 
 
+def test_run_constellation_twin_reports_configured_sites_without_windows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    member_scenario = load_twin_scenario("examples/twin/leo_observer_plane_a.yaml")
+    scenario = ConstellationTwinScenario(
+        scenario_id="no-access",
+        members=(
+            ConstellationMemberConfig(name="plane-a", twin_scenario="plane-a.yaml"),
+        ),
+        coverage_requirements=(
+            ConstellationCoverageRequirement(
+                ground_site="equator-eci",
+                minimum_coverage_fraction=0.25,
+                maximum_revisit_gap_s=300.0,
+            ),
+        ),
+    )
+
+    monkeypatch.setattr(
+        constellation,
+        "load_twin_scenario",
+        lambda _path: member_scenario,
+    )
+    monkeypatch.setattr(
+        constellation,
+        "run_digital_twin",
+        lambda _scenario: _digital_twin_result(elapsed_s=(0.0, 600.0)),
+    )
+
+    result = constellation.run_constellation_twin(scenario)
+
+    assert result.access_summaries[0].ground_site == "equator-eci"
+    assert result.access_summaries[0].coverage_fraction == 0.0
+    assert result.access_summaries[0].longest_gap_s == 600.0
+    assert result.link_summaries[0].ground_site == "equator-eci"
+    assert result.link_summaries[0].total_data_volume_mbit == 0.0
+    assert result.link_summaries[0].worst_ebn0_margin_db is None
+    margin_by_name = {
+        margin.name: margin for margin in result.fleet_margin_report.margins
+    }
+    assert (
+        margin_by_name["fleet_coverage_fraction_equator-eci"].status
+        is TwinMarginStatus.FAIL
+    )
+    assert (
+        margin_by_name["fleet_link_margin_db_equator-eci"].status
+        is TwinMarginStatus.FAIL
+    )
+
+
 def test_run_constellation_twin_rejects_member_timelines_without_overlap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

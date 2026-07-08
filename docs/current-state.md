@@ -93,10 +93,10 @@ Implemented and verified in the current pass:
   coverage authority.
 - Constellation Digital Twin final gates on `codex/constellation-twin-design`:
   `python -m pytest tests/astro_twin/test_constellation_models.py tests/astro_twin/test_constellation_io.py tests/astro_twin/test_constellation_aggregation.py tests/astro_twin/test_constellation_runner.py tests/astro_cli/test_cli.py::test_run_constellation_twin_command_writes_json_and_summary -q`
-  passed with `22 passed in 0.61s`; `python -m ruff check .` passed; `python -m mypy` passed with no
+  passed with `24 passed in 0.86s`; `python -m ruff check .` passed; `python -m mypy` passed with no
   issues in 81 source files; `python -m pytest -q` passed with
-  `630 passed, 11 skipped in 6.28s`; `git diff --check` was clean;
-  `python -m pytest tests/test_packaging.py -q` passed with `3 passed in 0.02s`; and
+  `632 passed, 11 skipped in 6.87s`; `git diff --check` was clean;
+  `python -m pytest tests/test_packaging.py -q` passed with `3 passed in 0.03s`; and
   `python -m build` produced `astro_suite-0.1.0.tar.gz` and
   `astro_suite-0.1.0-py3-none-any.whl`.
 

@@ -280,6 +280,29 @@ def test_link_proration_uses_window_timestamps_not_declared_duration() -> None:
     assert member_summaries[0].total_data_volume_mbit == 100.0
 
 
+def test_configured_ground_sites_without_windows_stay_visible() -> None:
+    access_summaries = aggregate_access_summaries(
+        member_access_windows={"plane-a": ()},
+        analysis_start_s=0.0,
+        analysis_end_s=600.0,
+        ground_sites=("equator-eci",),
+    )
+    link_summaries, _member_summaries = aggregate_link_summaries(
+        member_link_windows={"plane-a": ()},
+        analysis_start_s=0.0,
+        analysis_end_s=600.0,
+        ground_sites=("equator-eci",),
+    )
+
+    assert access_summaries[0].ground_site == "equator-eci"
+    assert access_summaries[0].total_access_duration_s == 0.0
+    assert access_summaries[0].longest_gap_s == 600.0
+    assert access_summaries[0].coverage_fraction == 0.0
+    assert link_summaries[0].ground_site == "equator-eci"
+    assert link_summaries[0].total_data_volume_mbit == 0.0
+    assert link_summaries[0].worst_ebn0_margin_db is None
+
+
 def test_build_fleet_margin_report_flags_missing_site_link_margin() -> None:
     access_summaries = aggregate_access_summaries(
         member_access_windows={

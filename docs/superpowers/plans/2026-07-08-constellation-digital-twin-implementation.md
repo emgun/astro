@@ -669,16 +669,16 @@ def aggregate_access_summaries(
     member_access_windows: dict[str, tuple[AccessWindow, ...]],
     analysis_start_s: float,
     analysis_end_s: float,
+    ground_sites: tuple[str, ...] = (),
 ) -> tuple[FleetAccessSummary, ...]:
-    ground_sites = sorted(
-        {
+    summary_sites = sorted(
+        set(ground_sites)
+        | {
             window.ground_site
             for windows in member_access_windows.values()
             for window in windows
         }
     )
-    if not ground_sites:
-        ground_sites = ["equator-eci"]
     return tuple(
         _access_summary_for_site(
             site,
@@ -691,7 +691,7 @@ def aggregate_access_summaries(
             analysis_start_s=analysis_start_s,
             analysis_end_s=analysis_end_s,
         )
-        for site in ground_sites
+        for site in summary_sites
     )
 
 
@@ -700,6 +700,7 @@ def aggregate_link_summaries(
     member_link_windows: dict[str, tuple[LinkBudgetWindow, ...]],
     analysis_start_s: float,
     analysis_end_s: float,
+    ground_sites: tuple[str, ...] = (),
 ) -> tuple[tuple[FleetLinkSummary, ...], tuple[MemberLinkSummary, ...]]:
     by_site: dict[str, list[LinkBudgetWindow]] = defaultdict(list)
     member_summaries: list[MemberLinkSummary] = []
@@ -724,9 +725,14 @@ def aggregate_link_summaries(
         FleetLinkSummary(
             ground_site=site,
             total_data_volume_mbit=fsum(window.data_volume_mbit for window in windows),
-            worst_ebn0_margin_db=min(window.worst_ebn0_margin_db for window in windows),
+            worst_ebn0_margin_db=(
+                min(window.worst_ebn0_margin_db for window in windows)
+                if windows
+                else None
+            ),
         )
-        for site, windows in sorted(by_site.items())
+        for site in sorted(set(ground_sites) | set(by_site))
+        for windows in (by_site[site],)
     )
     return fleet_summaries, tuple(member_summaries)
 
@@ -1141,8 +1147,20 @@ _CONSTELLATION_WARNING = (
 
 def run_constellation_twin(scenario: ConstellationTwinScenario) -> ConstellationTwinResult:
     member_results: list[MemberTwinResult] = []
+    loaded_member_scenarios = []
+    configured_sites = set()
     for member in scenario.members:
         twin_scenario = load_twin_scenario(member.twin_scenario)
+        configured_sites.update(site.name for site in twin_scenario.ground_sites)
+        loaded_member_scenarios.append((member, twin_scenario))
+
+    for requirement in scenario.coverage_requirements:
+        if requirement.ground_site not in configured_sites:
+            raise InvalidScenarioError(
+                "coverage requirement ground_site must be configured by at least one member"
+            )
+
+    for member, twin_scenario in loaded_member_scenarios:
         twin_result = run_digital_twin(twin_scenario)
         if not twin_result.geometry:
             raise InvalidScenarioError(
@@ -1151,17 +1169,6 @@ def run_constellation_twin(scenario: ConstellationTwinScenario) -> Constellation
         member_results.append(MemberTwinResult(member_name=member.name, result=twin_result))
 
     analysis_start_s, analysis_end_s = _common_analysis_window(tuple(member_results))
-    available_sites = {
-        window.ground_site
-        for member_result in member_results
-        for window in member_result.result.access_windows
-    }
-    for requirement in scenario.coverage_requirements:
-        if requirement.ground_site not in available_sites:
-            raise InvalidScenarioError(
-                "coverage requirement ground_site must appear in at least one member access window"
-            )
-
     member_access_windows = {
         member.member_name: member.result.access_windows for member in member_results
     }
@@ -1172,11 +1179,13 @@ def run_constellation_twin(scenario: ConstellationTwinScenario) -> Constellation
         member_access_windows=member_access_windows,
         analysis_start_s=analysis_start_s,
         analysis_end_s=analysis_end_s,
+        ground_sites=configured_sites,
     )
     link_summaries, member_link_summaries = aggregate_link_summaries(
         member_link_windows=member_link_windows,
         analysis_start_s=analysis_start_s,
         analysis_end_s=analysis_end_s,
+        ground_sites=configured_sites,
     )
     fleet_margin_report = build_fleet_margin_report(
         access_summaries=access_summaries,
