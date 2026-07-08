@@ -16,6 +16,8 @@ request -> typed plan -> allow-listed commands -> deterministic artifacts -> ver
 - Generates, imports, exports, and estimates orbit-determination measurements.
 - Runs local least-squares OD with rank and convergence checks.
 - Runs deterministic launch/ascent baselines, launch pitch tuning, and launch-to-orbit handoff.
+- Runs an integrated single-spacecraft digital twin screening workflow for orbit geometry, power,
+  thermal, ADCS, coverage, link budget, mass, and design margins.
 - Provides optional adapter boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, and JAX.
 - Exposes assistant workflows for scenario-bound local OD requests.
 
@@ -77,6 +79,14 @@ astro handoff-launch /tmp/astro-launch.json \
 astro propagate /tmp/astro-insertion.yaml \
   --backend local \
   --output /tmp/astro-insertion-trajectory.json
+```
+
+Run the integrated digital twin screening workflow:
+
+```bash
+astro run-twin examples/twin/leo_observer.yaml \
+  --output /tmp/astro-twin-result.json \
+  --summary-output /tmp/astro-twin-summary.txt
 ```
 
 ## Assistant Workflow
@@ -143,6 +153,7 @@ astro jax-smoke
 - `src/astro_launch`: launch/ascent models, local propagation, handoff, tuning, and reporting.
 - `src/astro_backends`: optional engine adapters and smoke checks.
 - `src/astro_assistant`: typed assistant plans, policy, verification, and artifact validation.
+- `src/astro_twin`: integrated single-spacecraft digital twin screening workflow.
 - `src/astro_cli`: the `astro` command line interface.
 - `examples/`: runnable scenarios, launch cases, measurements, and assistant prompts.
 - `docs/`: validation, backend, assistant, and research notes.
@@ -159,6 +170,7 @@ python -m build
 Useful docs:
 
 - [Validation Matrix](docs/validation-matrix.md)
+- [Digital Twin](docs/digital-twin.md)
 - [Assistant Workflows](docs/assistant-workflows.md)
 - [Assistant MCP Contract](docs/assistant-mcp-contract.md)
 - [Backend Installation](docs/backend-installation.md)

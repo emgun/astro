@@ -11,7 +11,7 @@ The sibling checkout at `/Users/emerygunselman/Documents/astro` is stale for thi
 `docs/research/2026-06-20-verifiable-ai-space-workflows.md` file. Do not edit or merge from that
 checkout unless the user explicitly asks to sync the old workspace.
 
-Integrated Code checkout state before this final state update:
+Integrated Code checkout state before the digital-twin implementation branch:
 
 - Branch: `main`
 - Latest integrated release-evidence commit before this state update: `91e213a`
@@ -29,9 +29,10 @@ explicit provenance and claim boundaries.
 ## Current Roadmap Decision
 
 The previous suite-owned roadmap pass and Verifiable OD Workflow Pack are integrated on `main` and
-pushed to `origin/main`. The new active roadmap scope is the Integrated Digital Twin: a
-single-spacecraft mission screening product that combines orbit geometry, power, thermal, ADCS,
-coverage, link budget, mass, and design-margin evidence in one suite-owned workflow.
+pushed to `origin/main`. The current implementation branch, `codex/digital-twin-plan`, makes the
+Integrated Digital Twin review-ready: a single-spacecraft mission screening product that combines
+orbit geometry, power, thermal, ADCS, coverage, link budget, mass, and design-margin evidence in one
+suite-owned workflow.
 
 Implemented and verified in the current pass:
 
@@ -52,6 +53,20 @@ Implemented and verified in the current pass:
   `git diff --check`, and `python -m build` passed locally on `codex/od-workflow-pack`.
 - Integrated Digital Twin planning artifacts: `docs/superpowers/specs/2026-07-08-integrated-digital-twin-design.md`
   and `docs/superpowers/plans/2026-07-08-integrated-digital-twin-implementation.md`.
+- Integrated Digital Twin implementation surface on `codex/digital-twin-plan`:
+  `src/astro_twin` for suite-owned models, IO, geometry, power, thermal, ADCS, coverage,
+  link-budget, margin aggregation, and runner orchestration; `astro run-twin` in
+  `src/astro_cli/main.py`; `examples/twin/leo_observer.yaml`; `tests/astro_twin`; and
+  `docs/digital-twin.md`.
+- Integrated Digital Twin verification on `codex/digital-twin-plan`:
+  `astro run-twin examples/twin/leo_observer.yaml --output /tmp/astro-twin-result.json --summary-output /tmp/astro-twin-summary.txt`
+  wrote JSON and text artifacts with 11 samples, 1 access window, worst link margin 30.280 dB,
+  limiting mass-margin warning 0.037, and explicit design-screening warnings;
+  `python -m pytest tests/astro_twin -q` passed with 15 tests; `python -m ruff check .` passed;
+  `python -m mypy` passed with no issues in 78 source files; `python -m pytest -q` passed with
+  606 tests and 11 optional-backend skips; `git diff --check` was clean;
+  `python -m pytest tests/test_packaging.py -q` passed with 3 tests; and `python -m build`
+  produced `astro_suite-0.1.0.tar.gz` and `astro_suite-0.1.0-py3-none-any.whl`.
 
 Post-MVP / external-campaign items:
 
@@ -71,11 +86,14 @@ Post-MVP / external-campaign items:
 | --- | --- | --- | --- | --- | --- |
 | roadmap-finish-state | done | decide/verify | steward | `docs/current-state.md`, release and live-ledger docs | State file records canonical workspace, release readiness, optional smoke evidence, and remaining post-MVP boundaries. |
 | verifiable-od-workflow-pack | done | productize/verify | steward | `src/astro_assistant`, `examples/workflows/local_od`, assistant docs and validation matrix | Local OD workflow has a manifest, golden prompt fixtures, JSON and text report outputs, focused tests, real CLI execution evidence, and is pushed on `main`. |
-| integrated-digital-twin | planned | productize/verify | steward | `docs/superpowers/specs`, `docs/superpowers/plans`, future `src/astro_twin` | Design and implementation plan define a single-spacecraft v1 with orbit geometry, power, thermal, ADCS, coverage, link budget, mass, and design margins. |
+| integrated-digital-twin | review-ready | productize/verify | steward | `src/astro_twin`, `astro run-twin`, `examples/twin`, `tests/astro_twin`, `docs/digital-twin.md` | Single-spacecraft v1 writes suite-owned orbit geometry, power, thermal, ADCS, coverage, link budget, mass, and design-margin evidence from one scenario; required local gates pass with explicit design-screening claim boundaries. |
 
 ## Next Best Paths
 
-1. Review and approve the integrated digital twin design/implementation plan.
-2. Implement `astro_twin` v1 on a feature branch using the planned TDD task sequence.
-3. Tag a release candidate from `/Users/emerygunselman/Code/astro` once the user provides the
+1. Review and merge `codex/digital-twin-plan` into `main` if the integrated twin v1 scope is
+   accepted.
+2. Tag a release candidate from `/Users/emerygunselman/Code/astro` once the user provides the
    desired release/tag policy.
+3. Choose the next roadmap expansion deliberately: constellation aggregation, higher-fidelity
+   subsystem models, or one external-campaign validation scope. Do not treat all three as hidden
+   implementation backlog.

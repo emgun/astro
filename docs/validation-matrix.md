@@ -1,6 +1,6 @@
 # Validation Matrix
 
-Date: 2026-06-15
+Date: 2026-07-08
 
 This matrix lists the current validation surfaces for Astro Suite. The suite treats local
 deterministic workflows and unit-level backend contracts as required regression references.
@@ -18,6 +18,7 @@ Rows that exercise optional engines through live CLI commands belong in `Optiona
 | Lint | `python -m ruff check .` | No lint findings. |
 | Types | `python -m mypy` | Strict type checking passes. |
 | Scenario validation | `astro validate examples/scenarios/leo_two_body.yaml` | Valid scenario message for `leo-two-body`. |
+| Integrated digital twin | `astro run-twin examples/twin/leo_observer.yaml --output /tmp/astro-twin-result.json --summary-output /tmp/astro-twin-summary.txt` and `python -m pytest tests/astro_twin -q` | Writes a suite-owned single-spacecraft digital twin product with orbit geometry, power, thermal, ADCS, coverage, link-budget, mass, and design-margin evidence. This is deterministic design-screening evidence, not flight qualification. |
 | Assistant dry-run and verification | `astro verify-assistant "Run local OD on leo_two_station_topocentric.yaml"`, `astro ask "Run the local OD demo" --dry-run`, and `astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --dry-run` | Writes typed verifier and dry-run traces to stdout with deterministic verification results, scenario-specific artifact paths, four allow-listed command specs for dry-runs, and no tool execution. |
 | Local OD workflow pack report | `astro ask "Run local orbit determination on examples/scenarios/leo_two_station_angles.yaml and export TDM." --execute --approved --trace-output /tmp/astro-assistant/leo_two_station_angles/trace.json --report-output /tmp/astro-assistant/leo_two_station_angles/report.json --report-summary-output /tmp/astro-assistant/leo_two_station_angles/report.txt` and `python -m pytest tests/astro_assistant/test_reports.py tests/astro_assistant/test_workflow_pack.py tests/astro_cli/test_assistant_cli.py::test_assistant_ask_writes_report_file tests/astro_cli/test_assistant_cli.py::test_assistant_ask_writes_report_summary_file -q` | Executes the local OD assistant workflow, writes a replayable trace plus product-level JSON and text reports, validates that the workflow-pack manifest and golden prompt fixtures match supported scenarios, verifies prompt-to-plan bindings across every supported local OD scenario, and summarizes executed steps, declared artifacts, measurement count, TDM line count, estimate convergence, iterations, RMS, Jacobian rank, residual count, and max absolute residual. Dry-run reports do not read stale artifacts from previous executions. |
 | Local propagation | `astro propagate examples/scenarios/leo_two_body.yaml --backend local --output /tmp/astro-local-trajectory.json` and `astro propagate examples/scenarios/leo_eccentric_two_body.yaml --backend local --output /tmp/astro-eccentric-trajectory.json` | Writes `Trajectory` products with `backend = "local"` and root-located apsis event metadata, including an interior apoapsis root in the eccentric LEO case. |
