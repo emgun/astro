@@ -29,10 +29,12 @@ explicit provenance and claim boundaries.
 ## Current Roadmap Decision
 
 The previous suite-owned roadmap pass and Verifiable OD Workflow Pack are integrated on `main` and
-pushed to `origin/main`. The current implementation branch, `codex/digital-twin-plan`, makes the
-Integrated Digital Twin review-ready: a single-spacecraft mission screening product that combines
-orbit geometry, power, thermal, ADCS, coverage, link budget, mass, and design-margin evidence in one
-suite-owned workflow.
+pushed to `origin/main`. The stacked implementation branches make the digital twin roadmap slice
+review-ready: `codex/digital-twin-plan` adds the single-spacecraft integrated twin,
+`codex/constellation-twin-design` extends it with a multi-spacecraft constellation screening product
+that aggregates fleet access, revisit, link-budget, data-volume, and margin evidence over embedded
+member twin results, and `codex/coverage-maps-v1` adds deterministic target-grid sensor coverage
+summaries on top of the constellation workflow.
 
 Implemented and verified in the current pass:
 
@@ -67,11 +69,70 @@ Implemented and verified in the current pass:
   606 tests and 11 optional-backend skips; `git diff --check` was clean;
   `python -m pytest tests/test_packaging.py -q` passed with 3 tests; and `python -m build`
   produced `astro_suite-0.1.0.tar.gz` and `astro_suite-0.1.0-py3-none-any.whl`.
+- Constellation Digital Twin planning artifacts:
+  `docs/superpowers/specs/2026-07-08-constellation-digital-twin-design.md` and
+  `docs/superpowers/plans/2026-07-08-constellation-digital-twin-implementation.md`.
+- Constellation Digital Twin implementation surface on `codex/constellation-twin-design`:
+  `src/astro_twin/constellation_models.py`, `src/astro_twin/constellation_io.py`,
+  `src/astro_twin/constellation.py`, `astro run-constellation-twin` in `src/astro_cli/main.py`,
+  `examples/twin/constellation_leo_observers.yaml`,
+  `examples/twin/leo_observer_plane_a.yaml`, `examples/twin/leo_observer_plane_b.yaml`,
+  `examples/scenarios/leo_two_body_phase_minus_4deg.yaml`,
+  `tests/astro_twin/test_constellation_models.py`,
+  `tests/astro_twin/test_constellation_io.py`,
+  `tests/astro_twin/test_constellation_aggregation.py`,
+  `tests/astro_twin/test_constellation_runner.py`, and constellation CLI tests in
+  `tests/astro_cli/test_cli.py`.
+- Constellation Digital Twin verification on `codex/constellation-twin-design`:
+  `astro run-constellation-twin examples/twin/constellation_leo_observers.yaml --output /tmp/astro-constellation-twin.json --summary-output /tmp/astro-constellation-twin.txt`
+  wrote JSON and text artifacts for `leo-observers` with 2 members, a 0.0 to 600.0 second analysis
+  window, 1 `equator-eci` fleet access summary, 300.0 seconds total fleet access, 0.5 coverage
+  fraction, 300.0 second longest gap, max simultaneous spacecraft 2, 1080.000 Mbit total data
+  volume, member data volumes of 480.0 Mbit for `plane-a` and 600.0 Mbit for `plane-b`, and a
+  limiting `fleet_longest_gap_s_equator-eci` margin with status `warn` and margin 0.000. The
+  product keeps explicit design-screening warnings and does not claim operational constellation
+  coverage authority.
+- Constellation Digital Twin final gates on `codex/constellation-twin-design`:
+  `python -m pytest tests/astro_twin/test_constellation_models.py tests/astro_twin/test_constellation_io.py tests/astro_twin/test_constellation_aggregation.py tests/astro_twin/test_constellation_runner.py tests/astro_cli/test_cli.py::test_run_constellation_twin_command_writes_json_and_summary -q`
+  passed with `24 passed in 0.86s`; `python -m ruff check .` passed; `python -m mypy` passed with no
+  issues in 81 source files; `python -m pytest -q` passed with
+  `632 passed, 11 skipped in 6.87s`; `git diff --check` was clean;
+  `python -m pytest tests/test_packaging.py -q` passed with `3 passed in 0.03s`; and
+  `python -m build` produced `astro_suite-0.1.0.tar.gz` and
+  `astro_suite-0.1.0-py3-none-any.whl`.
+- Constellation Coverage Maps v1 planning artifacts:
+  `docs/superpowers/specs/2026-07-09-constellation-coverage-maps-design.md` and
+  `docs/superpowers/plans/2026-07-09-constellation-coverage-maps-implementation.md`.
+- Constellation Coverage Maps v1 implementation surface on `codex/coverage-maps-v1`:
+  `ConstellationCoverageSensorConfig`, `ConstellationCoverageTargetConfig`,
+  `ConstellationCoverageMapConfig`, `CoverageMapSummary`, and `CoverageMapTargetSummary` in
+  `src/astro_twin/constellation_models.py`; `aggregate_coverage_maps` and coverage-map fleet
+  margins in `src/astro_twin/constellation.py`; summary formatting in
+  `src/astro_twin/constellation_io.py`; the checked two-target `equatorial-targets` map in
+  `examples/twin/constellation_leo_observers.yaml`; and focused model, aggregation, runner, IO, and
+  CLI tests.
+- Constellation Coverage Maps v1 verification on `codex/coverage-maps-v1`:
+  `astro run-constellation-twin examples/twin/constellation_leo_observers.yaml --output /tmp/astro-constellation-coverage-map.json --summary-output /tmp/astro-constellation-coverage-map.txt`
+  wrote JSON and text artifacts for `leo-observers` with 1 coverage map, 2 configured targets, 2
+  covered targets, 0.250 mean coverage fraction, 0.200 minimum target coverage fraction, 480.0
+  second maximum target gap, max simultaneous spacecraft 2, target fractions of 0.200 for
+  `prime-meridian` and 0.300 for `east-equator`, and limiting
+  `coverage_map_min_fraction_equatorial-targets` margin with status `warn` and margin 0.000. The
+  focused constellation and CLI slice passed with `29 passed in 0.86s`; `python -m ruff check .`
+  passed; `python -m mypy` passed with no issues in 81 source files; the twin test slice passed with
+  `43 passed in 0.32s`; `python -m pytest -q` passed with `637 passed, 11 skipped in 7.09s`;
+  `git diff --check` was clean; the packaging test slice passed with `3 passed in 0.03s`; and
+  `python -m build` produced
+  `astro_suite-0.1.0.tar.gz` and `astro_suite-0.1.0-py3-none-any.whl`. The product keeps explicit
+  design-screening warnings and does not claim operational coverage authority or certified sensor
+  performance.
 
 Post-MVP / external-campaign items:
 
 - Production-grade covariance certification through external drag, SRP, and third-body dynamics.
 - Flight-qualified actuator/sensor ACS modeling beyond deterministic screening products.
+- Operational constellation coverage authority, scheduling, or certified sensor performance beyond
+  deterministic target-grid screening.
 - Native RocketPy multi-motor/staged-separation execution if a validated upstream API becomes
   available.
 - Full high-fidelity multistage Dymos ascent design optimization beyond the current suite product
@@ -87,13 +148,15 @@ Post-MVP / external-campaign items:
 | roadmap-finish-state | done | decide/verify | steward | `docs/current-state.md`, release and live-ledger docs | State file records canonical workspace, release readiness, optional smoke evidence, and remaining post-MVP boundaries. |
 | verifiable-od-workflow-pack | done | productize/verify | steward | `src/astro_assistant`, `examples/workflows/local_od`, assistant docs and validation matrix | Local OD workflow has a manifest, golden prompt fixtures, JSON and text report outputs, focused tests, real CLI execution evidence, and is pushed on `main`. |
 | integrated-digital-twin | review-ready | productize/verify | steward | `src/astro_twin`, `astro run-twin`, `examples/twin`, `tests/astro_twin`, `docs/digital-twin.md` | Single-spacecraft v1 writes suite-owned orbit geometry, power, thermal, ADCS, coverage, link budget, mass, and design-margin evidence from one scenario; required local gates pass with explicit design-screening claim boundaries. |
+| constellation-digital-twin | review-ready | productize/verify | steward | `src/astro_twin/constellation*`, `astro run-constellation-twin`, `examples/twin/constellation_leo_observers.yaml`, constellation tests, `docs/digital-twin.md` | Constellation v1 embeds member `DigitalTwinResult`s and writes suite-owned fleet access, revisit, link, data-volume, and margin evidence for a checked two-member reference; required local gates pass with explicit design-screening and non-operational claim boundaries. |
+| constellation-coverage-maps | review-ready | productize/verify | steward | `src/astro_twin/constellation*`, `examples/twin/constellation_leo_observers.yaml`, `docs/digital-twin.md`, constellation tests | Coverage Maps v1 writes deterministic target-grid sensor coverage summaries and fleet margins from member geometry samples; required local gates pass with explicit design-screening and non-operational claim boundaries. |
 
 ## Next Best Paths
 
-1. Review and merge `codex/digital-twin-plan` into `main` if the integrated twin v1 scope is
-   accepted.
+1. Review and merge `codex/digital-twin-plan`, then the stacked
+   `codex/constellation-twin-design`, then `codex/coverage-maps-v1`, into `main` if the integrated
+   twin, constellation twin, and coverage-map scopes are accepted.
 2. Tag a release candidate from `/Users/emerygunselman/Code/astro` once the user provides the
    desired release/tag policy.
-3. Choose the next roadmap expansion deliberately: constellation aggregation, higher-fidelity
-   subsystem models, or one external-campaign validation scope. Do not treat all three as hidden
-   implementation backlog.
+3. Choose the next roadmap expansion deliberately: higher-fidelity subsystem models or one
+   external-campaign validation scope. Do not treat both as hidden implementation backlog.

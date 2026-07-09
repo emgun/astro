@@ -251,6 +251,106 @@ def test_run_twin_command_writes_json_and_summary(tmp_path: Path) -> None:
     assert "Limiting margin:" in summary.read_text(encoding="utf-8")
 
 
+def test_run_constellation_twin_command_writes_json_and_summary(tmp_path: Path) -> None:
+    output = tmp_path / "constellation-twin.json"
+    summary = tmp_path / "constellation-twin.txt"
+
+    result = runner.invoke(
+        app,
+        [
+            "run-constellation-twin",
+            "examples/twin/constellation_leo_observers.yaml",
+            "--output",
+            str(output),
+            "--summary-output",
+            str(summary),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert f"wrote constellation digital twin result: {output}" in result.stdout
+    assert f"wrote constellation digital twin summary: {summary}" in result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["workflow"] == "constellation_digital_twin_v1"
+    assert len(payload["members"]) == 2
+    assert [member["member_name"] for member in payload["members"]] == ["plane-a", "plane-b"]
+    assert payload["coverage_map_summaries"][0]["name"] == "equatorial-targets"
+    assert payload["coverage_map_summaries"][0]["target_count"] == 2
+    summary_text = summary.read_text(encoding="utf-8")
+    assert "Constellation twin: leo-observers" in summary_text
+    assert "Members: 2" in summary_text
+    assert "Coverage maps: 1" in summary_text
+    assert "Max simultaneous spacecraft: 2" in summary_text
+    assert "Limiting fleet margin:" in summary_text
+
+
+def test_run_constellation_twin_command_reports_invalid_scenario(
+    tmp_path: Path,
+) -> None:
+    scenario = tmp_path / "invalid-constellation.yaml"
+    output = tmp_path / "constellation-twin.json"
+    summary = tmp_path / "constellation-twin.txt"
+    scenario.write_text(
+        yaml.safe_dump(
+            {
+                "scenario_id": "invalid-constellation",
+                "members": [
+                    {
+                        "name": "plane-a",
+                        "twin_scenario": "examples/twin/leo_observer_plane_a.yaml",
+                    }
+                ],
+                "coverage_requirements": [
+                    {
+                        "ground_site": "missing-site",
+                        "minimum_coverage_fraction": 0.25,
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run-constellation-twin",
+            str(scenario),
+            "--output",
+            str(output),
+            "--summary-output",
+            str(summary),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "unconfigured ground sites" in result.stderr
+    assert not output.exists()
+    assert not summary.exists()
+
+
+def test_run_constellation_twin_command_reports_output_parent_errors(
+    tmp_path: Path,
+) -> None:
+    blocking_parent = tmp_path / "blocking-parent"
+    blocking_parent.write_text("not a directory", encoding="utf-8")
+    output = blocking_parent / "constellation-twin.json"
+
+    result = runner.invoke(
+        app,
+        [
+            "run-constellation-twin",
+            "examples/twin/constellation_leo_observers.yaml",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "could not create constellation digital twin result parent" in result.stderr
+
+
 def test_export_trajectory_command_writes_csv(tmp_path: Path) -> None:
     trajectory_path = tmp_path / "trajectory.json"
     output = tmp_path / "trajectory.csv"
