@@ -98,12 +98,21 @@ def format_constellation_summary(result: ConstellationTwinResult) -> str:
         ),
         default=0,
     )
+    min_target_coverage = min(
+        (
+            summary.minimum_target_coverage_fraction
+            for summary in result.coverage_map_summaries
+        ),
+        default=0.0,
+    )
     lines = [
         f"Constellation twin: {result.scenario_id}",
         f"Workflow: {result.workflow}",
         f"Members: {len(result.members)}",
         f"Analysis window s: {start_s} to {end_s}",
         f"Fleet access summaries: {len(result.access_summaries)}",
+        f"Coverage maps: {len(result.coverage_map_summaries)}",
+        f"Minimum target coverage fraction: {min_target_coverage:.3f}",
         f"Total data volume Mbit: {total_data_mbit:.3f}",
         f"Max simultaneous spacecraft: {max_simultaneous}",
         (

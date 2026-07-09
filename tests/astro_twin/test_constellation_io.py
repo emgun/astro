@@ -32,6 +32,24 @@ def test_load_constellation_twin_scenario_reads_yaml(tmp_path: Path) -> None:
                         "maximum_revisit_gap_s": 300.0,
                     }
                 ],
+                "coverage_maps": [
+                    {
+                        "name": "equatorial-targets",
+                        "sensor": {
+                            "name": "nadir-imager",
+                            "field_of_view_half_angle_deg": 25.0,
+                        },
+                        "targets": [
+                            {
+                                "name": "prime-meridian",
+                                "latitude_deg": 0.0,
+                                "longitude_deg": 0.0,
+                            }
+                        ],
+                        "minimum_target_coverage_fraction": 0.25,
+                        "maximum_target_revisit_gap_s": 600.0,
+                    }
+                ],
             },
             sort_keys=False,
         ),
@@ -43,6 +61,7 @@ def test_load_constellation_twin_scenario_reads_yaml(tmp_path: Path) -> None:
     assert scenario.scenario_id == "leo-observers"
     assert scenario.members[1].name == "plane-b"
     assert scenario.coverage_requirements[0].minimum_coverage_fraction == 0.25
+    assert scenario.coverage_maps[0].targets[0].name == "prime-meridian"
 
 
 def test_load_constellation_twin_scenario_rejects_non_mapping(
@@ -62,6 +81,7 @@ def test_write_load_and_format_constellation_result(tmp_path: Path) -> None:
         access_summaries=(),
         link_summaries=(),
         member_link_summaries=(),
+        coverage_map_summaries=(),
         fleet_margin_report=DesignMarginReport(
             margins=(
                 DesignMargin(
@@ -94,6 +114,7 @@ def test_write_load_and_format_constellation_result(tmp_path: Path) -> None:
     )
     assert loaded.scenario_id == "leo-observers"
     assert "Constellation twin: leo-observers" in summary
+    assert "Coverage maps: 0" in summary
     assert "Limiting fleet margin:" in summary
     assert "screening only" in summary
 
@@ -107,6 +128,7 @@ def test_write_constellation_twin_result_wraps_write_errors(
         access_summaries=(),
         link_summaries=(),
         member_link_summaries=(),
+        coverage_map_summaries=(),
         fleet_margin_report=DesignMarginReport(
             margins=(
                 DesignMargin(

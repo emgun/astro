@@ -6,7 +6,10 @@ import astro_twin.constellation as constellation
 from astro_core.errors import InvalidScenarioError
 from astro_twin.constellation_io import load_constellation_twin_scenario
 from astro_twin.constellation_models import (
+    ConstellationCoverageMapConfig,
     ConstellationCoverageRequirement,
+    ConstellationCoverageSensorConfig,
+    ConstellationCoverageTargetConfig,
     ConstellationMemberConfig,
     ConstellationTwinScenario,
 )
@@ -49,6 +52,16 @@ def test_run_constellation_twin_returns_fleet_result() -> None:
     assert len(result.link_summaries) == 1
     assert result.link_summaries[0].ground_site == "equator-eci"
     assert result.link_summaries[0].total_data_volume_mbit > 0.0
+    assert len(result.coverage_map_summaries) == 1
+    coverage_map = result.coverage_map_summaries[0]
+    assert coverage_map.name == "equatorial-targets"
+    assert coverage_map.target_count == 2
+    assert coverage_map.covered_target_count >= 1
+    assert coverage_map.max_simultaneous_spacecraft >= 1
+    assert any(
+        target.target_name == "prime-meridian"
+        for target in coverage_map.target_summaries
+    )
     member_data_by_name = {
         summary.member_name: summary.total_data_volume_mbit
         for summary in result.member_link_summaries
@@ -165,6 +178,70 @@ def test_run_constellation_twin_reports_configured_sites_without_windows(
     )
 
 
+def test_run_constellation_twin_reports_coverage_map_margins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    member_scenario = load_twin_scenario("examples/twin/leo_observer_plane_a.yaml")
+    scenario = ConstellationTwinScenario(
+        scenario_id="coverage-map-margin",
+        members=(
+            ConstellationMemberConfig(name="plane-a", twin_scenario="plane-a.yaml"),
+        ),
+        coverage_maps=(
+            ConstellationCoverageMapConfig(
+                name="target-grid",
+                sensor=ConstellationCoverageSensorConfig(
+                    name="nadir-imager",
+                    field_of_view_half_angle_deg=25.0,
+                ),
+                targets=(
+                    ConstellationCoverageTargetConfig(
+                        name="prime-meridian",
+                        latitude_deg=0.0,
+                        longitude_deg=0.0,
+                    ),
+                    ConstellationCoverageTargetConfig(
+                        name="high-latitude",
+                        latitude_deg=80.0,
+                        longitude_deg=0.0,
+                    ),
+                ),
+                minimum_target_coverage_fraction=0.25,
+                maximum_target_revisit_gap_s=90.0,
+            ),
+        ),
+    )
+
+    monkeypatch.setattr(
+        constellation,
+        "load_twin_scenario",
+        lambda _path: member_scenario,
+    )
+    monkeypatch.setattr(
+        constellation,
+        "run_digital_twin",
+        lambda _scenario: _digital_twin_result(
+            elapsed_s=(0.0, 60.0, 120.0),
+            position_km=(7000.0, 0.0, 0.0),
+        ),
+    )
+
+    result = constellation.run_constellation_twin(scenario)
+
+    assert result.coverage_map_summaries[0].name == "target-grid"
+    margin_by_name = {
+        margin.name: margin for margin in result.fleet_margin_report.margins
+    }
+    assert (
+        margin_by_name["coverage_map_min_fraction_target-grid"].status
+        is TwinMarginStatus.FAIL
+    )
+    assert (
+        margin_by_name["coverage_map_max_gap_s_target-grid"].status
+        is TwinMarginStatus.FAIL
+    )
+
+
 def test_run_constellation_twin_rejects_member_timelines_without_overlap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -200,7 +277,11 @@ def test_run_constellation_twin_rejects_member_timelines_without_overlap(
         constellation.run_constellation_twin(scenario)
 
 
-def _digital_twin_result(elapsed_s: tuple[float, ...]) -> DigitalTwinResult:
+def _digital_twin_result(
+    elapsed_s: tuple[float, ...],
+    *,
+    position_km: tuple[float, float, float] = (7000.0, 0.0, 0.0),
+) -> DigitalTwinResult:
     margin = DesignMargin(
         name="mass_margin_fraction",
         value=0.3,
@@ -214,7 +295,7 @@ def _digital_twin_result(elapsed_s: tuple[float, ...]) -> DigitalTwinResult:
             TimelineGeometrySample(
                 epoch=datetime(2026, 1, 1, tzinfo=UTC),
                 elapsed_s=elapsed,
-                position_km=(7000.0, 0.0, 0.0),
+                position_km=position_km,
                 altitude_km=621.8637,
                 sunlit=True,
             )

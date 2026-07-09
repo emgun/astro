@@ -1,24 +1,33 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from math import isfinite
+from math import acos, cos, degrees, isfinite, radians, sin, sqrt
 
+from astro_core.constants import R_EARTH_KM
 from astro_core.errors import InvalidScenarioError
 from astro_twin.constellation_models import (
+    ConstellationCoverageMapConfig,
     ConstellationCoverageRequirement,
+    ConstellationCoverageSensorConfig,
+    ConstellationCoverageTargetConfig,
     ConstellationTwinResult,
     ConstellationTwinScenario,
+    CoverageMapSummary,
+    CoverageMapTargetSummary,
     FleetAccessSummary,
     FleetLinkSummary,
     MemberLinkSummary,
     MemberTwinResult,
 )
+from astro_twin.geometry import elevation_and_range_km
 from astro_twin.io import load_twin_scenario
 from astro_twin.models import (
     AccessWindow,
     DesignMargin,
     DesignMarginReport,
+    GroundSiteConfig,
     LinkBudgetWindow,
+    TimelineGeometrySample,
     TwinMarginStatus,
 )
 from astro_twin.runner import run_digital_twin
@@ -36,6 +45,7 @@ def run_constellation_twin(
     member_results: list[MemberTwinResult] = []
     member_access_windows: dict[str, tuple[AccessWindow, ...]] = {}
     member_link_windows: dict[str, tuple[LinkBudgetWindow, ...]] = {}
+    member_geometry_samples: dict[str, tuple[TimelineGeometrySample, ...]] = {}
     member_limiting_margins: dict[str, DesignMargin] = {}
     configured_ground_sites: set[str] = set()
     analysis_starts_s: list[float] = []
@@ -64,6 +74,7 @@ def run_constellation_twin(
         )
         member_access_windows[member.name] = member_result.access_windows
         member_link_windows[member.name] = member_result.link_windows
+        member_geometry_samples[member.name] = member_result.geometry
         member_limiting_margins[member.name] = (
             member_result.margin_report.limiting_margin
         )
@@ -88,11 +99,19 @@ def run_constellation_twin(
         analysis_end_s=analysis_end_s,
         ground_sites=configured_ground_sites,
     )
+    coverage_map_summaries = aggregate_coverage_maps(
+        member_geometry_samples=member_geometry_samples,
+        coverage_maps=scenario.coverage_maps,
+        analysis_start_s=analysis_start_s,
+        analysis_end_s=analysis_end_s,
+    )
     fleet_margin_report = build_fleet_margin_report(
         access_summaries=access_summaries,
         link_summaries=link_summaries,
         coverage_requirements=scenario.coverage_requirements,
         member_limiting_margins=member_limiting_margins,
+        coverage_map_summaries=coverage_map_summaries,
+        coverage_maps=scenario.coverage_maps,
     )
     return ConstellationTwinResult(
         scenario_id=scenario.scenario_id,
@@ -100,6 +119,7 @@ def run_constellation_twin(
         access_summaries=access_summaries,
         link_summaries=link_summaries,
         member_link_summaries=member_link_summaries,
+        coverage_map_summaries=coverage_map_summaries,
         fleet_margin_report=fleet_margin_report,
         metadata={
             "analysis_window_s": {
@@ -193,6 +213,100 @@ def aggregate_access_summaries(
     return tuple(summaries)
 
 
+def aggregate_coverage_maps(
+    member_geometry_samples: Mapping[str, Iterable[TimelineGeometrySample]],
+    coverage_maps: Iterable[ConstellationCoverageMapConfig],
+    analysis_start_s: float,
+    analysis_end_s: float,
+) -> tuple[CoverageMapSummary, ...]:
+    """Summarize deterministic nadir sensor coverage over configured target grids."""
+    _validate_analysis_interval(analysis_start_s, analysis_end_s)
+    analysis_duration_s = analysis_end_s - analysis_start_s
+    summaries: list[CoverageMapSummary] = []
+
+    member_samples = {
+        member_name: tuple(sorted(samples, key=lambda sample: sample.elapsed_s))
+        for member_name, samples in member_geometry_samples.items()
+    }
+    for coverage_map in coverage_maps:
+        target_summaries: list[CoverageMapTargetSummary] = []
+        for target in coverage_map.targets:
+            target_intervals: list[tuple[float, float, str]] = []
+            for member_name, samples in member_samples.items():
+                target_intervals.extend(
+                    _visible_intervals_for_target(
+                        member_name=member_name,
+                        samples=samples,
+                        target=target,
+                        sensor=coverage_map.sensor,
+                        analysis_start_s=analysis_start_s,
+                        analysis_end_s=analysis_end_s,
+                    )
+                )
+
+            merged_intervals = _merge_intervals(
+                (start_s, end_s) for start_s, end_s, _member_name in target_intervals
+            )
+            total_covered_duration_s = sum(
+                end_s - start_s for start_s, end_s in merged_intervals
+            )
+            gaps_s = _gaps_s(
+                merged_intervals,
+                analysis_start_s=analysis_start_s,
+                analysis_end_s=analysis_end_s,
+            )
+            target_summaries.append(
+                CoverageMapTargetSummary(
+                    target_name=target.name,
+                    total_covered_duration_s=total_covered_duration_s,
+                    longest_gap_s=max(gaps_s, default=0.0),
+                    mean_gap_s=sum(gaps_s) / len(gaps_s) if gaps_s else 0.0,
+                    max_simultaneous_spacecraft=_max_simultaneous_members(
+                        target_intervals
+                    ),
+                    coverage_fraction=total_covered_duration_s / analysis_duration_s,
+                )
+            )
+
+        coverage_fractions = [
+            target.coverage_fraction for target in target_summaries
+        ]
+        summaries.append(
+            CoverageMapSummary(
+                name=coverage_map.name,
+                sensor_name=coverage_map.sensor.name,
+                target_count=len(target_summaries),
+                covered_target_count=sum(
+                    1
+                    for target in target_summaries
+                    if target.total_covered_duration_s > 0.0
+                ),
+                mean_coverage_fraction=(
+                    sum(coverage_fractions) / len(coverage_fractions)
+                    if coverage_fractions
+                    else 0.0
+                ),
+                minimum_target_coverage_fraction=min(
+                    coverage_fractions,
+                    default=0.0,
+                ),
+                maximum_target_gap_s=max(
+                    (target.longest_gap_s for target in target_summaries),
+                    default=0.0,
+                ),
+                max_simultaneous_spacecraft=max(
+                    (
+                        target.max_simultaneous_spacecraft
+                        for target in target_summaries
+                    ),
+                    default=0,
+                ),
+                target_summaries=tuple(target_summaries),
+            )
+        )
+    return tuple(summaries)
+
+
 def aggregate_link_summaries(
     member_link_windows: Mapping[str, Iterable[LinkBudgetWindow]],
     analysis_start_s: float,
@@ -266,10 +380,15 @@ def build_fleet_margin_report(
     link_summaries: Iterable[FleetLinkSummary],
     coverage_requirements: Iterable[ConstellationCoverageRequirement],
     member_limiting_margins: Mapping[str, DesignMargin],
+    coverage_map_summaries: Iterable[CoverageMapSummary] = (),
+    coverage_maps: Iterable[ConstellationCoverageMapConfig] = (),
 ) -> DesignMarginReport:
     """Build a deterministic fleet margin report from aggregated twin evidence."""
     access_by_site = {summary.ground_site: summary for summary in access_summaries}
     link_by_site = {summary.ground_site: summary for summary in link_summaries}
+    coverage_map_by_name = {
+        summary.name: summary for summary in coverage_map_summaries
+    }
     requirements_by_site = {
         requirement.ground_site: requirement for requirement in coverage_requirements
     }
@@ -312,6 +431,44 @@ def build_fleet_margin_report(
                 )
             )
 
+    for coverage_map in sorted(coverage_maps, key=lambda item: item.name):
+        summary = coverage_map_by_name.get(coverage_map.name)
+        minimum_target_coverage_fraction = (
+            summary.minimum_target_coverage_fraction if summary is not None else 0.0
+        )
+        coverage_margin = (
+            minimum_target_coverage_fraction
+            - coverage_map.minimum_target_coverage_fraction
+        )
+        margins.append(
+            DesignMargin(
+                name=f"coverage_map_min_fraction_{coverage_map.name}",
+                value=minimum_target_coverage_fraction,
+                threshold=coverage_map.minimum_target_coverage_fraction,
+                margin=coverage_margin,
+                status=_status(coverage_margin, warn_threshold=0.05),
+            )
+        )
+        if coverage_map.maximum_target_revisit_gap_s is not None:
+            maximum_target_gap_s = (
+                summary.maximum_target_gap_s
+                if summary is not None
+                else coverage_map.maximum_target_revisit_gap_s + 1.0
+            )
+            revisit_margin_s = (
+                coverage_map.maximum_target_revisit_gap_s
+                - maximum_target_gap_s
+            )
+            margins.append(
+                DesignMargin(
+                    name=f"coverage_map_max_gap_s_{coverage_map.name}",
+                    value=maximum_target_gap_s,
+                    threshold=coverage_map.maximum_target_revisit_gap_s,
+                    margin=revisit_margin_s,
+                    status=_status(revisit_margin_s, warn_threshold=60.0),
+                )
+            )
+
     represented_sites = (
         set(access_by_site)
         | set(link_by_site)
@@ -341,6 +498,125 @@ def build_fleet_margin_report(
         margins=tuple(margins),
         limiting_margin=limiting_margin,
     )
+
+
+def _visible_intervals_for_target(
+    *,
+    member_name: str,
+    samples: Iterable[TimelineGeometrySample],
+    target: ConstellationCoverageTargetConfig,
+    sensor: ConstellationCoverageSensorConfig,
+    analysis_start_s: float,
+    analysis_end_s: float,
+) -> tuple[tuple[float, float, str], ...]:
+    intervals: list[tuple[float, float, str]] = []
+    active_elapsed_s: list[float] = []
+    for sample in samples:
+        if sample.elapsed_s < analysis_start_s or sample.elapsed_s > analysis_end_s:
+            continue
+        if _target_visible_from_sample(sample, target, sensor):
+            active_elapsed_s.append(sample.elapsed_s)
+            continue
+        if active_elapsed_s:
+            intervals.append(
+                _coverage_interval_from_active(
+                    active_elapsed_s,
+                    member_name=member_name,
+                    analysis_end_s=analysis_end_s,
+                )
+            )
+            active_elapsed_s = []
+    if active_elapsed_s:
+        intervals.append(
+            _coverage_interval_from_active(
+                active_elapsed_s,
+                member_name=member_name,
+                analysis_end_s=analysis_end_s,
+            )
+        )
+    return tuple(
+        interval for interval in intervals if interval[1] > interval[0]
+    )
+
+
+def _coverage_interval_from_active(
+    active_elapsed_s: list[float],
+    *,
+    member_name: str,
+    analysis_end_s: float,
+) -> tuple[float, float, str]:
+    start_s = active_elapsed_s[0]
+    end_s = active_elapsed_s[-1]
+    if end_s <= start_s:
+        end_s = min(analysis_end_s, start_s + 1.0)
+    return start_s, end_s, member_name
+
+
+def _target_visible_from_sample(
+    sample: TimelineGeometrySample,
+    target: ConstellationCoverageTargetConfig,
+    sensor: ConstellationCoverageSensorConfig,
+) -> bool:
+    target_site = GroundSiteConfig(
+        name=target.name,
+        latitude_deg=target.latitude_deg,
+        longitude_deg=target.longitude_deg,
+        altitude_m=target.altitude_m,
+        minimum_elevation_deg=sensor.minimum_elevation_deg,
+    )
+    elevation_deg, range_km = elevation_and_range_km(
+        sample.position_km,
+        target_site,
+        sample.elapsed_s,
+    )
+    if elevation_deg < sensor.minimum_elevation_deg:
+        return False
+    if sensor.maximum_range_km is not None and range_km > sensor.maximum_range_km:
+        return False
+
+    target_position_km = _coverage_target_position_eci_km(
+        target,
+        elapsed_s=sample.elapsed_s,
+    )
+    target_vector_km: tuple[float, float, float] = (
+        target_position_km[0] - sample.position_km[0],
+        target_position_km[1] - sample.position_km[1],
+        target_position_km[2] - sample.position_km[2],
+    )
+    nadir_vector_km: tuple[float, float, float] = (
+        -sample.position_km[0],
+        -sample.position_km[1],
+        -sample.position_km[2],
+    )
+    off_nadir_deg = _angle_between_deg(nadir_vector_km, target_vector_km)
+    return off_nadir_deg <= sensor.field_of_view_half_angle_deg + 1.0e-9
+
+
+def _coverage_target_position_eci_km(
+    target: ConstellationCoverageTargetConfig,
+    *,
+    elapsed_s: float,
+) -> tuple[float, float, float]:
+    latitude = radians(target.latitude_deg)
+    longitude = radians(target.longitude_deg) + 7.2921159e-5 * elapsed_s
+    radius_km = R_EARTH_KM + target.altitude_m / 1000.0
+    return (
+        radius_km * cos(latitude) * cos(longitude),
+        radius_km * cos(latitude) * sin(longitude),
+        radius_km * sin(latitude),
+    )
+
+
+def _angle_between_deg(
+    first: tuple[float, float, float],
+    second: tuple[float, float, float],
+) -> float:
+    first_norm = sqrt(sum(component * component for component in first))
+    second_norm = sqrt(sum(component * component for component in second))
+    cosine = sum(first[index] * second[index] for index in range(3)) / (
+        first_norm * second_norm
+    )
+    return degrees(acos(max(-1.0, min(1.0, cosine))))
 
 
 def _validate_analysis_interval(analysis_start_s: float, analysis_end_s: float) -> None:
