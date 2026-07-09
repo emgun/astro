@@ -1,13 +1,13 @@
 # Live Backend Campaign Ledger
 
-Last local smoke run: 2026-07-09 on branch `codex/orekit-validation-refresh`
-from main commit `8111390`.
+Last local smoke run: 2026-07-09 on branch `codex/orekit-validation-refresh`,
+merged to `main` at `b668e1f`.
 
 Last live campaign refresh: 2026-07-09 on branch `codex/orekit-validation-refresh`.
 The refresh reran the Orekit high-fidelity covariance gate and representative Orekit drag, SRP, and
 Sun/Moon third-body trajectory products. TudatPy was not refreshed because the previously recorded
 isolated `/tmp/astro-tudat-live-env` environment no longer existed and the base environment does not
-have TudatPy installed.
+have TudatPy installed. PR #7 merged the evidence update into `main` at `b668e1f`.
 
 Last available full live campaign run: 2026-06-20 11:52 PDT on branch `codex/orbit-fd-od-mvp`
 in the working tree recorded by this ledger update. The optional smoke refresh above confirms

@@ -30,6 +30,7 @@ Latest optional validation refresh:
   `/tmp/astro-orekit-validation-third-body-20260709.json`. The covariance artifact records 11
   covariance samples with J2, drag, SRP, Sun, and Moon transition force models. This is optional
   machine-scoped backend evidence, not production covariance certification.
+- 2026-07-09: PR #7 merged the optional validation refresh to `main` at `b668e1f`.
 
 ## Required Local Gates
 
