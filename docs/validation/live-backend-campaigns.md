@@ -1,12 +1,19 @@
 # Live Backend Campaign Ledger
 
-Last local smoke run: 2026-06-20 17:50 PDT on branch `codex/roadmap-finish-state`
-at commit `870cb13`.
+Last local smoke run: 2026-07-09 on branch `codex/orekit-validation-refresh`
+from main commit `8111390`.
 
-Last available live campaign run: 2026-06-20 11:52 PDT on branch `codex/orbit-fd-od-mvp`
-in the working tree recorded by this ledger update. The optional smoke refresh above confirms the
-same optional runtimes import on the current main-equivalent checkout, but it does not rerun every
-live campaign gate.
+Last live campaign refresh: 2026-07-09 on branch `codex/orekit-validation-refresh`.
+The refresh reran the Orekit high-fidelity covariance gate and representative Orekit drag, SRP, and
+Sun/Moon third-body trajectory products. TudatPy was not refreshed because the previously recorded
+isolated `/tmp/astro-tudat-live-env` environment no longer existed and the base environment does not
+have TudatPy installed.
+
+Last available full live campaign run: 2026-06-20 11:52 PDT on branch `codex/orbit-fd-od-mvp`
+in the working tree recorded by this ledger update. The optional smoke refresh above confirms
+Orekit, RocketPy, Dymos/OpenMDAO, and JAX import on the current main-equivalent checkout, but it
+does not rerun every live campaign gate. Tudat evidence from this older run remains historical
+evidence for that isolated environment, not a refreshed claim for the current machine state.
 
 This ledger records optional backend campaign evidence. A passing smoke command means the local
 runtime can be imported and the minimal API gate passed. It does not by itself complete live
@@ -25,8 +32,11 @@ astro rocketpy-smoke
 astro dymos-smoke
 # available true, Dymos 1.13.1, OpenMDAO 3.41.0
 
+astro tudat-smoke
+# available false, TudatPy is not installed
+
 conda run -p /tmp/astro-tudat-live-env astro tudat-smoke
-# available true, TudatPy 1.0.0
+# not run: /tmp/astro-tudat-live-env no longer exists
 
 astro jax-smoke
 # available true, JAX 0.7.1, jaxlib 0.7.1
@@ -36,10 +46,10 @@ astro jax-smoke
 
 | Backend | Smoke status | Live gate status | Roadmap implication |
 | --- | --- | --- | --- |
-| Orekit | Available with explicit Homebrew OpenJDK environment | Passed propagation, generic/high-fidelity covariance, and native OD live gates | Orekit live propagation, covariance, and native OD claims are promoted for this machine only when the Java/data environment is configured. |
+| Orekit | Available with explicit Homebrew OpenJDK environment | Refreshed high-fidelity covariance plus drag/SRP/third-body trajectory products on 2026-07-09; historical propagation, generic covariance, and native OD live gates also exist | Orekit live propagation and covariance claims are promoted for this machine only when the Java/data environment is configured; the refresh does not certify production covariance operations. |
 | RocketPy | Available | Passed configured-example live gate; multi-motor config fails closed | RocketPy configured launch examples passed live validation on this machine, and additional configured motors are rejected because the loaded `Rocket.add_motor` API overwrites earlier motors. |
 | Dymos/OpenMDAO | Available | Passed live optimization gates | Dymos default phase, target-seeking pitch-program transcription, and linked multiphase stage transcription with stage-local mass depletion and exponential-atmosphere drag live tests passed on this machine, without promoting a full high-fidelity multistage ascent design optimizer. |
-| TudatPy | Available in isolated conda env | Propagation/high-fidelity covariance/native-variational gates passed; strict multi-scenario comparison found a calibrated J2 tolerance boundary | Tudat live force-model products are promoted only with the recorded comparison tolerances and remain cross-check products, not the operational authority. |
+| TudatPy | Not installed in the base environment; historical isolated `/tmp/astro-tudat-live-env` path is absent | Not refreshed on 2026-07-09; historical propagation/high-fidelity covariance/native-variational gates passed on 2026-06-20 | Do not promote fresh Tudat release claims unless a new isolated TudatPy environment is recreated and the live gates are rerun. Historical Tudat products remain cross-check products, not operational authority. |
 | JAX/JAXLIB | Available | Passed research promotion checklist | JAX research propagation, OD sensitivity, and research-estimate gates passed on this machine, but remain research workflows, not operational OD services. |
 
 ## Orekit
@@ -54,9 +64,9 @@ Smoke command: `astro orekit-smoke`
 Live validation command:
 `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_two_body_matches_local_reference tests/astro_backends/test_orekit_propagation.py::test_live_orekit_j2_matches_local_reference_scale tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product tests/astro_backends/test_orekit_estimation.py::test_live_orekit_native_od_executes_batch_estimator -q`
 
-Current local status: available when launched with the Homebrew OpenJDK environment and the existing
-`~/.orekit/orekit-data.zip` data context. Without that Java environment, the smoke command remains
-an actionable unavailable diagnostic rather than a failed release gate.
+Current local status: available on 2026-07-09 when launched with the Homebrew OpenJDK environment
+and the existing `~/.orekit/orekit-data.zip` data context. Without that Java environment, the smoke
+command remains an actionable unavailable diagnostic rather than a failed release gate.
 
 Validated smoke command:
 
@@ -84,6 +94,30 @@ generic/high-fidelity covariance, and native OD live gates with the explicit Jav
 Live validation results:
 
 ```text
+2026-07-09 refresh:
+
+JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q
+2 passed in 9.22s
+
+JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend orekit --output /tmp/astro-orekit-validation-high-fidelity-covariance-20260709.json
+wrote trajectory: /tmp/astro-orekit-validation-high-fidelity-covariance-20260709.json
+
+JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --output /tmp/astro-orekit-validation-drag-20260709.json
+wrote trajectory: /tmp/astro-orekit-validation-drag-20260709.json
+
+JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output /tmp/astro-orekit-validation-srp-20260709.json
+wrote trajectory: /tmp/astro-orekit-validation-srp-20260709.json
+
+JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output /tmp/astro-orekit-validation-third-body-20260709.json
+wrote trajectory: /tmp/astro-orekit-validation-third-body-20260709.json
+
+The high-fidelity covariance artifact contains 11 trajectory samples, 11 covariance samples,
+covariance_model=orekit_finite_difference_state_transition, covariance_process_noise=white_acceleration,
+and transition force models J2OnlyPerturbation, DragForce, SolarRadiationPressure,
+ThirdBodyAttraction(Sun), and ThirdBodyAttraction(Moon).
+
+Historical 2026-06-20 live campaign:
+
 ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_two_body_matches_local_reference tests/astro_backends/test_orekit_propagation.py::test_live_orekit_j2_matches_local_reference_scale tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product -q
 3 passed in 4.93s
 
@@ -245,12 +279,12 @@ Smoke command: `astro tudat-smoke`
 Live validation command:
 `astro compare-tudat-campaign examples/scenarios/leo_two_body.yaml examples/scenarios/leo_j2.yaml --reference-backend local --position-tolerance-km 0.01 --velocity-tolerance-km-s 0.00003 --output /tmp/astro-tudat-reference-campaign-calibrated.json`
 
-Current local status: available in the isolated conda environment
-`/tmp/astro-tudat-live-env` with Python 3.12.13 and TudatPy 1.0.0. A direct base-environment conda
-dry run would have replaced/downgraded unrelated packages, so the live campaign used an isolated
-environment instead.
+Current local status: not refreshed on 2026-07-09. The base environment reports TudatPy unavailable,
+and `conda run -p /tmp/astro-tudat-live-env ...` reports that the previously recorded isolated
+environment path no longer exists. The historical 2026-06-20 campaign below remains useful evidence
+for that old isolated environment but should not be treated as a refreshed current-machine claim.
 
-Validated smoke command:
+Validated smoke command from the historical 2026-06-20 campaign:
 
 ```bash
 conda run -p /tmp/astro-tudat-live-env astro tudat-smoke
@@ -267,9 +301,9 @@ Smoke output:
 }
 ```
 
-Roadmap claim allowed: this machine completed Tudat native propagation, high-fidelity
-finite-difference covariance, high-fidelity native variational covariance, and calibrated
-comparison campaign execution in the isolated TudatPy 1.0.0 environment.
+Roadmap claim allowed: the historical isolated TudatPy 1.0.0 environment completed Tudat native
+propagation, high-fidelity finite-difference covariance, high-fidelity native variational covariance,
+and calibrated comparison campaign execution. No fresh Tudat claim was promoted on 2026-07-09.
 
 Live validation results:
 

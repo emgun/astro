@@ -1,6 +1,6 @@
 # Astro Suite Current State
 
-Date: 2026-07-08 00:00 PDT
+Date: 2026-07-09 00:00 PDT
 
 ## Canonical Workspace
 
@@ -11,13 +11,20 @@ The sibling checkout at `/Users/emerygunselman/Documents/astro` is stale for thi
 `docs/research/2026-06-20-verifiable-ai-space-workflows.md` file. Do not edit or merge from that
 checkout unless the user explicitly asks to sync the old workspace.
 
-Integrated Code checkout state before the digital-twin implementation branch:
+Integrated Code checkout state for the external-validation refresh:
 
-- Branch: `main`
-- Latest integrated release-evidence commit before this state update: `91e213a`
-- Required local release gates: passed.
-- Optional backend smoke refresh: passed on the current checkout for Orekit, RocketPy,
-  Dymos/OpenMDAO, TudatPy, and JAX.
+- Base branch: `main`
+- Working branch: `codex/orekit-validation-refresh`
+- Latest integrated commit before this state update: `8111390`
+- Required local release gates: passed in the subsystem-fidelity merge pass.
+- Optional backend smoke refresh on 2026-07-09: Orekit, RocketPy, Dymos/OpenMDAO, and JAX
+  were available on the current machine. TudatPy was not installed in the base environment, and
+  the previously recorded isolated Tudat environment at `/tmp/astro-tudat-live-env` no longer
+  existed.
+- Bounded live validation refresh on `codex/orekit-validation-refresh`: Orekit high-fidelity
+  covariance, drag, SRP, and Sun/Moon third-body trajectory products executed with the explicit
+  Homebrew OpenJDK and `~/.orekit/orekit-data.zip` environment. This is machine-scoped optional
+  backend evidence, not a production covariance certification.
 
 ## North Star
 
@@ -151,6 +158,18 @@ Implemented and verified in the current pass:
   `astro_suite-0.1.0-py3-none-any.whl`. The product keeps explicit design-screening warnings and
   does not claim EPS certification, thermal certification, mass-properties authority, or
   flight-qualified GNC simulation. PR #6 merged this scope into `main` at merge commit `729a7d4`.
+- External validation refresh on `codex/orekit-validation-refresh`:
+  `JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" astro orekit-smoke`
+  reported Orekit JPype 13.1.5.0 available; `astro rocketpy-smoke`, `astro dymos-smoke`, and
+  `astro jax-smoke` also reported available runtimes; `astro tudat-smoke` reported TudatPy not
+  installed, and `conda run -p /tmp/astro-tudat-live-env ...` reported the historical Tudat
+  environment path no longer exists. The Orekit validation refresh passed
+  `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q`
+  with `2 passed in 9.22s` and wrote `/tmp/astro-orekit-validation-high-fidelity-covariance-20260709.json`,
+  `/tmp/astro-orekit-validation-drag-20260709.json`, `/tmp/astro-orekit-validation-srp-20260709.json`,
+  and `/tmp/astro-orekit-validation-third-body-20260709.json`. The high-fidelity covariance product
+  contains 11 samples, 11 covariance samples, `orekit_finite_difference_state_transition`, white
+  acceleration process noise, and transition force models for J2, drag, SRP, Sun, and Moon.
 
 Post-MVP / external-campaign items:
 
@@ -176,11 +195,14 @@ Post-MVP / external-campaign items:
 | constellation-digital-twin | done | productize/verify | steward | `src/astro_twin/constellation*`, `astro run-constellation-twin`, `examples/twin/constellation_leo_observers.yaml`, constellation tests, `docs/digital-twin.md` | Constellation v1 embeds member `DigitalTwinResult`s and writes suite-owned fleet access, revisit, link, data-volume, and margin evidence for a checked two-member reference; required local gates pass with explicit design-screening and non-operational claim boundaries and the stack is merged on `main`. |
 | constellation-coverage-maps | done | productize/verify | steward | `src/astro_twin/constellation*`, `examples/twin/constellation_leo_observers.yaml`, `docs/digital-twin.md`, constellation tests | Coverage Maps v1 writes deterministic target-grid sensor coverage summaries and fleet margins from member geometry samples; required local gates pass with explicit design-screening and non-operational claim boundaries and the stack is merged on `main`. |
 | subsystem-fidelity-pack | done | productize/verify | steward | `src/astro_twin`, `examples/twin/leo_observer.yaml`, `docs/digital-twin.md`, subsystem tests | Adds scheduled power loads, battery energy/efficiency, thermal heat-balance evidence, ADCS slew/utilization margins, and itemized mass-budget rollups; required local gates pass with explicit design-screening and non-certification claim boundaries and the scope is merged on `main`. |
+| external-validation-refresh | done | verify | steward | `docs/validation/live-backend-campaigns.md`, optional runtime smoke checks, Orekit live covariance gate | Refreshes machine-scoped optional validation evidence: Orekit high-fidelity covariance and drag/SRP/third-body products pass on this machine; Tudat-specific current release claims are not refreshed because the historical isolated Tudat environment is absent. |
 
 ## Next Best Paths
 
-1. Tag a release candidate from `/Users/emerygunselman/Code/astro` once the user provides the
-   desired release/tag policy.
-2. Choose the next roadmap expansion deliberately: one external-campaign validation scope, mission
-   design/reporting polish, or a bounded operational-readiness criteria pass. Do not treat all three
-   as hidden implementation backlog.
+1. Merge the external-validation refresh if the branch review is clean, then tag a release candidate
+   from `/Users/emerygunselman/Code/astro` once the user provides the desired release/tag policy.
+2. Recreate an isolated TudatPy environment only if a release claim specifically needs a fresh
+   Tudat-vs-local comparison or native variational covariance refresh.
+3. Choose the next roadmap expansion deliberately: mission design/reporting polish, a bounded
+   operational-readiness criteria pass, or one new external-campaign validation scope. Do not treat
+   all three as hidden implementation backlog.
