@@ -67,7 +67,7 @@ Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, JAX, or any external provider.
 ## Constellation Twin
 
 The constellation twin workflow runs multiple single-spacecraft twin scenarios and aggregates fleet
-access, revisit, link-budget, data-volume, and margin evidence.
+access, revisit, link-budget, data-volume, target-grid sensor coverage, and margin evidence.
 
 ```bash
 astro run-constellation-twin examples/twin/constellation_leo_observers.yaml \
@@ -76,9 +76,36 @@ astro run-constellation-twin examples/twin/constellation_leo_observers.yaml \
 ```
 
 The checked-in reference runs two LEO observer members against `equator-eci`, embeds each member's
-suite-owned `DigitalTwinResult`, and returns fleet access/link summaries plus member and fleet
-margin evidence.
+suite-owned `DigitalTwinResult`, and returns fleet access/link summaries, coverage-map summaries,
+member link totals, and fleet margin evidence.
+
+Constellation scenarios can include `coverage_maps`. A coverage map defines a nadir-pointed sensor
+cone and a set of latitude/longitude target points:
+
+```yaml
+coverage_maps:
+  - name: equatorial-targets
+    sensor:
+      name: nadir-imager
+      field_of_view_half_angle_deg: 45.0
+      minimum_elevation_deg: 0.0
+    targets:
+      - name: prime-meridian
+        latitude_deg: 0.0
+        longitude_deg: 0.0
+      - name: east-equator
+        latitude_deg: 0.0
+        longitude_deg: 4.0
+    minimum_target_coverage_fraction: 0.2
+    maximum_target_revisit_gap_s: 600.0
+```
+
+The result records per-target coverage duration, coverage fraction, longest gap, mean gap, and
+simultaneous-spacecraft count, then rolls those into map-level mean coverage, minimum target
+coverage, maximum target gap, and design margins.
 
 The v1 constellation product is deterministic design-screening evidence. It is not operational
-coverage authority, contact scheduling, spectrum coordination, collision avoidance, or constellation
-optimization.
+coverage authority, contact scheduling, spectrum coordination, collision avoidance, certified sensor
+performance, or constellation optimization. Coverage maps use spherical Earth geometry, uniform
+Earth rotation, local sampled propagation, target elevation, optional range, and nadir off-boresight
+cone checks.

@@ -274,9 +274,12 @@ def test_run_constellation_twin_command_writes_json_and_summary(tmp_path: Path) 
     assert payload["workflow"] == "constellation_digital_twin_v1"
     assert len(payload["members"]) == 2
     assert [member["member_name"] for member in payload["members"]] == ["plane-a", "plane-b"]
+    assert payload["coverage_map_summaries"][0]["name"] == "equatorial-targets"
+    assert payload["coverage_map_summaries"][0]["target_count"] == 2
     summary_text = summary.read_text(encoding="utf-8")
     assert "Constellation twin: leo-observers" in summary_text
     assert "Members: 2" in summary_text
+    assert "Coverage maps: 1" in summary_text
     assert "Max simultaneous spacecraft: 2" in summary_text
     assert "Limiting fleet margin:" in summary_text
 
