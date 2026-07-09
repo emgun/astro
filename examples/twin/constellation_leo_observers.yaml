@@ -1,0 +1,25 @@
+scenario_id: leo-observers
+members:
+  - name: plane-a
+    twin_scenario: examples/twin/leo_observer_plane_a.yaml
+  - name: plane-b
+    twin_scenario: examples/twin/leo_observer_plane_b.yaml
+coverage_requirements:
+  - ground_site: equator-eci
+    minimum_coverage_fraction: 0.25
+    maximum_revisit_gap_s: 300.0
+coverage_maps:
+  - name: equatorial-targets
+    sensor:
+      name: nadir-imager
+      field_of_view_half_angle_deg: 45.0
+      minimum_elevation_deg: 0.0
+    targets:
+      - name: prime-meridian
+        latitude_deg: 0.0
+        longitude_deg: 0.0
+      - name: east-equator
+        latitude_deg: 0.0
+        longitude_deg: 4.0
+    minimum_target_coverage_fraction: 0.2
+    maximum_target_revisit_gap_s: 600.0
