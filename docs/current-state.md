@@ -29,10 +29,10 @@ explicit provenance and claim boundaries.
 ## Current Roadmap Decision
 
 The previous suite-owned roadmap pass, Verifiable OD Workflow Pack, integrated digital twin,
-constellation digital twin, and constellation coverage-map stack are integrated on `main` and pushed
-to `origin/main`. The active branch `codex/subsystem-fidelity-pack` adds deterministic subsystem
-fidelity evidence for scheduled power loads, battery efficiency/energy, thermal heat balance, ADCS
-slew/utilization margins, and itemized mass-budget rollups.
+constellation digital twin, constellation coverage-map stack, and subsystem fidelity pack are
+integrated on `main` and pushed to `origin/main`. The current digital twin surface includes
+deterministic subsystem fidelity evidence for scheduled power loads, battery efficiency/energy,
+thermal heat balance, ADCS slew/utilization margins, and itemized mass-budget rollups.
 
 Implemented and verified in the current pass:
 
@@ -127,7 +127,7 @@ Implemented and verified in the current pass:
 - Subsystem Fidelity Pack planning artifacts:
   `docs/superpowers/specs/2026-07-09-subsystem-fidelity-pack-design.md` and
   `docs/superpowers/plans/2026-07-09-subsystem-fidelity-pack-implementation.md`.
-- Subsystem Fidelity Pack implementation surface on `codex/subsystem-fidelity-pack`:
+- Subsystem Fidelity Pack implementation surface merged from `codex/subsystem-fidelity-pack`:
   `PowerLoadSchedule`, `MassBudgetItemConfig`, and `MassBudgetSummary` in
   `src/astro_twin/models.py`; scheduled-load and battery-efficiency logic in
   `src/astro_twin/power.py`; albedo/planet-IR/mode-heat balance logic in
@@ -150,7 +150,7 @@ Implemented and verified in the current pass:
   `python -m build` produced `astro_suite-0.1.0.tar.gz` and
   `astro_suite-0.1.0-py3-none-any.whl`. The product keeps explicit design-screening warnings and
   does not claim EPS certification, thermal certification, mass-properties authority, or
-  flight-qualified GNC simulation.
+  flight-qualified GNC simulation. PR #6 merged this scope into `main` at merge commit `729a7d4`.
 
 Post-MVP / external-campaign items:
 
@@ -175,14 +175,12 @@ Post-MVP / external-campaign items:
 | integrated-digital-twin | done | productize/verify | steward | `src/astro_twin`, `astro run-twin`, `examples/twin`, `tests/astro_twin`, `docs/digital-twin.md` | Single-spacecraft v1 writes suite-owned orbit geometry, power, thermal, ADCS, coverage, link budget, mass, and design-margin evidence from one scenario; required local gates pass with explicit design-screening claim boundaries and the stack is merged on `main`. |
 | constellation-digital-twin | done | productize/verify | steward | `src/astro_twin/constellation*`, `astro run-constellation-twin`, `examples/twin/constellation_leo_observers.yaml`, constellation tests, `docs/digital-twin.md` | Constellation v1 embeds member `DigitalTwinResult`s and writes suite-owned fleet access, revisit, link, data-volume, and margin evidence for a checked two-member reference; required local gates pass with explicit design-screening and non-operational claim boundaries and the stack is merged on `main`. |
 | constellation-coverage-maps | done | productize/verify | steward | `src/astro_twin/constellation*`, `examples/twin/constellation_leo_observers.yaml`, `docs/digital-twin.md`, constellation tests | Coverage Maps v1 writes deterministic target-grid sensor coverage summaries and fleet margins from member geometry samples; required local gates pass with explicit design-screening and non-operational claim boundaries and the stack is merged on `main`. |
-| subsystem-fidelity-pack | review-ready | productize/verify | steward | `src/astro_twin`, `examples/twin/leo_observer.yaml`, `docs/digital-twin.md`, subsystem tests | Adds scheduled power loads, battery energy/efficiency, thermal heat-balance evidence, ADCS slew/utilization margins, and itemized mass-budget rollups; required local gates pass with explicit design-screening and non-certification claim boundaries. |
+| subsystem-fidelity-pack | done | productize/verify | steward | `src/astro_twin`, `examples/twin/leo_observer.yaml`, `docs/digital-twin.md`, subsystem tests | Adds scheduled power loads, battery energy/efficiency, thermal heat-balance evidence, ADCS slew/utilization margins, and itemized mass-budget rollups; required local gates pass with explicit design-screening and non-certification claim boundaries and the scope is merged on `main`. |
 
 ## Next Best Paths
 
-1. Review and merge `codex/subsystem-fidelity-pack` into `main` if the richer subsystem screening
-   scope is accepted.
-2. Tag a release candidate from `/Users/emerygunselman/Code/astro` once the user provides the
+1. Tag a release candidate from `/Users/emerygunselman/Code/astro` once the user provides the
    desired release/tag policy.
-3. Choose the next roadmap expansion deliberately: one external-campaign validation scope, mission
+2. Choose the next roadmap expansion deliberately: one external-campaign validation scope, mission
    design/reporting polish, or a bounded operational-readiness criteria pass. Do not treat all three
    as hidden implementation backlog.
