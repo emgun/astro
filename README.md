@@ -17,7 +17,7 @@ request -> typed plan -> allow-listed commands -> deterministic artifacts -> ver
 - Runs local least-squares OD with rank and convergence checks.
 - Runs deterministic launch/ascent baselines, launch pitch tuning, and launch-to-orbit handoff.
 - Runs an integrated single-spacecraft digital twin screening workflow for orbit geometry, power,
-  thermal, ADCS, coverage, link budget, mass, and design margins.
+  thermal, ADCS, coverage, link budget, itemized mass rollups, and design margins.
 - Provides optional adapter boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, and JAX.
 - Exposes assistant workflows for scenario-bound local OD requests.
 

@@ -3,6 +3,7 @@ from astro_twin.models import (
     ADCSConfig,
     ADCSSample,
     LinkBudgetWindow,
+    MassBudgetSummary,
     MissionMode,
     PowerConfig,
     PowerSample,
@@ -61,6 +62,9 @@ def test_build_margin_report_identifies_limiting_margin() -> None:
                 pointing_error_deg=0.08,
                 pointing_margin_deg=0.07,
                 torque_margin_n_m=0.05,
+                slew_rate_margin_deg_s=0.15,
+                actuator_utilization_fraction=0.375,
+                actuator_utilization_margin_fraction=0.325,
             ),
         ),
         adcs_config=ADCSConfig(
@@ -69,6 +73,9 @@ def test_build_margin_report_identifies_limiting_margin() -> None:
             pointing_requirement_deg=0.15,
             max_torque_n_m=0.08,
             required_slew_torque_n_m=0.03,
+            max_slew_rate_deg_s=0.2,
+            required_slew_rate_deg_s=0.05,
+            maximum_actuator_utilization_fraction=0.7,
         ),
         link_windows=(
             LinkBudgetWindow(
@@ -81,7 +88,23 @@ def test_build_margin_report_identifies_limiting_margin() -> None:
                 data_volume_mbit=120.0,
             ),
         ),
+        mass_budget=MassBudgetSummary(
+            dry_mass_kg=120.0,
+            payload_mass_kg=25.0,
+            propellant_mass_kg=5.0,
+            configured_wet_mass_kg=150.0,
+            itemized_base_mass_kg=130.0,
+            itemized_contingency_mass_kg=14.0,
+            itemized_total_mass_kg=144.0,
+            dry_payload_reference_mass_kg=145.0,
+            dry_payload_margin_kg=1.0,
+            category_totals_kg={"bus": 119.0, "payload": 25.0},
+        ),
     )
 
     assert report.limiting_margin.name == "thermal_bus_hot_margin_k"
     assert report.limiting_margin.margin == 1.0
+    margin_by_name = {margin.name: margin for margin in report.margins}
+    assert "slew_rate_margin_deg_s" in margin_by_name
+    assert "actuator_utilization_margin_fraction" in margin_by_name
+    assert "mass_budget_rollup_margin_kg" in margin_by_name

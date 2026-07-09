@@ -14,12 +14,13 @@ The command writes a suite-owned `DigitalTwinResult` JSON product and, optionall
 summary. The result includes:
 
 - orbit-derived geometry samples with altitude and sunlight state
-- power generation, load, and battery state-of-charge samples
-- lumped thermal node temperatures
-- ADCS pointing and torque screening margins
+- power generation, scheduled load, battery energy, and battery state-of-charge samples
+- lumped thermal node temperatures and per-node heat-balance screening values
+- ADCS pointing, torque, slew-rate, and actuator-utilization screening margins
 - ground-site access windows
 - link budget windows with Eb/N0 margin and data-volume estimates
-- aggregate mass, power, thermal, ADCS, and link design margins
+- itemized mass-budget rollup evidence
+- aggregate mass, power, thermal, ADCS, link, and mass-budget design margins
 
 The v1 twin is design-screening evidence. It is not flight qualification, thermal certification,
 RF certification, operational readiness evidence, or constellation coverage authority. Coverage
@@ -42,13 +43,22 @@ orbit_scenario: examples/scenarios/leo_two_body.yaml
 Subsystem sections define the screening assumptions:
 
 - `spacecraft`: dry, payload, and propellant mass plus required mass margin
-- `power`: solar array, battery, load, and minimum state-of-charge assumptions
+- `spacecraft.mass_budget_items`: optional itemized mass entries with category and contingency
+- `power`: solar array, battery, load, minimum state-of-charge, and battery efficiency assumptions
 - `thermal_nodes`: lumped thermal nodes with radiator, absorptivity, emissivity, and temperature
-  limits
-- `adcs`: pointing and torque screening requirements
+  limits, optional albedo/planet-IR flux terms, and optional mode heat scaling
+- `adcs`: pointing, torque, slew-rate, and actuator-utilization screening requirements
 - `ground_sites`: latitude, longitude, altitude, and elevation mask
 - `links`: RF link assumptions tied to configured ground sites
 - `mode_schedule`: optional elapsed-time mission modes that drive power load
+- `power_loads`: optional named elapsed-time load additions layered on top of mode loads
+
+The subsystem fidelity pack keeps the model deterministic and low-order. Scheduled loads are summed
+with mode loads; battery energy applies charge/discharge efficiency. Thermal nodes remain lumped
+nodes but include direct solar, albedo, planetary IR, internal heat, and radiated heat in the
+reported heat balance. ADCS samples report fixed pointing, torque, slew-rate, and utilization
+screening margins from the scenario assumptions. Mass-budget rollups compare itemized
+contingency-adjusted dry-plus-payload mass against the configured dry-plus-payload reference.
 
 ## Validation
 

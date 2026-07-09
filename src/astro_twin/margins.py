@@ -6,6 +6,7 @@ from astro_twin.models import (
     DesignMargin,
     DesignMarginReport,
     LinkBudgetWindow,
+    MassBudgetSummary,
     PowerConfig,
     PowerSample,
     SpacecraftBusConfig,
@@ -25,13 +26,17 @@ def build_margin_report(
     adcs: tuple[ADCSSample, ...],
     adcs_config: ADCSConfig,
     link_windows: tuple[LinkBudgetWindow, ...],
+    mass_budget: MassBudgetSummary | None = None,
 ) -> DesignMarginReport:
     margins = [
         _mass_margin(spacecraft),
+        *(_mass_budget_margins(mass_budget) if mass_budget is not None else []),
         _battery_margin(power_config, power),
         *_thermal_margins(thermal_nodes, thermal),
         _pointing_margin(adcs_config, adcs),
         _torque_margin(adcs_config, adcs),
+        _slew_rate_margin(adcs_config, adcs),
+        _actuator_utilization_margin(adcs_config, adcs),
         _link_margin(link_windows),
     ]
     limiting_margin = min(margins, key=_limiting_key)
@@ -63,6 +68,18 @@ def _battery_margin(power_config: PowerConfig, power: tuple[PowerSample, ...]) -
         margin=margin,
         status=_status(margin, warn_threshold=0.05),
     )
+
+
+def _mass_budget_margins(mass_budget: MassBudgetSummary) -> list[DesignMargin]:
+    return [
+        DesignMargin(
+            name="mass_budget_rollup_margin_kg",
+            value=mass_budget.itemized_total_mass_kg,
+            threshold=mass_budget.dry_payload_reference_mass_kg,
+            margin=mass_budget.dry_payload_margin_kg,
+            status=_status(mass_budget.dry_payload_margin_kg, warn_threshold=5.0),
+        )
+    ]
 
 
 def _thermal_margins(
@@ -117,6 +134,32 @@ def _torque_margin(adcs_config: ADCSConfig, adcs: tuple[ADCSSample, ...]) -> Des
         threshold=adcs_config.max_torque_n_m,
         margin=margin,
         status=_status(margin, warn_threshold=0.005),
+    )
+
+
+def _slew_rate_margin(adcs_config: ADCSConfig, adcs: tuple[ADCSSample, ...]) -> DesignMargin:
+    margin = min(sample.slew_rate_margin_deg_s for sample in adcs)
+    return DesignMargin(
+        name="slew_rate_margin_deg_s",
+        value=adcs_config.required_slew_rate_deg_s,
+        threshold=adcs_config.max_slew_rate_deg_s,
+        margin=margin,
+        status=_status(margin, warn_threshold=0.01),
+    )
+
+
+def _actuator_utilization_margin(
+    adcs_config: ADCSConfig,
+    adcs: tuple[ADCSSample, ...],
+) -> DesignMargin:
+    value = max(sample.actuator_utilization_fraction for sample in adcs)
+    margin = min(sample.actuator_utilization_margin_fraction for sample in adcs)
+    return DesignMargin(
+        name="actuator_utilization_margin_fraction",
+        value=value,
+        threshold=adcs_config.maximum_actuator_utilization_fraction,
+        margin=margin,
+        status=_status(margin, warn_threshold=0.05),
     )
 
 
