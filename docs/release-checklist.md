@@ -1,6 +1,6 @@
 # Release Checklist
 
-Date: 2026-06-20
+Date: 2026-07-09
 
 Use this checklist before tagging or publishing a release candidate.
 
@@ -15,6 +15,21 @@ Latest merged-main evidence:
 - 2026-06-20 17:50 PDT: Optional backend smoke refresh passed on current checkout for Orekit,
   RocketPy, Dymos/OpenMDAO, TudatPy, and JAX. These smoke checks do not replace optional live
   propagation, launch, optimization, covariance, or OD campaign gates.
+
+Latest optional validation refresh:
+
+- 2026-07-09: `codex/orekit-validation-refresh` refreshed optional backend smoke on the current
+  machine. Orekit, RocketPy, Dymos/OpenMDAO, and JAX were available; TudatPy was not installed in the
+  base environment, and the historical isolated `/tmp/astro-tudat-live-env` path no longer existed.
+- 2026-07-09: Orekit high-fidelity covariance validation passed with
+  `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q`
+  reporting `2 passed in 9.22s`.
+- 2026-07-09: Orekit wrote `/tmp/astro-orekit-validation-high-fidelity-covariance-20260709.json`,
+  `/tmp/astro-orekit-validation-drag-20260709.json`,
+  `/tmp/astro-orekit-validation-srp-20260709.json`, and
+  `/tmp/astro-orekit-validation-third-body-20260709.json`. The covariance artifact records 11
+  covariance samples with J2, drag, SRP, Sun, and Moon transition force models. This is optional
+  machine-scoped backend evidence, not production covariance certification.
 
 ## Required Local Gates
 
@@ -78,14 +93,14 @@ JSON and treat the gate as not-run rather than failed or complete.
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_two_body_matches_local_reference -v`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_j2_matches_local_reference_scale -v`
 - [ ] `astro propagate examples/scenarios/leo_orekit_high_fidelity.yaml --backend orekit --output /tmp/astro-orekit-high-fidelity.json`
-- [ ] `astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --output /tmp/astro-orekit-drag.json`
-- [ ] `astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output /tmp/astro-orekit-srp.json`
-- [ ] `astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output /tmp/astro-orekit-third-body.json`
+- [x] `astro propagate examples/scenarios/leo_orekit_drag.yaml --backend orekit --output /tmp/astro-orekit-drag.json`
+- [x] `astro propagate examples/scenarios/leo_orekit_srp.yaml --backend orekit --output /tmp/astro-orekit-srp.json`
+- [x] `astro propagate examples/scenarios/leo_orekit_third_body.yaml --backend orekit --output /tmp/astro-orekit-third-body.json`
 - [ ] `astro propagate examples/scenarios/leo_orekit_high_order_gravity.yaml --backend orekit --output /tmp/astro-orekit-high-order-gravity.json`
 - [ ] `astro propagate examples/scenarios/leo_covariance.yaml --backend orekit --output /tmp/astro-orekit-covariance.json`
-- [ ] `astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend orekit --output /tmp/astro-orekit-high-fidelity-covariance.json`
-- [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product -q`
-- [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q`
+- [x] `astro propagate examples/scenarios/leo_orekit_high_fidelity_covariance.yaml --backend orekit --output /tmp/astro-orekit-high-fidelity-covariance.json`
+- [x] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product -q`
+- [x] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q`
 - [ ] `ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_estimation.py::test_live_orekit_native_od_executes_batch_estimator -q`
 - [ ] `astro estimate-measurements <geodetic-range-rate-scenario.yaml> <measurements.json> --estimator orekit-native --output /tmp/astro-orekit-native-estimate.json`
 - [x] `astro rocketpy-smoke`
@@ -97,7 +112,8 @@ JSON and treat the gate as not-run rather than failed or complete.
 - [ ] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --dymos-mode pitch-program --output /tmp/astro-dymos-pitch-program-launch.json`
 - [ ] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend dymos --dymos-mode multistage-pitch-program --output /tmp/astro-dymos-multistage-pitch-program-launch.json`
 - [ ] `ASTRO_RUN_DYMOS_LIVE=1 python -m pytest tests/astro_backends/test_dymos_optimization.py::test_live_dymos_optimization_returns_suite_product tests/astro_backends/test_dymos_optimization.py::test_live_dymos_pitch_program_optimization_executes_native_transcription tests/astro_backends/test_dymos_optimization.py::test_live_dymos_multistage_pitch_program_executes_native_multiphase -q`
-- [x] `astro tudat-smoke`
+- [x] `astro tudat-smoke` captured the 2026-07-09 unavailable diagnostic; live Tudat gates were not
+  refreshed.
 - [ ] `astro propagate examples/scenarios/leo_two_body.yaml --backend tudat --output /tmp/astro-tudat-two-body.json`
 - [ ] `astro propagate examples/scenarios/leo_j2.yaml --backend tudat --output /tmp/astro-tudat-j2.json`
 - [ ] `astro propagate examples/scenarios/leo_orekit_drag.yaml --backend tudat --output /tmp/astro-tudat-drag.json`
