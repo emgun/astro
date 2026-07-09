@@ -6,9 +6,11 @@ from astro_twin.models import (
     DigitalTwinScenario,
     GroundSiteConfig,
     LinkBudgetConfig,
+    MassBudgetItemConfig,
     MissionMode,
     MissionModeSchedule,
     PowerConfig,
+    PowerLoadSchedule,
     SpacecraftBusConfig,
     ThermalNodeConfig,
 )
@@ -24,6 +26,19 @@ def _valid_scenario() -> DigitalTwinScenario:
             payload_mass_kg=25.0,
             propellant_mass_kg=5.0,
             mass_margin_fraction_required=0.2,
+            mass_budget_items=(
+                MassBudgetItemConfig(
+                    name="bus-structure",
+                    category="bus",
+                    mass_kg=90.0,
+                    contingency_fraction=0.1,
+                ),
+                MassBudgetItemConfig(
+                    name="payload",
+                    category="payload",
+                    mass_kg=25.0,
+                ),
+            ),
         ),
         power=PowerConfig(
             solar_array_area_m2=2.4,
@@ -45,8 +60,11 @@ def _valid_scenario() -> DigitalTwinScenario:
                 initial_temperature_k=293.0,
                 minimum_temperature_k=273.0,
                 maximum_temperature_k=313.0,
-                internal_heat_fraction=0.45,
-            ),
+            internal_heat_fraction=0.45,
+            albedo_flux_w_m2=120.0,
+            planet_ir_flux_w_m2=220.0,
+            mode_internal_heat_scale={"payload": 1.2},
+        ),
         ),
         adcs=ADCSConfig(
             pointing_mode="nadir",
@@ -54,6 +72,9 @@ def _valid_scenario() -> DigitalTwinScenario:
             pointing_requirement_deg=0.15,
             max_torque_n_m=0.08,
             required_slew_torque_n_m=0.03,
+            max_slew_rate_deg_s=0.2,
+            required_slew_rate_deg_s=0.05,
+            maximum_actuator_utilization_fraction=0.7,
         ),
         ground_sites=(
             GroundSiteConfig(
@@ -80,6 +101,14 @@ def _valid_scenario() -> DigitalTwinScenario:
             MissionModeSchedule(mode=MissionMode.PAYLOAD, start_s=600.0, end_s=1800.0),
             MissionModeSchedule(mode=MissionMode.DOWNLINK, start_s=2400.0, end_s=3000.0),
         ),
+        power_loads=(
+            PowerLoadSchedule(
+                name="payload-heater",
+                start_s=600.0,
+                end_s=1200.0,
+                additional_load_w=40.0,
+            ),
+        ),
     )
 
 
@@ -88,6 +117,8 @@ def test_digital_twin_scenario_accepts_valid_config() -> None:
 
     assert scenario.scenario_id == "leo-observer"
     assert scenario.links[0].ground_site == "goldstone"
+    assert scenario.power_loads[0].additional_load_w == 40.0
+    assert scenario.spacecraft.mass_budget_items[0].contingency_fraction == 0.1
 
 
 def test_digital_twin_scenario_rejects_unknown_link_site() -> None:
@@ -117,4 +148,27 @@ def test_thermal_node_rejects_inverted_temperature_limits() -> None:
             minimum_temperature_k=300.0,
             maximum_temperature_k=290.0,
             internal_heat_fraction=0.2,
+        )
+
+
+def test_power_load_schedule_rejects_inverted_window() -> None:
+    with pytest.raises(
+        ValidationError,
+        match="Power load schedule end_s must be greater than start_s",
+    ):
+        PowerLoadSchedule(
+            name="bad-load",
+            start_s=120.0,
+            end_s=60.0,
+            additional_load_w=10.0,
+        )
+
+
+def test_mass_budget_item_rejects_negative_contingency() -> None:
+    with pytest.raises(ValidationError):
+        MassBudgetItemConfig(
+            name="bad-item",
+            category="bus",
+            mass_kg=10.0,
+            contingency_fraction=-0.1,
         )

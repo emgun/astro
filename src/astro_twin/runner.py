@@ -7,6 +7,7 @@ from astro_twin.coverage import access_windows_from_samples
 from astro_twin.geometry import build_geometry_timeline, elevation_and_range_km
 from astro_twin.link_budget import compute_link_budget_windows
 from astro_twin.margins import build_margin_report
+from astro_twin.mass import build_mass_budget_summary
 from astro_twin.models import (
     DigitalTwinResult,
     DigitalTwinScenario,
@@ -30,7 +31,12 @@ def run_digital_twin(scenario: DigitalTwinScenario) -> DigitalTwinResult:
     trajectory = propagate_local(orbit_scenario)
     geometry = build_geometry_timeline(trajectory)
     mode_by_elapsed_s = _mode_by_elapsed_s(scenario, geometry)
-    power = compute_power_timeline(scenario.power, geometry, mode_by_elapsed_s)
+    power = compute_power_timeline(
+        scenario.power,
+        geometry,
+        mode_by_elapsed_s,
+        power_loads=scenario.power_loads,
+    )
     thermal = compute_thermal_timeline(scenario.thermal_nodes, geometry, power)
     adcs = compute_adcs_timeline(scenario.adcs, geometry)
     access_windows = tuple(
@@ -39,6 +45,7 @@ def run_digital_twin(scenario: DigitalTwinScenario) -> DigitalTwinResult:
         for window in access_windows_from_samples(site, _access_samples_for_site(site, geometry))
     )
     link_windows = compute_link_budget_windows(scenario.links, access_windows)
+    mass_budget = build_mass_budget_summary(scenario.spacecraft)
     margin_report = build_margin_report(
         spacecraft=scenario.spacecraft,
         power_config=scenario.power,
@@ -48,6 +55,7 @@ def run_digital_twin(scenario: DigitalTwinScenario) -> DigitalTwinResult:
         adcs=adcs,
         adcs_config=scenario.adcs,
         link_windows=link_windows,
+        mass_budget=mass_budget,
     )
     return DigitalTwinResult(
         scenario_id=scenario.scenario_id,
@@ -57,6 +65,7 @@ def run_digital_twin(scenario: DigitalTwinScenario) -> DigitalTwinResult:
         adcs=adcs,
         access_windows=access_windows,
         link_windows=link_windows,
+        mass_budget=mass_budget,
         margin_report=margin_report,
         metadata={
             "orbit_scenario": scenario.orbit_scenario,
