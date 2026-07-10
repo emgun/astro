@@ -13,10 +13,10 @@ checkout unless the user explicitly asks to sync the old workspace.
 
 Integrated `main` state after the Mission Lifecycle Workflow merge:
 
-- Release baseline: `main` at `1182493`.
-- Published annotated release-candidate tag: `v0.1.0-rc.1` at `1182493`.
-- Branch: `main` at merge commit `d37b9a6`.
-- Required local release gates: passed on merged `main` after PR #8.
+- Pre-lifecycle release baseline: annotated tag `v0.1.0-rc.1` at `1182493`.
+- Lifecycle-inclusive release candidate: annotated tag `v0.1.0-rc.2` at `6cc7d2f`.
+- Branch: `main`; Mission Lifecycle Workflow merge commit `d37b9a6` and state commit `6cc7d2f`.
+- Required local release gates: passed on merged `main` after PR #9.
 - Optional backend smoke refresh on 2026-07-09: Orekit, RocketPy, Dymos/OpenMDAO, and JAX
   were available on the current machine. TudatPy was not installed in the base environment, and
   the previously recorded isolated Tudat environment at `/tmp/astro-tudat-live-env` no longer
@@ -255,8 +255,8 @@ Post-MVP / external-campaign items:
 
 ## Next Best Paths
 
-1. Decide whether the next release candidate should include the Mission Lifecycle Workflow or
-   retain `v0.1.0-rc.1` as the pre-workflow baseline and publish a new candidate.
+1. Let `v0.1.0-rc.2` serve as the lifecycle-inclusive candidate, then promote `v0.1.0` only after
+   the desired candidate review or soak period and any final release-note decision.
 2. Recreate an isolated TudatPy environment only if a release claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
 3. Choose any higher-authority reentry campaign deliberately and keep it separate from the local

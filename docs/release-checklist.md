@@ -6,9 +6,10 @@ Use this checklist before tagging or publishing a release candidate.
 
 Latest merged-main evidence:
 
+- 2026-07-10: annotated tag `v0.1.0-rc.2` was published at `6cc7d2f`, including the merged Mission
+  Lifecycle Workflow and its recorded verification state.
 - 2026-07-10: annotated tag `v0.1.0-rc.1` was published at release baseline `1182493`, before the
   Mission Lifecycle Workflow branch.
-
 - 2026-06-20: `main` fast-forwarded to `0fb9a87`.
 - 2026-06-20: Release evidence recorded on `main` at `870cb13`.
 - 2026-06-20: `python -m pytest -q` passed with 505 passed, 11 skipped.
