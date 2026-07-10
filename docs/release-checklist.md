@@ -55,8 +55,8 @@ Latest mission lifecycle branch evidence:
   margins, and a nine-file artifact bundle.
 - 2026-07-10: the public command passed with all margins passing; focused lifecycle tests reported
   `8 passed`; full local tests reported `686 passed, 11 skipped`; Ruff, strict MyPy across 97 source
-  files, `git diff --check`, wheel inspection, and both distribution builds passed. Branch
-  integration remains pending.
+  files, `git diff --check`, wheel inspection, and both distribution builds passed. GitHub CI
+  passed and PR #9 merged at `d37b9a6`.
 
 ## Required Local Gates
 
