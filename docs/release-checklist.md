@@ -32,6 +32,18 @@ Latest optional validation refresh:
   machine-scoped backend evidence, not production covariance certification.
 - 2026-07-09: PR #7 merged the optional validation refresh to `main` at `b668e1f`.
 
+Latest reentry candidate evidence:
+
+- 2026-07-10: `codex/reentry-suite` added suite-owned ballistic, prescribed-bank lifting, and
+  target-tracking entry products plus local guidance optimization and trajectory handoff.
+- 2026-07-10: the checked ballistic, lifting, and guided public CLI cases completed. The guided
+  case produced 18.431 km target miss; bounded bank-schedule optimization converged in 13
+  iterations and reduced miss to 6.231 km.
+- 2026-07-10: internal-step convergence, monotonic heat-load, model/IO/guidance/margin,
+  optimization, handoff, CLI, strict typing, packaging, and full regression gates passed on the
+  branch: `676 passed, 11 skipped`, with `33 passed` in the focused reentry/CLI slice. This is
+  branch-scoped deterministic screening evidence until review and merge.
+
 ## Required Local Gates
 
 - [x] `python -m pytest -q`
@@ -77,6 +89,12 @@ Latest optional validation refresh:
 - [x] `astro synth-measurements examples/scenarios/leo_geodetic_precession_nutation_topocentric.yaml --backend local --output /tmp/astro-geodetic-precession-nutation-measurements.json`
 - [x] `astro estimate-measurements examples/scenarios/leo_two_station_od.yaml examples/measurements/leo_two_station_od_measurements.json --backend local --output /tmp/astro-local-estimate.json`
 - [x] `astro launch examples/launch/pitch_program_two_stage.yaml --backend local --output /tmp/astro-launch.json`
+- [x] `astro simulate-reentry examples/reentry/ballistic_capsule.yaml --output /tmp/astro-ballistic-reentry.json --summary-output /tmp/astro-ballistic-reentry.txt`
+- [x] `astro simulate-reentry examples/reentry/lifting_bank_schedule.yaml --output /tmp/astro-lifting-reentry.json --summary-output /tmp/astro-lifting-reentry.txt`
+- [x] `astro simulate-reentry examples/reentry/guided_lifting_body.yaml --output /tmp/astro-guided-reentry.json --summary-output /tmp/astro-guided-reentry.txt`
+- [x] `astro optimize-reentry examples/reentry/guided_lifting_body.yaml --maximum-iterations 20 --output /tmp/astro-reentry-optimization.json --tuned-scenario-output /tmp/astro-reentry-tuned.yaml --summary-output /tmp/astro-reentry-optimization.txt`
+- [x] `astro handoff-reentry /tmp/astro-local-trajectory.json examples/reentry/ballistic_capsule.yaml --sample-index 0 --output /tmp/astro-reentry-handoff.yaml`
+- [x] `python -m pytest tests/astro_reentry tests/astro_cli/test_reentry_cli.py -q`
 - [x] `python -m pytest tests/astro_launch/test_launch_io.py::test_load_rocketpy_configured_launch_scenario -q`
 - [x] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend local --point-indices 2,3 --iterations 1 --radial-velocity-weight 1 --output /tmp/astro-optimized-launch.json`
 - [x] `astro research-propagate examples/scenarios/leo_two_body.yaml --backend local --cases 2 --position-sigma-km 0.01 --velocity-sigma-km-s 0.000001 --seed 7 --output /tmp/astro-research.json`
@@ -160,3 +178,4 @@ the message is actionable.
 - [x] Build succeeds with `python -m build` when build tooling is installed.
 - [x] Wheel metadata includes optional extras: `dev`, `orekit`, `launch`, `optimization`, and
   `research`.
+- [x] Wheel contents include the suite-owned `astro_reentry` package.

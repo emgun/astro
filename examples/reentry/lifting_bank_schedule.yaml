@@ -1,0 +1,56 @@
+scenario_id: leo-lifting-bank-schedule
+description: Deterministic lifting entry with a prescribed velocity-indexed bank schedule.
+body: earth
+time_scale: UTC
+initial_state:
+  epoch: '2026-01-01T00:00:00Z'
+  altitude_km: 120.0
+  velocity_km_s: 7.8
+  flight_path_angle_deg: -6.0
+  heading_deg: 90.0
+  latitude_deg: 0.0
+  longitude_deg: 0.0
+vehicle:
+  name: reference-lifting-body
+  mass_kg: 5500.0
+  reference_area_m2: 12.0
+  drag_coefficient: 1.5
+  lift_to_drag_ratio: 0.3
+  nose_radius_m: 0.75
+atmosphere:
+  model: exponential
+  reference_density_kg_m3: 1.225
+  reference_altitude_m: 0.0
+  scale_height_m: 7200.0
+  density_scale_factor: 1.0
+aerothermal:
+  model: sutton_graves
+  sutton_graves_coefficient: 0.00017415
+  wall_emissivity: 0.85
+guidance:
+  mode: bank_schedule
+  bank_schedule:
+    - velocity_km_s: 7.8
+      bank_angle_deg: 45.0
+    - velocity_km_s: 5.0
+      bank_angle_deg: 55.0
+    - velocity_km_s: 2.5
+      bank_angle_deg: -35.0
+    - velocity_km_s: 0.5
+      bank_angle_deg: -20.0
+  minimum_control_velocity_km_s: 0.5
+  minimum_bank_reversal_interval_s: 20.0
+limits:
+  maximum_dynamic_pressure_pa: 50000.0
+  maximum_deceleration_g: 15.0
+  maximum_heat_rate_w_m2: 2500000.0
+  maximum_heat_load_j_m2: 150000000.0
+propagation:
+  duration_s: 1000.0
+  step_s: 5.0
+  internal_step_s: 0.5
+  termination_altitude_km: 0.0
+  minimum_velocity_km_s: 0.05
+  entry_interface_altitude_km: 120.0
+metadata:
+  reference_case: prescribed_bank_lifting_screening

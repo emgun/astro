@@ -1,6 +1,6 @@
 # Astro Suite Current State
 
-Date: 2026-07-09 00:00 PDT
+Date: 2026-07-10 00:00 PDT
 
 ## Canonical Workspace
 
@@ -11,10 +11,10 @@ The sibling checkout at `/Users/emerygunselman/Documents/astro` is stale for thi
 `docs/research/2026-06-20-verifiable-ai-space-workflows.md` file. Do not edit or merge from that
 checkout unless the user explicitly asks to sync the old workspace.
 
-Integrated Code checkout state after the external-validation refresh merge:
+Integrated `main` state after the external-validation refresh merge:
 
 - Branch: `main`
-- Latest integrated commit: `b668e1f`
+- Latest integrated commit: `0e3aa32`
 - Required local release gates: passed in the subsystem-fidelity merge pass.
 - Optional backend smoke refresh on 2026-07-09: Orekit, RocketPy, Dymos/OpenMDAO, and JAX
   were available on the current machine. TudatPy was not installed in the base environment, and
@@ -26,12 +26,22 @@ Integrated Code checkout state after the external-validation refresh merge:
   backend evidence, not a production covariance certification. PR #7 merged this scope into `main`
   at merge commit `b668e1f`.
 
+Current reentry implementation candidate:
+
+- Branch: `codex/reentry-suite`, based on `main` at `0e3aa32`.
+- Public products and commands: suite-owned `ReentryScenario`, `ReentryResult`, and
+  `ReentryOptimizationResult`; `astro simulate-reentry`, `astro optimize-reentry`, and
+  `astro handoff-reentry`.
+- Required local gates on 2026-07-10: `676 passed, 11 skipped`; `ruff`, strict `mypy` across 92
+  source files, `git diff --check`, 4 packaging tests, and `python -m build` passed.
+- This evidence is branch-scoped until the reentry branch is reviewed and merged.
+
 ## North Star
 
 Astro Suite is a Python flight-dynamics suite with suite-owned product boundaries for orbital
-simulation, flight dynamics, orbit determination, launch/ascent, optional operational backends, and
-research workflows. External engines are adapters; public outputs stay in Astro Suite models with
-explicit provenance and claim boundaries.
+simulation, flight dynamics, orbit determination, launch/ascent, reentry, integrated digital twins,
+optional operational backends, and research workflows. External engines are adapters; public
+outputs stay in Astro Suite models with explicit provenance and claim boundaries.
 
 ## Current Roadmap Decision
 
@@ -40,6 +50,11 @@ constellation digital twin, constellation coverage-map stack, and subsystem fide
 integrated on `main` and pushed to `origin/main`. The current digital twin surface includes
 deterministic subsystem fidelity evidence for scheduled power loads, battery efficiency/energy,
 thermal heat balance, ADCS slew/utilization margins, and itemized mass-budget rollups.
+
+The `codex/reentry-suite` candidate adds the next suite-owned product boundary: deterministic
+ballistic, prescribed-bank lifting, and target-tracking guided entry with local guidance
+optimization and orbit-state handoff. It is implemented and locally release-ready but is not yet
+integrated on `main`.
 
 Implemented and verified in the current pass:
 
@@ -171,6 +186,31 @@ Implemented and verified in the current pass:
   contains 11 samples, 11 covariance samples, `orekit_finite_difference_state_transition`, white
   acceleration process noise, and transition force models for J2, drag, SRP, Sun, and Moon. PR #7
   merged this validation refresh into `main` at merge commit `b668e1f`.
+- Reentry Suite implementation on `codex/reentry-suite`:
+  `src/astro_reentry` owns scenario/result schemas, exponential atmosphere and vacuum controls,
+  Sutton-Graves-style convective heating, spherical-Earth 3-DOF RK4 propagation, ballistic,
+  constant-bank, velocity-scheduled, and target-tracking guidance, peak/event extraction,
+  requirement margins, bounded Powell bank-schedule optimization, EME2000-to-Earth-fixed
+  trajectory handoff, and local backend dispatch. `src/astro_cli/main.py` exposes
+  `simulate-reentry`, `optimize-reentry`, and `handoff-reentry`; checked examples cover a ballistic
+  capsule, prescribed-bank lifting body, and guided lifting body. Pre-merge review hardening rejects
+  ignored guidance fields and initially terminal states, records resolved trajectory sample indices,
+  and prevents optimization products from accepting a regressing candidate.
+- Reentry Suite numerical and public-command evidence on `codex/reentry-suite`:
+  the ballistic case terminates at 314.213 s with peak dynamic pressure 54,334.589 Pa, peak
+  aerodynamic deceleration 18.133 g, peak convective heat rate 2,327,838.015 W/m^2, and total heat
+  load 99,670,993.043 J/m^2. The prescribed lifting case terminates at 480.539 s with one bank
+  reversal; the guided case terminates at 464.320 s with 18.431 km target miss. Bounded guidance
+  optimization converges in 13 iterations and reduces target miss to 6.231 km. The ballistic
+  internal-step convergence check agrees on terminal time within 0.001 s across 1.0, 0.5, and 0.25
+  second steps and preserves monotonic heat load.
+- Reentry Suite final local gates on `codex/reentry-suite`:
+  `python -m pytest -q` passed with `676 passed, 11 skipped in 13.02s`; the focused reentry and
+  CLI slice passed with `33 passed in 7.43s`; `python -m ruff check .`
+  passed; `python -m mypy` passed with no issues in 92 source files; `git diff --check` was clean;
+  `python -m pytest tests/test_packaging.py -q` passed with `4 passed in 0.03s`; and
+  `python -m build` produced `astro_suite-0.1.0.tar.gz` and
+  `astro_suite-0.1.0-py3-none-any.whl`, with `astro_reentry` present in the wheel.
 
 Post-MVP / external-campaign items:
 
@@ -185,6 +225,9 @@ Post-MVP / external-campaign items:
 - Official standards-grade DSN ODF/TNF decoding, official station calibration solving, and deeper
   astrometry/CCSDS authority.
 - Operational-grade differentiable OD services beyond the current JAX research products.
+- External correlation or higher-authority reentry campaigns for rotating-Earth dynamics,
+  atmosphere/wind uncertainty, 6-DOF aerodynamics and GNC, rarefied/real-gas/radiative flow, CFD,
+  ablation/material response, terrain/descent systems, and operational landing dispersion.
 
 ## Active Work Registry
 
@@ -197,13 +240,16 @@ Post-MVP / external-campaign items:
 | constellation-coverage-maps | done | productize/verify | steward | `src/astro_twin/constellation*`, `examples/twin/constellation_leo_observers.yaml`, `docs/digital-twin.md`, constellation tests | Coverage Maps v1 writes deterministic target-grid sensor coverage summaries and fleet margins from member geometry samples; required local gates pass with explicit design-screening and non-operational claim boundaries and the stack is merged on `main`. |
 | subsystem-fidelity-pack | done | productize/verify | steward | `src/astro_twin`, `examples/twin/leo_observer.yaml`, `docs/digital-twin.md`, subsystem tests | Adds scheduled power loads, battery energy/efficiency, thermal heat-balance evidence, ADCS slew/utilization margins, and itemized mass-budget rollups; required local gates pass with explicit design-screening and non-certification claim boundaries and the scope is merged on `main`. |
 | external-validation-refresh | done | verify | steward | `docs/validation/live-backend-campaigns.md`, optional runtime smoke checks, Orekit live covariance gate | Refreshes machine-scoped optional validation evidence: Orekit high-fidelity covariance and drag/SRP/third-body products pass on this machine; Tudat-specific current release claims are not refreshed because the historical isolated Tudat environment is absent; PR #7 is merged on `main`. |
+| reentry-suite | ready | productize/verify | steward | `src/astro_reentry`, reentry CLI commands, `examples/reentry`, `tests/astro_reentry`, `docs/reentry.md` | Ballistic, prescribed-bank lifting, target-tracking guidance, aerothermal/load/margin products, local optimization, trajectory handoff, documentation, convergence checks, full local gates, and packaging pass on `codex/reentry-suite`; review and merge remain. |
 
 ## Next Best Paths
 
-1. Tag a release candidate from `/Users/emerygunselman/Code/astro` once the user provides the
+1. Review and merge `codex/reentry-suite`, then rerun the required local gates on integrated
+   `main` before release tagging.
+2. Tag a release candidate from `/Users/emerygunselman/Code/astro` once the user provides the
    desired release/tag policy.
-2. Recreate an isolated TudatPy environment only if a release claim specifically needs a fresh
+3. Recreate an isolated TudatPy environment only if a release claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-3. Choose the next roadmap expansion deliberately: mission design/reporting polish, a bounded
-   operational-readiness criteria pass, or one new external-campaign validation scope. Do not treat
-   all three as hidden implementation backlog.
+4. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+   screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
+   Dymos/Tudat/Orekit correlation.

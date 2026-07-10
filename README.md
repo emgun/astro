@@ -16,14 +16,16 @@ request -> typed plan -> allow-listed commands -> deterministic artifacts -> ver
 - Generates, imports, exports, and estimates orbit-determination measurements.
 - Runs local least-squares OD with rank and convergence checks.
 - Runs deterministic launch/ascent baselines, launch pitch tuning, and launch-to-orbit handoff.
+- Simulates ballistic, prescribed-bank lifting, and target-tracking guided reentry with load,
+  aerothermal, target-miss, margin, and guidance-optimization products.
 - Runs an integrated single-spacecraft digital twin screening workflow for orbit geometry, power,
   thermal, ADCS, coverage, link budget, itemized mass rollups, and design margins.
 - Provides optional adapter boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, and JAX.
 - Exposes assistant workflows for scenario-bound local OD requests.
 
 Astro Suite owns the public product boundaries: scenarios, trajectories, measurements, estimates,
-launch reports, backend metadata, and assistant traces. External engines are integrated through
-explicit adapter boundaries.
+launch and reentry reports, digital-twin results, backend metadata, and assistant traces. External
+engines are integrated through explicit adapter boundaries.
 
 ## Install
 
@@ -89,6 +91,18 @@ astro run-twin examples/twin/leo_observer.yaml \
   --summary-output /tmp/astro-twin-summary.txt
 ```
 
+Run ballistic and guided reentry workflows:
+
+```bash
+astro simulate-reentry examples/reentry/ballistic_capsule.yaml \
+  --output /tmp/astro-ballistic-reentry.json \
+  --summary-output /tmp/astro-ballistic-reentry.txt
+
+astro optimize-reentry examples/reentry/guided_lifting_body.yaml \
+  --output /tmp/astro-reentry-optimization.json \
+  --tuned-scenario-output /tmp/astro-reentry-tuned.yaml
+```
+
 ## Assistant Workflow
 
 The assistant layer compiles supported local OD requests into typed plans, validates scenario
@@ -151,6 +165,8 @@ astro jax-smoke
 - `src/astro_dynamics`: local propagation, covariance, attitude, maneuvers, and conjunction tools.
 - `src/astro_od`: measurement generation, import/export, calibration, and estimation.
 - `src/astro_launch`: launch/ascent models, local propagation, handoff, tuning, and reporting.
+- `src/astro_reentry`: entry scenarios, 3-DOF simulation, guidance, aerothermal loads, margins,
+  optimization, and orbit handoff.
 - `src/astro_backends`: optional engine adapters and smoke checks.
 - `src/astro_assistant`: typed assistant plans, policy, verification, and artifact validation.
 - `src/astro_twin`: integrated single-spacecraft digital twin screening workflow.
@@ -171,6 +187,7 @@ Useful docs:
 
 - [Validation Matrix](docs/validation-matrix.md)
 - [Digital Twin](docs/digital-twin.md)
+- [Reentry Modeling And Simulation](docs/reentry.md)
 - [Assistant Workflows](docs/assistant-workflows.md)
 - [Assistant MCP Contract](docs/assistant-mcp-contract.md)
 - [Backend Installation](docs/backend-installation.md)

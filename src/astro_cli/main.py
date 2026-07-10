@@ -84,6 +84,15 @@ from astro_od.io import (
     resolve_measurement_format,
 )
 from astro_od.measurements import generate_synthetic_measurements
+from astro_reentry.backends import simulate_reentry_with_backend
+from astro_reentry.handoff import trajectory_to_reentry_scenario
+from astro_reentry.io import (
+    format_reentry_optimization_summary,
+    format_reentry_summary,
+    load_reentry_scenario,
+)
+from astro_reentry.models import ReentryOptimizationConfig, ReentryScenario
+from astro_reentry.optimization import optimize_reentry_guidance
 from astro_twin.constellation import run_constellation_twin
 from astro_twin.constellation_io import (
     format_constellation_summary,
@@ -129,6 +138,14 @@ def _load_launch_scenario_or_exit(scenario_path: Path) -> LaunchScenario:
 def _load_launch_trajectory_or_exit(trajectory_path: Path) -> LaunchTrajectory:
     try:
         return load_launch_trajectory(trajectory_path)
+    except InvalidScenarioError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+
+def _load_reentry_scenario_or_exit(scenario_path: Path) -> ReentryScenario:
+    try:
+        return load_reentry_scenario(scenario_path)
     except InvalidScenarioError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
@@ -1105,6 +1122,111 @@ def handoff_launch(
     payload = yaml.safe_dump(scenario.model_dump(mode="json"), sort_keys=False)
     _write_text_or_exit(output, payload.rstrip("\n"), "orbit scenario")
     typer.echo(f"wrote orbit scenario: {output}")
+
+
+@app.command("simulate-reentry")
+def simulate_reentry(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    backend: Annotated[str, typer.Option()] = "local",
+    summary_output: Annotated[Path | None, typer.Option()] = None,
+) -> None:
+    """Run a ballistic or lifting reentry scenario and write a result product."""
+    scenario = _load_reentry_scenario_or_exit(scenario_path)
+    try:
+        result = simulate_reentry_with_backend(scenario, backend)
+    except UnsupportedBackendError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    _ensure_parent_or_exit(output, "reentry result")
+    _write_text_or_exit(output, result.model_dump_json(indent=2), "reentry result")
+    typer.echo(f"wrote reentry result: {output}")
+    if summary_output is not None:
+        _ensure_parent_or_exit(summary_output, "reentry summary")
+        _write_text_or_exit(summary_output, format_reentry_summary(result), "reentry summary")
+        typer.echo(f"wrote reentry summary: {summary_output}")
+
+
+@app.command("optimize-reentry")
+def optimize_reentry(
+    scenario_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    tuned_scenario_output: Annotated[Path | None, typer.Option()] = None,
+    summary_output: Annotated[Path | None, typer.Option()] = None,
+    maximum_iterations: Annotated[int, typer.Option()] = 80,
+    bank_angle_lower_deg: Annotated[float, typer.Option()] = 0.0,
+    bank_angle_upper_deg: Annotated[float, typer.Option()] = 80.0,
+    load_penalty_scale: Annotated[float, typer.Option()] = 1000.0,
+) -> None:
+    """Tune target-tracking bank magnitudes and write an optimization product."""
+    scenario = _load_reentry_scenario_or_exit(scenario_path)
+    try:
+        config = ReentryOptimizationConfig(
+            maximum_iterations=maximum_iterations,
+            bank_angle_lower_deg=bank_angle_lower_deg,
+            bank_angle_upper_deg=bank_angle_upper_deg,
+            load_penalty_scale=load_penalty_scale,
+        )
+        result = optimize_reentry_guidance(scenario, config)
+    except ValueError as exc:
+        typer.echo(f"could not optimize reentry guidance: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    _ensure_parent_or_exit(output, "reentry optimization")
+    _write_text_or_exit(
+        output,
+        result.model_dump_json(indent=2),
+        "reentry optimization",
+    )
+    typer.echo(f"wrote reentry optimization: {output}")
+    if tuned_scenario_output is not None:
+        payload = yaml.safe_dump(result.tuned_scenario.model_dump(mode="json"), sort_keys=False)
+        _ensure_parent_or_exit(tuned_scenario_output, "tuned reentry scenario")
+        _write_text_or_exit(
+            tuned_scenario_output,
+            payload.rstrip("\n"),
+            "tuned reentry scenario",
+        )
+        typer.echo(f"wrote tuned reentry scenario: {tuned_scenario_output}")
+    if summary_output is not None:
+        _ensure_parent_or_exit(summary_output, "reentry optimization summary")
+        _write_text_or_exit(
+            summary_output,
+            format_reentry_optimization_summary(result),
+            "reentry optimization summary",
+        )
+        typer.echo(f"wrote reentry optimization summary: {summary_output}")
+
+
+@app.command("handoff-reentry")
+def handoff_reentry(
+    trajectory_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    template_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    output: Annotated[Path, typer.Option()],
+    sample_index: Annotated[int, typer.Option()] = -1,
+    scenario_id: Annotated[str | None, typer.Option()] = None,
+    use_sample_mass: Annotated[bool, typer.Option()] = False,
+) -> None:
+    """Convert an EME2000 trajectory sample into a reentry scenario initial state."""
+    trajectory = _load_trajectory_or_exit(trajectory_path)
+    template = _load_reentry_scenario_or_exit(template_path)
+    try:
+        scenario = trajectory_to_reentry_scenario(
+            trajectory,
+            template,
+            sample_index=sample_index,
+            scenario_id=scenario_id,
+            use_sample_mass=use_sample_mass,
+        )
+    except ValueError as exc:
+        typer.echo(f"could not create reentry scenario: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+
+    payload = yaml.safe_dump(scenario.model_dump(mode="json"), sort_keys=False)
+    _ensure_parent_or_exit(output, "reentry scenario")
+    _write_text_or_exit(output, payload.rstrip("\n"), "reentry scenario")
+    typer.echo(f"wrote reentry scenario: {output}")
 
 
 @app.command("sweep-launch-pitch")
