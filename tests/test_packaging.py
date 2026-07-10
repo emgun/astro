@@ -35,3 +35,12 @@ def test_dev_dependencies_keep_ci_type_checking_stable() -> None:
 
     assert "mypy>=1.11,<1.12" in dev_dependencies
     assert "types-PyYAML>=6.0" in dev_dependencies
+
+
+def test_reentry_package_is_in_wheel_and_strict_type_surfaces() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+
+    assert "src/astro_reentry" in pyproject["tool"]["hatch"]["build"]["targets"]["wheel"][
+        "packages"
+    ]
+    assert "astro_reentry" in pyproject["tool"]["mypy"]["packages"]

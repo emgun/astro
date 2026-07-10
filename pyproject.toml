@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "astro-suite"
 version = "0.1.0"
-description = "Python flight dynamics suite for verifiable AI-assisted mission workflows, orbit determination, propagation, and launch analysis."
+description = "Python flight dynamics suite for orbit determination, launch, reentry, digital twins, and verifiable mission workflows."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
@@ -63,6 +63,7 @@ packages = [
   "src/astro_cli",
   "src/astro_assistant",
   "src/astro_twin",
+  "src/astro_reentry",
 ]
 
 [tool.pytest.ini_options]
@@ -95,4 +96,5 @@ packages = [
   "astro_cli",
   "astro_assistant",
   "astro_twin",
+  "astro_reentry",
 ]
