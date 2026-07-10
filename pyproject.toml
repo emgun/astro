@@ -64,6 +64,7 @@ packages = [
   "src/astro_assistant",
   "src/astro_twin",
   "src/astro_reentry",
+  "src/astro_mission",
 ]
 
 [tool.pytest.ini_options]
@@ -97,4 +98,5 @@ packages = [
   "astro_assistant",
   "astro_twin",
   "astro_reentry",
+  "astro_mission",
 ]

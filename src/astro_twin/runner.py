@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from astro_core.io import load_scenario
+from astro_core.models import Trajectory
 from astro_dynamics.local import propagate_local
 from astro_twin.adcs import compute_adcs_timeline
 from astro_twin.coverage import access_windows_from_samples
@@ -26,9 +27,18 @@ _COVERAGE_GEOMETRY_WARNING = (
 )
 
 
-def run_digital_twin(scenario: DigitalTwinScenario) -> DigitalTwinResult:
-    orbit_scenario = load_scenario(scenario.orbit_scenario)
-    trajectory = propagate_local(orbit_scenario)
+def run_digital_twin(
+    scenario: DigitalTwinScenario,
+    *,
+    trajectory_override: Trajectory | None = None,
+) -> DigitalTwinResult:
+    if trajectory_override is None:
+        orbit_scenario = load_scenario(scenario.orbit_scenario)
+        trajectory = propagate_local(orbit_scenario)
+        trajectory_source = "orbit_scenario"
+    else:
+        trajectory = trajectory_override
+        trajectory_source = "trajectory_override"
     geometry = build_geometry_timeline(trajectory)
     mode_by_elapsed_s = _mode_by_elapsed_s(scenario, geometry)
     power = compute_power_timeline(
@@ -70,6 +80,8 @@ def run_digital_twin(scenario: DigitalTwinScenario) -> DigitalTwinResult:
         metadata={
             "orbit_scenario": scenario.orbit_scenario,
             "orbit_backend": trajectory.backend,
+            "orbit_trajectory_source": trajectory_source,
+            "orbit_trajectory_scenario_id": trajectory.scenario_id,
         },
         warnings=[_DESIGN_SCREENING_WARNING, _COVERAGE_GEOMETRY_WARNING],
     )

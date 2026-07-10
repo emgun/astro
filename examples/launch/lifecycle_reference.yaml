@@ -1,0 +1,58 @@
+scenario_id: lifecycle-reference-launch
+description: Checked two-stage ascent for the mission lifecycle design-screening workflow.
+epoch: '2026-01-01T00:00:00Z'
+time_scale: UTC
+frame: EME2000
+launch_site:
+  name: equator-pad
+  latitude_deg: 0.0
+  longitude_deg: 0.0
+  altitude_m: 0.0
+  body: earth
+vehicle:
+  name: lifecycle-two-stage
+  payload_mass_kg: 500.0
+  stages:
+    - name: stage-1
+      dry_mass_kg: 15000.0
+      propellant_mass_kg: 260000.0
+      engine:
+        name: booster
+        thrust_n: 5000000.0
+        specific_impulse_s: 300.0
+      burn_duration_s: 150.0
+      reference_area_m2: 20.0
+      drag_coefficient: 0.25
+    - name: stage-2
+      dry_mass_kg: 4000.0
+      propellant_mass_kg: 10000.0
+      engine:
+        name: upper
+        thrust_n: 200000.0
+        specific_impulse_s: 340.0
+      burn_duration_s: 150.0
+      reference_area_m2: 8.0
+      drag_coefficient: 0.2
+atmosphere:
+  model: exponential
+  sea_level_density_kg_m3: 1.225
+  scale_height_m: 8500.0
+guidance:
+  mode: pitch_program
+  pitch_program:
+    - {time_s: 0.0, pitch_deg: 90.0}
+    - {time_s: 30.0, pitch_deg: 90.0}
+    - {time_s: 80.0, pitch_deg: 29.5}
+    - {time_s: 150.0, pitch_deg: 7.4}
+    - {time_s: 220.0, pitch_deg: 7.4}
+    - {time_s: 300.0, pitch_deg: 1.0}
+    - {time_s: 330.0, pitch_deg: 0.0}
+target_orbit:
+  altitude_km: 200.0
+  inclination_deg: 0.0
+  altitude_tolerance_km: 20.0
+  velocity_tolerance_km_s: 0.2
+  radial_velocity_tolerance_km_s: 0.1
+propagation:
+  duration_s: 330.0
+  step_s: 2.0
