@@ -11,10 +11,11 @@ The sibling checkout at `/Users/emerygunselman/Documents/astro` is stale for thi
 `docs/research/2026-06-20-verifiable-ai-space-workflows.md` file. Do not edit or merge from that
 checkout unless the user explicitly asks to sync the old workspace.
 
-Integrated `main` state after the Reentry Suite merge:
+Release baseline and active lifecycle branch:
 
-- Branch: `main`
-- Latest integrated commit before this state-only update: `3c73f8b`.
+- Release baseline: `main` at `1182493`.
+- Published annotated release-candidate tag: `v0.1.0-rc.1` at `1182493`.
+- Active branch: `codex/mission-lifecycle`.
 - Required local release gates: passed on merged `main` after PR #8.
 - Optional backend smoke refresh on 2026-07-09: Orekit, RocketPy, Dymos/OpenMDAO, and JAX
   were available on the current machine. TudatPy was not installed in the base environment, and
@@ -211,6 +212,15 @@ Implemented and verified in the current pass:
   `python -m pytest tests/test_packaging.py -q` passed with `4 passed in 0.03s`; and
   `python -m build` produced `astro_suite-0.1.0.tar.gz` and
   `astro_suite-0.1.0-py3-none-any.whl`, with `astro_reentry` present in the wheel.
+- Mission Lifecycle Workflow branch evidence on `codex/mission-lifecycle`: the checked
+  `leo-round-trip` command wrote one lifecycle result, a text summary, and nine phase artifacts.
+  Launch insertion passed its three declared tolerances; eight state/epoch/mass continuity checks
+  passed; the deorbit burn consumed 32.861 kg and retained 17.139 kg; entry handoff occurred at
+  119.794 km; and reentry terminated at zero altitude with all cross-phase margins passing. Focused
+  lifecycle tests passed with `8 passed`; full local verification passed with
+  `686 passed, 11 skipped`, Ruff, strict MyPy across 97 source files, `git diff --check`, wheel
+  content inspection, and both distribution builds. Integration is pending branch publication and
+  review.
 
 Post-MVP / external-campaign items:
 
@@ -241,11 +251,11 @@ Post-MVP / external-campaign items:
 | subsystem-fidelity-pack | done | productize/verify | steward | `src/astro_twin`, `examples/twin/leo_observer.yaml`, `docs/digital-twin.md`, subsystem tests | Adds scheduled power loads, battery energy/efficiency, thermal heat-balance evidence, ADCS slew/utilization margins, and itemized mass-budget rollups; required local gates pass with explicit design-screening and non-certification claim boundaries and the scope is merged on `main`. |
 | external-validation-refresh | done | verify | steward | `docs/validation/live-backend-campaigns.md`, optional runtime smoke checks, Orekit live covariance gate | Refreshes machine-scoped optional validation evidence: Orekit high-fidelity covariance and drag/SRP/third-body products pass on this machine; Tudat-specific current release claims are not refreshed because the historical isolated Tudat environment is absent; PR #7 is merged on `main`. |
 | reentry-suite | done | productize/verify | steward | `src/astro_reentry`, reentry CLI commands, `examples/reentry`, `tests/astro_reentry`, `docs/reentry.md` | Ballistic, prescribed-bank lifting, target-tracking guidance, aerothermal/load/margin products, local optimization, trajectory handoff, documentation, convergence checks, full local gates, packaging, review hardening, GitHub CI, and merged-main verification pass; PR #8 is merged at `3c73f8b`. |
+| mission-lifecycle | active | productize/verify | steward | `src/astro_mission`, `astro run-mission-lifecycle`, checked phase fixtures, lifecycle tests and docs | Connect launch, operations propagation, the integrated twin, deorbit, and reentry through suite-owned products; fail closed on continuity or phase gates; write an ordered artifact manifest; pass focused and full release gates before integration. |
 
 ## Next Best Paths
 
-1. Tag a release candidate from `/Users/emerygunselman/Code/astro` once the user provides the
-   desired release/tag policy.
+1. Complete and integrate the checked Mission Lifecycle Workflow on `codex/mission-lifecycle`.
 2. Recreate an isolated TudatPy environment only if a release claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
 3. Choose any higher-authority reentry campaign deliberately and keep it separate from the local

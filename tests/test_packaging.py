@@ -44,3 +44,12 @@ def test_reentry_package_is_in_wheel_and_strict_type_surfaces() -> None:
         "packages"
     ]
     assert "astro_reentry" in pyproject["tool"]["mypy"]["packages"]
+
+
+def test_mission_package_is_in_wheel_and_strict_type_surfaces() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+
+    assert (
+        "src/astro_mission" in pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"]
+    )
+    assert "astro_mission" in pyproject["tool"]["mypy"]["packages"]

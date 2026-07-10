@@ -20,6 +20,8 @@ request -> typed plan -> allow-listed commands -> deterministic artifacts -> ver
   aerothermal, target-miss, margin, and guidance-optimization products.
 - Runs an integrated single-spacecraft digital twin screening workflow for orbit geometry, power,
   thermal, ADCS, coverage, link budget, itemized mass rollups, and design margins.
+- Runs a checked launch-to-reentry mission lifecycle workflow with explicit state, epoch, mass,
+  propellant-reserve, entry-interface, provenance, and margin evidence across every phase.
 - Provides optional adapter boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, and JAX.
 - Exposes assistant workflows for scenario-bound local OD requests.
 
@@ -103,6 +105,15 @@ astro optimize-reentry examples/reentry/guided_lifting_body.yaml \
   --tuned-scenario-output /tmp/astro-reentry-tuned.yaml
 ```
 
+Run the integrated launch-to-reentry mission lifecycle:
+
+```bash
+astro run-mission-lifecycle examples/lifecycle/leo_round_trip.yaml \
+  --output /tmp/astro-mission-lifecycle.json \
+  --summary-output /tmp/astro-mission-lifecycle.txt \
+  --artifacts-dir /tmp/astro-mission-lifecycle-artifacts
+```
+
 ## Assistant Workflow
 
 The assistant layer compiles supported local OD requests into typed plans, validates scenario
@@ -170,6 +181,7 @@ astro jax-smoke
 - `src/astro_backends`: optional engine adapters and smoke checks.
 - `src/astro_assistant`: typed assistant plans, policy, verification, and artifact validation.
 - `src/astro_twin`: integrated single-spacecraft digital twin screening workflow.
+- `src/astro_mission`: checked orchestration across launch, operations, twin, deorbit, and reentry.
 - `src/astro_cli`: the `astro` command line interface.
 - `examples/`: runnable scenarios, launch cases, measurements, and assistant prompts.
 - `docs/`: validation, backend, assistant, and research notes.
@@ -188,6 +200,7 @@ Useful docs:
 - [Validation Matrix](docs/validation-matrix.md)
 - [Digital Twin](docs/digital-twin.md)
 - [Reentry Modeling And Simulation](docs/reentry.md)
+- [Mission Lifecycle Workflow](docs/mission-lifecycle.md)
 - [Assistant Workflows](docs/assistant-workflows.md)
 - [Assistant MCP Contract](docs/assistant-mcp-contract.md)
 - [Backend Installation](docs/backend-installation.md)

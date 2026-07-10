@@ -6,6 +6,9 @@ Use this checklist before tagging or publishing a release candidate.
 
 Latest merged-main evidence:
 
+- 2026-07-10: annotated tag `v0.1.0-rc.1` was published at release baseline `1182493`, before the
+  Mission Lifecycle Workflow branch.
+
 - 2026-06-20: `main` fast-forwarded to `0fb9a87`.
 - 2026-06-20: Release evidence recorded on `main` at `870cb13`.
 - 2026-06-20: `python -m pytest -q` passed with 505 passed, 11 skipped.
@@ -44,6 +47,16 @@ Latest reentry integration evidence:
   branch and were repeated on merged `main`: `676 passed, 11 skipped`, with `33 passed` in the
   focused reentry/CLI slice. GitHub CI passed and PR #8 merged at `3c73f8b`. This remains
   deterministic screening evidence within the claim boundary in `docs/reentry.md`.
+
+Latest mission lifecycle branch evidence:
+
+- 2026-07-10: `codex/mission-lifecycle` added the checked launch, operations, digital twin,
+  deorbit, and reentry phase chain with suite-owned products, eight continuity checks, cross-phase
+  margins, and a nine-file artifact bundle.
+- 2026-07-10: the public command passed with all margins passing; focused lifecycle tests reported
+  `8 passed`; full local tests reported `686 passed, 11 skipped`; Ruff, strict MyPy across 97 source
+  files, `git diff --check`, wheel inspection, and both distribution builds passed. Branch
+  integration remains pending.
 
 ## Required Local Gates
 
@@ -95,6 +108,8 @@ Latest reentry integration evidence:
 - [x] `astro simulate-reentry examples/reentry/guided_lifting_body.yaml --output /tmp/astro-guided-reentry.json --summary-output /tmp/astro-guided-reentry.txt`
 - [x] `astro optimize-reentry examples/reentry/guided_lifting_body.yaml --maximum-iterations 20 --output /tmp/astro-reentry-optimization.json --tuned-scenario-output /tmp/astro-reentry-tuned.yaml --summary-output /tmp/astro-reentry-optimization.txt`
 - [x] `astro handoff-reentry /tmp/astro-local-trajectory.json examples/reentry/ballistic_capsule.yaml --sample-index 0 --output /tmp/astro-reentry-handoff.yaml`
+- [x] `astro run-mission-lifecycle examples/lifecycle/leo_round_trip.yaml --output /tmp/astro-mission-lifecycle.json --summary-output /tmp/astro-mission-lifecycle.txt --artifacts-dir /tmp/astro-mission-lifecycle-artifacts`
+- [x] `python -m pytest tests/astro_mission -q`
 - [x] `python -m pytest tests/astro_reentry tests/astro_cli/test_reentry_cli.py -q`
 - [x] `python -m pytest tests/astro_launch/test_launch_io.py::test_load_rocketpy_configured_launch_scenario -q`
 - [x] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend local --point-indices 2,3 --iterations 1 --radial-velocity-weight 1 --output /tmp/astro-optimized-launch.json`
@@ -180,3 +195,4 @@ the message is actionable.
 - [x] Wheel metadata includes optional extras: `dev`, `orekit`, `launch`, `optimization`, and
   `research`.
 - [x] Wheel contents include the suite-owned `astro_reentry` package.
+- [x] Wheel contents include the suite-owned `astro_mission` package.

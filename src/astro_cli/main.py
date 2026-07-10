@@ -64,6 +64,13 @@ from astro_launch.reporting import (
     generate_tuned_launch_report_batch,
 )
 from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
+from astro_mission.errors import MissionLifecycleError
+from astro_mission.io import (
+    format_mission_lifecycle_summary,
+    load_mission_lifecycle_scenario,
+    write_mission_artifact_bundle,
+)
+from astro_mission.runner import run_mission_lifecycle
 from astro_od.calibration import (
     generate_dsn_calibration_product,
     generate_dsn_calibration_product_from_measurements,
@@ -621,6 +628,52 @@ def run_twin(
             "digital twin summary",
         )
         typer.echo(f"wrote digital twin summary: {summary_output}")
+
+
+@app.command("run-mission-lifecycle")
+def run_mission_lifecycle_command(
+    scenario_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Mission lifecycle scenario YAML path."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Write lifecycle JSON result.")],
+    summary_output: Annotated[
+        Path | None,
+        typer.Option("--summary-output", help="Write a concise text summary."),
+    ] = None,
+    artifacts_dir: Annotated[
+        Path | None,
+        typer.Option("--artifacts-dir", help="Write the phase artifact bundle."),
+    ] = None,
+) -> None:
+    """Run the checked launch-to-reentry mission lifecycle workflow."""
+    try:
+        scenario = load_mission_lifecycle_scenario(scenario_path)
+        result = run_mission_lifecycle(scenario)
+        _ensure_parent_or_exit(output, "mission lifecycle result")
+        _write_text_or_exit(
+            output,
+            result.model_dump_json(indent=2),
+            "mission lifecycle result",
+        )
+        if summary_output is not None:
+            _ensure_parent_or_exit(summary_output, "mission lifecycle summary")
+            _write_text_or_exit(
+                summary_output,
+                format_mission_lifecycle_summary(result),
+                "mission lifecycle summary",
+            )
+        if artifacts_dir is not None:
+            write_mission_artifact_bundle(artifacts_dir, result)
+    except (InvalidScenarioError, MissionLifecycleError, UnsupportedBackendError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo(f"wrote mission lifecycle result: {output}")
+    if summary_output is not None:
+        typer.echo(f"wrote mission lifecycle summary: {summary_output}")
+    if artifacts_dir is not None:
+        typer.echo(f"wrote mission artifact bundle: {artifacts_dir}")
 
 
 @app.command("run-constellation-twin")
