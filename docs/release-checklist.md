@@ -1,6 +1,6 @@
 # Release Checklist
 
-Date: 2026-07-09
+Date: 2026-07-10
 
 Use this checklist before tagging or publishing a release candidate.
 
@@ -32,7 +32,7 @@ Latest optional validation refresh:
   machine-scoped backend evidence, not production covariance certification.
 - 2026-07-09: PR #7 merged the optional validation refresh to `main` at `b668e1f`.
 
-Latest reentry candidate evidence:
+Latest reentry integration evidence:
 
 - 2026-07-10: `codex/reentry-suite` added suite-owned ballistic, prescribed-bank lifting, and
   target-tracking entry products plus local guidance optimization and trajectory handoff.
@@ -41,8 +41,9 @@ Latest reentry candidate evidence:
   iterations and reduced miss to 6.231 km.
 - 2026-07-10: internal-step convergence, monotonic heat-load, model/IO/guidance/margin,
   optimization, handoff, CLI, strict typing, packaging, and full regression gates passed on the
-  branch: `676 passed, 11 skipped`, with `33 passed` in the focused reentry/CLI slice. This is
-  branch-scoped deterministic screening evidence until review and merge.
+  branch and were repeated on merged `main`: `676 passed, 11 skipped`, with `33 passed` in the
+  focused reentry/CLI slice. GitHub CI passed and PR #8 merged at `3c73f8b`. This remains
+  deterministic screening evidence within the claim boundary in `docs/reentry.md`.
 
 ## Required Local Gates
 
