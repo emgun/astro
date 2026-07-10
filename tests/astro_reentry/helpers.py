@@ -32,7 +32,10 @@ def make_reentry_scenario(
             ),
         )
     else:
-        guidance = ReentryGuidanceConfig(mode=mode, bank_angle_deg=45.0)
+        guidance = ReentryGuidanceConfig(
+            mode=mode,
+            bank_angle_deg=45.0 if mode == "constant_bank" else 0.0,
+        )
     payload: dict[str, object] = {
         "scenario_id": f"test-{mode}",
         "description": "Reentry unit test scenario.",

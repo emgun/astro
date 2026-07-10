@@ -37,7 +37,8 @@ def optimize_reentry_guidance(
         result = simulate_reentry_local(candidate)
         return _objective_value(result, settings.load_penalty_scale)
 
-    initial_objective = objective(initial_angles)
+    initial_result = simulate_reentry_local(scenario)
+    initial_objective = _objective_value(initial_result, settings.load_penalty_scale)
     raw_result = minimize(
         objective,
         initial_angles,
@@ -54,15 +55,27 @@ def optimize_reentry_guidance(
     )
     optimized = cast(OptimizeResult, raw_result)
     optimized_angles = np.asarray(optimized.x, dtype=np.float64)
-    tuned_scenario = _scenario_with_bank_angles(scenario, optimized_angles)
-    reentry_result = simulate_reentry_local(tuned_scenario)
+    candidate_scenario = _scenario_with_bank_angles(scenario, optimized_angles)
+    candidate_result = simulate_reentry_local(candidate_scenario)
+    candidate_objective = _objective_value(candidate_result, settings.load_penalty_scale)
+    accepted_optimized_solution = candidate_objective <= initial_objective
+    if accepted_optimized_solution:
+        tuned_scenario = candidate_scenario
+        reentry_result = candidate_result
+        final_objective = candidate_objective
+        message = str(optimized.message)
+    else:
+        tuned_scenario = scenario
+        reentry_result = initial_result
+        final_objective = initial_objective
+        message = f"{optimized.message}; rejected candidate that regressed the objective"
     return ReentryOptimizationResult(
         scenario_id=scenario.scenario_id,
-        success=bool(optimized.success),
-        message=str(optimized.message),
+        success=bool(optimized.success) and accepted_optimized_solution,
+        message=message,
         iterations=int(optimized.nit),
         initial_objective=initial_objective,
-        final_objective=_objective_value(reentry_result, settings.load_penalty_scale),
+        final_objective=final_objective,
         tuned_scenario=tuned_scenario,
         reentry_result=reentry_result,
         metadata={
@@ -73,6 +86,9 @@ def optimize_reentry_guidance(
                 settings.bank_angle_upper_deg,
             ],
             "load_penalty_scale": settings.load_penalty_scale,
+            "accepted_solution": (
+                "optimized" if accepted_optimized_solution else "initial_no_regression"
+            ),
         },
     )
 

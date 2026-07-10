@@ -41,7 +41,7 @@ Latest reentry candidate evidence:
   iterations and reduced miss to 6.231 km.
 - 2026-07-10: internal-step convergence, monotonic heat-load, model/IO/guidance/margin,
   optimization, handoff, CLI, strict typing, packaging, and full regression gates passed on the
-  branch: `672 passed, 11 skipped`, with `29 passed` in the focused reentry/CLI slice. This is
+  branch: `676 passed, 11 skipped`, with `33 passed` in the focused reentry/CLI slice. This is
   branch-scoped deterministic screening evidence until review and merge.
 
 ## Required Local Gates

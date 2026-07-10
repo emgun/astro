@@ -34,3 +34,16 @@ def test_trajectory_handoff_rejects_out_of_range_sample() -> None:
             make_reentry_scenario(),
             sample_index=100000,
         )
+
+
+def test_trajectory_handoff_records_resolved_negative_sample_index() -> None:
+    trajectory = propagate_local(load_scenario("examples/scenarios/leo_two_body.yaml"))
+
+    scenario = trajectory_to_reentry_scenario(
+        trajectory,
+        make_reentry_scenario(),
+        sample_index=-1,
+    )
+
+    assert scenario.metadata["source_sample_index"] == len(trajectory.samples) - 1
+    assert scenario.metadata["requested_sample_index"] == -1

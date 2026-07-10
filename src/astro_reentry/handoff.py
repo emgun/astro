@@ -17,6 +17,9 @@ def trajectory_to_reentry_scenario(
     scenario_id: str | None = None,
     use_sample_mass: bool = False,
 ) -> ReentryScenario:
+    resolved_sample_index = (
+        sample_index if sample_index >= 0 else len(trajectory.samples) + sample_index
+    )
     try:
         sample = trajectory.samples[sample_index]
     except IndexError as exc:
@@ -86,7 +89,8 @@ def trajectory_to_reentry_scenario(
                 "workflow": "trajectory_reentry_handoff",
                 "source_trajectory_scenario_id": trajectory.scenario_id,
                 "source_trajectory_backend": trajectory.backend,
-                "source_sample_index": sample_index,
+                "source_sample_index": resolved_sample_index,
+                "requested_sample_index": sample_index,
                 "source_frame": "EME2000",
                 "handoff_frame": "Earth-fixed spherical",
                 "earth_rotation_model": "GMST plus constant angular velocity",

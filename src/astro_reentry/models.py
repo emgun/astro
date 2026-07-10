@@ -157,6 +157,12 @@ class ReentryGuidanceConfig(AstroModel):
 
     @model_validator(mode="after")
     def validate_schedule(self) -> ReentryGuidanceConfig:
+        if self.mode in {"ballistic", "constant_bank"} and self.bank_schedule:
+            raise ValueError(f"{self.mode} guidance does not accept bank_schedule points")
+        if self.mode == "ballistic" and self.bank_angle_deg != 0.0:
+            raise ValueError("ballistic guidance requires bank_angle_deg = 0")
+        if self.mode in {"bank_schedule", "target_tracking"} and self.bank_angle_deg != 0.0:
+            raise ValueError(f"{self.mode} guidance requires bank_angle_deg = 0")
         if self.mode in {"bank_schedule", "target_tracking"} and len(self.bank_schedule) < 2:
             raise ValueError(f"{self.mode} guidance requires at least two bank_schedule points")
         velocities = [point.velocity_km_s for point in self.bank_schedule]
@@ -263,6 +269,8 @@ class ReentryScenario(AstroModel):
             raise ValueError("target_tracking guidance requires a target")
         if self.initial_state.altitude_km <= self.propagation.termination_altitude_km:
             raise ValueError("initial altitude must be above termination_altitude_km")
+        if self.initial_state.velocity_km_s <= self.propagation.minimum_velocity_km_s:
+            raise ValueError("initial velocity must be above minimum_velocity_km_s")
         return self
 
 

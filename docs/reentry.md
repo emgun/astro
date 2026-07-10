@@ -76,7 +76,9 @@ equilibrium wall temperature is reported from configured emissivity. `none` disa
 `astro optimize-reentry` supports `target_tracking` scenarios. It uses deterministic bounded SciPy
 optimization to tune bank-schedule magnitudes against final great-circle target miss plus normalized
 penalties for exceeded dynamic-pressure, deceleration, heat-rate, and heat-load limits. The
-optimization result contains both the tuned scenario and its full `ReentryResult`.
+optimization result contains both the tuned scenario and its full `ReentryResult`. An optimized
+candidate is accepted only when its objective does not regress from the input schedule; otherwise
+the product retains the initial scenario and records `accepted_solution = initial_no_regression`.
 
 ## Result Product
 

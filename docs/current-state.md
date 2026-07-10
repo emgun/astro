@@ -32,7 +32,7 @@ Current reentry implementation candidate:
 - Public products and commands: suite-owned `ReentryScenario`, `ReentryResult`, and
   `ReentryOptimizationResult`; `astro simulate-reentry`, `astro optimize-reentry`, and
   `astro handoff-reentry`.
-- Required local gates on 2026-07-10: `672 passed, 11 skipped`; `ruff`, strict `mypy` across 92
+- Required local gates on 2026-07-10: `676 passed, 11 skipped`; `ruff`, strict `mypy` across 92
   source files, `git diff --check`, 4 packaging tests, and `python -m build` passed.
 - This evidence is branch-scoped until the reentry branch is reviewed and merged.
 
@@ -193,7 +193,9 @@ Implemented and verified in the current pass:
   requirement margins, bounded Powell bank-schedule optimization, EME2000-to-Earth-fixed
   trajectory handoff, and local backend dispatch. `src/astro_cli/main.py` exposes
   `simulate-reentry`, `optimize-reentry`, and `handoff-reentry`; checked examples cover a ballistic
-  capsule, prescribed-bank lifting body, and guided lifting body.
+  capsule, prescribed-bank lifting body, and guided lifting body. Pre-merge review hardening rejects
+  ignored guidance fields and initially terminal states, records resolved trajectory sample indices,
+  and prevents optimization products from accepting a regressing candidate.
 - Reentry Suite numerical and public-command evidence on `codex/reentry-suite`:
   the ballistic case terminates at 314.213 s with peak dynamic pressure 54,334.589 Pa, peak
   aerodynamic deceleration 18.133 g, peak convective heat rate 2,327,838.015 W/m^2, and total heat
@@ -203,8 +205,8 @@ Implemented and verified in the current pass:
   internal-step convergence check agrees on terminal time within 0.001 s across 1.0, 0.5, and 0.25
   second steps and preserves monotonic heat load.
 - Reentry Suite final local gates on `codex/reentry-suite`:
-  `python -m pytest -q` passed with `672 passed, 11 skipped in 13.13s`; the focused reentry and
-  CLI slice passed with `29 passed in 7.51s`; `python -m ruff check .`
+  `python -m pytest -q` passed with `676 passed, 11 skipped in 13.02s`; the focused reentry and
+  CLI slice passed with `33 passed in 7.43s`; `python -m ruff check .`
   passed; `python -m mypy` passed with no issues in 92 source files; `git diff --check` was clean;
   `python -m pytest tests/test_packaging.py -q` passed with `4 passed in 0.03s`; and
   `python -m build` produced `astro_suite-0.1.0.tar.gz` and
