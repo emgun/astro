@@ -6,6 +6,11 @@ Use this checklist before tagging or publishing a release candidate.
 
 Latest merged-main evidence:
 
+- 2026-07-10: annotated final tag `v0.1.0` was published at `6cc7d2f`, exactly matching the reviewed
+  `v0.1.0-rc.2` commit. A detached release worktree repeated Ruff, strict MyPy across 97 source
+  files, `686 passed, 11 skipped`, the public mission lifecycle command and artifact bundle, both
+  distribution builds, wheel-content inspection, `git diff --check`, and clean-worktree review
+  before promotion.
 - 2026-07-10: annotated tag `v0.1.0-rc.2` was published at `6cc7d2f`, including the merged Mission
   Lifecycle Workflow and its recorded verification state.
 - 2026-07-10: annotated tag `v0.1.0-rc.1` was published at release baseline `1182493`, before the
