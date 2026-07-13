@@ -3,6 +3,7 @@
 from astro_uq.models import (
     CampaignDefinition,
     CampaignResult,
+    CampaignSensitivityReport,
     DistributionSpec,
     SamplerSpec,
     UncertaintyModel,
@@ -11,6 +12,7 @@ from astro_uq.models import (
 __all__ = [
     "CampaignDefinition",
     "CampaignResult",
+    "CampaignSensitivityReport",
     "DistributionSpec",
     "SamplerSpec",
     "UncertaintyModel",

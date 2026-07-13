@@ -88,6 +88,17 @@ gate. Surrogate acceleration therefore remains stopped for these local evaluator
 verification passed 888 tests with 11 skipped, Ruff, strict MyPy across 120 source files, and
 sdist/wheel builds.
 
+Lifecycle Sensitivity and Margin Attribution v1 adds a separate digest-bound Spearman/PRCC product
+over completed campaign evidence. A checked 64-case LHS run over the seven reviewed cross-phase
+inputs completed 64/64 cases with effective sample size 64, 56 residual degrees of freedom, full
+rank, condition number 1.6532, and no ties. Deorbit delta-v and specific impulse dominate
+propellant-use association; delta-v, specific impulse, and wet mass dominate reserve-margin
+association; reentry drag coefficient and deorbit delta-v dominate peak heat-rate and
+dynamic-pressure association. The largest observed absolute PRCC for entry-interface margin is
+0.2015; no practical-effect threshold is asserted. These are non-causal design-space associations,
+not Sobol indices or operational risk contributions. The integrated scope passes 901 tests with 11
+skipped, Ruff, strict MyPy across 121 source files, and sdist/wheel builds.
+
 Independent review hardened the campaign boundary before integration: non-authoritative evaluator
 labels now fail closed, resume verifies the definition, samples, cases, statistics, and regenerated
 deterministic sample plan, and a non-resume run refuses to overwrite existing evidence. Requirement
@@ -309,14 +320,15 @@ Post-MVP / external-campaign items:
 | reentry-suite | done | productize/verify | steward | `src/astro_reentry`, reentry CLI commands, `examples/reentry`, `tests/astro_reentry`, `docs/reentry.md` | Ballistic, prescribed-bank lifting, target-tracking guidance, aerothermal/load/margin products, local optimization, trajectory handoff, documentation, convergence checks, full local gates, packaging, review hardening, GitHub CI, and merged-main verification pass; PR #8 is merged at `3c73f8b`. |
 | mission-lifecycle | done | productize/verify | steward | `src/astro_mission`, `astro run-mission-lifecycle`, checked phase fixtures, lifecycle tests and docs | Connects launch, operations propagation, the integrated twin, deorbit, and reentry through suite-owned products; fails closed on continuity or phase gates; writes an ordered artifact manifest; passes focused, full, package, public-command, and GitHub CI gates; PR #9 is merged at `d37b9a6`. |
 | ai-native-uncertainty-surrogates | done | productize/verify | steward | `astro_uq`, `astro_surrogates`, campaign CLI, assistant campaign plans, checked lifecycle campaign, benchmark and validation docs | UQ campaigns v1, safe surrogate artifact contracts, deterministic assistant campaign plans, and separate machine-scoped timing profiles are implemented. Checked local J2 orbit and integrated-twin profiles have complete phase accounting but fail the preregistered 0.050-second median evaluator-cost gate. The hardened timing scope passes 888 tests, lint, type checking, and package builds; surrogate training/promotion remains deliberately stopped. |
+| lifecycle-sensitivity-attribution | done | productize/verify | steward | `astro_uq.sensitivity`, `astro analyze-campaign-sensitivity`, checked 64-case lifecycle campaign, sensitivity docs and tests | Produces digest-bound Spearman and PRCC association evidence for numeric metrics and signed requirement margins with sample-size, residual-DF, tie, weight, failure, and conditioning gates. The checked lifecycle campaign completes 64/64 cases and records bounded design-space attribution without causal, Sobol-index, operational-probability, or certification claims. |
 
 ## Next Best Paths
 
 1. Keep surrogate acceleration closed for the inexpensive local orbit and twin evaluators; reopen
    only for a measured optional teacher or future high-fidelity evaluator with materially larger
    absolute cost that survives simpler challengers.
-2. Expand cross-phase lifecycle uncertainty only through the typed `input_overrides` bundle; do not
-   patch generated insertion state or infer paths into phase artifacts.
+2. Add any new cross-phase lifecycle uncertainty only through the typed `input_overrides` bundle,
+   and require a specific decision target before broadening the seven-input attribution domain.
 3. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
 4. Choose any higher-authority reentry campaign deliberately and keep it separate from the local

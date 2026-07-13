@@ -40,17 +40,20 @@ from astro_uq.io import (
 from astro_uq.metrics import MetricError, MetricRegistry
 from astro_uq.models import (
     CampaignDefinition,
+    CampaignSensitivityReport,
     CampaignState,
     CampaignStatistics,
     CampaignTimingProfile,
     CaseObservation,
     OutcomeStatus,
+    ParameterRealization,
     TimingMachineMetadata,
     TimingRuntimeMetadata,
 )
 from astro_uq.parameters import ParameterBindingError, ParameterRegistry
 from astro_uq.profiling import summarize_case_timings
 from astro_uq.runner import CampaignRuntime, run_campaign
+from astro_uq.sensitivity import analyze_campaign_sensitivity
 from astro_uq.statistics import summarize_campaign
 
 SOFTWARE_COMPATIBILITY = {"astro-suite": "0.1.0", "campaign-runtime": "1.1"}
@@ -307,6 +310,9 @@ def profile_campaign_command(
                 definition,
                 software_compatibility=manifest["software_compatibility"],
             )
+            verified_manifest = json.loads(
+                (output_dir / CAMPAIGN_FILE).read_text(encoding="utf-8")
+            )
         if resume_state.state is not CampaignState.COMPLETED:
             raise CampaignIOError("only completed campaigns can be profiled")
         observations = tuple(
@@ -315,7 +321,7 @@ def profile_campaign_command(
         profile = CampaignTimingProfile(
             campaign_id=definition.campaign_id,
             definition_digest=resume_state.definition_digest,
-            cases_digest=str(manifest["cases_digest"]),
+            cases_digest=str(verified_manifest["cases_digest"]),
             claim_boundary=definition.evaluator.claim_boundary,
             software_compatibility={
                 str(key): str(value)
@@ -348,3 +354,56 @@ def _astro_version() -> str:
         return version("astro-suite")
     except PackageNotFoundError:
         return "unknown"
+
+
+def analyze_campaign_sensitivity_command(
+    output_dir: Annotated[Path, typer.Argument(exists=True, file_okay=False, readable=True)],
+    output: Annotated[Path, typer.Option("--output")],
+    metric: Annotated[list[str] | None, typer.Option("--metric")] = None,
+    requirement_margin: Annotated[
+        list[str] | None, typer.Option("--requirement-margin")
+    ] = None,
+) -> None:
+    """Attribute campaign metrics and requirement margins to declared parameters."""
+    campaign_id: str | None = None
+    try:
+        if output.resolve().is_relative_to(output_dir.resolve()):
+            raise CampaignIOError(
+                "sensitivity output must be outside the source campaign directory"
+            )
+        manifest = json.loads((output_dir / CAMPAIGN_FILE).read_text(encoding="utf-8"))
+        definition = CampaignDefinition.model_validate(manifest["definition"])
+        campaign_id = definition.campaign_id
+        store = CampaignArtifactStore(output_dir)
+        with store:
+            resume_state = store.resume(
+                definition,
+                software_compatibility=manifest["software_compatibility"],
+            )
+            verified_manifest = json.loads(
+                (output_dir / CAMPAIGN_FILE).read_text(encoding="utf-8")
+            )
+        if resume_state.state is not CampaignState.COMPLETED:
+            raise CampaignIOError("only completed campaigns can be analyzed for sensitivity")
+        report: CampaignSensitivityReport = analyze_campaign_sensitivity(
+            definition,
+            tuple(ParameterRealization.model_validate(sample) for sample in resume_state.samples),
+            tuple(CaseObservation.model_validate(case) for case in resume_state.cases),
+            metric_ids=tuple(metric or ()),
+            requirement_margin_ids=tuple(requirement_margin or ()),
+            definition_digest=resume_state.definition_digest,
+            samples_digest=str(verified_manifest["samples_digest"]),
+            cases_digest=str(verified_manifest["cases_digest"]),
+        )
+        atomic_write_json(output, report)
+    except (
+        KeyError,
+        ValueError,
+        TypeError,
+        OSError,
+        CampaignIOError,
+        json.JSONDecodeError,
+    ) as exc:
+        _error(f"could not analyze campaign sensitivity: {exc}", campaign_id=campaign_id)
+        raise typer.Exit(code=2) from exc
+    typer.echo(report.model_dump_json())
