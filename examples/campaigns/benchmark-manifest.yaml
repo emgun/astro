@@ -108,3 +108,16 @@ surrogate_selection:
     - The evaluator has a bounded, versioned input/output contract and validation domain.
     - Vectorization, caching, batching, or analytical simplification cannot remove the bottleneck more safely.
   kill_decision: Stop acceleration work if neither candidate dominates campaign cost after simpler fixes, or if neither can satisfy bounded-domain, OOD, fallback, and authoritative-replay gates.
+
+profiling_gate:
+  warmup_runs: 1
+  minimum_measured_cases: 5
+  candidate_campaign: examples/campaigns/profile_orbit_j2.yaml
+  challenger_campaign: examples/campaigns/profile_digital_twin.yaml
+  minimum_evaluation_share_of_instrumented_time: 0.8
+  minimum_median_evaluation_time_s: 0.05
+  proceed_only_if:
+    - Every measured case has complete setup, evaluation, metric-extraction, serialization, and total timing.
+    - The evaluator clears both the share and absolute-time thresholds on the recorded machine.
+    - A follow-up challenger shows vectorization, batching, caching, and analytical simplification cannot remove the cost more safely.
+  evidence_scope: machine_scoped

@@ -66,6 +66,7 @@ def test_callable_evaluator_records_each_timing_and_returns_result() -> None:
     assert outcome.timing.model_dump() == {
         "setup_s": 2.0,
         "evaluation_s": 5.0,
+        "metric_extraction_s": None,
         "serialization_s": 2.0,
         "total_s": 12.0,
     }

@@ -1,0 +1,42 @@
+schema_version: "1.0"
+campaign_id: profile-orbit-j2-v1
+workflow:
+  kind: orbit
+  scenario: ../scenarios/leo_j2.yaml
+uncertainty:
+  parameters:
+    - parameter_id: initial_position_x
+      target: orbit.initial_state.cartesian.position_x_km
+      unit: km
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 6999.0
+        high: 7001.0
+  correlations: []
+  model_variants: []
+sampler:
+  kind: latin_hypercube
+  samples: 7
+  seed: 7132026
+  scramble: true
+evaluator:
+  evaluator_id: local-orbit-j2-profile
+  kind: authoritative
+  workflow: orbit
+  implementation_version: local_j2_v1
+  backend: local
+  claim_boundary: machine_scoped_timing_not_operational_performance
+metrics:
+  - metric_id: final_altitude
+    extractor: orbit.final_altitude_km
+    value_kind: numeric
+    unit: km
+requirements: []
+stopping:
+  kind: fixed_count
+retention:
+  policy: none
+metadata:
+  purpose: surrogate_gate_timing_candidate
+  interpretation: machine_scoped_profiling_not_portable_performance

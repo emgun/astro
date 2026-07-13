@@ -290,12 +290,19 @@ class EvaluatorSpec(AstroModel):
 class EvaluationTiming(AstroModel):
     setup_s: FiniteFloat = Field(ge=0.0, default=0.0)
     evaluation_s: FiniteFloat = Field(ge=0.0, default=0.0)
+    metric_extraction_s: FiniteFloat | None = Field(ge=0.0, default=None)
     serialization_s: FiniteFloat = Field(ge=0.0, default=0.0)
     total_s: FiniteFloat = Field(ge=0.0, default=0.0)
 
     @model_validator(mode="after")
     def total_must_cover_components(self) -> EvaluationTiming:
-        if self.total_s + 1.0e-12 < self.setup_s + self.evaluation_s + self.serialization_s:
+        components = (
+            self.setup_s
+            + self.evaluation_s
+            + (self.metric_extraction_s or 0.0)
+            + self.serialization_s
+        )
+        if self.total_s + 1.0e-12 < components:
             raise ValueError("total evaluation time must cover component times")
         return self
 
@@ -401,6 +408,56 @@ class StatisticSummary(AstroModel):
     variance: FiniteFloat | None = Field(ge=0.0, default=None)
     standard_error: FiniteFloat | None = Field(ge=0.0, default=None)
     quantiles: dict[str, FiniteFloat] = Field(default_factory=dict)
+
+
+class TimingPhaseSummary(AstroModel):
+    count: int = Field(ge=0)
+    total_s: FiniteFloat = Field(ge=0.0)
+    mean_s: FiniteFloat = Field(ge=0.0)
+    median_s: FiniteFloat = Field(ge=0.0)
+    minimum_s: FiniteFloat = Field(ge=0.0)
+    maximum_s: FiniteFloat = Field(ge=0.0)
+    median_absolute_deviation_s: FiniteFloat = Field(ge=0.0)
+
+
+class CampaignTimingSummary(AstroModel):
+    case_count: int = Field(ge=0)
+    fully_instrumented_case_count: int = Field(ge=0)
+    setup: TimingPhaseSummary
+    evaluation: TimingPhaseSummary
+    metric_extraction: TimingPhaseSummary | None = None
+    serialization: TimingPhaseSummary
+    unattributed: TimingPhaseSummary
+    total: TimingPhaseSummary
+    evaluation_share_of_instrumented_time: FiniteFloat | None = Field(ge=0.0, le=1.0)
+    accounted_share_of_instrumented_time: FiniteFloat | None = Field(ge=0.0, le=1.0)
+
+
+class TimingMachineMetadata(AstroModel):
+    hostname: str = Field(min_length=1)
+    operating_system: str = Field(min_length=1)
+    operating_system_release: str = Field(min_length=1)
+    architecture: str = Field(min_length=1)
+    processor: str | None = None
+    logical_cpu_count: int | None = Field(gt=0, default=None)
+
+
+class TimingRuntimeMetadata(AstroModel):
+    python_version: str = Field(min_length=1)
+    astro_version: str = Field(min_length=1)
+
+
+class CampaignTimingProfile(AstroModel):
+    schema_version: SchemaVersion = "1.0"
+    campaign_id: str = Field(min_length=1)
+    definition_digest: str = Field(min_length=1)
+    cases_digest: str = Field(min_length=1)
+    claim_boundary: str = Field(min_length=1)
+    evidence_scope: Literal["machine_scoped"] = "machine_scoped"
+    software_compatibility: dict[str, str]
+    machine: TimingMachineMetadata
+    runtime: TimingRuntimeMetadata
+    timing: CampaignTimingSummary
 
 
 class CampaignStatistics(AstroModel):

@@ -5,9 +5,11 @@ import pytest
 
 from astro_uq.models import (
     CaseObservation,
+    EvaluationTiming,
     OutcomeStatus,
     RequirementOutcome,
 )
+from astro_uq.profiling import summarize_case_timings
 from astro_uq.statistics import effective_sample_size, summarize_campaign, wilson_interval
 
 
@@ -74,3 +76,100 @@ def test_wilson_interval_contains_observed_proportion() -> None:
 
 def test_effective_sample_size_for_equal_weights() -> None:
     assert effective_sample_size(np.ones(4)) == 4.0
+
+
+def test_timing_profile_accounts_for_every_instrumented_phase() -> None:
+    observations = tuple(
+        CaseObservation(
+            sample_id=sample_id,
+            outcome_status=OutcomeStatus.SUCCESS,
+            evaluator_id="fixture",
+            claim_boundary="machine_scoped_test",
+            evaluation_timing=EvaluationTiming(
+                setup_s=setup,
+                evaluation_s=evaluation,
+                metric_extraction_s=extraction,
+                serialization_s=serialization,
+                total_s=total,
+            ),
+        )
+        for sample_id, setup, evaluation, extraction, serialization, total in (
+            ("a", 1.0, 4.0, 1.0, 1.0, 8.0),
+            ("b", 1.0, 6.0, 1.0, 1.0, 10.0),
+        )
+    )
+
+    profile = summarize_case_timings(observations)
+
+    assert profile.case_count == 2
+    assert profile.fully_instrumented_case_count == 2
+    assert profile.evaluation.median_s == 5.0
+    assert profile.evaluation.median_absolute_deviation_s == 1.0
+    assert profile.unattributed.total_s == 2.0
+    assert profile.evaluation_share_of_instrumented_time == pytest.approx(10.0 / 18.0)
+    assert profile.accounted_share_of_instrumented_time == pytest.approx(16.0 / 18.0)
+
+
+def test_legacy_timing_remains_explicitly_uninstrumented() -> None:
+    observation = CaseObservation.model_validate(
+        {
+            "sample_id": "legacy",
+            "outcome_status": "success",
+            "evaluator_id": "fixture",
+            "claim_boundary": "legacy_test",
+            "evaluation_timing": {
+                "setup_s": 0.0,
+                "evaluation_s": 1.0,
+                "serialization_s": 0.0,
+                "total_s": 1.0,
+            },
+        }
+    )
+
+    profile = summarize_case_timings((observation,))
+
+    assert profile.fully_instrumented_case_count == 0
+    assert profile.metric_extraction is None
+    assert profile.evaluation_share_of_instrumented_time is None
+    assert profile.accounted_share_of_instrumented_time is None
+
+
+def test_untimed_case_remains_in_profile_completeness_denominator() -> None:
+    timed = CaseObservation(
+        sample_id="timed",
+        outcome_status=OutcomeStatus.SUCCESS,
+        evaluator_id="fixture",
+        claim_boundary="machine_scoped_test",
+        evaluation_timing=EvaluationTiming(
+            evaluation_s=1.0,
+            metric_extraction_s=0.1,
+            total_s=1.1,
+        ),
+    )
+    untimed = CaseObservation(
+        sample_id="untimed",
+        outcome_status=OutcomeStatus.SUCCESS,
+        evaluator_id="fixture",
+        claim_boundary="machine_scoped_test",
+    )
+
+    profile = summarize_case_timings((timed, untimed))
+
+    assert profile.case_count == 2
+    assert profile.fully_instrumented_case_count == 1
+    assert profile.evaluation.count == 1
+    assert profile.evaluation_share_of_instrumented_time is None
+    assert profile.accounted_share_of_instrumented_time is None
+
+
+def test_timing_profile_rejects_failed_cases() -> None:
+    failed = CaseObservation(
+        sample_id="failed",
+        outcome_status=OutcomeStatus.EXECUTION_FAILURE,
+        evaluator_id="fixture",
+        claim_boundary="machine_scoped_test",
+        evaluation_timing=EvaluationTiming(total_s=0.1, metric_extraction_s=0.0),
+    )
+
+    with pytest.raises(ValueError, match="every campaign case to succeed"):
+        summarize_case_timings((failed,))
