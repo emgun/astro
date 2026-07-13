@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 
 class AstroToolName(StrEnum):
@@ -9,6 +9,9 @@ class AstroToolName(StrEnum):
     SYNTH_MEASUREMENTS = "synth_measurements"
     EXPORT_MEASUREMENTS = "export_measurements"
     ESTIMATE_MEASUREMENTS = "estimate_measurements"
+    VALIDATE_CAMPAIGN = "validate_campaign"
+    RUN_CAMPAIGN = "run_campaign"
+    SUMMARIZE_CAMPAIGN = "summarize_campaign"
 
 
 class RiskLevel(StrEnum):
@@ -23,6 +26,34 @@ class ArtifactKind(StrEnum):
     MEASUREMENTS_TDM = "measurements_tdm"
     ESTIMATE_JSON = "estimate_json"
     TRACE_JSON = "trace_json"
+    CAMPAIGN_DEFINITION = "campaign_definition"
+    CAMPAIGN_RESULT = "campaign_result"
+    CAMPAIGN_SUMMARY = "campaign_summary"
+
+
+class _CampaignInputs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("*", mode="after")
+    @classmethod
+    def _reject_option_like_paths(cls, value: object) -> object:
+        if isinstance(value, str) and (value == "" or value.startswith("-") or "\x00" in value):
+            raise ValueError("path inputs must be non-empty and may not look like command options")
+        return value
+
+
+class ValidateCampaignInputs(_CampaignInputs):
+    definition_path: str
+
+
+class RunCampaignInputs(_CampaignInputs):
+    definition_path: str
+    output_dir: str
+    resume: StrictBool = False
+
+
+class SummarizeCampaignInputs(_CampaignInputs):
+    output_dir: str
 
 
 class WorkflowArtifact(BaseModel):

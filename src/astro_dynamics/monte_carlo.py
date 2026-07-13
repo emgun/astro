@@ -8,7 +8,6 @@ from pydantic import Field, FiniteFloat, field_validator
 
 from astro_core.models import (
     AstroModel,
-    CartesianState,
     OrbitState,
     Scenario,
     Trajectory,
@@ -18,6 +17,28 @@ from astro_core.models import (
     _numeric_sequence_input_must_be_numbers,
 )
 from astro_dynamics.backends import propagate_with_backend
+from astro_uq.adapters.orbit import orbit_parameter_registry
+from astro_uq.evaluators import AuthoritativeCallableEvaluator, evaluate_authoritatively
+from astro_uq.models import (
+    DistributionKind,
+    DistributionSpec,
+    OutcomeStatus,
+    ParameterRealization,
+    UncertainParameter,
+    UncertaintyKind,
+    UncertaintyModel,
+)
+
+_UQ_CAMPAIGN_KERNEL = "astro_uq.evaluators.evaluate_authoritatively"
+_UQ_CAMPAIGN_KERNEL_VERSION = "1.0"
+_CARTESIAN_PARAMETERS = (
+    ("position_x", "orbit.initial_state.cartesian.position_x_km", "km", 0),
+    ("position_y", "orbit.initial_state.cartesian.position_y_km", "km", 1),
+    ("position_z", "orbit.initial_state.cartesian.position_z_km", "km", 2),
+    ("velocity_x", "orbit.initial_state.cartesian.velocity_x_km_s", "km/s", 0),
+    ("velocity_y", "orbit.initial_state.cartesian.velocity_y_km_s", "km/s", 1),
+    ("velocity_z", "orbit.initial_state.cartesian.velocity_z_km_s", "km/s", 2),
+)
 
 
 class MonteCarloCase(AstroModel):
@@ -83,6 +104,60 @@ def _validate_inputs(
         raise ValueError("sigmas must be nonnegative")
 
 
+def _distribution(mean: float, sigma: float) -> DistributionSpec:
+    if sigma == 0.0:
+        return DistributionSpec(kind=DistributionKind.CONSTANT, value=mean)
+    return DistributionSpec(kind=DistributionKind.NORMAL, mean=mean, sigma=sigma)
+
+
+def _initial_state_uncertainty(
+    scenario: Scenario,
+    *,
+    position_sigma_km: float,
+    velocity_sigma_km_s: float,
+) -> UncertaintyModel:
+    position = scenario.initial_state.cartesian.position_km
+    velocity = scenario.initial_state.cartesian.velocity_km_s
+    parameters = []
+    for parameter_id, target, unit, index in _CARTESIAN_PARAMETERS:
+        is_position = parameter_id.startswith("position_")
+        mean = float(position[index] if is_position else velocity[index])
+        sigma = position_sigma_km if is_position else velocity_sigma_km_s
+        parameters.append(
+            UncertainParameter(
+                parameter_id=parameter_id,
+                target=target,
+                unit=unit,
+                uncertainty_kind=UncertaintyKind.ALEATORY,
+                distribution=_distribution(mean, sigma),
+            )
+        )
+    return UncertaintyModel(parameters=tuple(parameters))
+
+
+def _realization(
+    *,
+    case_index: int,
+    base_position: np.ndarray[tuple[int], np.dtype[np.float64]],
+    base_velocity: np.ndarray[tuple[int], np.dtype[np.float64]],
+    position_delta: np.ndarray[tuple[int], np.dtype[np.float64]],
+    velocity_delta: np.ndarray[tuple[int], np.dtype[np.float64]],
+) -> ParameterRealization:
+    position = base_position + position_delta
+    velocity = base_velocity + velocity_delta
+    values: dict[str, float | str] = {
+        parameter_id: float(
+            position[index] if parameter_id.startswith("position_") else velocity[index]
+        )
+        for parameter_id, _target, _unit, index in _CARTESIAN_PARAMETERS
+    }
+    return ParameterRealization(
+        sample_id=f"legacy-monte-carlo-{case_index}",
+        sample_index=case_index,
+        physical_values=values,
+    )
+
+
 def run_initial_state_monte_carlo(
     scenario: Scenario,
     *,
@@ -101,18 +176,45 @@ def run_initial_state_monte_carlo(
     rng = np.random.default_rng(seed)
     base_position = scenario.initial_state.cartesian.position_array()
     base_velocity = scenario.initial_state.cartesian.velocity_array()
+    uncertainty = _initial_state_uncertainty(
+        scenario,
+        position_sigma_km=position_sigma_km,
+        velocity_sigma_km_s=velocity_sigma_km_s,
+    )
+    parameters = orbit_parameter_registry()
+    evaluator = AuthoritativeCallableEvaluator[Scenario, Trajectory](
+        evaluator_id=f"orbit-propagation-{backend}",
+        evaluate_callable=lambda resolved: propagate_with_backend(resolved, backend),
+        serialize_callable=lambda _trajectory: (),
+    )
     monte_carlo_cases: list[MonteCarloCase] = []
 
     for case_index in range(cases):
         position_delta = rng.normal(0.0, position_sigma_km, size=3)
         velocity_delta = rng.normal(0.0, velocity_sigma_km_s, size=3)
-        cartesian = CartesianState(
-            position_km=_tuple3(base_position + position_delta),
-            velocity_km_s=_tuple3(base_velocity + velocity_delta),
+        realization = _realization(
+            case_index=case_index,
+            base_position=base_position,
+            base_velocity=base_velocity,
+            position_delta=position_delta,
+            velocity_delta=velocity_delta,
         )
-        initial_state = scenario.initial_state.model_copy(update={"cartesian": cartesian})
-        perturbed_scenario = scenario.model_copy(update={"initial_state": initial_state})
-        trajectory = propagate_with_backend(perturbed_scenario, backend)
+        resolved, scenario_evidence = parameters.apply(
+            workflow="orbit",
+            scenario=scenario,
+            uncertainty=uncertainty,
+            realization=realization,
+        )
+        perturbed_scenario = Scenario.model_validate(resolved)
+        outcome, trajectory = evaluate_authoritatively(
+            evaluator,
+            perturbed_scenario,
+            scenario_evidence,
+        )
+        if outcome.status is not OutcomeStatus.SUCCESS or trajectory is None:
+            detail = outcome.error_message or outcome.status.value
+            raise RuntimeError(f"Monte Carlo case {case_index} evaluation failed: {detail}")
+        initial_state = perturbed_scenario.initial_state
         monte_carlo_cases.append(
             MonteCarloCase(
                 case_index=case_index,
@@ -130,4 +232,8 @@ def run_initial_state_monte_carlo(
         position_sigma_km=position_sigma_km,
         velocity_sigma_km_s=velocity_sigma_km_s,
         cases=monte_carlo_cases,
+        metadata={
+            "uq_campaign_kernel": _UQ_CAMPAIGN_KERNEL,
+            "uq_campaign_kernel_version": _UQ_CAMPAIGN_KERNEL_VERSION,
+        },
     )

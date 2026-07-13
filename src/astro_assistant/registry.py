@@ -1,6 +1,13 @@
 from collections.abc import Callable
 
-from astro_assistant.models import AstroToolName, CommandSpec, WorkflowStep
+from astro_assistant.models import (
+    AstroToolName,
+    CommandSpec,
+    RunCampaignInputs,
+    SummarizeCampaignInputs,
+    ValidateCampaignInputs,
+    WorkflowStep,
+)
 
 
 def _required_str(step: WorkflowStep, key: str) -> str:
@@ -88,11 +95,51 @@ def _estimate_measurements(step: WorkflowStep, cwd: str | None) -> CommandSpec:
     )
 
 
+def _validate_campaign(step: WorkflowStep, cwd: str | None) -> CommandSpec:
+    inputs = ValidateCampaignInputs.model_validate(step.inputs)
+    return CommandSpec(
+        step_id=step.step_id,
+        argv=["astro", "validate-campaign", inputs.definition_path],
+        cwd=cwd,
+    )
+
+
+def _run_campaign(step: WorkflowStep, cwd: str | None) -> CommandSpec:
+    inputs = RunCampaignInputs.model_validate(step.inputs)
+    argv = [
+        "astro",
+        "run-campaign",
+        inputs.definition_path,
+        "--output-dir",
+        inputs.output_dir,
+    ]
+    if inputs.resume:
+        argv.append("--resume")
+    return CommandSpec(
+        step_id=step.step_id,
+        argv=argv,
+        cwd=cwd,
+        writes=[inputs.output_dir],
+    )
+
+
+def _summarize_campaign(step: WorkflowStep, cwd: str | None) -> CommandSpec:
+    inputs = SummarizeCampaignInputs.model_validate(step.inputs)
+    return CommandSpec(
+        step_id=step.step_id,
+        argv=["astro", "summarize-campaign", inputs.output_dir],
+        cwd=cwd,
+    )
+
+
 _BUILDERS: dict[AstroToolName, Callable[[WorkflowStep, str | None], CommandSpec]] = {
     AstroToolName.VALIDATE_SCENARIO: _validate_scenario,
     AstroToolName.SYNTH_MEASUREMENTS: _synth_measurements,
     AstroToolName.EXPORT_MEASUREMENTS: _export_measurements,
     AstroToolName.ESTIMATE_MEASUREMENTS: _estimate_measurements,
+    AstroToolName.VALIDATE_CAMPAIGN: _validate_campaign,
+    AstroToolName.RUN_CAMPAIGN: _run_campaign,
+    AstroToolName.SUMMARIZE_CAMPAIGN: _summarize_campaign,
 }
 
 

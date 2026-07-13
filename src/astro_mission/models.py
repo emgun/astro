@@ -54,6 +54,21 @@ class DeorbitPhaseConfig(AstroModel):
         return self
 
 
+class MissionLifecycleInputOverrides(AstroModel):
+    launch_upper_stage_thrust_n: FiniteFloat | None = Field(default=None, gt=0.0)
+    spacecraft_wet_mass_kg: FiniteFloat | None = Field(default=None, gt=0.0)
+    twin_solar_array_efficiency: FiniteFloat | None = Field(default=None, gt=0.0, le=1.0)
+    reentry_atmosphere_density_scale_factor: FiniteFloat | None = Field(
+        default=None,
+        gt=0.0,
+    )
+    reentry_vehicle_drag_coefficient: FiniteFloat | None = Field(
+        default=None,
+        gt=0.0,
+        le=10.0,
+    )
+
+
 class MissionLifecycleScenario(AstroModel):
     scenario_id: str = Field(min_length=1)
     description: str = ""
@@ -64,6 +79,7 @@ class MissionLifecycleScenario(AstroModel):
     deorbit: DeorbitPhaseConfig
     reentry_scenario: str = Field(min_length=1)
     reentry_backend: str = Field(min_length=1, default="local")
+    input_overrides: MissionLifecycleInputOverrides | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 

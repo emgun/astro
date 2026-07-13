@@ -37,7 +37,7 @@ from astro_reentry.handoff import trajectory_to_reentry_scenario
 from astro_reentry.io import load_reentry_scenario
 from astro_reentry.models import ReentryMarginStatus, ReentryResult, ReentryScenario
 from astro_twin.io import load_twin_scenario
-from astro_twin.models import DigitalTwinResult, TwinMarginStatus
+from astro_twin.models import DigitalTwinResult, DigitalTwinScenario, TwinMarginStatus
 from astro_twin.runner import run_digital_twin
 
 _STANDARD_GRAVITY_M_S2 = 9.80665
@@ -47,6 +47,7 @@ _MASS_CONTINUITY_TOLERANCE_KG = 1.0e-6
 
 def run_mission_lifecycle(scenario: MissionLifecycleScenario) -> MissionLifecycleResult:
     launch_scenario = load_launch_scenario(scenario.launch_scenario)
+    launch_scenario = _apply_launch_input_overrides(launch_scenario, scenario)
     launch = propagate_launch_with_backend(launch_scenario, scenario.launch_backend)
     launch_margins = _launch_margins(launch_scenario, launch)
     _require_no_failed_margins(launch_margins, "launch insertion")
@@ -65,6 +66,7 @@ def run_mission_lifecycle(scenario: MissionLifecycleScenario) -> MissionLifecycl
     operations = propagate_local(orbit_scenario)
 
     twin_scenario = load_twin_scenario(scenario.twin_scenario)
+    twin_scenario = _apply_twin_input_overrides(twin_scenario, scenario)
     twin_wet_mass_kg = float(
         twin_scenario.spacecraft.dry_mass_kg
         + twin_scenario.spacecraft.payload_mass_kg
@@ -74,7 +76,8 @@ def run_mission_lifecycle(scenario: MissionLifecycleScenario) -> MissionLifecycl
     if abs(twin_wet_mass_kg - orbit_mass_kg) > _MASS_CONTINUITY_TOLERANCE_KG:
         raise MissionLifecycleError(
             "digital twin wet mass does not match launch payload mass: "
-            f"{twin_wet_mass_kg:.6f} kg != {orbit_mass_kg:.6f} kg"
+            f"{twin_wet_mass_kg:.6f} kg != {orbit_mass_kg:.6f} kg",
+            lifecycle_phase="digital_twin",
         )
     twin = run_digital_twin(twin_scenario, trajectory_override=operations)
 
@@ -85,6 +88,7 @@ def run_mission_lifecycle(scenario: MissionLifecycleScenario) -> MissionLifecycl
         available_propellant_kg=float(twin_scenario.spacecraft.propellant_mass_kg),
     )
     reentry_template = load_reentry_scenario(scenario.reentry_scenario)
+    reentry_template = _apply_reentry_input_overrides(reentry_template, scenario)
     reentry_scenario = trajectory_to_reentry_scenario(
         deorbit,
         reentry_template,
@@ -142,6 +146,16 @@ def run_mission_lifecycle(scenario: MissionLifecycleScenario) -> MissionLifecycl
             **scenario.metadata,
             "phase_order": ["launch", "operations", "digital_twin", "deorbit", "reentry"],
             "propellant_used_kg": propellant_used_kg,
+            **(
+                {
+                    "resolved_input_overrides": scenario.input_overrides.model_dump(
+                        mode="json",
+                        exclude_none=True,
+                    )
+                }
+                if scenario.input_overrides is not None
+                else {}
+            ),
         },
         warnings=[
             "Mission lifecycle evidence is deterministic design screening, "
@@ -150,6 +164,63 @@ def run_mission_lifecycle(scenario: MissionLifecycleScenario) -> MissionLifecycl
             *reentry.warnings,
         ],
     )
+
+
+def _apply_launch_input_overrides(
+    launch_scenario: LaunchScenario,
+    lifecycle_scenario: MissionLifecycleScenario,
+) -> LaunchScenario:
+    overrides = lifecycle_scenario.input_overrides
+    if overrides is None:
+        return launch_scenario
+
+    resolved = launch_scenario.model_dump(mode="python")
+    if overrides.launch_upper_stage_thrust_n is not None:
+        resolved["vehicle"]["stages"][-1]["engine"]["thrust_n"] = (
+            overrides.launch_upper_stage_thrust_n
+        )
+    if overrides.spacecraft_wet_mass_kg is not None:
+        resolved["vehicle"]["payload_mass_kg"] = overrides.spacecraft_wet_mass_kg
+    return LaunchScenario.model_validate(resolved)
+
+
+def _apply_twin_input_overrides(
+    twin_scenario: DigitalTwinScenario,
+    lifecycle_scenario: MissionLifecycleScenario,
+) -> DigitalTwinScenario:
+    overrides = lifecycle_scenario.input_overrides
+    if overrides is None:
+        return twin_scenario
+
+    resolved = twin_scenario.model_dump(mode="python")
+    if overrides.spacecraft_wet_mass_kg is not None:
+        dry_payload_mass_kg = float(
+            twin_scenario.spacecraft.dry_mass_kg + twin_scenario.spacecraft.payload_mass_kg
+        )
+        resolved["spacecraft"]["propellant_mass_kg"] = (
+            float(overrides.spacecraft_wet_mass_kg) - dry_payload_mass_kg
+        )
+    if overrides.twin_solar_array_efficiency is not None:
+        resolved["power"]["solar_array_efficiency"] = overrides.twin_solar_array_efficiency
+    return DigitalTwinScenario.model_validate(resolved)
+
+
+def _apply_reentry_input_overrides(
+    reentry_scenario: ReentryScenario,
+    lifecycle_scenario: MissionLifecycleScenario,
+) -> ReentryScenario:
+    overrides = lifecycle_scenario.input_overrides
+    if overrides is None:
+        return reentry_scenario
+
+    resolved = reentry_scenario.model_dump(mode="python")
+    if overrides.reentry_atmosphere_density_scale_factor is not None:
+        resolved["atmosphere"]["density_scale_factor"] = (
+            overrides.reentry_atmosphere_density_scale_factor
+        )
+    if overrides.reentry_vehicle_drag_coefficient is not None:
+        resolved["vehicle"]["drag_coefficient"] = overrides.reentry_vehicle_drag_coefficient
+    return ReentryScenario.model_validate(resolved)
 
 
 def _launch_margins(
@@ -235,7 +306,8 @@ def _run_deorbit(
         raise MissionLifecycleError(
             "deorbit burn violates propellant reserve: "
             f"{reserve_kg:.6f} kg available after burn, "
-            f"{float(scenario.deorbit.minimum_propellant_reserve_kg):.6f} kg required"
+            f"{float(scenario.deorbit.minimum_propellant_reserve_kg):.6f} kg required",
+            lifecycle_phase="deorbit",
         )
     deorbit_scenario = Scenario(
         scenario_id=f"{scenario.scenario_id}-deorbit",
@@ -265,7 +337,8 @@ def _run_deorbit(
     ):
         raise MissionLifecycleError(
             "deorbit coast crossed entry interface outside tolerance: "
-            f"{interface_altitude_km:.6f} km"
+            f"{interface_altitude_km:.6f} km",
+            lifecycle_phase="deorbit",
         )
     deorbit = full_coast.model_copy(
         update={
@@ -296,7 +369,8 @@ def _entry_interface_index(trajectory: Trajectory, interface_altitude_km: float)
         ):
             return index
     raise MissionLifecycleError(
-        f"deorbit coast did not reach descending {interface_altitude_km:.3f} km entry interface"
+        f"deorbit coast did not reach descending {interface_altitude_km:.3f} km entry interface",
+        lifecycle_phase="deorbit",
     )
 
 
@@ -613,7 +687,10 @@ def _severity(status: LifecycleStatus) -> int:
 def _require_no_failed_margins(margins: tuple[MissionLifecycleMargin, ...], label: str) -> None:
     failed = [margin.name for margin in margins if margin.status == LifecycleStatus.FAIL]
     if failed:
-        raise MissionLifecycleError(f"{label} failed: {', '.join(failed)}")
+        raise MissionLifecycleError(
+            f"{label} failed: {', '.join(failed)}",
+            lifecycle_phase="launch",
+        )
 
 
 def _altitude_km(position_km: Vector3) -> float:

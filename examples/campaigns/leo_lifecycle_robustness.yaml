@@ -1,0 +1,140 @@
+schema_version: "1.0"
+campaign_id: leo-lifecycle-robustness-v1
+workflow:
+  kind: mission_lifecycle
+  scenario: examples/lifecycle/leo_round_trip.yaml
+uncertainty:
+  parameters:
+    - parameter_id: launch_upper_stage_thrust
+      target: lifecycle.launch.upper_stage_thrust_n
+      unit: N
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 199800.0
+        high: 200200.0
+    - parameter_id: spacecraft_wet_mass
+      target: lifecycle.spacecraft.wet_mass_kg
+      unit: kg
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 499.0
+        high: 501.0
+    - parameter_id: solar_array_efficiency
+      target: lifecycle.digital_twin.power.solar_array_efficiency
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.285
+        high: 0.295
+    - parameter_id: reentry_density_scale
+      target: lifecycle.reentry.atmosphere.density_scale_factor
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.98
+        high: 1.02
+    - parameter_id: reentry_drag_coefficient
+      target: lifecycle.reentry.vehicle.drag_coefficient
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 1.47
+        high: 1.53
+    - parameter_id: deorbit_delta_v
+      target: lifecycle.deorbit.delta_v_km_s
+      unit: km/s
+      uncertainty_kind: epistemic
+      distribution:
+        kind: triangular
+        low: 0.19
+        mode: 0.20
+        high: 0.21
+    - parameter_id: deorbit_specific_impulse
+      target: lifecycle.deorbit.specific_impulse_s
+      unit: s
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 290.0
+        high: 310.0
+  correlations: []
+  model_variants: []
+sampler:
+  kind: latin_hypercube
+  samples: 8
+  seed: 7122026
+  scramble: true
+evaluator:
+  evaluator_id: local-lifecycle
+  kind: authoritative
+  workflow: mission_lifecycle
+  implementation_version: mission_lifecycle_v1
+  backend: local
+  claim_boundary: deterministic_design_screening_not_operational_probability
+metrics:
+  - metric_id: mission_passed
+    extractor: lifecycle.passed
+    value_kind: boolean
+  - metric_id: all_phases_completed
+    extractor: lifecycle.all_phases_completed
+    value_kind: boolean
+  - metric_id: twin_limiting_margin
+    extractor: lifecycle.twin_limiting_margin
+    value_kind: numeric
+    unit: native
+  - metric_id: twin_limiting_status
+    extractor: lifecycle.twin_limiting_status
+    value_kind: category
+  - metric_id: deorbit_propellant_used
+    extractor: lifecycle.deorbit_propellant_used_kg
+    value_kind: numeric
+    unit: kg
+  - metric_id: propellant_reserve_margin
+    extractor: lifecycle.propellant_reserve_margin_kg
+    value_kind: numeric
+    unit: kg
+  - metric_id: entry_interface_margin
+    extractor: lifecycle.entry_interface_margin_km
+    value_kind: numeric
+    unit: km
+  - metric_id: reentry_peak_heat_rate
+    extractor: lifecycle.reentry_peak_heat_rate_w_m2
+    value_kind: numeric
+    unit: W/m^2
+  - metric_id: reentry_peak_dynamic_pressure
+    extractor: lifecycle.reentry_peak_dynamic_pressure_pa
+    value_kind: numeric
+    unit: Pa
+  - metric_id: reentry_peak_deceleration
+    extractor: lifecycle.reentry_peak_deceleration_g
+    value_kind: numeric
+    unit: g
+  - metric_id: reentry_total_heat_load
+    extractor: lifecycle.reentry_total_heat_load_j_m2
+    value_kind: numeric
+    unit: J/m^2
+  - metric_id: reentry_target_miss
+    extractor: lifecycle.reentry_target_miss_km
+    value_kind: numeric
+    unit: km
+requirements:
+  - requirement_id: lifecycle_success
+    metric_id: mission_passed
+    operator: is_true
+  - requirement_id: propellant_reserve
+    metric_id: propellant_reserve_margin
+    operator: ge
+    value: 0.0
+stopping:
+  kind: fixed_count
+retention:
+  policy: failures_and_boundaries
+  boundary_tolerance: 0.05
+metadata:
+  uncertainty_scope: reviewed_cross_phase_epistemic_design_inputs
+  interpretation: epistemic_design_robustness_not_frequency_probability
