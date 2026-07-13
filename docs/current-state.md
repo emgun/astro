@@ -107,12 +107,25 @@ Only observed link and propellant-fraction margins varied under the existing sev
 margin's largest observed absolute PRCC values were launch thrust `-0.9965` and wet mass `+0.8913`,
 but its full target range was only `0.0035 dB` and no practical-effect threshold was evaluated. Wet
 mass had PRCC `+1.0000` with propellant-fraction margin. Constant battery, thermal, ADCS, rollup,
-and contact
-targets were excluded from attribution rather than assigned artificial ranks. These remain local
+and contact targets were excluded from attribution rather than assigned artificial ranks. These
+remain local
 configured-design-space associations, not causal, operational-reliability, coverage-authority, or
 certification claims.
 The completed implementation passes 903 tests with 11 skipped, Ruff, strict MyPy across 121 source
 files, and sdist/wheel builds.
+
+Lifecycle Power/Thermal Input Pack adds typed solar-array area, battery-capacity, and named
+thermal-node overrides alongside the existing efficiency input. A separate checked 64-case LHS
+campaign over five inputs completed 64/64 cases with all four declared requirements passing,
+effective sample size 64, 58 residual degrees of freedom, rank 5, and condition number 1.3968. Bus
+hot-margin PRCC was `-0.9779` for internal-heat fraction and `+0.9723` for emissivity. Battery-SOC
+margin had 26 unique values, tie fraction `0.5938`, and largest observed PRCC `+0.7404` for array
+area; smaller coefficients are not promoted because the target plateaus at initial SOC and array
+area interacts multiplicatively with efficiency. The checked window is only 600 seconds and
+sunlit, with no load shedding or battery-thermal feedback, so this is preliminary sizing evidence,
+not full-orbit energy balance, EPS reliability, or thermal certification.
+The integrated implementation passes 910 tests with 11 skipped, Ruff, strict MyPy across 121
+source files, and sdist/wheel builds.
 
 Independent review hardened the campaign boundary before integration: non-authoritative evaluator
 labels now fail closed, resume verifies the definition, samples, cases, statistics, and regenerated
@@ -337,15 +350,16 @@ Post-MVP / external-campaign items:
 | ai-native-uncertainty-surrogates | done | productize/verify | steward | `astro_uq`, `astro_surrogates`, campaign CLI, assistant campaign plans, checked lifecycle campaign, benchmark and validation docs | UQ campaigns v1, safe surrogate artifact contracts, deterministic assistant campaign plans, and separate machine-scoped timing profiles are implemented. Checked local J2 orbit and integrated-twin profiles have complete phase accounting but fail the preregistered 0.050-second median evaluator-cost gate. The hardened timing scope passes 888 tests, lint, type checking, and package builds; surrogate training/promotion remains deliberately stopped. |
 | lifecycle-sensitivity-attribution | done | productize/verify | steward | `astro_uq.sensitivity`, `astro analyze-campaign-sensitivity`, checked 64-case lifecycle campaign, sensitivity docs and tests | Produces digest-bound Spearman and PRCC association evidence for numeric metrics and signed requirement margins with sample-size, residual-DF, tie, weight, failure, and conditioning gates. The checked lifecycle campaign completes 64/64 cases and records bounded design-space attribution without causal, Sobol-index, operational-probability, or certification claims. |
 | lifecycle-subsystem-margin-targets | done | productize/verify | steward | lifecycle UQ adapter, checked lifecycle campaigns, subsystem requirement tests and docs | Exposes unit-stable battery, thermal-envelope, ADCS, worst-observed-link, propellant-fraction, and mass-budget margins plus contact metrics through lifecycle campaigns. The checked 64-case run passes every subsystem requirement and attributes only the two nonconstant targets, preserving practical-effect, no-contact, constant-target, and coverage claim boundaries. |
+| lifecycle-power-thermal-inputs | done | productize/verify | steward | typed lifecycle overrides, dynamic named-node bindings and metrics, checked five-input campaign, tests and docs | Screens solar-array, battery-capacity, and bus thermal design inputs against battery-SOC and separate hot/cold margins. The checked campaign records the battery tie warning and short-sunlit-window boundary instead of claiming full-orbit EPS or thermal authority. |
 
 ## Next Best Paths
 
 1. Keep surrogate acceleration closed for the inexpensive local orbit and twin evaluators; reopen
    only for a measured optional teacher or future high-fidelity evaluator with materially larger
    absolute cost that survives simpler challengers.
-2. Choose one subsystem decision before expanding lifecycle uncertainty. The highest-signal next
-   candidate is a typed power/thermal input pack tied to battery-SOC and thermal-envelope margins;
-   ADCS and link inputs should remain separate so each campaign has a clear decision boundary.
+2. Do not promote lifecycle battery evidence until a full-orbit twin campaign includes eclipse
+   exposure and explicit energy-balance review. Keep any ADCS or link uncertainty in separate
+   decision campaigns with mechanism-specific inputs and targets.
 3. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
 4. Choose any higher-authority reentry campaign deliberately and keep it separate from the local

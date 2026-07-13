@@ -3,10 +3,15 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 from typer.testing import CliRunner
 
 from astro_cli.main import app
+from astro_mission.io import load_mission_lifecycle_scenario
+from astro_mission.runner import resolve_lifecycle_twin_scenario
+from astro_twin.io import load_twin_scenario
+from astro_uq.parameters import model_digest
 
 runner = CliRunner()
 
@@ -253,6 +258,84 @@ def test_sensitivity_output_cannot_overwrite_campaign_evidence(tmp_path: Path) -
     assert analyzed.exit_code == 2
     assert "outside the source campaign directory" in analyzed.output
     assert integrity_check.exit_code == 0
+
+
+def test_checked_power_thermal_campaign_binds_dependency_and_sensitivity(
+    tmp_path: Path,
+) -> None:
+    lifecycle_path = tmp_path / "lifecycle.yaml"
+    lifecycle_payload = yaml.safe_load(
+        Path("examples/lifecycle/leo_round_trip.yaml").read_text()
+    )
+    lifecycle_payload["twin_scenario"] = str(
+        Path("examples/twin/lifecycle_observer.yaml").resolve()
+    )
+    lifecycle_path.write_text(yaml.safe_dump(lifecycle_payload, sort_keys=False))
+    definition = tmp_path / "power-thermal.yaml"
+    definition_payload = yaml.safe_load(
+        Path("examples/campaigns/leo_lifecycle_power_thermal.yaml").read_text()
+    )
+    definition_payload["workflow"]["scenario"] = str(lifecycle_path)
+    definition.write_text(yaml.safe_dump(definition_payload, sort_keys=False))
+    output = tmp_path / "power-thermal"
+    report_path = tmp_path / "power-thermal-sensitivity.json"
+
+    run = runner.invoke(
+        app,
+        ["run-campaign", str(definition), "--output-dir", str(output), "--workers", "2"],
+    )
+    analyzed = runner.invoke(
+        app,
+        [
+            "analyze-campaign-sensitivity",
+            str(output),
+            "--requirement-margin",
+            "battery_soc",
+            "--requirement-margin",
+            "bus_hot",
+            "--output",
+            str(report_path),
+        ],
+    )
+
+    assert run.exit_code == 0, run.output
+    assert analyzed.exit_code == 0, analyzed.output
+    manifest = json.loads((output / "campaign.json").read_text())
+    dependency = manifest["definition"]["metadata"]["resolved_dependencies"]
+    lifecycle_scenario = load_mission_lifecycle_scenario(lifecycle_path)
+    twin_scenario = load_twin_scenario(dependency["twin_scenario"])
+    assert dependency["twin_scenario"] == lifecycle_payload["twin_scenario"]
+    assert dependency["twin_template_digest"] == model_digest(twin_scenario)
+    assert dependency["resolved_twin_scenario_digest"] == model_digest(
+        resolve_lifecycle_twin_scenario(twin_scenario, lifecycle_scenario)
+    )
+    assert len((output / "cases.jsonl").read_text().splitlines()) == 64
+    report = json.loads(report_path.read_text())
+    targets = {target["target_id"]: target for target in report["targets"]}
+    assert targets["battery_soc"]["target_unique_count"] == 26
+    assert targets["battery_soc"]["target_tie_fraction"] == pytest.approx(0.59375)
+    assert (
+        targets["battery_soc"]["largest_absolute_prcc_parameter_id"]
+        == "solar_array_area"
+    )
+    assert (
+        targets["bus_hot"]["largest_absolute_prcc_parameter_id"]
+        == "bus_internal_heat_fraction"
+    )
+    lifecycle_payload["input_overrides"] = {"spacecraft_wet_mass_kg": 501.0}
+    lifecycle_path.write_text(yaml.safe_dump(lifecycle_payload, sort_keys=False))
+    resumed = runner.invoke(
+        app,
+        [
+            "run-campaign",
+            str(definition),
+            "--output-dir",
+            str(output),
+            "--resume",
+        ],
+    )
+    assert resumed.exit_code == 2
+    assert "campaign definition digest is incompatible with resume" in resumed.output
 
 
 def test_run_campaign_dry_run_and_max_cases_do_not_write_evidence(tmp_path: Path) -> None:

@@ -1,0 +1,102 @@
+schema_version: "1.0"
+campaign_id: leo-lifecycle-power-thermal-v1
+workflow:
+  kind: mission_lifecycle
+  scenario: ../lifecycle/leo_round_trip.yaml
+uncertainty:
+  parameters:
+    - parameter_id: solar_array_area
+      target: lifecycle.digital_twin.power.solar_array_area_m2
+      unit: m^2
+      uncertainty_kind: epistemic
+      distribution:
+        kind: triangular
+        low: 0.4
+        mode: 0.8
+        high: 2.4
+    - parameter_id: solar_array_efficiency
+      target: lifecycle.digital_twin.power.solar_array_efficiency
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.20
+        high: 0.30
+    - parameter_id: battery_capacity
+      target: lifecycle.digital_twin.power.battery_capacity_wh
+      unit: Wh
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 800.0
+        high: 1600.0
+    - parameter_id: bus_emissivity
+      target: lifecycle.digital_twin.thermal_nodes.bus.emissivity
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.70
+        high: 0.86
+    - parameter_id: bus_internal_heat_fraction
+      target: lifecycle.digital_twin.thermal_nodes.bus.internal_heat_fraction
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.35
+        high: 0.55
+  correlations: []
+  model_variants: []
+sampler:
+  kind: latin_hypercube
+  samples: 64
+  seed: 7142026
+  scramble: true
+evaluator:
+  evaluator_id: local-lifecycle-power-thermal
+  kind: authoritative
+  workflow: mission_lifecycle
+  implementation_version: mission_lifecycle_v1
+  backend: local
+  claim_boundary: configured_power_thermal_design_screening_not_reliability_or_certification
+metrics:
+  - metric_id: mission_passed
+    extractor: lifecycle.passed
+    value_kind: boolean
+  - metric_id: battery_soc_margin
+    extractor: lifecycle.twin_battery_soc_margin_fraction
+    value_kind: numeric
+    unit: "1"
+  - metric_id: bus_cold_margin
+    extractor: lifecycle.twin_thermal_nodes.bus.cold_margin_k
+    value_kind: numeric
+    unit: K
+  - metric_id: bus_hot_margin
+    extractor: lifecycle.twin_thermal_nodes.bus.hot_margin_k
+    value_kind: numeric
+    unit: K
+requirements:
+  - requirement_id: mission_success
+    metric_id: mission_passed
+    operator: is_true
+  - requirement_id: battery_soc
+    metric_id: battery_soc_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: bus_cold
+    metric_id: bus_cold_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: bus_hot
+    metric_id: bus_hot_margin
+    operator: ge
+    value: 0.0
+stopping:
+  kind: fixed_count
+retention:
+  policy: none
+metadata:
+  uncertainty_scope: preliminary_solar_array_downsizing_battery_and_bus_thermal_inputs
+  purpose: power_thermal_margin_sensitivity_screening
+  interpretation: configured_design_space_association_not_causal_reliability_or_certification

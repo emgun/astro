@@ -54,10 +54,27 @@ class DeorbitPhaseConfig(AstroModel):
         return self
 
 
+class TwinThermalNodeInputOverride(AstroModel):
+    node_name: str = Field(min_length=1)
+    emissivity: FiniteFloat | None = Field(default=None, gt=0.0, le=1.0)
+    internal_heat_fraction: FiniteFloat | None = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def at_least_one_field_must_be_set(self) -> TwinThermalNodeInputOverride:
+        if self.emissivity is None and self.internal_heat_fraction is None:
+            raise ValueError("thermal node override must set at least one field")
+        return self
+
+
 class MissionLifecycleInputOverrides(AstroModel):
     launch_upper_stage_thrust_n: FiniteFloat | None = Field(default=None, gt=0.0)
     spacecraft_wet_mass_kg: FiniteFloat | None = Field(default=None, gt=0.0)
     twin_solar_array_efficiency: FiniteFloat | None = Field(default=None, gt=0.0, le=1.0)
+    twin_solar_array_area_m2: FiniteFloat | None = Field(default=None, gt=0.0)
+    twin_battery_capacity_wh: FiniteFloat | None = Field(default=None, gt=0.0)
+    twin_thermal_node_overrides: tuple[TwinThermalNodeInputOverride, ...] = Field(
+        default_factory=tuple
+    )
     reentry_atmosphere_density_scale_factor: FiniteFloat | None = Field(
         default=None,
         gt=0.0,
@@ -67,6 +84,13 @@ class MissionLifecycleInputOverrides(AstroModel):
         gt=0.0,
         le=10.0,
     )
+
+    @model_validator(mode="after")
+    def thermal_node_overrides_must_be_unique(self) -> MissionLifecycleInputOverrides:
+        names = [override.node_name for override in self.twin_thermal_node_overrides]
+        if len(set(names)) != len(names):
+            raise ValueError("thermal node overrides must use unique node names")
+        return self
 
 
 class MissionLifecycleScenario(AstroModel):

@@ -7,7 +7,11 @@ from astro_core.models import Trajectory
 from astro_launch.models import LaunchScenario, LaunchTrajectory
 from astro_mission.errors import MissionLifecycleError
 from astro_mission.io import load_mission_lifecycle_scenario
-from astro_mission.models import DeorbitPhaseConfig, MissionLifecycleInputOverrides
+from astro_mission.models import (
+    DeorbitPhaseConfig,
+    MissionLifecycleInputOverrides,
+    TwinThermalNodeInputOverride,
+)
 from astro_mission.runner import run_mission_lifecycle
 from astro_reentry.models import ReentryResult, ReentryScenario
 from astro_twin.io import load_twin_scenario
@@ -47,6 +51,15 @@ def test_lifecycle_applies_validated_input_overrides_with_mass_continuity(
                 launch_upper_stage_thrust_n=200_000.0,
                 spacecraft_wet_mass_kg=510.0,
                 twin_solar_array_efficiency=0.3,
+                twin_solar_array_area_m2=1.2,
+                twin_battery_capacity_wh=1000.0,
+                twin_thermal_node_overrides=(
+                    TwinThermalNodeInputOverride(
+                        node_name="bus",
+                        emissivity=0.82,
+                        internal_heat_fraction=0.5,
+                    ),
+                ),
                 reentry_atmosphere_density_scale_factor=1.1,
                 reentry_vehicle_drag_coefficient=1.6,
             )
@@ -88,6 +101,11 @@ def test_lifecycle_applies_validated_input_overrides_with_mass_continuity(
     assert launch.vehicle.stages[-1].engine.thrust_n == 200_000.0
     assert launch.vehicle.payload_mass_kg == 510.0
     assert twin.power.solar_array_efficiency == 0.3
+    assert twin.power.solar_array_area_m2 == 1.2
+    assert twin.power.battery_capacity_wh == 1000.0
+    assert twin.thermal_nodes[0].name == "bus"
+    assert twin.thermal_nodes[0].emissivity == 0.82
+    assert twin.thermal_nodes[0].internal_heat_fraction == 0.5
     assert (
         twin.spacecraft.dry_mass_kg
         + twin.spacecraft.payload_mass_kg
@@ -106,9 +124,61 @@ def test_lifecycle_applies_validated_input_overrides_with_mass_continuity(
         "launch_upper_stage_thrust_n": 200_000.0,
         "spacecraft_wet_mass_kg": 510.0,
         "twin_solar_array_efficiency": 0.3,
+        "twin_solar_array_area_m2": 1.2,
+        "twin_battery_capacity_wh": 1000.0,
+        "twin_thermal_node_overrides": [
+            {
+                "node_name": "bus",
+                "emissivity": 0.82,
+                "internal_heat_fraction": 0.5,
+            }
+        ],
         "reentry_atmosphere_density_scale_factor": 1.1,
         "reentry_vehicle_drag_coefficient": 1.6,
     }
+
+
+def test_lifecycle_rejects_missing_thermal_override_node() -> None:
+    scenario = load_mission_lifecycle_scenario("examples/lifecycle/leo_round_trip.yaml")
+    scenario = scenario.model_copy(
+        update={
+            "input_overrides": MissionLifecycleInputOverrides(
+                twin_thermal_node_overrides=(
+                    TwinThermalNodeInputOverride(node_name="missing", emissivity=0.8),
+                )
+            )
+        }
+    )
+
+    with pytest.raises(MissionLifecycleError, match="missing node") as exc_info:
+        run_mission_lifecycle(scenario)
+    assert exc_info.value.lifecycle_phase == "digital_twin"
+
+
+def test_lifecycle_thermal_override_requires_values_and_unique_names() -> None:
+    with pytest.raises(ValueError, match="at least one field"):
+        TwinThermalNodeInputOverride(node_name="bus")
+
+    override = TwinThermalNodeInputOverride(node_name="bus", emissivity=0.8)
+    with pytest.raises(ValueError, match="unique node names"):
+        MissionLifecycleInputOverrides(
+            twin_thermal_node_overrides=(override, override)
+        )
+
+
+def test_lifecycle_invalid_resolved_twin_records_digital_twin_phase() -> None:
+    scenario = load_mission_lifecycle_scenario("examples/lifecycle/leo_round_trip.yaml")
+    scenario = scenario.model_copy(
+        update={
+            "input_overrides": MissionLifecycleInputOverrides(
+                spacecraft_wet_mass_kg=400.0
+            )
+        }
+    )
+
+    with pytest.raises(MissionLifecycleError, match="resolved digital twin") as exc_info:
+        run_mission_lifecycle(scenario)
+    assert exc_info.value.lifecycle_phase == "digital_twin"
 
 
 def test_lifecycle_fails_closed_when_launch_misses_declared_insertion() -> None:

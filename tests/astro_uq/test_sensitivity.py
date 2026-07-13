@@ -295,6 +295,24 @@ def test_checked_lifecycle_sensitivity_campaign_has_sufficient_design() -> None:
     } <= {requirement.requirement_id for requirement in definition.requirements}
 
 
+def test_checked_power_thermal_campaign_has_bounded_design() -> None:
+    definition = load_campaign_definition(
+        "examples/campaigns/leo_lifecycle_power_thermal.yaml"
+    )
+    parameter_count = len(definition.uncertainty.parameters)
+
+    assert parameter_count == 5
+    assert definition.sampler.kind is SamplerKind.LATIN_HYPERCUBE
+    assert definition.sampler.samples >= max(30, 5 * (parameter_count + 1))
+    assert definition.retention.policy.value == "none"
+    assert {requirement.requirement_id for requirement in definition.requirements} == {
+        "mission_success",
+        "battery_soc",
+        "bus_cold",
+        "bus_hot",
+    }
+
+
 def test_prcc_matches_independent_tied_confounding_oracle() -> None:
     count = 40
     rng = np.random.default_rng(123)

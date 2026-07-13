@@ -83,3 +83,22 @@ attributed.
 These coefficients apply only to the declared ranges, models, sampler, and local deterministic
 lifecycle workflow. They are not causal contributions, portable variance fractions, operational
 probabilities, mission assurance, or certification evidence.
+
+## Checked Power And Thermal Evidence
+
+`examples/campaigns/leo_lifecycle_power_thermal.yaml` is a separate 64-case LHS sizing screen over
+five power and bus-thermal inputs. It completed 64/64 cases with all mission, battery-SOC, bus-cold,
+and bus-hot requirements passing. Effective sample size was 64, residual degrees of freedom 58,
+rank was 5, and ranked-design condition number was 1.3968.
+
+| Target | Largest observed absolute PRCC values | Interpretation |
+| --- | --- | --- |
+| Battery-SOC margin | array area `+0.7404` | Array area has the largest observed association, but the target has only 26 unique values and tie fraction `0.5938`. Thermal inputs have no path into the power model, so their nonzero coefficients are treated as negative-control estimator leakage; area and efficiency also interact multiplicatively, which PRCC does not decompose. |
+| Bus hot margin | internal-heat fraction `-0.9779`; emissivity `+0.9723` | Greater allocated internal heat reduces hot margin, while greater emissivity increases it in the configured lumped-node model. |
+| Bus cold margin | constant `20.0 K` | The trajectory only heats this node, so cold margin is requirement evidence but not a valid sensitivity target. |
+
+The lifecycle operations window is only 600 seconds and remains sunlit in the checked fixture.
+Battery capacity represents normalized depletion buffering; the model has no load shedding,
+unmet-load state, or thermal feedback from battery depletion. These results are preliminary sizing
+associations, not full-orbit energy balance, EPS reliability, thermal qualification, or causal
+contributions.
