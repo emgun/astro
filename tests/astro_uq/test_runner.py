@@ -150,6 +150,21 @@ def _runtime_with_serializer(calls: list[float]) -> CampaignRuntime:
     )
 
 
+def _runtime_with_failing_serializer() -> CampaignRuntime:
+    runtime = _runtime()
+
+    def serialize(_result: AstroModel) -> tuple[str, ...]:
+        raise OSError("artifact write failed")
+
+    return CampaignRuntime(
+        scenario=runtime.scenario,
+        parameters=runtime.parameters,
+        metrics=runtime.metrics,
+        evaluate=runtime.evaluate,
+        serialize=serialize,
+    )
+
+
 def _interrupting_runtime(*, after: int) -> CampaignRuntime:
     runtime = _runtime()
     calls = 0
@@ -276,6 +291,33 @@ def test_runner_applies_success_artifact_retention_policy(
     ]
     assert len(calls) == expected_serialized
     assert sum(bool(case.artifact_refs) for case in cases) == expected_serialized
+    assert all(case.evaluation_timing is not None for case in cases)
+    assert all(
+        case.evaluation_timing.metric_extraction_s is not None
+        for case in cases
+        if case.evaluation_timing is not None
+    )
+
+
+def test_serialization_failure_preserves_prior_phase_timing(tmp_path: Path) -> None:
+    definition = _definition(samples=1).model_copy(
+        update={"retention": RetentionSpec(policy=RetentionPolicy.ALL)}
+    )
+    output = tmp_path / "serialization-failure"
+
+    result = run_campaign(
+        definition,
+        _runtime_with_failing_serializer(),
+        output_dir=output,
+        software_compatibility={"astro": "test"},
+    )
+
+    case = CaseObservation.model_validate_json((output / "cases.jsonl").read_text())
+    assert result.statistics.outcome_counts == {"execution_failure": 1}
+    assert case.metadata["phase"] == "serialization"
+    assert case.evaluation_timing is not None
+    assert case.evaluation_timing.metric_extraction_s is not None
+    assert case.evaluation_timing.serialization_s >= 0.0
 
 
 @pytest.mark.parametrize(
@@ -333,6 +375,12 @@ def test_metric_failure_is_a_case_outcome_for_every_retention_policy(
     ]
     assert len(cases) == 4
     assert {case.metadata["phase"] for case in cases} == {"metric_extraction"}
+    assert all(case.evaluation_timing is not None for case in cases)
+    assert all(
+        case.evaluation_timing.metric_extraction_s is not None
+        for case in cases
+        if case.evaluation_timing is not None
+    )
 
 
 def test_runner_stops_at_ci_batch_and_records_convergence(tmp_path: Path) -> None:

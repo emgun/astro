@@ -11,6 +11,8 @@ astro validate-campaign examples/campaigns/leo_lifecycle_robustness.yaml
 astro run-campaign examples/campaigns/leo_lifecycle_robustness.yaml \
   --output-dir /tmp/astro-lifecycle-robustness --workers 2
 astro summarize-campaign /tmp/astro-lifecycle-robustness
+astro profile-campaign /tmp/astro-lifecycle-robustness \
+  --output /tmp/astro-lifecycle-profile.json
 ```
 
 Its eight Latin-hypercube cases vary reviewed epistemic launch-thrust, shared-wet-mass, twin-power,
@@ -33,12 +35,21 @@ requires equal sample weights and fails closed for weighted ensembles. `--max-ca
 execution and `--dry-run` resolves the scenario and registries without running physics or writing
 evidence.
 
+`astro profile-campaign` derives a machine-scoped timing product from integrity-checked case
+records. It reports setup, authoritative evaluation, metric extraction, retained-result
+serialization, unattributed overhead, total instrumented time, median absolute deviation, and
+evaluator share of instrumented time. The profile binds the source case digest, software/runtime
+compatibility, and machine identity. It does not modify deterministic campaign statistics. Cases written before extraction
+instrumentation remain visibly incomplete and cannot produce evaluator-share claims.
+
 ## Surrogate Boundary
 
-The baseline benchmark does not currently justify a learned evaluator: no workflow demonstrated an
-evaluator-dominated cost after process startup and component timings were not previously available.
-Surrogate training therefore remains stopped until campaign timing identifies a bounded bottleneck
-that cannot be removed more safely through batching, vectorization, caching, or analytical changes.
+The baseline benchmark does not currently justify a learned evaluator. Checked campaign profiling
+found that local J2 orbit evaluation and the integrated digital twin account for more than 97% of
+their instrumented phase time, but their median evaluations are only about 0.000553 and 0.001431 seconds.
+Both fail the preregistered 0.050-second absolute-cost gate. Surrogate training therefore remains
+stopped until a materially more expensive bounded evaluator is measured and the cost cannot be
+removed more safely through batching, vectorization, caching, or analytical changes.
 
 A future promoted surrogate may screen a bounded campaign, but decision-critical, boundary, failed,
 and out-of-domain cases must be replayed through authoritative physics. Training never grants

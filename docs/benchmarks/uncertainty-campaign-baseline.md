@@ -62,3 +62,31 @@ Optional Orekit and Tudat teacher runs are separate machine-scoped evidence. The
 Choose the residual orbit candidate only if its authoritative teacher evaluation dominates campaign cost after simpler fixes and the teacher/baseline force models, horizon, regime, parameters, features, targets, and units can be frozen. Choose the digital-twin challenger only if its bounded outputs dominate cost and requirement-boundary behavior can be validated.
 
 Otherwise, stop. The uncertainty campaign product remains valuable without a surrogate, and replacing cheap two-body or J2 propagation with a learned model is not an objective.
+
+## Campaign Timing Gate Refresh
+
+On 2026-07-13, the campaign boundary gained explicit metric-extraction timing and the derived
+`astro profile-campaign` product. Profiling remains separate from deterministic campaign statistics
+and is explicitly machine-scoped. Legacy cases without extraction timing remain marked as
+incompletely instrumented rather than being interpreted as zero-time measurements.
+
+The gate was preregistered in `examples/campaigns/benchmark-manifest.yaml`: one warm-up, at least
+five measured cases, complete phase timing, evaluation share of instrumented time of at least 0.80, and median evaluator
+time of at least 0.050 seconds. Clearing those timing thresholds would still require a follow-up
+vectorization, batching, caching, and analytical challenger before surrogate work could proceed.
+
+The checked orbit candidate and digital-twin challenger each ran one warm-up followed by seven
+measured Latin-hypercube cases on `Mac.lan`, Darwin 25.0.0 arm64, Python 3.12.7, from Git revision
+`48c011d` with the timing implementation uncommitted. Generated case and profile artifacts remained
+under `/tmp` and are not committed.
+
+| Campaign | Complete cases | Evaluation median (s) | Evaluation MAD (s) | Evaluation share of instrumented time | Gate |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Local J2 orbit | 7/7 | 0.000553 | 0.000004 | 0.9737 | fail: absolute cost |
+| Integrated digital twin | 7/7 | 0.001431 | 0.000070 | 0.9918 | fail: absolute cost |
+
+Both evaluators dominate their measured instrumented phase time, but both are more than an order of magnitude
+below the 0.050-second absolute-cost floor. The decision remains **do not begin surrogate
+acceleration work** for these local evaluators. The next legitimate reopening condition is a
+measured optional teacher or future high-fidelity evaluator with materially larger absolute cost,
+not a learned replacement for the current inexpensive local physics.

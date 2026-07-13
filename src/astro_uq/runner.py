@@ -268,10 +268,23 @@ def _evaluate_sample(
         scenario_evidence,
         serialize_result=False,
     )
+    started = perf_counter()
     try:
         observation = _observe(definition, runtime.metrics, outcome, result)
     except Exception as exc:
-        return _case_failure_from_exception(definition, outcome, exc, phase="metric_extraction")
+        observation = _case_failure_from_exception(
+            definition, outcome, exc, phase="metric_extraction"
+        )
+        return _add_timing_phase(
+            observation,
+            field="metric_extraction_s",
+            elapsed_s=max(0.0, perf_counter() - started),
+        )
+    observation = _add_timing_phase(
+        observation,
+        field="metric_extraction_s",
+        elapsed_s=max(0.0, perf_counter() - started),
+    )
     if (
         observation.outcome_status is not OutcomeStatus.SUCCESS
         or result is None
@@ -282,19 +295,34 @@ def _evaluate_sample(
     try:
         artifact_refs = runtime.serialize(result)
     except Exception as exc:
-        return _case_failure_from_exception(definition, outcome, exc, phase="serialization")
-    elapsed = max(0.0, perf_counter() - started)
-    timing = observation.evaluation_timing
-    if timing is not None:
-        timing = timing.model_copy(
-            update={
-                "serialization_s": elapsed,
-                "total_s": float(timing.total_s) + elapsed,
-            }
+        observation = _add_timing_phase(
+            observation,
+            field="serialization_s",
+            elapsed_s=max(0.0, perf_counter() - started),
         )
-    return observation.model_copy(
-        update={"artifact_refs": artifact_refs, "evaluation_timing": timing}
+        return _case_failure_from_observation(
+            definition, observation, exc, phase="serialization"
+        )
+    elapsed = max(0.0, perf_counter() - started)
+    observation = _add_timing_phase(observation, field="serialization_s", elapsed_s=elapsed)
+    return observation.model_copy(update={"artifact_refs": artifact_refs})
+
+
+def _add_timing_phase(
+    observation: CaseObservation,
+    *,
+    field: str,
+    elapsed_s: float,
+) -> CaseObservation:
+    timing = observation.evaluation_timing
+    if timing is None:
+        return observation
+    current_value = getattr(timing, field)
+    current = 0.0 if current_value is None else float(current_value)
+    timing = timing.model_copy(
+        update={field: current + elapsed_s, "total_s": float(timing.total_s) + elapsed_s}
     )
+    return observation.model_copy(update={"evaluation_timing": timing})
 
 
 def _case_failure_from_exception(
@@ -319,6 +347,30 @@ def _case_failure_from_exception(
         outcome_status=OutcomeStatus.EXECUTION_FAILURE,
         evaluator_id=evaluated.evaluator_id,
         evaluation_timing=evaluated.timing,
+        claim_boundary=definition.evaluator.claim_boundary,
+        metadata=metadata,
+    )
+
+
+def _case_failure_from_observation(
+    definition: CampaignDefinition,
+    observation: CaseObservation,
+    exc: Exception,
+    *,
+    phase: str,
+) -> CaseObservation:
+    metadata = {
+        **observation.metadata,
+        "phase": phase,
+        "error_type": type(exc).__name__,
+        "error_message": str(exc) or repr(exc),
+        "traceback_summary": list(traceback.format_exception(exc)),
+    }
+    return CaseObservation(
+        sample_id=observation.sample_id,
+        outcome_status=OutcomeStatus.EXECUTION_FAILURE,
+        evaluator_id=observation.evaluator_id,
+        evaluation_timing=observation.evaluation_timing,
         claim_boundary=definition.evaluator.claim_boundary,
         metadata=metadata,
     )

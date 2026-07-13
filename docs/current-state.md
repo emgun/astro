@@ -78,6 +78,16 @@ training, neural dependencies, and model promotion are stopped. Safe immutable s
 and integrity-checked NPZ/JSON artifacts exist to support a future reopened gate without granting
 model authority.
 
+A follow-up machine-scoped timing gate now separates profiling from deterministic campaign
+statistics and records setup, evaluation, metric extraction, retained-result serialization,
+unattributed overhead, and total instrumented time with source-digest and machine/runtime
+provenance. Seven-case checked profiles found median evaluator times
+of 0.000553 seconds for local J2 orbit and 0.001431 seconds for the integrated digital twin. Although
+their evaluator shares were 0.9737 and 0.9918, both fail the preregistered 0.050-second absolute-cost
+gate. Surrogate acceleration therefore remains stopped for these local evaluators. Final local
+verification passed 888 tests with 11 skipped, Ruff, strict MyPy across 120 source files, and
+sdist/wheel builds.
+
 Independent review hardened the campaign boundary before integration: non-authoritative evaluator
 labels now fail closed, resume verifies the definition, samples, cases, statistics, and regenerated
 deterministic sample plan, and a non-resume run refuses to overwrite existing evidence. Requirement
@@ -298,12 +308,13 @@ Post-MVP / external-campaign items:
 | external-validation-refresh | done | verify | steward | `docs/validation/live-backend-campaigns.md`, optional runtime smoke checks, Orekit live covariance gate | Refreshes machine-scoped optional validation evidence: Orekit high-fidelity covariance and drag/SRP/third-body products pass on this machine; Tudat-specific current release claims are not refreshed because the historical isolated Tudat environment is absent; PR #7 is merged on `main`. |
 | reentry-suite | done | productize/verify | steward | `src/astro_reentry`, reentry CLI commands, `examples/reentry`, `tests/astro_reentry`, `docs/reentry.md` | Ballistic, prescribed-bank lifting, target-tracking guidance, aerothermal/load/margin products, local optimization, trajectory handoff, documentation, convergence checks, full local gates, packaging, review hardening, GitHub CI, and merged-main verification pass; PR #8 is merged at `3c73f8b`. |
 | mission-lifecycle | done | productize/verify | steward | `src/astro_mission`, `astro run-mission-lifecycle`, checked phase fixtures, lifecycle tests and docs | Connects launch, operations propagation, the integrated twin, deorbit, and reentry through suite-owned products; fails closed on continuity or phase gates; writes an ordered artifact manifest; passes focused, full, package, public-command, and GitHub CI gates; PR #9 is merged at `d37b9a6`. |
-| ai-native-uncertainty-surrogates | done | productize/verify | steward | `astro_uq`, `astro_surrogates`, campaign CLI, assistant campaign plans, checked lifecycle campaign, benchmark and validation docs | UQ campaigns v1, safe surrogate artifact contracts, and deterministic assistant campaign plans are implemented. Bounded process execution, adaptive stopping, retention, typed cross-phase lifecycle inputs, interruption/resume, independent review hardening, 879-test full-suite verification, lint, type checking, packaging tests, public CLI replay, sdist/wheel builds, and GitHub CI pass. Surrogate training/promotion is deliberately stopped because no evaluator-dominated bottleneck has been demonstrated; PR #10 is merged on `main` at `6ca5d78`. |
+| ai-native-uncertainty-surrogates | done | productize/verify | steward | `astro_uq`, `astro_surrogates`, campaign CLI, assistant campaign plans, checked lifecycle campaign, benchmark and validation docs | UQ campaigns v1, safe surrogate artifact contracts, deterministic assistant campaign plans, and separate machine-scoped timing profiles are implemented. Checked local J2 orbit and integrated-twin profiles have complete phase accounting but fail the preregistered 0.050-second median evaluator-cost gate. The hardened timing scope passes 888 tests, lint, type checking, and package builds; surrogate training/promotion remains deliberately stopped. |
 
 ## Next Best Paths
 
-1. Reopen surrogate training only after evaluator-phase timing identifies a bounded dominant cost
-   that survives simpler vectorization, batching, caching, and analytical challengers.
+1. Keep surrogate acceleration closed for the inexpensive local orbit and twin evaluators; reopen
+   only for a measured optional teacher or future high-fidelity evaluator with materially larger
+   absolute cost that survives simpler challengers.
 2. Expand cross-phase lifecycle uncertainty only through the typed `input_overrides` bundle; do not
    patch generated insertion state or infer paths into phase artifacts.
 3. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh

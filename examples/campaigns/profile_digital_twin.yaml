@@ -1,0 +1,46 @@
+schema_version: "1.0"
+campaign_id: profile-digital-twin-v1
+workflow:
+  kind: digital_twin
+  scenario: ../twin/leo_observer.yaml
+uncertainty:
+  parameters:
+    - parameter_id: solar_array_efficiency
+      target: digital_twin.power.solar_array_efficiency
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.285
+        high: 0.295
+  correlations: []
+  model_variants: []
+sampler:
+  kind: latin_hypercube
+  samples: 7
+  seed: 7132026
+  scramble: true
+evaluator:
+  evaluator_id: local-digital-twin-profile
+  kind: authoritative
+  workflow: digital_twin
+  implementation_version: integrated_twin_v1
+  backend: local
+  claim_boundary: machine_scoped_timing_not_hardware_or_operational_performance
+metrics:
+  - metric_id: limiting_margin
+    extractor: digital_twin.limiting_margin
+    value_kind: numeric
+    unit: "1"
+  - metric_id: minimum_battery_soc
+    extractor: digital_twin.min_battery_soc_fraction
+    value_kind: numeric
+    unit: "1"
+requirements: []
+stopping:
+  kind: fixed_count
+retention:
+  policy: none
+metadata:
+  purpose: surrogate_gate_timing_challenger
+  interpretation: machine_scoped_profiling_not_portable_performance

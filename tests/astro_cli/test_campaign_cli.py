@@ -99,6 +99,70 @@ def test_run_resume_and_regenerate_summary(tmp_path: Path) -> None:
     assert (output / "summary.txt").exists()
 
 
+def test_profile_campaign_writes_machine_scoped_timing_product(tmp_path: Path) -> None:
+    output = tmp_path / "campaign-output"
+    profile_path = tmp_path / "profile.json"
+    run = runner.invoke(
+        app,
+        ["run-campaign", str(_campaign(tmp_path)), "--output-dir", str(output)],
+    )
+
+    profiled = runner.invoke(
+        app,
+        ["profile-campaign", str(output), "--output", str(profile_path)],
+    )
+
+    assert run.exit_code == 0
+    assert profiled.exit_code == 0
+    profile = json.loads(profiled.stdout)
+    assert profile["evidence_scope"] == "machine_scoped"
+    assert profile["timing"]["case_count"] == 2
+    assert profile["timing"]["fully_instrumented_case_count"] == 2
+    assert profile["cases_digest"]
+    assert profile["software_compatibility"]["campaign-runtime"] == "1.1"
+    assert profile["machine"]["architecture"]
+    assert profile["runtime"]["python_version"]
+    assert profile["timing"]["evaluation_share_of_instrumented_time"] is not None
+    assert json.loads(profile_path.read_text()) == profile
+
+
+def test_profile_campaign_rejects_output_inside_source_evidence(tmp_path: Path) -> None:
+    output = tmp_path / "campaign-output"
+    run = runner.invoke(
+        app,
+        ["run-campaign", str(_campaign(tmp_path)), "--output-dir", str(output)],
+    )
+
+    profiled = runner.invoke(
+        app,
+        ["profile-campaign", str(output), "--output", str(output / "statistics.json")],
+    )
+    integrity_check = runner.invoke(app, ["profile-campaign", str(output)])
+
+    assert run.exit_code == 0
+    assert profiled.exit_code == 2
+    assert "outside the source campaign directory" in profiled.output
+    assert integrity_check.exit_code == 0
+
+
+def test_profile_campaign_rejects_interrupted_evidence(tmp_path: Path) -> None:
+    output = tmp_path / "campaign-output"
+    run = runner.invoke(
+        app,
+        ["run-campaign", str(_campaign(tmp_path)), "--output-dir", str(output)],
+    )
+    manifest_path = output / "campaign.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["state"] = "interrupted"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    profiled = runner.invoke(app, ["profile-campaign", str(output)])
+
+    assert run.exit_code == 0
+    assert profiled.exit_code == 2
+    assert "only completed campaigns can be profiled" in profiled.output
+
+
 def test_run_campaign_dry_run_and_max_cases_do_not_write_evidence(tmp_path: Path) -> None:
     path = _campaign(tmp_path)
     output = tmp_path / "dry-run"

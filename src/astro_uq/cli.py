@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
+import platform
+import socket
 from functools import partial
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -29,16 +33,27 @@ from astro_uq.io import (
     CASES_FILE,
     CampaignArtifactStore,
     CampaignIOError,
+    atomic_write_json,
     load_campaign_definition,
     read_jsonl,
 )
 from astro_uq.metrics import MetricError, MetricRegistry
-from astro_uq.models import CampaignDefinition, CampaignStatistics, CaseObservation, OutcomeStatus
+from astro_uq.models import (
+    CampaignDefinition,
+    CampaignState,
+    CampaignStatistics,
+    CampaignTimingProfile,
+    CaseObservation,
+    OutcomeStatus,
+    TimingMachineMetadata,
+    TimingRuntimeMetadata,
+)
 from astro_uq.parameters import ParameterBindingError, ParameterRegistry
+from astro_uq.profiling import summarize_case_timings
 from astro_uq.runner import CampaignRuntime, run_campaign
 from astro_uq.statistics import summarize_campaign
 
-SOFTWARE_COMPATIBILITY = {"astro-suite": "0.1.0", "campaign-runtime": "1.0"}
+SOFTWARE_COMPATIBILITY = {"astro-suite": "0.1.0", "campaign-runtime": "1.1"}
 
 
 def _error(message: str, *, campaign_id: str | None = None, sample_id: str | None = None) -> None:
@@ -272,3 +287,64 @@ def summarize_campaign_command(
         _error(f"could not summarize campaign: {exc}", campaign_id=campaign_id)
         raise typer.Exit(code=2) from exc
     typer.echo(summary, nl=False)
+
+
+def profile_campaign_command(
+    output_dir: Annotated[Path, typer.Argument(exists=True, file_okay=False, readable=True)],
+    output: Annotated[Path | None, typer.Option("--output")] = None,
+) -> None:
+    """Summarize machine-scoped evaluator timing from completed campaign cases."""
+    campaign_id: str | None = None
+    try:
+        if output is not None and output.resolve().is_relative_to(output_dir.resolve()):
+            raise CampaignIOError("profile output must be outside the source campaign directory")
+        manifest = json.loads((output_dir / CAMPAIGN_FILE).read_text(encoding="utf-8"))
+        definition = CampaignDefinition.model_validate(manifest["definition"])
+        campaign_id = definition.campaign_id
+        store = CampaignArtifactStore(output_dir)
+        with store:
+            resume_state = store.resume(
+                definition,
+                software_compatibility=manifest["software_compatibility"],
+            )
+        if resume_state.state is not CampaignState.COMPLETED:
+            raise CampaignIOError("only completed campaigns can be profiled")
+        observations = tuple(
+            CaseObservation.model_validate(case) for case in resume_state.cases
+        )
+        profile = CampaignTimingProfile(
+            campaign_id=definition.campaign_id,
+            definition_digest=resume_state.definition_digest,
+            cases_digest=str(manifest["cases_digest"]),
+            claim_boundary=definition.evaluator.claim_boundary,
+            software_compatibility={
+                str(key): str(value)
+                for key, value in manifest["software_compatibility"].items()
+            },
+            machine=TimingMachineMetadata(
+                hostname=socket.gethostname(),
+                operating_system=platform.system(),
+                operating_system_release=platform.release(),
+                architecture=platform.machine(),
+                processor=platform.processor() or None,
+                logical_cpu_count=os.cpu_count(),
+            ),
+            runtime=TimingRuntimeMetadata(
+                python_version=platform.python_version(),
+                astro_version=_astro_version(),
+            ),
+            timing=summarize_case_timings(observations),
+        )
+        if output is not None:
+            atomic_write_json(output, profile)
+    except (KeyError, ValueError, TypeError, OSError, CampaignIOError, json.JSONDecodeError) as exc:
+        _error(f"could not profile campaign: {exc}", campaign_id=campaign_id)
+        raise typer.Exit(code=2) from exc
+    typer.echo(profile.model_dump_json())
+
+
+def _astro_version() -> str:
+    try:
+        return version("astro-suite")
+    except PackageNotFoundError:
+        return "unknown"
