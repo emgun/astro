@@ -58,7 +58,8 @@ sampling strategies over one campaign contract. Surrogates are separately valida
 not samplers or replacements for authoritative physics. A benchmark must select or kill the first
 learned target before neural dependencies or training work enter the critical path.
 
-Astro Uncertainty Campaigns v1 is implemented on `codex/uncertainty-campaigns`. The suite now has
+Astro Uncertainty Campaigns v1 is integrated on `main` through PR #10 at merge commit `6ca5d78`.
+The suite now has
 typed uncertainty/distribution/correlation contracts; deterministic pseudorandom, LHS, Sobol,
 sweep, and model-ensemble sampling; allow-listed parameter and metric registries; explicit failure
 outcomes; weighted statistics; fixed-count, CI, and metric-stability stopping; deterministic
@@ -87,7 +88,9 @@ retention policy, and CI stopping fails closed for unequal weights. A deliberate
 records the stopping phase without fabricating downstream artifacts. Final local verification on
 2026-07-13 passed 879 tests with 11 skipped, Ruff, strict
 MyPy across 119 source files, packaging tests, sdist/wheel builds, and a fresh two-worker public-CLI
-run of the checked lifecycle campaign.
+run of the checked lifecycle campaign. GitHub CI passed the merged PR after an identity-safe Tudat
+SPICE-kernel cache correction removed an order-dependent fake-module collision exposed by the
+expanded suite.
 
 The previous suite-owned roadmap pass, Verifiable OD Workflow Pack, integrated digital twin,
 constellation digital twin, constellation coverage-map stack, and subsystem fidelity pack are
@@ -295,18 +298,16 @@ Post-MVP / external-campaign items:
 | external-validation-refresh | done | verify | steward | `docs/validation/live-backend-campaigns.md`, optional runtime smoke checks, Orekit live covariance gate | Refreshes machine-scoped optional validation evidence: Orekit high-fidelity covariance and drag/SRP/third-body products pass on this machine; Tudat-specific current release claims are not refreshed because the historical isolated Tudat environment is absent; PR #7 is merged on `main`. |
 | reentry-suite | done | productize/verify | steward | `src/astro_reentry`, reentry CLI commands, `examples/reentry`, `tests/astro_reentry`, `docs/reentry.md` | Ballistic, prescribed-bank lifting, target-tracking guidance, aerothermal/load/margin products, local optimization, trajectory handoff, documentation, convergence checks, full local gates, packaging, review hardening, GitHub CI, and merged-main verification pass; PR #8 is merged at `3c73f8b`. |
 | mission-lifecycle | done | productize/verify | steward | `src/astro_mission`, `astro run-mission-lifecycle`, checked phase fixtures, lifecycle tests and docs | Connects launch, operations propagation, the integrated twin, deorbit, and reentry through suite-owned products; fails closed on continuity or phase gates; writes an ordered artifact manifest; passes focused, full, package, public-command, and GitHub CI gates; PR #9 is merged at `d37b9a6`. |
-| ai-native-uncertainty-surrogates | done | productize/verify | steward | `astro_uq`, `astro_surrogates`, campaign CLI, assistant campaign plans, checked lifecycle campaign, benchmark and validation docs | UQ campaigns v1, safe surrogate artifact contracts, and deterministic assistant campaign plans are implemented. Bounded process execution, adaptive stopping, retention, typed cross-phase lifecycle inputs, interruption/resume, independent review hardening, 879-test full-suite verification, lint, type checking, packaging tests, public CLI replay, and sdist/wheel builds pass. Surrogate training/promotion is deliberately stopped because no evaluator-dominated bottleneck has been demonstrated; the branch is integration-ready. |
+| ai-native-uncertainty-surrogates | done | productize/verify | steward | `astro_uq`, `astro_surrogates`, campaign CLI, assistant campaign plans, checked lifecycle campaign, benchmark and validation docs | UQ campaigns v1, safe surrogate artifact contracts, and deterministic assistant campaign plans are implemented. Bounded process execution, adaptive stopping, retention, typed cross-phase lifecycle inputs, interruption/resume, independent review hardening, 879-test full-suite verification, lint, type checking, packaging tests, public CLI replay, sdist/wheel builds, and GitHub CI pass. Surrogate training/promotion is deliberately stopped because no evaluator-dominated bottleneck has been demonstrated; PR #10 is merged on `main` at `6ca5d78`. |
 
 ## Next Best Paths
 
-1. Review and integrate `codex/uncertainty-campaigns` without broadening its deterministic
-   design-screening claim boundary.
-2. Reopen surrogate training only after evaluator-phase timing identifies a bounded dominant cost
+1. Reopen surrogate training only after evaluator-phase timing identifies a bounded dominant cost
    that survives simpler vectorization, batching, caching, and analytical challengers.
-3. Expand cross-phase lifecycle uncertainty only through the typed `input_overrides` bundle; do not
+2. Expand cross-phase lifecycle uncertainty only through the typed `input_overrides` bundle; do not
    patch generated insertion state or infer paths into phase artifacts.
-4. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+3. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-5. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+4. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.
