@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from astro_assistant.models import AstroWorkflowPlan, RiskLevel
+from astro_assistant.models import AstroToolName, AstroWorkflowPlan, RiskLevel
 
 
 class PolicyDecision(BaseModel):
@@ -15,10 +15,26 @@ def evaluate_plan(plan: AstroWorkflowPlan, *, dry_run: bool, approved: bool) -> 
     if dry_run:
         return PolicyDecision(allowed=True)
 
+    campaign_risks = {
+        AstroToolName.VALIDATE_CAMPAIGN: RiskLevel.READ_ONLY,
+        AstroToolName.RUN_CAMPAIGN: RiskLevel.WRITES_ARTIFACTS,
+        AstroToolName.SUMMARIZE_CAMPAIGN: RiskLevel.READ_ONLY,
+    }
+    for step in plan.steps:
+        expected_risk = campaign_risks.get(step.tool)
+        if expected_risk is not None and step.risk is not expected_risk:
+            warnings.append(
+                f"{step.tool.value} must use {expected_risk.value} risk classification"
+            )
+
     if RiskLevel.OPTIONAL_BACKEND in risks:
         warnings.append("optional backend execution is not enabled in the first assistant slice")
 
-    if plan.requires_approval and RiskLevel.WRITES_ARTIFACTS in risks and not approved:
+    campaign_run = any(step.tool is AstroToolName.RUN_CAMPAIGN for step in plan.steps)
+    writes_requiring_approval = campaign_run or (
+        plan.requires_approval and RiskLevel.WRITES_ARTIFACTS in risks
+    )
+    if writes_requiring_approval and not approved:
         warnings.append("execution requires approval because the plan writes artifacts")
 
     return PolicyDecision(allowed=len(warnings) == 0, warnings=warnings)

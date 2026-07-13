@@ -1,6 +1,6 @@
 # Astro Suite Current State
 
-Date: 2026-07-10 00:00 PDT
+Date: 2026-07-13 00:00 PDT
 
 ## Canonical Workspace
 
@@ -46,6 +46,48 @@ optional operational backends, and research workflows. External engines are adap
 outputs stay in Astro Suite models with explicit provenance and claim boundaries.
 
 ## Current Roadmap Decision
+
+The next deliberate product direction is **AI-Native Uncertainty Campaigns and Validated
+Surrogates**. The architecture and staged roadmap are recorded in
+`docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`; the executable plan
+is `docs/superpowers/plans/2026-07-12-ai-native-uncertainty-surrogate-implementation.md`.
+
+The first delivery is suite-level uncertainty campaign infrastructure with a Robust Mission
+Lifecycle Campaign as the flagship. Monte Carlo, LHS, Sobol, sweeps, and model ensembles are
+sampling strategies over one campaign contract. Surrogates are separately validated evaluators,
+not samplers or replacements for authoritative physics. A benchmark must select or kill the first
+learned target before neural dependencies or training work enter the critical path.
+
+Astro Uncertainty Campaigns v1 is implemented on `codex/uncertainty-campaigns`. The suite now has
+typed uncertainty/distribution/correlation contracts; deterministic pseudorandom, LHS, Sobol,
+sweep, and model-ensemble sampling; allow-listed parameter and metric registries; explicit failure
+outcomes; weighted statistics; fixed-count, CI, and metric-stability stopping; deterministic
+retention; atomic resumable campaign artifacts; bounded process execution; and authoritative orbit,
+digital-twin, reentry, and mission-lifecycle evaluators. Public commands are `astro
+validate-campaign`, `astro run-campaign`, and `astro summarize-campaign`; execution also supports
+worker bounds, max-case caps, dry runs, and integrity-checked resume.
+
+The checked `leo-lifecycle-robustness-v1` campaign completed 8/8 LHS cases with effective sample
+size 8.0 and requirement fractions 1.0 for lifecycle success and propellant reserve. Its reviewed
+epistemic inputs span launch thrust, shared spacecraft wet mass, twin power efficiency, deorbit
+design values, reentry atmosphere density, and reentry drag. These are design-space results, not
+operational probabilities. The benchmark found no
+evaluator-dominated cost and component timings had not previously been instrumented, so surrogate
+training, neural dependencies, and model promotion are stopped. Safe immutable surrogate schemas
+and integrity-checked NPZ/JSON artifacts exist to support a future reopened gate without granting
+model authority.
+
+Independent review hardened the campaign boundary before integration: non-authoritative evaluator
+labels now fail closed, resume verifies the definition, samples, cases, statistics, and regenerated
+deterministic sample plan, and a non-resume run refuses to overwrite existing evidence. Requirement
+fractions use all completed cases as their denominator, so failed evaluations cannot silently
+disappear. OS-backed campaign locks release on process death, write-ahead append transactions recover
+index/manifest crash windows, metric extraction failures remain typed case outcomes under every
+retention policy, and CI stopping fails closed for unequal weights. A deliberately failed launch
+records the stopping phase without fabricating downstream artifacts. Final local verification on
+2026-07-13 passed 879 tests with 11 skipped, Ruff, strict
+MyPy across 119 source files, packaging tests, sdist/wheel builds, and a fresh two-worker public-CLI
+run of the checked lifecycle campaign.
 
 The previous suite-owned roadmap pass, Verifiable OD Workflow Pack, integrated digital twin,
 constellation digital twin, constellation coverage-map stack, and subsystem fidelity pack are
@@ -253,13 +295,18 @@ Post-MVP / external-campaign items:
 | external-validation-refresh | done | verify | steward | `docs/validation/live-backend-campaigns.md`, optional runtime smoke checks, Orekit live covariance gate | Refreshes machine-scoped optional validation evidence: Orekit high-fidelity covariance and drag/SRP/third-body products pass on this machine; Tudat-specific current release claims are not refreshed because the historical isolated Tudat environment is absent; PR #7 is merged on `main`. |
 | reentry-suite | done | productize/verify | steward | `src/astro_reentry`, reentry CLI commands, `examples/reentry`, `tests/astro_reentry`, `docs/reentry.md` | Ballistic, prescribed-bank lifting, target-tracking guidance, aerothermal/load/margin products, local optimization, trajectory handoff, documentation, convergence checks, full local gates, packaging, review hardening, GitHub CI, and merged-main verification pass; PR #8 is merged at `3c73f8b`. |
 | mission-lifecycle | done | productize/verify | steward | `src/astro_mission`, `astro run-mission-lifecycle`, checked phase fixtures, lifecycle tests and docs | Connects launch, operations propagation, the integrated twin, deorbit, and reentry through suite-owned products; fails closed on continuity or phase gates; writes an ordered artifact manifest; passes focused, full, package, public-command, and GitHub CI gates; PR #9 is merged at `d37b9a6`. |
+| ai-native-uncertainty-surrogates | done | productize/verify | steward | `astro_uq`, `astro_surrogates`, campaign CLI, assistant campaign plans, checked lifecycle campaign, benchmark and validation docs | UQ campaigns v1, safe surrogate artifact contracts, and deterministic assistant campaign plans are implemented. Bounded process execution, adaptive stopping, retention, typed cross-phase lifecycle inputs, interruption/resume, independent review hardening, 879-test full-suite verification, lint, type checking, packaging tests, public CLI replay, and sdist/wheel builds pass. Surrogate training/promotion is deliberately stopped because no evaluator-dominated bottleneck has been demonstrated; the branch is integration-ready. |
 
 ## Next Best Paths
 
-1. Choose the next product or validation scope deliberately; `v0.1.0` is complete and should not
-   acquire a hidden post-release implementation backlog.
-2. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+1. Review and integrate `codex/uncertainty-campaigns` without broadening its deterministic
+   design-screening claim boundary.
+2. Reopen surrogate training only after evaluator-phase timing identifies a bounded dominant cost
+   that survives simpler vectorization, batching, caching, and analytical challengers.
+3. Expand cross-phase lifecycle uncertainty only through the typed `input_overrides` bundle; do not
+   patch generated insertion state or infer paths into phase artifacts.
+4. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-3. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+5. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.

@@ -1,0 +1,110 @@
+schema_version: "1.0"
+benchmark_id: uncertainty-campaign-baseline-v1
+warmup_runs: 1
+repetitions: 5
+measurements:
+  - repeated_wall_time_s
+  - evaluator_time_s
+  - serialization_time_s
+  - metric_extraction_time_s
+  - peak_rss_bytes
+  - artifact_bytes
+machine_metadata:
+  - captured_at_utc
+  - hostname
+  - operating_system
+  - architecture
+  - cpu
+  - logical_cpu_count
+  - memory_bytes
+runtime_metadata:
+  - python_version
+  - astro_version
+  - git_commit
+  - git_dirty
+  - dependency_versions
+entries:
+  - workflow: orbit
+    command:
+      - astro
+      - propagate
+      - examples/scenarios/leo_j2.yaml
+      - --backend
+      - local
+      - --output
+      - "{output_dir}/orbit.json"
+    repetitions: 5
+    expected_artifact: "{output_dir}/orbit.json"
+    claim_boundary: Deterministic local two-body plus J2 design-screening evidence; not operational navigation or flight certification.
+
+  - workflow: digital_twin
+    command:
+      - astro
+      - run-twin
+      - examples/twin/leo_observer.yaml
+      - --output
+      - "{output_dir}/digital-twin.json"
+      - --summary-output
+      - "{output_dir}/digital-twin.txt"
+    repetitions: 5
+    expected_artifact: "{output_dir}/digital-twin.json"
+    claim_boundary: Deterministic suite-owned subsystem design-screening evidence; not hardware qualification or operational prediction.
+
+  - workflow: constellation
+    command:
+      - astro
+      - run-constellation-twin
+      - examples/twin/constellation_leo_observers.yaml
+      - --output
+      - "{output_dir}/constellation.json"
+      - --summary-output
+      - "{output_dir}/constellation.txt"
+    repetitions: 5
+    expected_artifact: "{output_dir}/constellation.json"
+    claim_boundary: Deterministic constellation geometry and subsystem screening evidence; not guaranteed service availability or operational coverage.
+
+  - workflow: reentry
+    command:
+      - astro
+      - simulate-reentry
+      - examples/reentry/guided_lifting_body.yaml
+      - --backend
+      - local
+      - --output
+      - "{output_dir}/reentry.json"
+      - --summary-output
+      - "{output_dir}/reentry.txt"
+    repetitions: 5
+    expected_artifact: "{output_dir}/reentry.json"
+    claim_boundary: Deterministic engineering screening; not CFD, TPS certification, flight qualification, or an operational landing prediction.
+
+  - workflow: mission_lifecycle
+    command:
+      - astro
+      - run-mission-lifecycle
+      - examples/lifecycle/leo_round_trip.yaml
+      - --output
+      - "{output_dir}/lifecycle.json"
+      - --summary-output
+      - "{output_dir}/lifecycle.txt"
+      - --artifacts-dir
+      - "{output_dir}/lifecycle-artifacts"
+    repetitions: 5
+    expected_artifact: "{output_dir}/lifecycle.json"
+    claim_boundary: Integrated deterministic launch-to-reentry design-screening evidence; not mission assurance, flight certification, or operational probability.
+
+optional_teacher_policy:
+  backends:
+    - orekit
+    - tudat
+  evidence_scope: machine_scoped
+  rule: Results are evidence only for the recorded machine, runtime, backend version, model configuration, and input domain; they are not portable fidelity claims.
+
+surrogate_selection:
+  first_candidate: bounded residual correction from local or JAX orbit propagation to a high-fidelity in-orbit teacher
+  challenger: coupled digital-twin evaluator for subsystem margin and event outputs
+  proceed_only_if:
+    - One evaluator dominates end-to-end campaign cost across repeated runs.
+    - The evaluator has a bounded, versioned input/output contract and validation domain.
+    - Vectorization, caching, batching, or analytical simplification cannot remove the bottleneck more safely.
+  kill_decision: Stop acceleration work if neither candidate dominates campaign cost after simpler fixes, or if neither can satisfy bounded-domain, OOD, fallback, and authoritative-replay gates.
