@@ -6,6 +6,7 @@ import pytest
 
 from astro_mission.io import load_mission_lifecycle_scenario
 from astro_mission.runner import run_mission_lifecycle
+from astro_twin.io import load_twin_scenario
 from astro_uq.adapters.lifecycle import (
     lifecycle_metric_registry,
     lifecycle_parameter_registry,
@@ -24,8 +25,12 @@ def test_reference_lifecycle_campaign_runs_end_to_end(tmp_path: Path) -> None:
         definition,
         CampaignRuntime(
             scenario=scenario,
-            parameters=lifecycle_parameter_registry(),
-            metrics=lifecycle_metric_registry(),
+            parameters=lifecycle_parameter_registry(
+                load_twin_scenario(scenario.twin_scenario)
+            ),
+            metrics=lifecycle_metric_registry(
+                load_twin_scenario(scenario.twin_scenario)
+            ),
             evaluate=lambda model: run_mission_lifecycle(type(scenario).model_validate(model)),
         ),
         output_dir=tmp_path / "campaign",

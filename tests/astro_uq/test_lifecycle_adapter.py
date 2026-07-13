@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from astro_mission.io import load_mission_lifecycle_scenario
 from astro_mission.models import MissionLifecycleScenario
 from astro_mission.runner import run_mission_lifecycle
+from astro_twin.io import load_twin_scenario
 from astro_uq.adapters.lifecycle import (
     lifecycle_metric_registry,
     lifecycle_parameter_registry,
@@ -28,6 +31,7 @@ from astro_uq.models import (
     UncertaintyModel,
     WorkflowSpec,
 )
+from astro_uq.parameters import ParameterBindingError
 from astro_uq.runner import CampaignRuntime, run_campaign
 
 
@@ -49,7 +53,9 @@ def test_lifecycle_deorbit_binding_revalidates_scenario() -> None:
         )
     )
 
-    resolved, evidence = lifecycle_parameter_registry().apply(
+    resolved, evidence = lifecycle_parameter_registry(
+        load_twin_scenario(scenario.twin_scenario)
+    ).apply(
         workflow="mission_lifecycle",
         scenario=scenario,
         uncertainty=uncertainty,
@@ -75,6 +81,18 @@ def test_lifecycle_cross_phase_bindings_use_typed_input_overrides() -> None:
             "lifecycle.digital_twin.power.solar_array_efficiency",
             "1",
             0.3,
+        ),
+        (
+            "array_area",
+            "lifecycle.digital_twin.power.solar_array_area_m2",
+            "m^2",
+            1.2,
+        ),
+        (
+            "battery_capacity",
+            "lifecycle.digital_twin.power.battery_capacity_wh",
+            "Wh",
+            1000.0,
         ),
         (
             "density",
@@ -103,7 +121,9 @@ def test_lifecycle_cross_phase_bindings_use_typed_input_overrides() -> None:
         physical_values={item[0]: item[3] for item in definitions},
     )
 
-    resolved, evidence = lifecycle_parameter_registry().apply(
+    resolved, evidence = lifecycle_parameter_registry(
+        load_twin_scenario(scenario.twin_scenario)
+    ).apply(
         workflow="mission_lifecycle",
         scenario=scenario,
         uncertainty=uncertainty,
@@ -115,16 +135,80 @@ def test_lifecycle_cross_phase_bindings_use_typed_input_overrides() -> None:
     assert validated.input_overrides.launch_upper_stage_thrust_n == 201000.0
     assert validated.input_overrides.spacecraft_wet_mass_kg == 505.0
     assert validated.input_overrides.twin_solar_array_efficiency == 0.3
+    assert validated.input_overrides.twin_solar_array_area_m2 == 1.2
+    assert validated.input_overrides.twin_battery_capacity_wh == 1000.0
     assert validated.input_overrides.reentry_atmosphere_density_scale_factor == 1.05
     assert validated.input_overrides.reentry_vehicle_drag_coefficient == 1.6
     assert evidence.resolved_scenario_digest != evidence.base_scenario_digest
+
+
+def test_lifecycle_named_thermal_bindings_merge_typed_node_override() -> None:
+    scenario = load_mission_lifecycle_scenario("examples/lifecycle/leo_round_trip.yaml")
+    twin_scenario = load_twin_scenario(scenario.twin_scenario)
+    definitions = (
+        (
+            "emissivity",
+            "lifecycle.digital_twin.thermal_nodes.bus.emissivity",
+            0.82,
+        ),
+        (
+            "internal_heat",
+            "lifecycle.digital_twin.thermal_nodes.bus.internal_heat_fraction",
+            0.5,
+        ),
+    )
+    uncertainty = UncertaintyModel(
+        parameters=tuple(
+            UncertainParameter(
+                parameter_id=parameter_id,
+                target=target,
+                unit="1",
+                uncertainty_kind=UncertaintyKind.EPISTEMIC,
+                distribution=DistributionSpec(kind=DistributionKind.CONSTANT, value=value),
+            )
+            for parameter_id, target, value in definitions
+        )
+    )
+
+    resolved, _evidence = lifecycle_parameter_registry(twin_scenario).apply(
+        workflow="mission_lifecycle",
+        scenario=scenario,
+        uncertainty=uncertainty,
+        realization=ParameterRealization(
+            sample_id="sample-thermal",
+            sample_index=0,
+            normalized_values={item[0]: 0.5 for item in definitions},
+            physical_values={item[0]: item[2] for item in definitions},
+        ),
+    )
+    validated = MissionLifecycleScenario.model_validate(resolved)
+
+    assert validated.input_overrides is not None
+    assert len(validated.input_overrides.twin_thermal_node_overrides) == 1
+    override = validated.input_overrides.twin_thermal_node_overrides[0]
+    assert override.node_name == "bus"
+    assert override.emissivity == 0.82
+    assert override.internal_heat_fraction == 0.5
+
+
+def test_lifecycle_registry_rejects_duplicate_thermal_template_names() -> None:
+    scenario = load_mission_lifecycle_scenario("examples/lifecycle/leo_round_trip.yaml")
+    twin_scenario = load_twin_scenario(scenario.twin_scenario)
+    duplicate = twin_scenario.model_copy(
+        update={"thermal_nodes": (*twin_scenario.thermal_nodes, twin_scenario.thermal_nodes[0])}
+    )
+
+    with pytest.raises(ParameterBindingError, match="must be unique"):
+        lifecycle_parameter_registry(duplicate)
 
 
 def test_lifecycle_metrics_extract_checked_result() -> None:
     result = run_mission_lifecycle(
         load_mission_lifecycle_scenario("examples/lifecycle/leo_round_trip.yaml")
     )
-    values = lifecycle_metric_registry().extract(
+    values = lifecycle_metric_registry(
+        load_twin_scenario("examples/twin/lifecycle_observer.yaml")
+    ).extract(
         workflow="mission_lifecycle",
         result=result,
         specifications=(
@@ -160,6 +244,18 @@ def test_lifecycle_metrics_extract_checked_result() -> None:
             MetricSpec(
                 metric_id="thermal_margin",
                 extractor="lifecycle.twin_minimum_thermal_margin_k",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="K",
+            ),
+            MetricSpec(
+                metric_id="bus_cold_margin",
+                extractor="lifecycle.twin_thermal_nodes.bus.cold_margin_k",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="K",
+            ),
+            MetricSpec(
+                metric_id="bus_hot_margin",
+                extractor="lifecycle.twin_thermal_nodes.bus.hot_margin_k",
                 value_kind=MetricValueKind.NUMERIC,
                 unit="K",
             ),
@@ -236,6 +332,8 @@ def test_lifecycle_metrics_extract_checked_result() -> None:
     assert values["thermal_margin"] == min(
         value for name, value in twin_margins.items() if name.startswith("thermal_")
     )
+    assert values["bus_cold_margin"] == twin_margins["thermal_bus_cold_margin_k"]
+    assert values["bus_hot_margin"] == twin_margins["thermal_bus_hot_margin_k"]
     assert values["pointing_margin"] == twin_margins["pointing_margin_deg"]
     assert values["torque_margin"] == twin_margins["torque_margin_n_m"]
     assert values["slew_margin"] == twin_margins["slew_rate_margin_deg_s"]
@@ -263,7 +361,9 @@ def test_lifecycle_link_margin_is_missing_without_contact() -> None:
     twin = result.digital_twin.model_copy(update={"link_windows": ()})
     without_contact = result.model_copy(update={"digital_twin": twin})
 
-    values = lifecycle_metric_registry().extract(
+    values = lifecycle_metric_registry(
+        load_twin_scenario("examples/twin/lifecycle_observer.yaml")
+    ).extract(
         workflow="mission_lifecycle",
         result=without_contact,
         specifications=(
@@ -315,7 +415,9 @@ def test_lifecycle_link_margin_uses_worst_observed_contact() -> None:
     )
     with_extra_contact = result.model_copy(update={"digital_twin": twin})
 
-    values = lifecycle_metric_registry().extract(
+    values = lifecycle_metric_registry(
+        load_twin_scenario("examples/twin/lifecycle_observer.yaml")
+    ).extract(
         workflow="mission_lifecycle",
         result=with_extra_contact,
         specifications=(
@@ -375,8 +477,8 @@ def test_failed_launch_is_counted_and_records_stopped_phase(tmp_path: Path) -> N
     )
     runtime = CampaignRuntime(
         scenario=scenario,
-        parameters=lifecycle_parameter_registry(),
-        metrics=lifecycle_metric_registry(),
+        parameters=lifecycle_parameter_registry(load_twin_scenario(scenario.twin_scenario)),
+        metrics=lifecycle_metric_registry(load_twin_scenario(scenario.twin_scenario)),
         evaluate=lambda model: run_mission_lifecycle(
             MissionLifecycleScenario.model_validate(model)
         ),

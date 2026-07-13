@@ -8,6 +8,7 @@ from astro_mission.models import (
     MissionLifecycleResult,
     MissionLifecycleScenario,
 )
+from astro_twin.models import DigitalTwinScenario
 from astro_uq.metrics import MetricError, MetricExtractor, MetricRegistry
 from astro_uq.models import MetricValue, MetricValueKind
 from astro_uq.parameters import (
@@ -81,7 +82,57 @@ def _replace_override_field(field: str) -> Callable[[AstroModel, ParameterValue]
     return update
 
 
-def lifecycle_parameter_registry() -> ParameterRegistry:
+def _thermal_override_field(name: str, field: str) -> Callable[[AstroModel], float]:
+    def get(model: AstroModel) -> float:
+        overrides = _scenario(model).input_overrides
+        matches = (
+            []
+            if overrides is None
+            else [
+                override
+                for override in overrides.twin_thermal_node_overrides
+                if override.node_name == name
+            ]
+        )
+        if len(matches) != 1 or getattr(matches[0], field) is None:
+            raise ParameterBindingError(
+                f"lifecycle thermal node override {name}.{field} is not resolved"
+            )
+        return float(getattr(matches[0], field))
+
+    return get
+
+
+def _replace_thermal_override_field(
+    name: str, field: str
+) -> Callable[[AstroModel, ParameterValue], AstroModel]:
+    def update(model: AstroModel, value: ParameterValue) -> AstroModel:
+        scenario = _scenario(model)
+        overrides_payload = (
+            {}
+            if scenario.input_overrides is None
+            else scenario.input_overrides.model_dump(mode="python")
+        )
+        thermal_payloads = list(overrides_payload.get("twin_thermal_node_overrides", ()))
+        positions = {
+            str(payload["node_name"]): index for index, payload in enumerate(thermal_payloads)
+        }
+        if name in positions:
+            thermal_payloads[positions[name]][field] = _numeric(value)
+        else:
+            thermal_payloads.append({"node_name": name, field: _numeric(value)})
+        overrides_payload["twin_thermal_node_overrides"] = tuple(thermal_payloads)
+        overrides = MissionLifecycleInputOverrides.model_validate(overrides_payload)
+        return MissionLifecycleScenario.model_validate(
+            scenario.model_copy(update={"input_overrides": overrides}).model_dump(mode="python")
+        )
+
+    return update
+
+
+def lifecycle_parameter_registry(
+    twin_scenario: DigitalTwinScenario | None = None,
+) -> ParameterRegistry:
     registry = ParameterRegistry()
     definitions = (
         ("delta_v_km_s", "km/s", 1.0e-12),
@@ -111,6 +162,20 @@ def lifecycle_parameter_registry() -> ParameterRegistry:
             1.0,
         ),
         (
+            "digital_twin.power.solar_array_area_m2",
+            "twin_solar_array_area_m2",
+            "m^2",
+            1.0e-12,
+            None,
+        ),
+        (
+            "digital_twin.power.battery_capacity_wh",
+            "twin_battery_capacity_wh",
+            "Wh",
+            1.0e-12,
+            None,
+        ),
+        (
             "reentry.atmosphere.density_scale_factor",
             "reentry_atmosphere_density_scale_factor",
             "1",
@@ -138,6 +203,25 @@ def lifecycle_parameter_registry() -> ParameterRegistry:
                 upper=upper,
             )
         )
+    thermal_names = (
+        [] if twin_scenario is None else [node.name for node in twin_scenario.thermal_nodes]
+    )
+    if len(set(thermal_names)) != len(thermal_names):
+        raise ParameterBindingError("digital twin thermal node names must be unique")
+    for name in thermal_names:
+        for field in ("emissivity", "internal_heat_fraction"):
+            registry.register(
+                ParameterBinding(
+                    target=f"lifecycle.digital_twin.thermal_nodes.{name}.{field}",
+                    workflow=WORKFLOW,
+                    unit="1",
+                    value_type=float,
+                    getter=_thermal_override_field(name, field),
+                    updater=_replace_thermal_override_field(name, field),
+                    lower=1.0e-12 if field == "emissivity" else 0.0,
+                    upper=1.0,
+                )
+            )
     return registry
 
 
@@ -190,7 +274,9 @@ def _worst_observed_link_margin(model: AstroModel) -> MetricValue:
     return min(float(window.worst_ebn0_margin_db) for window in windows)
 
 
-def lifecycle_metric_registry() -> MetricRegistry:
+def lifecycle_metric_registry(
+    twin_scenario: DigitalTwinScenario | None = None,
+) -> MetricRegistry:
     registry = MetricRegistry()
 
     def target_miss(model: AstroModel) -> float | None:
@@ -362,4 +448,22 @@ def lifecycle_metric_registry() -> MetricRegistry:
                 extract=extract,
             )
         )
+    thermal_names = (
+        [] if twin_scenario is None else [node.name for node in twin_scenario.thermal_nodes]
+    )
+    if len(set(thermal_names)) != len(thermal_names):
+        raise MetricError("digital twin thermal node names must be unique")
+    for name in thermal_names:
+        for boundary in ("cold", "hot"):
+            registry.register(
+                MetricExtractor(
+                    extractor_id=(
+                        f"lifecycle.twin_thermal_nodes.{name}.{boundary}_margin_k"
+                    ),
+                    workflow=WORKFLOW,
+                    value_kind=MetricValueKind.NUMERIC,
+                    unit="K",
+                    extract=_twin_margin(f"thermal_{name}_{boundary}_margin_k"),
+                )
+            )
     return registry

@@ -15,9 +15,10 @@ from astro_core.errors import InvalidScenarioError
 from astro_core.io import load_scenario
 from astro_core.models import Scenario
 from astro_dynamics.backends import propagate_with_backend
+from astro_mission.errors import MissionLifecycleError
 from astro_mission.io import load_mission_lifecycle_scenario
 from astro_mission.models import MissionLifecycleScenario
-from astro_mission.runner import run_mission_lifecycle
+from astro_mission.runner import resolve_lifecycle_twin_scenario, run_mission_lifecycle
 from astro_reentry.backends import simulate_reentry_with_backend
 from astro_reentry.io import load_reentry_scenario
 from astro_reentry.models import ReentryScenario
@@ -50,13 +51,14 @@ from astro_uq.models import (
     TimingMachineMetadata,
     TimingRuntimeMetadata,
 )
-from astro_uq.parameters import ParameterBindingError, ParameterRegistry
+from astro_uq.parameters import ParameterBindingError, ParameterRegistry, model_digest
 from astro_uq.profiling import summarize_case_timings
 from astro_uq.runner import CampaignRuntime, run_campaign
 from astro_uq.sensitivity import analyze_campaign_sensitivity
 from astro_uq.statistics import summarize_campaign
 
 SOFTWARE_COMPATIBILITY = {"astro-suite": "0.1.0", "campaign-runtime": "1.1"}
+_RESOLVED_DEPENDENCIES_KEY = "resolved_dependencies"
 
 
 def _error(message: str, *, campaign_id: str | None = None, sample_id: str | None = None) -> None:
@@ -73,6 +75,28 @@ def _scenario_path(definition_path: Path, configured_path: str) -> Path:
     if configured.is_absolute() or configured.exists():
         return configured
     return definition_path.parent / configured
+
+
+def _bind_resolved_dependencies(
+    definition: CampaignDefinition, definition_path: Path
+) -> CampaignDefinition:
+    if definition.workflow.kind != "mission_lifecycle":
+        return definition
+    scenario_path = _scenario_path(definition_path, definition.workflow.scenario)
+    lifecycle_scenario = load_mission_lifecycle_scenario(scenario_path)
+    twin_scenario = load_twin_scenario(lifecycle_scenario.twin_scenario)
+    resolved_twin_scenario = resolve_lifecycle_twin_scenario(
+        twin_scenario, lifecycle_scenario
+    )
+    metadata = dict(definition.metadata)
+    metadata[_RESOLVED_DEPENDENCIES_KEY] = {
+        "twin_scenario": lifecycle_scenario.twin_scenario,
+        "twin_template_digest": model_digest(twin_scenario),
+        "resolved_twin_scenario_digest": model_digest(resolved_twin_scenario),
+    }
+    return CampaignDefinition.model_validate(
+        definition.model_copy(update={"metadata": metadata}).model_dump(mode="python")
+    )
 
 
 def _runtime(definition: CampaignDefinition, definition_path: Path) -> CampaignRuntime:
@@ -107,10 +131,25 @@ def _runtime(definition: CampaignDefinition, definition_path: Path) -> CampaignR
             ),
         )
     if definition.workflow.kind == "mission_lifecycle":
+        lifecycle_scenario = load_mission_lifecycle_scenario(scenario_path)
+        lifecycle_twin_scenario = load_twin_scenario(lifecycle_scenario.twin_scenario)
+        resolved_lifecycle_twin_scenario = resolve_lifecycle_twin_scenario(
+            lifecycle_twin_scenario, lifecycle_scenario
+        )
+        dependency = definition.metadata.get(_RESOLVED_DEPENDENCIES_KEY)
+        expected_dependency = {
+            "twin_scenario": lifecycle_scenario.twin_scenario,
+            "twin_template_digest": model_digest(lifecycle_twin_scenario),
+            "resolved_twin_scenario_digest": model_digest(
+                resolved_lifecycle_twin_scenario
+            ),
+        }
+        if dependency != expected_dependency:
+            raise CampaignIOError("resolved lifecycle twin dependency digest mismatch")
         return CampaignRuntime(
-            scenario=load_mission_lifecycle_scenario(scenario_path),
-            parameters=lifecycle_parameter_registry(),
-            metrics=lifecycle_metric_registry(),
+            scenario=lifecycle_scenario,
+            parameters=lifecycle_parameter_registry(lifecycle_twin_scenario),
+            metrics=lifecycle_metric_registry(lifecycle_twin_scenario),
             evaluate=lambda resolved: run_mission_lifecycle(
                 MissionLifecycleScenario.model_validate(resolved)
             ),
@@ -146,11 +185,19 @@ def validate_campaign(
     """Validate a supported campaign definition without executing it."""
     campaign_id: str | None = None
     try:
-        definition = load_campaign_definition(definition_path)
+        definition = _bind_resolved_dependencies(
+            load_campaign_definition(definition_path), definition_path
+        )
         campaign_id = definition.campaign_id
         runtime = _runtime(definition, definition_path)
         _validate_registries(definition, runtime.parameters, runtime.metrics)
-    except (CampaignIOError, InvalidScenarioError, MetricError, ParameterBindingError) as exc:
+    except (
+        CampaignIOError,
+        InvalidScenarioError,
+        MetricError,
+        MissionLifecycleError,
+        ParameterBindingError,
+    ) as exc:
         _error(str(exc), campaign_id=campaign_id)
         raise typer.Exit(code=2) from exc
     typer.echo(json.dumps({"campaign_id": campaign_id, "valid": True}, sort_keys=True))
@@ -167,7 +214,9 @@ def run_campaign_command(
     """Execute a supported uncertainty campaign."""
     campaign_id: str | None = None
     try:
-        definition = load_campaign_definition(definition_path)
+        definition = _bind_resolved_dependencies(
+            load_campaign_definition(definition_path), definition_path
+        )
         configured_samples = definition.sampler.samples
         if max_cases is not None and max_cases < configured_samples:
             limited = definition.model_copy(
@@ -209,6 +258,7 @@ def run_campaign_command(
         CampaignIOError,
         InvalidScenarioError,
         MetricError,
+        MissionLifecycleError,
         ParameterBindingError,
         OSError,
     ) as exc:

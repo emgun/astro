@@ -37,6 +37,23 @@ screening uses the same orbit product that feeds the deorbit phase.
 With `--artifacts-dir`, the command also writes independently parseable phase files and
 `manifest.json`. Artifact names are stable within the `mission_lifecycle_v1` workflow.
 
+## Typed Campaign Overrides
+
+Lifecycle uncertainty campaigns may override solar-array area and efficiency, battery capacity,
+and named thermal-node emissivity or internal-heat fraction through
+`MissionLifecycleInputOverrides`. Thermal fields are stored as one typed override per node and are
+resolved only against names present in the referenced twin template. Missing or duplicate node
+names fail before campaign execution, and the complete resolved `DigitalTwinScenario` is validated
+before the twin runs.
+
+CLI campaign definitions record both the referenced twin-template digest and the fully resolved
+twin-scenario digest after lifecycle overrides. A changed template or preconfigured override
+therefore changes the campaign definition digest and prevents evidence resume under stale nested
+physics.
+
+These overrides are campaign inputs, not edits to the referenced scenario files. They preserve the
+base scenario and sampled-value provenance in each case.
+
 ## Fail-Closed Gates
 
 Execution stops before downstream phases when:

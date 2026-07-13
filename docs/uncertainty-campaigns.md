@@ -13,6 +13,14 @@ astro run-campaign examples/campaigns/leo_lifecycle_robustness.yaml \
 astro summarize-campaign /tmp/astro-lifecycle-robustness
 astro profile-campaign /tmp/astro-lifecycle-robustness \
   --output /tmp/astro-lifecycle-profile.json
+
+astro validate-campaign examples/campaigns/leo_lifecycle_power_thermal.yaml
+astro run-campaign examples/campaigns/leo_lifecycle_power_thermal.yaml \
+  --output-dir /tmp/astro-lifecycle-power-thermal --workers 2
+astro analyze-campaign-sensitivity /tmp/astro-lifecycle-power-thermal \
+  --requirement-margin battery_soc \
+  --requirement-margin bus_hot \
+  --output /tmp/astro-lifecycle-power-thermal-sensitivity.json
 ```
 
 Its eight Latin-hypercube cases vary reviewed epistemic launch-thrust, shared-wet-mass, twin-power,
@@ -35,6 +43,12 @@ change between cases.
 
 The adapter's margin-name-to-unit mapping is a versioned v1 contract because the underlying twin
 margin model does not yet carry units directly.
+
+The separate checked power/thermal campaign uses five inputs: solar-array area and efficiency,
+battery capacity, and the `bus` node's emissivity and internal-heat fraction. The array range is an
+explicit downsizing trade from `0.4` to the reference `2.4 m^2`, not a calibrated uncertainty
+distribution. Named thermal targets keep hot and cold boundaries separate instead of attributing a
+switching envelope minimum.
 
 Campaign artifacts include the resolved definition and digest, sampled physical values, one typed
 outcome per requested case, aggregate statistics, evaluator timing, and a concise text summary.

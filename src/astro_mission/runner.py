@@ -66,7 +66,7 @@ def run_mission_lifecycle(scenario: MissionLifecycleScenario) -> MissionLifecycl
     operations = propagate_local(orbit_scenario)
 
     twin_scenario = load_twin_scenario(scenario.twin_scenario)
-    twin_scenario = _apply_twin_input_overrides(twin_scenario, scenario)
+    twin_scenario = resolve_lifecycle_twin_scenario(twin_scenario, scenario)
     twin_wet_mass_kg = float(
         twin_scenario.spacecraft.dry_mass_kg
         + twin_scenario.spacecraft.payload_mass_kg
@@ -151,6 +151,7 @@ def run_mission_lifecycle(scenario: MissionLifecycleScenario) -> MissionLifecycl
                     "resolved_input_overrides": scenario.input_overrides.model_dump(
                         mode="json",
                         exclude_none=True,
+                        exclude_defaults=True,
                     )
                 }
                 if scenario.input_overrides is not None
@@ -184,10 +185,11 @@ def _apply_launch_input_overrides(
     return LaunchScenario.model_validate(resolved)
 
 
-def _apply_twin_input_overrides(
+def resolve_lifecycle_twin_scenario(
     twin_scenario: DigitalTwinScenario,
     lifecycle_scenario: MissionLifecycleScenario,
 ) -> DigitalTwinScenario:
+    """Apply typed lifecycle overrides and validate the resolved twin template."""
     overrides = lifecycle_scenario.input_overrides
     if overrides is None:
         return twin_scenario
@@ -202,7 +204,36 @@ def _apply_twin_input_overrides(
         )
     if overrides.twin_solar_array_efficiency is not None:
         resolved["power"]["solar_array_efficiency"] = overrides.twin_solar_array_efficiency
-    return DigitalTwinScenario.model_validate(resolved)
+    if overrides.twin_solar_array_area_m2 is not None:
+        resolved["power"]["solar_array_area_m2"] = overrides.twin_solar_array_area_m2
+    if overrides.twin_battery_capacity_wh is not None:
+        resolved["power"]["battery_capacity_wh"] = overrides.twin_battery_capacity_wh
+    thermal_names = [node["name"] for node in resolved["thermal_nodes"]]
+    if len(set(thermal_names)) != len(thermal_names):
+        raise MissionLifecycleError(
+            "digital twin thermal node names must be unique",
+            lifecycle_phase="digital_twin",
+        )
+    thermal_positions = {name: index for index, name in enumerate(thermal_names)}
+    for thermal_override in overrides.twin_thermal_node_overrides:
+        if thermal_override.node_name not in thermal_positions:
+            raise MissionLifecycleError(
+                f"digital twin thermal override references missing node: "
+                f"{thermal_override.node_name}",
+                lifecycle_phase="digital_twin",
+            )
+        node = resolved["thermal_nodes"][thermal_positions[thermal_override.node_name]]
+        if thermal_override.emissivity is not None:
+            node["emissivity"] = thermal_override.emissivity
+        if thermal_override.internal_heat_fraction is not None:
+            node["internal_heat_fraction"] = thermal_override.internal_heat_fraction
+    try:
+        return DigitalTwinScenario.model_validate(resolved)
+    except ValueError as exc:
+        raise MissionLifecycleError(
+            f"resolved digital twin scenario is invalid: {exc}",
+            lifecycle_phase="digital_twin",
+        ) from exc
 
 
 def _apply_reentry_input_overrides(
