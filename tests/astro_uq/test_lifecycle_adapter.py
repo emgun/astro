@@ -9,6 +9,7 @@ from astro_uq.adapters.lifecycle import (
     lifecycle_metric_registry,
     lifecycle_parameter_registry,
 )
+from astro_uq.metrics import evaluate_requirements
 from astro_uq.models import (
     CampaignDefinition,
     DistributionKind,
@@ -150,6 +151,77 @@ def test_lifecycle_metrics_extract_checked_result() -> None:
                 value_kind=MetricValueKind.NUMERIC,
                 unit="Pa",
             ),
+            MetricSpec(
+                metric_id="battery_margin",
+                extractor="lifecycle.twin_battery_soc_margin_fraction",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="1",
+            ),
+            MetricSpec(
+                metric_id="thermal_margin",
+                extractor="lifecycle.twin_minimum_thermal_margin_k",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="K",
+            ),
+            MetricSpec(
+                metric_id="pointing_margin",
+                extractor="lifecycle.twin_pointing_margin_deg",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="deg",
+            ),
+            MetricSpec(
+                metric_id="torque_margin",
+                extractor="lifecycle.twin_torque_margin_n_m",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="N*m",
+            ),
+            MetricSpec(
+                metric_id="slew_margin",
+                extractor="lifecycle.twin_slew_rate_margin_deg_s",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="deg/s",
+            ),
+            MetricSpec(
+                metric_id="actuator_margin",
+                extractor="lifecycle.twin_actuator_utilization_margin_fraction",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="1",
+            ),
+            MetricSpec(
+                metric_id="has_contact",
+                extractor="lifecycle.twin_has_contact",
+                value_kind=MetricValueKind.BOOLEAN,
+            ),
+            MetricSpec(
+                metric_id="worst_observed_link_margin",
+                extractor="lifecycle.twin_worst_observed_link_margin_db",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="dB",
+            ),
+            MetricSpec(
+                metric_id="propellant_fraction_margin",
+                extractor="lifecycle.twin_propellant_fraction_margin",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="1",
+            ),
+            MetricSpec(
+                metric_id="mass_budget_margin",
+                extractor="lifecycle.twin_mass_budget_rollup_margin_kg",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="kg",
+            ),
+            MetricSpec(
+                metric_id="access_count",
+                extractor="lifecycle.twin_access_window_count",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="1",
+            ),
+            MetricSpec(
+                metric_id="access_duration",
+                extractor="lifecycle.twin_total_access_duration_s",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="s",
+            ),
         ),
     )
 
@@ -157,6 +229,106 @@ def test_lifecycle_metrics_extract_checked_result() -> None:
     assert isinstance(values["reserve"], float)
     assert values["propellant_used"] == result.metadata["propellant_used_kg"]
     assert values["peak_dynamic_pressure"] == result.reentry_result.peaks.dynamic_pressure.value
+    twin_margins = {
+        margin.name: margin.margin for margin in result.digital_twin.margin_report.margins
+    }
+    assert values["battery_margin"] == twin_margins["battery_soc_margin_fraction"]
+    assert values["thermal_margin"] == min(
+        value for name, value in twin_margins.items() if name.startswith("thermal_")
+    )
+    assert values["pointing_margin"] == twin_margins["pointing_margin_deg"]
+    assert values["torque_margin"] == twin_margins["torque_margin_n_m"]
+    assert values["slew_margin"] == twin_margins["slew_rate_margin_deg_s"]
+    assert values["actuator_margin"] == twin_margins[
+        "actuator_utilization_margin_fraction"
+    ]
+    assert values["has_contact"] is True
+    assert values["worst_observed_link_margin"] == min(
+        window.worst_ebn0_margin_db for window in result.digital_twin.link_windows
+    )
+    assert values["propellant_fraction_margin"] == twin_margins["mass_margin_fraction"]
+    assert values["mass_budget_margin"] == twin_margins[
+        "mass_budget_rollup_margin_kg"
+    ]
+    assert values["access_count"] == float(len(result.digital_twin.access_windows))
+    assert values["access_duration"] == sum(
+        window.duration_s for window in result.digital_twin.access_windows
+    )
+
+
+def test_lifecycle_link_margin_is_missing_without_contact() -> None:
+    result = run_mission_lifecycle(
+        load_mission_lifecycle_scenario("examples/lifecycle/leo_round_trip.yaml")
+    )
+    twin = result.digital_twin.model_copy(update={"link_windows": ()})
+    without_contact = result.model_copy(update={"digital_twin": twin})
+
+    values = lifecycle_metric_registry().extract(
+        workflow="mission_lifecycle",
+        result=without_contact,
+        specifications=(
+            MetricSpec(
+                metric_id="has_contact",
+                extractor="lifecycle.twin_has_contact",
+                value_kind=MetricValueKind.BOOLEAN,
+            ),
+            MetricSpec(
+                metric_id="worst_observed_link_margin",
+                extractor="lifecycle.twin_worst_observed_link_margin_db",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="dB",
+            ),
+        ),
+    )
+
+    assert values == {"has_contact": False, "worst_observed_link_margin": None}
+    outcomes = evaluate_requirements(
+        values,
+        (
+            RequirementSpec(
+                requirement_id="contact_available",
+                metric_id="has_contact",
+                operator=RequirementOperator.IS_TRUE,
+            ),
+            RequirementSpec(
+                requirement_id="observed_link_margin",
+                metric_id="worst_observed_link_margin",
+                operator=RequirementOperator.GE,
+                value=0.0,
+            ),
+        ),
+    )
+    assert outcomes[0].passed is False
+    assert outcomes[0].margin == -1.0
+    assert outcomes[1].passed is None
+    assert outcomes[1].reason == "metric_missing_or_not_applicable"
+
+
+def test_lifecycle_link_margin_uses_worst_observed_contact() -> None:
+    result = run_mission_lifecycle(
+        load_mission_lifecycle_scenario("examples/lifecycle/leo_round_trip.yaml")
+    )
+    first = result.digital_twin.link_windows[0]
+    worse = first.model_copy(update={"worst_ebn0_margin_db": 2.5})
+    twin = result.digital_twin.model_copy(
+        update={"link_windows": (*result.digital_twin.link_windows, worse)}
+    )
+    with_extra_contact = result.model_copy(update={"digital_twin": twin})
+
+    values = lifecycle_metric_registry().extract(
+        workflow="mission_lifecycle",
+        result=with_extra_contact,
+        specifications=(
+            MetricSpec(
+                metric_id="worst_observed_link_margin",
+                extractor="lifecycle.twin_worst_observed_link_margin_db",
+                value_kind=MetricValueKind.NUMERIC,
+                unit="dB",
+            ),
+        ),
+    )
+
+    assert values == {"worst_observed_link_margin": 2.5}
 
 
 def test_failed_launch_is_counted_and_records_stopped_phase(tmp_path: Path) -> None:

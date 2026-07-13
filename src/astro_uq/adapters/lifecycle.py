@@ -8,7 +8,7 @@ from astro_mission.models import (
     MissionLifecycleResult,
     MissionLifecycleScenario,
 )
-from astro_uq.metrics import MetricExtractor, MetricRegistry
+from astro_uq.metrics import MetricError, MetricExtractor, MetricRegistry
 from astro_uq.models import MetricValue, MetricValueKind
 from astro_uq.parameters import (
     ParameterBinding,
@@ -156,6 +156,40 @@ def _margin(phase: str, name: str) -> Callable[[AstroModel], float]:
     return extract
 
 
+def _twin_margin(name: str) -> Callable[[AstroModel], float]:
+    def extract(model: AstroModel) -> float:
+        matches = [
+            margin
+            for margin in _result(model).digital_twin.margin_report.margins
+            if margin.name == name
+        ]
+        if len(matches) != 1:
+            qualifier = "missing" if not matches else "duplicate"
+            raise MetricError(f"{qualifier} lifecycle twin margin name: {name}")
+        return float(matches[0].margin)
+
+    return extract
+
+
+def _minimum_thermal_margin(model: AstroModel) -> float:
+    margins = [
+        margin
+        for margin in _result(model).digital_twin.margin_report.margins
+        if margin.name.startswith("thermal_")
+        and (margin.name.endswith("_cold_margin_k") or margin.name.endswith("_hot_margin_k"))
+    ]
+    if not margins:
+        raise MetricError("missing lifecycle twin thermal margins")
+    return min(float(margin.margin) for margin in margins)
+
+
+def _worst_observed_link_margin(model: AstroModel) -> MetricValue:
+    windows = _result(model).digital_twin.link_windows
+    if not windows:
+        return None
+    return min(float(window.worst_ebn0_margin_db) for window in windows)
+
+
 def lifecycle_metric_registry() -> MetricRegistry:
     registry = MetricRegistry()
 
@@ -205,6 +239,81 @@ def lifecycle_metric_registry() -> MetricRegistry:
             MetricValueKind.CATEGORY,
             None,
             lambda model: _result(model).digital_twin.margin_report.limiting_margin.status.value,
+        ),
+        (
+            "lifecycle.twin_battery_soc_margin_fraction",
+            MetricValueKind.NUMERIC,
+            "1",
+            _twin_margin("battery_soc_margin_fraction"),
+        ),
+        (
+            "lifecycle.twin_minimum_thermal_margin_k",
+            MetricValueKind.NUMERIC,
+            "K",
+            _minimum_thermal_margin,
+        ),
+        (
+            "lifecycle.twin_pointing_margin_deg",
+            MetricValueKind.NUMERIC,
+            "deg",
+            _twin_margin("pointing_margin_deg"),
+        ),
+        (
+            "lifecycle.twin_torque_margin_n_m",
+            MetricValueKind.NUMERIC,
+            "N*m",
+            _twin_margin("torque_margin_n_m"),
+        ),
+        (
+            "lifecycle.twin_slew_rate_margin_deg_s",
+            MetricValueKind.NUMERIC,
+            "deg/s",
+            _twin_margin("slew_rate_margin_deg_s"),
+        ),
+        (
+            "lifecycle.twin_actuator_utilization_margin_fraction",
+            MetricValueKind.NUMERIC,
+            "1",
+            _twin_margin("actuator_utilization_margin_fraction"),
+        ),
+        (
+            "lifecycle.twin_has_contact",
+            MetricValueKind.BOOLEAN,
+            None,
+            lambda model: bool(_result(model).digital_twin.link_windows),
+        ),
+        (
+            "lifecycle.twin_worst_observed_link_margin_db",
+            MetricValueKind.NUMERIC,
+            "dB",
+            _worst_observed_link_margin,
+        ),
+        (
+            "lifecycle.twin_propellant_fraction_margin",
+            MetricValueKind.NUMERIC,
+            "1",
+            _twin_margin("mass_margin_fraction"),
+        ),
+        (
+            "lifecycle.twin_mass_budget_rollup_margin_kg",
+            MetricValueKind.NUMERIC,
+            "kg",
+            _twin_margin("mass_budget_rollup_margin_kg"),
+        ),
+        (
+            "lifecycle.twin_access_window_count",
+            MetricValueKind.NUMERIC,
+            "1",
+            lambda model: float(len(_result(model).digital_twin.access_windows)),
+        ),
+        (
+            "lifecycle.twin_total_access_duration_s",
+            MetricValueKind.NUMERIC,
+            "s",
+            lambda model: sum(
+                float(window.duration_s)
+                for window in _result(model).digital_twin.access_windows
+            ),
         ),
         (
             "lifecycle.deorbit_propellant_used_kg",

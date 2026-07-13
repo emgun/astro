@@ -37,10 +37,30 @@ def test_reference_lifecycle_campaign_runs_end_to_end(tmp_path: Path) -> None:
     assert set(result.statistics.requirement_probabilities) == {
         "lifecycle_success",
         "propellant_reserve",
+        "twin_actuator_utilization",
+        "twin_battery_soc",
+        "twin_contact_available",
+        "twin_mass_budget_rollup",
+        "twin_propellant_fraction",
+        "twin_pointing",
+        "twin_slew_rate",
+        "twin_thermal",
+        "twin_torque",
+        "twin_worst_observed_link_margin",
     }
     assert result.statistics.requirement_probabilities == {
         "lifecycle_success": 1.0,
         "propellant_reserve": 1.0,
+        "twin_actuator_utilization": 1.0,
+        "twin_battery_soc": 1.0,
+        "twin_contact_available": 1.0,
+        "twin_mass_budget_rollup": 1.0,
+        "twin_propellant_fraction": 1.0,
+        "twin_pointing": 1.0,
+        "twin_slew_rate": 1.0,
+        "twin_thermal": 1.0,
+        "twin_torque": 1.0,
+        "twin_worst_observed_link_margin": 1.0,
     }
     means = {metric.metric_id: metric.mean for metric in result.statistics.metrics}
     assert means["deorbit_propellant_used"] == pytest.approx(
