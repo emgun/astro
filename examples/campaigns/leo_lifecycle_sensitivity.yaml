@@ -1,0 +1,112 @@
+schema_version: "1.0"
+campaign_id: leo-lifecycle-sensitivity-v1
+workflow:
+  kind: mission_lifecycle
+  scenario: ../lifecycle/leo_round_trip.yaml
+uncertainty:
+  parameters:
+    - parameter_id: launch_upper_stage_thrust
+      target: lifecycle.launch.upper_stage_thrust_n
+      unit: N
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 199800.0
+        high: 200200.0
+    - parameter_id: spacecraft_wet_mass
+      target: lifecycle.spacecraft.wet_mass_kg
+      unit: kg
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 499.0
+        high: 501.0
+    - parameter_id: solar_array_efficiency
+      target: lifecycle.digital_twin.power.solar_array_efficiency
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.285
+        high: 0.295
+    - parameter_id: reentry_density_scale
+      target: lifecycle.reentry.atmosphere.density_scale_factor
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.98
+        high: 1.02
+    - parameter_id: reentry_drag_coefficient
+      target: lifecycle.reentry.vehicle.drag_coefficient
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 1.47
+        high: 1.53
+    - parameter_id: deorbit_delta_v
+      target: lifecycle.deorbit.delta_v_km_s
+      unit: km/s
+      uncertainty_kind: epistemic
+      distribution:
+        kind: triangular
+        low: 0.19
+        mode: 0.20
+        high: 0.21
+    - parameter_id: deorbit_specific_impulse
+      target: lifecycle.deorbit.specific_impulse_s
+      unit: s
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 290.0
+        high: 310.0
+  correlations: []
+  model_variants: []
+sampler:
+  kind: latin_hypercube
+  samples: 64
+  seed: 7132026
+  scramble: true
+evaluator:
+  evaluator_id: local-lifecycle-sensitivity
+  kind: authoritative
+  workflow: mission_lifecycle
+  implementation_version: mission_lifecycle_v1
+  backend: local
+  claim_boundary: campaign_design_space_rank_association_not_operational_probability
+metrics:
+  - metric_id: deorbit_propellant_used
+    extractor: lifecycle.deorbit_propellant_used_kg
+    value_kind: numeric
+    unit: kg
+  - metric_id: propellant_reserve_margin
+    extractor: lifecycle.propellant_reserve_margin_kg
+    value_kind: numeric
+    unit: kg
+  - metric_id: entry_interface_margin
+    extractor: lifecycle.entry_interface_margin_km
+    value_kind: numeric
+    unit: km
+  - metric_id: reentry_peak_heat_rate
+    extractor: lifecycle.reentry_peak_heat_rate_w_m2
+    value_kind: numeric
+    unit: W/m^2
+  - metric_id: reentry_peak_dynamic_pressure
+    extractor: lifecycle.reentry_peak_dynamic_pressure_pa
+    value_kind: numeric
+    unit: Pa
+requirements:
+  - requirement_id: propellant_reserve
+    metric_id: propellant_reserve_margin
+    operator: ge
+    value: 0.0
+stopping:
+  kind: fixed_count
+retention:
+  policy: none
+metadata:
+  uncertainty_scope: reviewed_cross_phase_epistemic_design_inputs
+  purpose: lifecycle_rank_sensitivity_and_margin_attribution
+  interpretation: design_space_association_not_causal_or_operational_probability

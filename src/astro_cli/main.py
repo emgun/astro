@@ -108,6 +108,7 @@ from astro_twin.constellation_io import (
 from astro_twin.io import format_twin_summary, load_twin_scenario
 from astro_twin.runner import run_digital_twin
 from astro_uq.cli import (
+    analyze_campaign_sensitivity_command,
     profile_campaign_command,
     run_campaign_command,
     summarize_campaign_command,
@@ -119,6 +120,7 @@ app.command("validate-campaign")(validate_campaign)
 app.command("run-campaign")(run_campaign_command)
 app.command("summarize-campaign")(summarize_campaign_command)
 app.command("profile-campaign")(profile_campaign_command)
+app.command("analyze-campaign-sensitivity")(analyze_campaign_sensitivity_command)
 
 INITIAL_GUESS_POSITION_DELTA_KM = (1.0, -0.8, 0.6)
 INITIAL_GUESS_VELOCITY_DELTA_KM_S = (0.0005, -0.001, 0.0008)

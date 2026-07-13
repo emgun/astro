@@ -460,6 +460,63 @@ class CampaignTimingProfile(AstroModel):
     timing: CampaignTimingSummary
 
 
+class SensitivityTargetKind(StrEnum):
+    METRIC = "metric"
+    REQUIREMENT_MARGIN = "requirement_margin"
+
+
+class SensitivityParameter(AstroModel):
+    parameter_id: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    target: str = Field(min_length=1)
+    unit: str = Field(min_length=1)
+    uncertainty_kind: UncertaintyKind
+
+
+class SensitivityEstimate(AstroModel):
+    parameter_id: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
+    spearman_rho: FiniteFloat = Field(ge=-1.0, le=1.0)
+    partial_rank_correlation: FiniteFloat = Field(ge=-1.0, le=1.0)
+    absolute_prcc_rank: int = Field(gt=0)
+    input_unique_count: int = Field(ge=5)
+    input_tie_fraction: FiniteFloat = Field(ge=0.0, lt=1.0)
+
+
+class SensitivityTargetSummary(AstroModel):
+    target_id: str = Field(min_length=1)
+    kind: SensitivityTargetKind
+    unit: str = Field(min_length=1)
+    source_metric_id: str = Field(min_length=1)
+    orientation: Literal["association_only", "higher_is_safer"]
+    requirement_operator: RequirementOperator | None = None
+    sample_count: int = Field(gt=0)
+    target_unique_count: int = Field(ge=5)
+    target_tie_fraction: FiniteFloat = Field(ge=0.0, lt=1.0)
+    estimates: tuple[SensitivityEstimate, ...] = Field(min_length=1)
+    largest_absolute_prcc_parameter_id: str = Field(min_length=1)
+
+
+class CampaignSensitivityReport(AstroModel):
+    schema_version: SchemaVersion = "1.0"
+    campaign_id: str = Field(min_length=1)
+    definition_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    samples_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    cases_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    claim_boundary: str = Field(min_length=1)
+    evidence_scope: Literal["campaign_design_space"] = "campaign_design_space"
+    method: Literal["spearman_and_prcc"] = "spearman_and_prcc"
+    weight_policy: Literal["equal_only"] = "equal_only"
+    sampler_kind: SamplerKind
+    sample_count: int = Field(gt=0)
+    effective_sample_size: FiniteFloat = Field(gt=0.0)
+    parameter_count: int = Field(gt=0)
+    residual_degrees_of_freedom: int = Field(gt=0)
+    ranked_design_rank: int = Field(gt=0)
+    ranked_design_condition_number: FiniteFloat = Field(ge=1.0)
+    parameters: tuple[SensitivityParameter, ...] = Field(min_length=1)
+    targets: tuple[SensitivityTargetSummary, ...] = Field(min_length=1)
+    warnings: tuple[str, ...] = Field(default_factory=tuple)
+
+
 class CampaignStatistics(AstroModel):
     requested_samples: int = Field(gt=0)
     completed_samples: int = Field(ge=0)

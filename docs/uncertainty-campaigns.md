@@ -42,6 +42,12 @@ evaluator share of instrumented time. The profile binds the source case digest, 
 compatibility, and machine identity. It does not modify deterministic campaign statistics. Cases written before extraction
 instrumentation remain visibly incomplete and cannot produce evaluator-share claims.
 
+`astro analyze-campaign-sensitivity` derives digest-bound Spearman and PRCC association evidence
+for selected numeric metrics and signed requirement margins. It requires a completed, equal-weight
+campaign that passes the configured sample-size gates and rejects failed cases, missing targets, boolean margins, and
+singular ranked designs. See `docs/campaign-sensitivity.md` for the validity gates and the checked
+64-case lifecycle attribution result.
+
 ## Surrogate Boundary
 
 The baseline benchmark does not currently justify a learned evaluator. Checked campaign profiling

@@ -11,7 +11,17 @@ from astro_cli.main import app
 runner = CliRunner()
 
 
-def _campaign(tmp_path: Path, *, extractor: str = "orbit.final_altitude_km") -> Path:
+def _campaign(
+    tmp_path: Path,
+    *,
+    extractor: str = "orbit.final_altitude_km",
+    samples: int = 2,
+    parameter_id: str = "mass",
+    parameter_target: str = "orbit.spacecraft.mass_kg",
+    parameter_unit: str = "kg",
+    parameter_low: float = 900.0,
+    parameter_high: float = 901.0,
+) -> Path:
     source = Path("examples/scenarios/leo_two_body.yaml").resolve()
     definition = {
         "campaign_id": "cli-orbit",
@@ -19,15 +29,19 @@ def _campaign(tmp_path: Path, *, extractor: str = "orbit.final_altitude_km") -> 
         "uncertainty": {
             "parameters": [
                 {
-                    "parameter_id": "mass",
-                    "target": "orbit.spacecraft.mass_kg",
-                    "unit": "kg",
+                    "parameter_id": parameter_id,
+                    "target": parameter_target,
+                    "unit": parameter_unit,
                     "uncertainty_kind": "epistemic",
-                    "distribution": {"kind": "uniform", "low": 900.0, "high": 901.0},
+                    "distribution": {
+                        "kind": "uniform",
+                        "low": parameter_low,
+                        "high": parameter_high,
+                    },
                 }
             ]
         },
-        "sampler": {"kind": "pseudorandom", "samples": 2, "seed": 7},
+        "sampler": {"kind": "pseudorandom", "samples": samples, "seed": 7},
         "evaluator": {
             "evaluator_id": "local-orbit",
             "kind": "authoritative",
@@ -161,6 +175,84 @@ def test_profile_campaign_rejects_interrupted_evidence(tmp_path: Path) -> None:
     assert run.exit_code == 0
     assert profiled.exit_code == 2
     assert "only completed campaigns can be profiled" in profiled.output
+
+
+def test_analyze_campaign_sensitivity_writes_digest_bound_report(tmp_path: Path) -> None:
+    campaign = _campaign(
+        tmp_path,
+        samples=32,
+        parameter_id="position_x",
+        parameter_target="orbit.initial_state.cartesian.position_x_km",
+        parameter_unit="km",
+        parameter_low=6999.0,
+        parameter_high=7001.0,
+    )
+    output = tmp_path / "campaign-output"
+    report_path = tmp_path / "sensitivity.json"
+    run = runner.invoke(app, ["run-campaign", str(campaign), "--output-dir", str(output)])
+
+    analyzed = runner.invoke(
+        app,
+        [
+            "analyze-campaign-sensitivity",
+            str(output),
+            "--metric",
+            "altitude",
+            "--requirement-margin",
+            "above_earth",
+            "--output",
+            str(report_path),
+        ],
+    )
+
+    assert run.exit_code == 0
+    assert analyzed.exit_code == 0, analyzed.output
+    report = json.loads(analyzed.stdout)
+    assert report["evidence_scope"] == "campaign_design_space"
+    assert report["sample_count"] == 32
+    assert report["samples_digest"]
+    assert report["cases_digest"]
+    assert {target["target_id"] for target in report["targets"]} == {
+        "altitude",
+        "above_earth",
+    }
+    assert all(
+        target["largest_absolute_prcc_parameter_id"] == "position_x"
+        for target in report["targets"]
+    )
+    assert json.loads(report_path.read_text()) == report
+
+
+def test_sensitivity_output_cannot_overwrite_campaign_evidence(tmp_path: Path) -> None:
+    campaign = _campaign(
+        tmp_path,
+        samples=32,
+        parameter_id="position_x",
+        parameter_target="orbit.initial_state.cartesian.position_x_km",
+        parameter_unit="km",
+        parameter_low=6999.0,
+        parameter_high=7001.0,
+    )
+    output = tmp_path / "campaign-output"
+    run = runner.invoke(app, ["run-campaign", str(campaign), "--output-dir", str(output)])
+
+    analyzed = runner.invoke(
+        app,
+        [
+            "analyze-campaign-sensitivity",
+            str(output),
+            "--metric",
+            "altitude",
+            "--output",
+            str(output / "statistics.json"),
+        ],
+    )
+    integrity_check = runner.invoke(app, ["profile-campaign", str(output)])
+
+    assert run.exit_code == 0
+    assert analyzed.exit_code == 2
+    assert "outside the source campaign directory" in analyzed.output
+    assert integrity_check.exit_code == 0
 
 
 def test_run_campaign_dry_run_and_max_cases_do_not_write_evidence(tmp_path: Path) -> None:
