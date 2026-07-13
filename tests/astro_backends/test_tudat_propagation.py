@@ -80,7 +80,7 @@ def test_propagate_tudat_runs_default_two_body_with_fake_tudat_modules(
 ) -> None:
     scenario = load_scenario("examples/scenarios/leo_two_body.yaml")
     fake_modules = _FakeTudatModules()
-    monkeypatch.setattr("astro_backends.tudat.propagation._LOADED_SPICE_MODULE_IDS", set())
+    monkeypatch.setattr("astro_backends.tudat.propagation._LOADED_SPICE_MODULES", [])
     monkeypatch.setattr(
         "astro_backends.tudat.propagation.import_module",
         fake_modules.import_module,

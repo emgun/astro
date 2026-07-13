@@ -39,15 +39,14 @@ _SUPPORTED_TUDAT_HIGH_FIDELITY_FLAGS = {
     "solar_radiation_pressure",
     "third_body_gravity",
 }
-_LOADED_SPICE_MODULE_IDS: set[int] = set()
+_LOADED_SPICE_MODULES: list[Any] = []
 
 
 def _load_standard_spice_kernels_once(spice: Any) -> None:
-    module_id = id(spice)
-    if module_id in _LOADED_SPICE_MODULE_IDS:
+    if any(loaded is spice for loaded in _LOADED_SPICE_MODULES):
         return
     spice.load_standard_kernels()
-    _LOADED_SPICE_MODULE_IDS.add(module_id)
+    _LOADED_SPICE_MODULES.append(spice)
 
 
 def _load_tudat_propagation_api() -> dict[str, Any]:
