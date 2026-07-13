@@ -99,6 +99,21 @@ dynamic-pressure association. The largest observed absolute PRCC for entry-inter
 not Sobol indices or operational risk contributions. The integrated scope passes 901 tests with 11
 skipped, Ruff, strict MyPy across 121 source files, and sdist/wheel builds.
 
+Lifecycle Subsystem Margin Targets add unit-stable campaign extractors for battery SOC, the minimum
+hot/cold thermal envelope, ADCS pointing/torque/slew/utilization, worst observed contact link margin,
+propellant fraction, and itemized mass-budget rollup, plus separate contact availability, count, and
+duration metrics. A fresh 64-case run completed 64/64 with all ten subsystem requirements passing.
+Only observed link and propellant-fraction margins varied under the existing seven inputs: link
+margin's largest observed absolute PRCC values were launch thrust `-0.9965` and wet mass `+0.8913`,
+but its full target range was only `0.0035 dB` and no practical-effect threshold was evaluated. Wet
+mass had PRCC `+1.0000` with propellant-fraction margin. Constant battery, thermal, ADCS, rollup,
+and contact
+targets were excluded from attribution rather than assigned artificial ranks. These remain local
+configured-design-space associations, not causal, operational-reliability, coverage-authority, or
+certification claims.
+The completed implementation passes 903 tests with 11 skipped, Ruff, strict MyPy across 121 source
+files, and sdist/wheel builds.
+
 Independent review hardened the campaign boundary before integration: non-authoritative evaluator
 labels now fail closed, resume verifies the definition, samples, cases, statistics, and regenerated
 deterministic sample plan, and a non-resume run refuses to overwrite existing evidence. Requirement
@@ -321,14 +336,16 @@ Post-MVP / external-campaign items:
 | mission-lifecycle | done | productize/verify | steward | `src/astro_mission`, `astro run-mission-lifecycle`, checked phase fixtures, lifecycle tests and docs | Connects launch, operations propagation, the integrated twin, deorbit, and reentry through suite-owned products; fails closed on continuity or phase gates; writes an ordered artifact manifest; passes focused, full, package, public-command, and GitHub CI gates; PR #9 is merged at `d37b9a6`. |
 | ai-native-uncertainty-surrogates | done | productize/verify | steward | `astro_uq`, `astro_surrogates`, campaign CLI, assistant campaign plans, checked lifecycle campaign, benchmark and validation docs | UQ campaigns v1, safe surrogate artifact contracts, deterministic assistant campaign plans, and separate machine-scoped timing profiles are implemented. Checked local J2 orbit and integrated-twin profiles have complete phase accounting but fail the preregistered 0.050-second median evaluator-cost gate. The hardened timing scope passes 888 tests, lint, type checking, and package builds; surrogate training/promotion remains deliberately stopped. |
 | lifecycle-sensitivity-attribution | done | productize/verify | steward | `astro_uq.sensitivity`, `astro analyze-campaign-sensitivity`, checked 64-case lifecycle campaign, sensitivity docs and tests | Produces digest-bound Spearman and PRCC association evidence for numeric metrics and signed requirement margins with sample-size, residual-DF, tie, weight, failure, and conditioning gates. The checked lifecycle campaign completes 64/64 cases and records bounded design-space attribution without causal, Sobol-index, operational-probability, or certification claims. |
+| lifecycle-subsystem-margin-targets | done | productize/verify | steward | lifecycle UQ adapter, checked lifecycle campaigns, subsystem requirement tests and docs | Exposes unit-stable battery, thermal-envelope, ADCS, worst-observed-link, propellant-fraction, and mass-budget margins plus contact metrics through lifecycle campaigns. The checked 64-case run passes every subsystem requirement and attributes only the two nonconstant targets, preserving practical-effect, no-contact, constant-target, and coverage claim boundaries. |
 
 ## Next Best Paths
 
 1. Keep surrogate acceleration closed for the inexpensive local orbit and twin evaluators; reopen
    only for a measured optional teacher or future high-fidelity evaluator with materially larger
    absolute cost that survives simpler challengers.
-2. Add any new cross-phase lifecycle uncertainty only through the typed `input_overrides` bundle,
-   and require a specific decision target before broadening the seven-input attribution domain.
+2. Choose one subsystem decision before expanding lifecycle uncertainty. The highest-signal next
+   candidate is a typed power/thermal input pack tied to battery-SOC and thermal-envelope margins;
+   ADCS and link inputs should remain separate so each campaign has a clear decision boundary.
 3. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
 4. Choose any higher-authority reentry campaign deliberately and keep it separate from the local

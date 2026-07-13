@@ -11,6 +11,8 @@ astro analyze-campaign-sensitivity /tmp/astro-lifecycle-sensitivity/campaign \
   --metric reentry_peak_heat_rate \
   --metric reentry_peak_dynamic_pressure \
   --requirement-margin propellant_reserve \
+  --requirement-margin twin_worst_observed_link_margin \
+  --requirement-margin twin_propellant_fraction \
   --output /tmp/astro-lifecycle-sensitivity/sensitivity.json
 ```
 
@@ -67,6 +69,16 @@ no input or target ties. Generated bulk artifacts remain under `/tmp` and are no
 | Reentry peak heat rate | drag coefficient `-0.9844`; delta-v `+0.8422` | Vehicle drag and the upstream deorbit design dominate this local screening response. |
 | Reentry peak dynamic pressure | drag coefficient `-0.9895`; delta-v `+0.8415` | The same bounded design inputs dominate peak dynamic-pressure association. |
 | Entry-interface margin | largest observed absolute PRCC `0.2015` | The observed associations are smaller than the dominant coefficients above; no practical-effect threshold is asserted. |
+| Twin worst observed contact link margin | launch thrust `-0.9965`; wet mass `+0.8913` | The conditional association reflects the coupled launch-state and observed link-geometry response in this configured lifecycle model. The full 64-case target range is only `0.0035 dB`; no practical-effect threshold was evaluated. |
+| Twin propellant-fraction margin | wet mass `+1.0000` | The wet-mass override changes available propellant while dry and payload mass stay fixed. This is not conventional mass-growth allowance. |
+
+All ten checked subsystem requirements passed in all 64 cases. Battery-SOC, minimum thermal,
+pointing, torque, slew-rate, actuator-utilization, and itemized mass-budget margins were constant
+under the existing seven inputs, as were contact count and duration. They are therefore valid
+campaign requirement evidence but invalid PRCC targets. Astro fails closed on those constant
+targets; it does not manufacture a ranking. Relevant typed thermal, ADCS, power-load, or link
+inputs must be introduced through a separate decision-specific scope before those margins can be
+attributed.
 
 These coefficients apply only to the declared ranges, models, sampler, and local deterministic
 lifecycle workflow. They are not causal contributions, portable variance fractions, operational

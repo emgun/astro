@@ -20,6 +20,22 @@ deorbit, reentry-atmosphere, and reentry-aerodynamics inputs through typed ownin
 The resulting pass fraction is a design-space summary, not an operational frequency or certified
 mission-success probability.
 
+Lifecycle campaigns expose the integrated twin's signed battery-SOC, minimum thermal-envelope,
+pointing, torque, slew-rate, actuator-utilization, link, propellant-fraction, and itemized
+mass-budget margins with stable physical units. Contact availability, contact-window count, and
+duration are separate metrics; they are not labeled as constellation coverage or revisit evidence.
+Link margin is explicitly the worst observed contact margin, not proof that every configured link
+has contact. No contact fails the availability requirement and leaves observed dB margin missing;
+the detailed case outcome distinguishes that state from a negative observed link margin even
+though both are non-passing in the all-completed-cases requirement denominator.
+
+The legacy generic `lifecycle.twin_limiting_margin` extractor remains available for compatibility,
+but checked campaigns do not use it for quantitative analysis because its subsystem and unit can
+change between cases.
+
+The adapter's margin-name-to-unit mapping is a versioned v1 contract because the underlying twin
+margin model does not yet carry units directly.
+
 Campaign artifacts include the resolved definition and digest, sampled physical values, one typed
 outcome per requested case, aggregate statistics, evaluator timing, and a concise text summary.
 Invalid realizations, workflow failures, numerical failures, OOD decisions, and policy rejections

@@ -89,6 +89,53 @@ metrics:
     extractor: lifecycle.entry_interface_margin_km
     value_kind: numeric
     unit: km
+  - metric_id: twin_battery_soc_margin
+    extractor: lifecycle.twin_battery_soc_margin_fraction
+    value_kind: numeric
+    unit: "1"
+  - metric_id: twin_minimum_thermal_margin
+    extractor: lifecycle.twin_minimum_thermal_margin_k
+    value_kind: numeric
+    unit: K
+  - metric_id: twin_pointing_margin
+    extractor: lifecycle.twin_pointing_margin_deg
+    value_kind: numeric
+    unit: deg
+  - metric_id: twin_torque_margin
+    extractor: lifecycle.twin_torque_margin_n_m
+    value_kind: numeric
+    unit: N*m
+  - metric_id: twin_slew_rate_margin
+    extractor: lifecycle.twin_slew_rate_margin_deg_s
+    value_kind: numeric
+    unit: deg/s
+  - metric_id: twin_actuator_utilization_margin
+    extractor: lifecycle.twin_actuator_utilization_margin_fraction
+    value_kind: numeric
+    unit: "1"
+  - metric_id: twin_has_contact
+    extractor: lifecycle.twin_has_contact
+    value_kind: boolean
+  - metric_id: twin_worst_observed_link_margin
+    extractor: lifecycle.twin_worst_observed_link_margin_db
+    value_kind: numeric
+    unit: dB
+  - metric_id: twin_propellant_fraction_margin
+    extractor: lifecycle.twin_propellant_fraction_margin
+    value_kind: numeric
+    unit: "1"
+  - metric_id: twin_mass_budget_rollup_margin
+    extractor: lifecycle.twin_mass_budget_rollup_margin_kg
+    value_kind: numeric
+    unit: kg
+  - metric_id: twin_access_window_count
+    extractor: lifecycle.twin_access_window_count
+    value_kind: numeric
+    unit: "1"
+  - metric_id: twin_total_access_duration
+    extractor: lifecycle.twin_total_access_duration_s
+    value_kind: numeric
+    unit: s
   - metric_id: reentry_peak_heat_rate
     extractor: lifecycle.reentry_peak_heat_rate_w_m2
     value_kind: numeric
@@ -100,6 +147,45 @@ metrics:
 requirements:
   - requirement_id: propellant_reserve
     metric_id: propellant_reserve_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: twin_battery_soc
+    metric_id: twin_battery_soc_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: twin_thermal
+    metric_id: twin_minimum_thermal_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: twin_pointing
+    metric_id: twin_pointing_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: twin_torque
+    metric_id: twin_torque_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: twin_slew_rate
+    metric_id: twin_slew_rate_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: twin_actuator_utilization
+    metric_id: twin_actuator_utilization_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: twin_contact_available
+    metric_id: twin_has_contact
+    operator: is_true
+  - requirement_id: twin_worst_observed_link_margin
+    metric_id: twin_worst_observed_link_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: twin_propellant_fraction
+    metric_id: twin_propellant_fraction_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: twin_mass_budget_rollup
+    metric_id: twin_mass_budget_rollup_margin
     operator: ge
     value: 0.0
 stopping:

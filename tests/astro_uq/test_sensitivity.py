@@ -281,6 +281,18 @@ def test_checked_lifecycle_sensitivity_campaign_has_sufficient_design() -> None:
     assert definition.sampler.samples >= max(30, 5 * (parameter_count + 1))
     assert definition.retention.policy.value == "none"
     assert definition.metadata["purpose"] == "lifecycle_rank_sensitivity_and_margin_attribution"
+    assert {
+        "twin_battery_soc",
+        "twin_thermal",
+        "twin_pointing",
+        "twin_torque",
+        "twin_slew_rate",
+        "twin_actuator_utilization",
+        "twin_contact_available",
+        "twin_propellant_fraction",
+        "twin_mass_budget_rollup",
+        "twin_worst_observed_link_margin",
+    } <= {requirement.requirement_id for requirement in definition.requirements}
 
 
 def test_prcc_matches_independent_tied_confounding_oracle() -> None:
