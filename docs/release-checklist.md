@@ -41,6 +41,12 @@ Latest merged-main evidence:
 
 Latest post-launch mission-assurance integration evidence:
 
+- 2026-07-14: deterministic assurance review verifies paired evidence before writing 10 typed
+  findings and an `additional_evidence_required` disposition for the illustrative calibration.
+  The public `/tmp` workflow, 12 focused tests, `970 passed, 11 skipped`, Ruff, strict MyPy across
+  137 source files, 9 package/import tests, builds, and `git diff --check` pass. Unlike-unit metrics
+  are preserved but not ranked by raw magnitude. GitHub review and CI integration are pending.
+
 - 2026-07-13: `codex/post-launch-mission-assurance` added the suite-owned launch insertion,
   simulated tracking, OD, bounded candidate correction, estimate/truth replay, corrected digital
   twin, continuity, margin, digest-manifest, and artifact-bundle workflow.

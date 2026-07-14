@@ -79,3 +79,11 @@ Current classifier codes include:
 - A future agentic verifier may generate extra challenge checks, but deterministic validators remain
   the execution authority.
 - Arbitrary shell commands are not supported.
+
+## Paired Assurance Review Plan
+
+`astro_assistant.planner.assurance_review_plan` compiles a fixed two-step workflow: verify one paired
+assurance result, then write its deterministic review. Both steps must use the same source path and
+the declared review output must match the command input. Verification is read-only; review output
+requires explicit approval. The assistant does not derive findings, alter calibration status, or
+interpret profile counts as probability; those rules remain in `astro_assurance`.

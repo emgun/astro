@@ -111,6 +111,9 @@ astro run-assurance-validation \
   --output /tmp/astro-paired-assurance.json \
   --summary-output /tmp/astro-paired-assurance.txt
 astro verify-assurance-validation /tmp/astro-paired-assurance.json
+astro review-assurance-validation /tmp/astro-paired-assurance.json \
+  --output /tmp/astro-paired-assurance-review.json \
+  --summary-output /tmp/astro-paired-assurance-review.txt
 ```
 
 Each explicit coordinate carries its own tracking-noise seed, truth sigma and bias, estimator sigma
@@ -146,6 +149,19 @@ The configured tracking biases and four-second maneuver timing error remain illu
 therefore requires mission-specific station residuals, insertion covariance with frame and
 correlation semantics, propulsion execution residuals including timing, and reviewed subsystem
 acceptance evidence. A larger case count cannot promote the evidence class.
+
+### Deterministic Review
+
+`review-assurance-validation` verifies the complete paired result before deriving a suite-owned
+decision-support artifact. Findings cover integrity, calibration authority, pair completeness,
+pass reversals, selected signed metric shifts, and the source claim boundary. Unlike units are not
+ranked by raw magnitude. Identical source bytes
+produce identical review bytes. Tampered evidence or path collisions prevent publication.
+
+The review disposition is `additional_evidence_required` when calibration or completeness blocks
+claim promotion; otherwise it is `design_review_ready`. Neither disposition authorizes navigation,
+probability, autonomous action, or a flight command. A later AI explainer may reference finding ids,
+but cannot create, remove, downgrade, or modify deterministic findings.
 
 The checked eight-coordinate, one-hour protocol uses 30 minutes of causal pre-decision tracking and
 30 minutes of post-decision truth verification. It completed all eight pairs. All eight matched
