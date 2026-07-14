@@ -20,7 +20,11 @@ from astro_assurance.io import (
     verify_mission_assurance_artifact_bundle,
     write_mission_assurance_artifact_bundle,
 )
-from astro_assurance.review_cli import review_assurance_validation_command
+from astro_assurance.review_cli import (
+    compare_assurance_reviews_command,
+    review_assurance_validation_command,
+    verify_assurance_review_comparison_command,
+)
 from astro_assurance.runner import run_post_launch_assurance
 from astro_assurance.validation_cli import (
     run_assurance_validation_command,
@@ -139,6 +143,10 @@ app.command("validate-assurance-validation")(validate_assurance_validation_comma
 app.command("run-assurance-validation")(run_assurance_validation_command)
 app.command("verify-assurance-validation")(verify_assurance_validation_command)
 app.command("review-assurance-validation")(review_assurance_validation_command)
+app.command("compare-assurance-reviews")(compare_assurance_reviews_command)
+app.command("verify-assurance-review-comparison")(
+    verify_assurance_review_comparison_command
+)
 
 INITIAL_GUESS_POSITION_DELTA_KM = (1.0, -0.8, 0.6)
 INITIAL_GUESS_VELOCITY_DELTA_KM_S = (0.0005, -0.001, 0.0008)

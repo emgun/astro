@@ -21,6 +21,7 @@ def evaluate_plan(plan: AstroWorkflowPlan, *, dry_run: bool, approved: bool) -> 
         AstroToolName.SUMMARIZE_CAMPAIGN: RiskLevel.READ_ONLY,
         AstroToolName.VERIFY_ASSURANCE_VALIDATION: RiskLevel.READ_ONLY,
         AstroToolName.REVIEW_ASSURANCE_VALIDATION: RiskLevel.WRITES_ARTIFACTS,
+        AstroToolName.COMPARE_ASSURANCE_REVIEWS: RiskLevel.WRITES_ARTIFACTS,
     }
     for step in plan.steps:
         expected_risk = campaign_risks.get(step.tool)
@@ -33,7 +34,12 @@ def evaluate_plan(plan: AstroWorkflowPlan, *, dry_run: bool, approved: bool) -> 
         warnings.append("optional backend execution is not enabled in the first assistant slice")
 
     always_approved_writes = any(
-        step.tool in {AstroToolName.RUN_CAMPAIGN, AstroToolName.REVIEW_ASSURANCE_VALIDATION}
+        step.tool
+        in {
+            AstroToolName.RUN_CAMPAIGN,
+            AstroToolName.REVIEW_ASSURANCE_VALIDATION,
+            AstroToolName.COMPARE_ASSURANCE_REVIEWS,
+        }
         for step in plan.steps
     )
     writes_requiring_approval = always_approved_writes or (

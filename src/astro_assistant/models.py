@@ -14,6 +14,7 @@ class AstroToolName(StrEnum):
     SUMMARIZE_CAMPAIGN = "summarize_campaign"
     VERIFY_ASSURANCE_VALIDATION = "verify_assurance_validation"
     REVIEW_ASSURANCE_VALIDATION = "review_assurance_validation"
+    COMPARE_ASSURANCE_REVIEWS = "compare_assurance_reviews"
 
 
 class RiskLevel(StrEnum):
@@ -33,6 +34,7 @@ class ArtifactKind(StrEnum):
     CAMPAIGN_SUMMARY = "campaign_summary"
     ASSURANCE_VALIDATION_RESULT = "assurance_validation_result"
     ASSURANCE_REVIEW = "assurance_review"
+    ASSURANCE_REVIEW_COMPARISON = "assurance_review_comparison"
 
 
 class _CampaignInputs(BaseModel):
@@ -66,6 +68,13 @@ class VerifyAssuranceValidationInputs(_CampaignInputs):
 
 class ReviewAssuranceValidationInputs(_CampaignInputs):
     result_path: str
+    output: str
+    summary_output: str | None = None
+
+
+class CompareAssuranceReviewsInputs(_CampaignInputs):
+    baseline_path: str
+    candidate_path: str
     output: str
     summary_output: str | None = None
 

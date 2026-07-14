@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from hashlib import sha256
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from astro_assurance.validation_models import (
     AssuranceCalibrationPromotionStatus,
     PairedAssuranceValidationResult,
 )
+from astro_core.errors import InvalidScenarioError
 
 _DECISION_METRIC_PRIORITY = (
     "truth_recovery_position_error_km",
@@ -29,9 +31,24 @@ _DECISION_METRIC_PRIORITY = (
 
 def review_assurance_validation(result_path: Path | str) -> AssuranceValidationReview:
     path = Path(result_path).resolve()
+    source_bytes = path.read_bytes()
     result = verify_paired_assurance_validation_result(path)
-    source_digest = sha256(path.read_bytes()).hexdigest()
+    if path.read_bytes() != source_bytes:
+        raise InvalidScenarioError("paired assurance result changed during verification")
+    source_digest = sha256(source_bytes).hexdigest()
     return derive_assurance_validation_review(result, str(path), source_digest)
+
+
+def verify_assurance_validation_review(review_path: Path | str) -> AssuranceValidationReview:
+    from astro_assurance.review_io import load_assurance_validation_review
+
+    review = load_assurance_validation_review(review_path)
+    expected = review_assurance_validation(review.source_path)
+    if review != expected:
+        raise InvalidScenarioError(
+            "assurance validation review does not match its verified source evidence"
+        )
+    return review
 
 
 def derive_assurance_validation_review(
@@ -141,10 +158,10 @@ def derive_assurance_validation_review(
         for metric in _DECISION_METRIC_PRIORITY
         if metric in shifts_by_metric
     ]
-    for index, shift in enumerate(selected_shifts, start=1):
+    for shift in selected_shifts:
         findings.append(
             _finding(
-                f"metric_shift_{index:02d}",
+                f"metric_shift_{_finding_id_component(shift.metric)}",
                 AssuranceReviewSeverity.INFO,
                 AssuranceReviewCategory.METRIC_SHIFT,
                 f"{shift.metric} has a median mismatched-minus-matched shift of {shift.median}.",
@@ -181,6 +198,13 @@ def derive_assurance_validation_review(
         findings=tuple(findings),
         source_claim_boundary=result.claim_boundary,
     )
+
+
+def _finding_id_component(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "_", value.lower()).strip("_")
+    if not normalized or not normalized[0].isalpha():
+        normalized = f"value_{normalized}"
+    return normalized
 
 
 def _finding(

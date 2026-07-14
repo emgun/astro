@@ -59,6 +59,15 @@ authority. No recommendation is a command.
 
 Invalid or tampered inputs produce no review artifact rather than an `invalid` disposition.
 
+## Cross-Run Comparison
+
+Comparison re-verifies each stored review against its bound paired-validation result before using
+it. Findings are compared by stable id and metrics by stable name; only actual nonzero median shifts
+are reported as metric changes. Overall direction uses a lexicographically ordered evidence-risk
+vector of disposition, calibration authority, blocker count, and warning count instead of
+scalarizing heterogeneous evidence. Recommendations copy unresolved candidate blocker and warning
+actions with their finding ids. They cannot execute work or promote evidence authority.
+
 ## AI-Native Extension
 
 A later provider-backed explainer may consume only the typed review plus explicitly selected source
@@ -68,7 +77,7 @@ is optional and never part of the required release gate.
 
 ## Exit Gate
 
-The first slice exits when a public CLI command can verify and review the checked paired-assurance
-result, the output is byte-stable for identical input bytes, tampering prevents publication, the
-assistant registry can compile an allow-listed verify/review plan, and focused/full release gates
-pass.
+The first slice exits when public CLI commands can verify, review, and compare checked
+paired-assurance evidence, outputs are byte-stable for identical input bytes, tampering prevents
+publication, the assistant registry can compile allow-listed review and comparison plans, and
+focused/full release gates pass.

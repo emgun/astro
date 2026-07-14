@@ -43,10 +43,19 @@ Gate: path/flag injection fails closed and existing OD/campaign plans remain unc
 - Obtain independent review when subagent quota is available; otherwise use local adversarial
   review plus GitHub CI and record the limitation.
 
+## Cross-Run Extension
+
+- Re-verify both stored reviews and their original paired evidence before comparison.
+- Bind review and source digests in the comparison artifact.
+- Compare findings by stable id and report only nonzero metric changes by stable name.
+- Use an ordered evidence-risk vector rather than a heterogeneous scalar score.
+- Derive non-executing recommendations from unresolved candidate blocker and warning actions.
+- Compile one strict, approval-gated assistant comparison plan with distinct input and output paths.
+
 ## Deferred
 
 - Provider-backed explanation and finding prioritization.
-- Cross-campaign trend and anomaly review.
+- Cross-campaign anomaly explanation beyond deterministic review comparison.
 - Mission-assurance case and lifecycle review beyond paired validation.
 - Active evidence-acquisition recommendations tied to real station or propulsion residuals.
 - Any autonomous execution, model promotion, or operational command path.

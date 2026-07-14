@@ -50,7 +50,7 @@ def test_review_is_deterministic_and_preserves_claim_boundaries(
     findings = {finding.finding_id: finding for finding in first.findings}
     assert findings["calibration_authority"].severity is AssuranceReviewSeverity.BLOCKER
     assert findings["model_form_disposition"].severity is AssuranceReviewSeverity.WARNING
-    assert findings["metric_shift_01"].evidence[0].value == (
+    assert findings["metric_shift_truth_recovery_position_error_km"].evidence[0].value == (
         "truth_recovery_position_error_km"
     )
     assert findings["claim_boundary"].required_action.endswith(
