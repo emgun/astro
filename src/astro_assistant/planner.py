@@ -95,3 +95,37 @@ def local_od_demo_plan(user_intent: str) -> AstroWorkflowPlan:
             ),
         ],
     )
+
+
+def assurance_review_plan(
+    user_intent: str,
+    *,
+    result_path: str,
+    output: str,
+    summary_output: str | None = None,
+) -> AstroWorkflowPlan:
+    review_inputs: dict[str, object] = {"result_path": result_path, "output": output}
+    if summary_output is not None:
+        review_inputs["summary_output"] = summary_output
+    return AstroWorkflowPlan(
+        plan_id="paired-assurance-review",
+        title="Paired Assurance Evidence Review",
+        user_intent=user_intent,
+        steps=[
+            WorkflowStep(
+                step_id="verify_assurance_validation",
+                tool=AstroToolName.VERIFY_ASSURANCE_VALIDATION,
+                description="Verify paired assurance evidence and all bound sources.",
+                inputs={"result_path": result_path},
+                risk=RiskLevel.READ_ONLY,
+            ),
+            WorkflowStep(
+                step_id="review_assurance_validation",
+                tool=AstroToolName.REVIEW_ASSURANCE_VALIDATION,
+                description="Write deterministic assurance findings from verified evidence.",
+                inputs=review_inputs,
+                outputs=[WorkflowArtifact(path=output, kind=ArtifactKind.ASSURANCE_REVIEW)],
+                risk=RiskLevel.WRITES_ARTIFACTS,
+            ),
+        ],
+    )

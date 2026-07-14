@@ -1,5 +1,6 @@
 from astro_assistant.models import (
     ArtifactKind,
+    AstroToolName,
     AstroWorkflowPlan,
     VerificationDiagnostic,
     VerificationResult,
@@ -19,6 +20,8 @@ LOCAL_OD_STEP_IDS = (
 
 
 def verify_plan(plan: AstroWorkflowPlan) -> VerificationResult:
+    if plan.plan_id == "paired-assurance-review":
+        return _verify_assurance_review_plan(plan)
     if plan.plan_id != "local-od-demo":
         return VerificationResult(passed=True)
 
@@ -35,6 +38,42 @@ def verify_plan(plan: AstroWorkflowPlan) -> VerificationResult:
     if len(plan.steps) == len(LOCAL_OD_STEP_IDS):
         _verify_local_od_steps(plan.steps, resolved, diagnostics)
 
+    return VerificationResult(passed=not diagnostics, diagnostics=diagnostics)
+
+
+def _verify_assurance_review_plan(plan: AstroWorkflowPlan) -> VerificationResult:
+    diagnostics: list[VerificationDiagnostic] = []
+    if len(plan.steps) != 2:
+        diagnostics.append(
+            _diagnostic("unexpected_step_order", "assurance review requires two steps")
+        )
+        return VerificationResult(passed=False, diagnostics=diagnostics)
+    verify_step, review_step = plan.steps
+    if (
+        verify_step.tool is not AstroToolName.VERIFY_ASSURANCE_VALIDATION
+        or review_step.tool is not AstroToolName.REVIEW_ASSURANCE_VALIDATION
+    ):
+        diagnostics.append(
+            _diagnostic("unexpected_step_order", "assurance review must verify before review")
+        )
+    if verify_step.inputs.get("result_path") != review_step.inputs.get("result_path"):
+        diagnostics.append(
+            _diagnostic("source_discontinuity", "verify and review must use the same result path")
+        )
+    if (
+        len(review_step.outputs) != 1
+        or review_step.outputs[0].kind is not ArtifactKind.ASSURANCE_REVIEW
+    ):
+        diagnostics.append(
+            _diagnostic(
+                "unexpected_step_output",
+                "assurance review must declare one review artifact",
+            )
+        )
+    elif review_step.inputs.get("output") != review_step.outputs[0].path:
+        diagnostics.append(
+            _diagnostic("output_discontinuity", "declared review output must match command input")
+        )
     return VerificationResult(passed=not diagnostics, diagnostics=diagnostics)
 
 

@@ -7,6 +7,7 @@ _JSON_KINDS = {
     ArtifactKind.MEASUREMENTS_JSON,
     ArtifactKind.ESTIMATE_JSON,
     ArtifactKind.TRACE_JSON,
+    ArtifactKind.ASSURANCE_REVIEW,
 }
 
 

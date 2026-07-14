@@ -128,6 +128,20 @@ builds pass. Independent subagent review was attempted but could not start becau
 was exhausted; local adversarial review added and tested end-of-run calibration drift rejection.
 GitHub CI passed in `2m10s`; PR #20 merged the scope to `main` at `f84dee7`.
 
+AI-Native Assurance Review v1 adds a deterministic decision-support product over verified paired
+assurance evidence. The public review command binds source path and digest, preserves every signed
+metric shift, emits typed integrity/calibration/completeness/model-form/metric/claim findings, and
+returns `additional_evidence_required` for the illustrative checked calibration. The assistant
+compiles only a fixed verify-then-review plan with source/output continuity and explicit approval
+for writes. The checked public artifact contains 10 findings: one calibration blocker, two warnings,
+and seven informational findings. Focused review/assistant tests pass 12 tests; the full suite passes
+`970 tests with 11 optional-backend skips`; Ruff, strict MyPy across 137 source files, package tests,
+builds, and `git diff --check` pass. GitHub review and CI integration remain.
+
+Project-specific steward learning: never rank heterogeneous assurance metrics by raw magnitude.
+Preserve all signed values and use an explicit decision-metric priority so units and engineering
+meaning remain visible.
+
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
 the executable plan is
@@ -452,6 +466,7 @@ Post-MVP / external-campaign items:
 | paired-assurance-validation | done | productize/verify | steward | `src/astro_assurance/validation_*`, paired validation CLI, explicit protocol fixture, tests and docs | Separates matched two-body and truth-J2/two-body-estimator profiles over shared coordinates. Independent review found and the implementation fixed noncausal OD, forged-derived-evidence acceptance, swallowed source drift, duplicate coordinate seeds, omitted executed-component authority, coordinate/profile substitution, and output-path collision. The corrected checked result completes 8/8 pairs with eight regressions; `951 passed, 11 skipped`, lint, typing, packaging, builds, outside-repository public run/verifier, GitHub CI, and integration pass. PR #19 merged at `d7710f5`. |
 | assurance-calibration-evidence | done | calibrate/verify | steward | `examples/assurance/paired_force_model_calibration.yaml`, calibration contracts, paired runner/verifier, assurance docs and tests | Every configured numeric dimension has one digest-bound evidence envelope and promotion derives from the weakest authority. Current status remains illustrative. Public campaign verification, all local release gates, GitHub CI, and integration pass; PR #20 merged at `f84dee7`. |
 | v0.2.0-rc.1 | done | release/verify | steward | package metadata, campaign compatibility, release notes, merged-main and detached-worktree gates | Package metadata, built-wheel public workflow, local gates, GitHub CI, merged-commit detached verification, and annotated tag agree at `f1baa02`. |
+| assurance-review-operator | active | productize/verify | steward | deterministic paired-assurance review, public CLI, typed assistant plan, tests and docs | Public artifact and all local gates pass. Findings remain deterministic and non-operational; GitHub review and CI integration are pending. |
 
 ## Next Best Paths
 

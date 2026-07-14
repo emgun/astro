@@ -12,6 +12,8 @@ class AstroToolName(StrEnum):
     VALIDATE_CAMPAIGN = "validate_campaign"
     RUN_CAMPAIGN = "run_campaign"
     SUMMARIZE_CAMPAIGN = "summarize_campaign"
+    VERIFY_ASSURANCE_VALIDATION = "verify_assurance_validation"
+    REVIEW_ASSURANCE_VALIDATION = "review_assurance_validation"
 
 
 class RiskLevel(StrEnum):
@@ -29,6 +31,8 @@ class ArtifactKind(StrEnum):
     CAMPAIGN_DEFINITION = "campaign_definition"
     CAMPAIGN_RESULT = "campaign_result"
     CAMPAIGN_SUMMARY = "campaign_summary"
+    ASSURANCE_VALIDATION_RESULT = "assurance_validation_result"
+    ASSURANCE_REVIEW = "assurance_review"
 
 
 class _CampaignInputs(BaseModel):
@@ -54,6 +58,16 @@ class RunCampaignInputs(_CampaignInputs):
 
 class SummarizeCampaignInputs(_CampaignInputs):
     output_dir: str
+
+
+class VerifyAssuranceValidationInputs(_CampaignInputs):
+    result_path: str
+
+
+class ReviewAssuranceValidationInputs(_CampaignInputs):
+    result_path: str
+    output: str
+    summary_output: str | None = None
 
 
 class WorkflowArtifact(BaseModel):
