@@ -55,8 +55,10 @@ candidate correction, estimate/truth replay, and a corrected digital twin in one
 merged the implementation to `main` at `0d73d5b`; it remains deterministic local design screening
 and does not claim RF acquisition, operational navigation, or flight-command authority.
 
-The next layer after this deterministic reference is an uncertainty campaign over the full
-assurance loop, followed by external tracking fixtures and execution-error validation. AI should
+The first uncertainty layer over the deterministic assurance reference is now implemented through
+the generic campaign engine. The next layer is a paired assurance-validation protocol for
+independent tracking realizations, estimator-noise mismatch, execution timing/pointing, and
+force-model mismatch. AI should
 enter through typed planning, evidence review, anomaly triage, and bounded decision support before
 any autonomous execution. Surrogate training remains stopped for current cheap local evaluators
 unless a mission-assurance teacher or other evaluator passes the existing cost and fidelity gate.
@@ -70,6 +72,22 @@ Focused assurance and packaging tests pass `21` tests; the full suite passes `93
 optional-backend skips`; Ruff, strict MyPy across 127 source files, `git diff --check`, the fresh
 public CLI run and verifier, wheel inspection, and sdist/wheel builds pass. GitHub CI passed in
 `1m25s` before PR #17 merged the scope at `0d73d5b`.
+
+Mission Assurance Uncertainty Campaign v1 adds typed UQ bindings for insertion components,
+tracking range/range-rate sigma, correction execution scale, solar-array efficiency, battery
+capacity, and named thermal-node properties. The truth replay now distinguishes the commanded
+candidate from the executed impulse, depletes executed propellant, and gates executed delta-v.
+Model alternatives carry an explicit `model_form` classification, while the checked reference
+declares no alternate model. A fresh two-worker 8-case LHS run completed 8/8 cases with all ten
+configured requirements passing inside illustrative bounds. Recovery position error was
+`0.4471` to `0.7189 km` at q05/q95, recovery velocity error was `0.002814` to `0.004071 km/s`, and
+propellant reserve was `49.1010` to `49.5189 kg`. The fixed tracking seed provides common random
+numbers, not independent measurement-noise draws; these are all-completed-case design-space
+frequencies, not calibrated success probabilities or operational authority. Independent review
+found and the implementation fixed missing top-level assurance-source binding and repository-CWD
+path dependence. The final local gate passes `935 tests with 11 optional-backend skips`, Ruff,
+strict MyPy across 128 source files, `git diff --check`, package builds, and the public campaign from
+outside the repository.
 
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
@@ -391,12 +409,15 @@ Post-MVP / external-campaign items:
 | lifecycle-subsystem-margin-targets | done | productize/verify | steward | lifecycle UQ adapter, checked lifecycle campaigns, subsystem requirement tests and docs | Exposes unit-stable battery, thermal-envelope, ADCS, worst-observed-link, propellant-fraction, and mass-budget margins plus contact metrics through lifecycle campaigns. The checked 64-case run passes every subsystem requirement and attributes only the two nonconstant targets, preserving practical-effect, no-contact, constant-target, and coverage claim boundaries. |
 | lifecycle-power-thermal-inputs | done | productize/verify | steward | typed lifecycle overrides, dynamic named-node bindings and metrics, checked five-input campaign, tests and docs | Screens solar-array, battery-capacity, and bus thermal design inputs against battery-SOC and separate hot/cold margins. The checked campaign records the battery tie warning and short-sunlit-window boundary instead of claiming full-orbit EPS or thermal authority. |
 | post-launch-mission-assurance | done | productize/verify | steward | `src/astro_assurance`, `astro run-mission-assurance`, `examples/assurance`, assurance tests and docs | Connects launch insertion, visibility-filtered simulation tracking, OD, a bounded manual-review correction, estimate/truth replay, and the corrected digital twin through one suite-owned evidence case. Independent review, focused and release-scale local gates, public digest verification, GitHub CI, and merged-main integration pass; PR #17 merged at `0d73d5b`. |
+| mission-assurance-uncertainty | active | integrate | steward | `src/astro_uq/adapters/assurance.py`, `examples/campaigns/leo_mission_assurance_robustness.yaml`, assurance/UQ tests and docs | Adds a bounded first campaign over insertion, tracking sigma, execution magnitude, and subsystem margins. The checked 8-case run, full release gates, and independent review pass; PR/CI/merge remain active. |
 
 ## Next Best Paths
 
-1. Add a dedicated assurance uncertainty campaign over insertion, tracking, estimation, maneuver
-   execution, and subsystem margins. Keep aleatory, epistemic, and model-form inputs distinguishable
-   and report design-space frequencies rather than operational probabilities.
+1. Run the paired assurance-validation protocol: independent tracking-noise realizations, separate
+   truth and estimator sigma/bias assumptions, maneuver timing and pointing errors, and matched
+   versus truth-J2/estimator-two-body profiles. Preserve paired deltas and both all-case and
+   physics-complete denominators; do not pool model profiles into one probability. Derive bounds
+   from reviewed launch, sensor, propulsion, and subsystem evidence before scaling case count.
 2. Introduce external tracking fixtures and maneuver-execution validation only when a specific
    release claim and reviewed acceptance criteria justify the campaign. This is the route toward
    real acquisition/recovery evidence; more synthetic cases are not a substitute.

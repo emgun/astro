@@ -132,6 +132,8 @@ def evaluate_authoritatively(  # noqa: UP047
         status = _status_for_exception(exc)
         exception_metadata: dict[str, object] = {}
         workflow_phase = getattr(exc, "lifecycle_phase", None)
+        if workflow_phase is None:
+            workflow_phase = getattr(exc, "phase", None)
         if isinstance(workflow_phase, str) and workflow_phase:
             exception_metadata["workflow_phase"] = workflow_phase
         outcome = _failure_outcome(

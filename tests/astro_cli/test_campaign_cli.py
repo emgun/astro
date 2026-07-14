@@ -139,7 +139,7 @@ def test_profile_campaign_writes_machine_scoped_timing_product(tmp_path: Path) -
     assert profile["timing"]["case_count"] == 2
     assert profile["timing"]["fully_instrumented_case_count"] == 2
     assert profile["cases_digest"]
-    assert profile["software_compatibility"]["campaign-runtime"] == "1.1"
+    assert profile["software_compatibility"]["campaign-runtime"] == "1.2"
     assert profile["machine"]["architecture"]
     assert profile["runtime"]["python_version"]
     assert profile["timing"]["evaluation_share_of_instrumented_time"] is not None

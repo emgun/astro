@@ -8,11 +8,16 @@ from astro_assurance.io import (
     write_mission_assurance_artifact_bundle,
     write_mission_assurance_result,
 )
-from astro_assurance.models import MissionAssuranceCase, PostLaunchAssuranceScenario
+from astro_assurance.models import (
+    MissionAssuranceCase,
+    MissionAssuranceInputOverrides,
+    PostLaunchAssuranceScenario,
+)
 from astro_assurance.runner import run_post_launch_assurance
 
 __all__ = [
     "MissionAssuranceCase",
+    "MissionAssuranceInputOverrides",
     "PostLaunchAssuranceScenario",
     "format_mission_assurance_summary",
     "load_mission_assurance_result",

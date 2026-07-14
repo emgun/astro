@@ -1,0 +1,90 @@
+schema_version: "1.0"
+campaign_id: leo-mission-assurance-robustness-v1
+workflow:
+  kind: mission_assurance
+  scenario: ../assurance/post_launch_orbit_acquisition.yaml
+uncertainty:
+  parameters:
+    - parameter_id: insertion_position_x
+      target: mission_assurance.insertion.position_x
+      unit: km
+      uncertainty_kind: aleatory
+      distribution: {kind: uniform, low: 1.8, high: 2.2}
+    - parameter_id: insertion_velocity_y
+      target: mission_assurance.insertion.velocity_y
+      unit: km/s
+      uncertainty_kind: aleatory
+      distribution: {kind: uniform, low: -0.00165, high: -0.00135}
+    - parameter_id: tracking_range_sigma
+      target: mission_assurance.tracking.range_sigma_km
+      unit: km
+      uncertainty_kind: epistemic
+      distribution: {kind: uniform, low: 0.008, high: 0.012}
+    - parameter_id: tracking_range_rate_sigma
+      target: mission_assurance.tracking.range_rate_sigma_km_s
+      unit: km/s
+      uncertainty_kind: epistemic
+      distribution: {kind: uniform, low: 0.000008, high: 0.000012}
+    - parameter_id: correction_execution_scale
+      target: mission_assurance.correction.execution_scale
+      unit: "1"
+      uncertainty_kind: aleatory
+      distribution: {kind: uniform, low: 0.99, high: 1.01}
+    - parameter_id: solar_array_efficiency
+      target: mission_assurance.digital_twin.power.solar_array_efficiency
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution: {kind: uniform, low: 0.285, high: 0.295}
+    - parameter_id: bus_emissivity
+      target: mission_assurance.digital_twin.thermal_nodes.bus.emissivity
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution: {kind: uniform, low: 0.76, high: 0.80}
+  correlations: []
+  model_variants: []
+sampler:
+  kind: latin_hypercube
+  samples: 8
+  seed: 7132026
+  scramble: true
+evaluator:
+  evaluator_id: local-mission-assurance
+  kind: authoritative
+  workflow: mission_assurance
+  implementation_version: post_launch_mission_assurance_v1
+  backend: local
+  claim_boundary: conditional_design_space_frequency_not_operational_probability_or_flight_authority
+metrics:
+  - {metric_id: assurance_passed, extractor: mission_assurance.passed, value_kind: boolean}
+  - {metric_id: od_position_error, extractor: mission_assurance.od_position_error_km, value_kind: numeric, unit: km}
+  - {metric_id: od_velocity_error, extractor: mission_assurance.od_velocity_error_km_s, value_kind: numeric, unit: km/s}
+  - {metric_id: candidate_delta_v, extractor: mission_assurance.candidate_delta_v_km_s, value_kind: numeric, unit: km/s}
+  - {metric_id: executed_delta_v, extractor: mission_assurance.executed_delta_v_km_s, value_kind: numeric, unit: km/s}
+  - {metric_id: recovery_position_error, extractor: mission_assurance.truth_recovery_position_error_km, value_kind: numeric, unit: km}
+  - {metric_id: recovery_velocity_error, extractor: mission_assurance.truth_recovery_velocity_error_km_s, value_kind: numeric, unit: km/s}
+  - {metric_id: error_reduction_fraction, extractor: mission_assurance.position_error_reduction_fraction, value_kind: numeric, unit: "1"}
+  - {metric_id: propellant_reserve, extractor: mission_assurance.propellant_reserve_kg, value_kind: numeric, unit: kg}
+  - {metric_id: minimum_battery_soc, extractor: mission_assurance.minimum_battery_soc_fraction, value_kind: numeric, unit: "1"}
+  - {metric_id: minimum_thermal_margin, extractor: mission_assurance.minimum_thermal_margin_k, value_kind: numeric, unit: K}
+  - {metric_id: failed_twin_margins, extractor: mission_assurance.failed_twin_margin_count, value_kind: numeric, unit: "1"}
+  - {metric_id: retained_measurements, extractor: mission_assurance.retained_measurement_count, value_kind: numeric, unit: "1"}
+requirements:
+  - {requirement_id: assurance_success, metric_id: assurance_passed, operator: is_true}
+  - {requirement_id: od_position, metric_id: od_position_error, operator: le, value: 0.1}
+  - {requirement_id: od_velocity, metric_id: od_velocity_error, operator: le, value: 0.0001}
+  - {requirement_id: recovery_position, metric_id: recovery_position_error, operator: le, value: 1.0}
+  - {requirement_id: recovery_velocity, metric_id: recovery_velocity_error, operator: le, value: 0.005}
+  - {requirement_id: recovery_improves_position, metric_id: error_reduction_fraction, operator: ge, value: 0.5}
+  - {requirement_id: propellant_reserve, metric_id: propellant_reserve, operator: ge, value: 45.0}
+  - {requirement_id: battery_soc, metric_id: minimum_battery_soc, operator: ge, value: 0.35}
+  - {requirement_id: thermal_margin, metric_id: minimum_thermal_margin, operator: ge, value: 0.0}
+  - {requirement_id: twin_margins, metric_id: failed_twin_margins, operator: le, value: 0.0}
+stopping: {kind: fixed_count}
+retention: {policy: none}
+metadata:
+  uncertainty_scope: aleatory_insertion_and_execution_plus_epistemic_sensor_and_subsystem_inputs
+  model_form_scope: no_model_variants_in_v1_reference_campaign
+  interpretation: conditional_design_space_frequencies_not_calibrated_operational_probabilities
+  tracking_realization_policy: fixed_seed_common_random_numbers_for_parameter_screening
+  parameter_bounds: illustrative_reference_bounds_not_calibrated_flight_distributions
+  recovery_authority: candidate_for_manual_review

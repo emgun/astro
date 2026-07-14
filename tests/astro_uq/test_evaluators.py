@@ -179,3 +179,27 @@ def test_workflow_phase_context_is_preserved_in_failure_metadata() -> None:
 
     assert result is None
     assert outcome.metadata["workflow_phase"] == "launch"
+
+
+def test_generic_phase_context_is_preserved_in_failure_metadata() -> None:
+    class PhaseFailure(RuntimeError):
+        phase = "tracking"
+
+    evaluator: Evaluator[FixtureScenario, FixtureResult] = AuthoritativeCallableEvaluator[
+        FixtureScenario, FixtureResult
+    ](
+        evaluator_id="fixture",
+        evaluate_callable=lambda _scenario: (_ for _ in ()).throw(
+            PhaseFailure("tracking failed")
+        ),
+        serialize_callable=lambda _result: (),
+    )
+
+    outcome, result = evaluate_authoritatively(
+        evaluator,
+        FixtureScenario(value=1.0),
+        _realization(),
+    )
+
+    assert result is None
+    assert outcome.metadata["workflow_phase"] == "tracking"

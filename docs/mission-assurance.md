@@ -28,7 +28,8 @@ The reference performs these phases in order:
 3. Propagate nominal and truth trajectories and generate deterministic synthetic tracking.
 4. Estimate the initial orbit from the nominal prior with suite-owned batch OD.
 5. Design one bounded inertial impulsive correction from the estimated trajectory.
-6. Replay the same candidate against both the estimate and simulation truth.
+6. Replay the commanded candidate against the estimate and a separately modeled executed impulse
+   against simulation truth.
 7. Drive the digital twin with the corrected truth trajectory.
 8. Return continuity checks, margins, product digests, warnings, and a derived decision.
 
@@ -70,11 +71,28 @@ The first version intentionally uses the local propagator for correction replay.
 do not yet share a uniform maneuver contract, so backend expansion requires a separately validated
 adapter campaign rather than silent substitution.
 
-## Next Validation Layer
+## Uncertainty Campaign
 
-The deterministic reference is the baseline for a future mission-assurance uncertainty campaign.
-That campaign should disperse launch, tracking, OD, execution, and subsystem inputs through the
-existing `astro_uq` contract while preserving failed cases and evidence scopes. Operational or
-probabilistic claims require external tracking fixtures, calibrated noise and bias models, maneuver
-execution uncertainty, and reviewed acceptance criteria; Monte Carlo volume alone does not supply
-that authority.
+The first integrated campaign is available through the generic UQ commands:
+
+```bash
+astro validate-campaign examples/campaigns/leo_mission_assurance_robustness.yaml
+astro run-campaign examples/campaigns/leo_mission_assurance_robustness.yaml \
+  --output-dir /tmp/astro-assurance-uq --workers 2
+astro summarize-campaign /tmp/astro-assurance-uq
+```
+
+The checked eight-case LHS campaign varies insertion position and velocity, tracking range and
+range-rate sigma, correction execution scale, solar-array efficiency, and bus emissivity. The
+input contract labels insertion and execution dispersion as aleatory and sensor/subsystem values as
+epistemic. Model variants carry an explicit `model_form` label, but the reference declares none:
+no alternate force or measurement model has yet passed a paired validation campaign.
+
+The tracking generator intentionally retains a fixed seed, so cases use common random numbers for
+parameter screening rather than independent noise realizations. Its bounds are illustrative and
+the reported requirement fractions use all completed cases as the denominator. They are
+conditional design-space frequencies, not calibrated mission-success probabilities. Operational
+or probabilistic claims still require independent and calibrated tracking noise/bias evidence,
+separate truth and estimator noise assumptions, maneuver timing and pointing errors, paired
+force-model mismatch, external tracking fixtures, and reviewed acceptance criteria. Monte Carlo
+volume alone does not supply that authority.
