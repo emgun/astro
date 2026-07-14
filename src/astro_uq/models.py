@@ -183,6 +183,7 @@ class ModelVariant(AstroModel):
     target: str = Field(min_length=1)
     value: str = Field(min_length=1)
     weight: FiniteFloat = Field(gt=0.0, default=1.0)
+    uncertainty_kind: Literal["model_form"] = "model_form"
     provenance: dict[str, Any] = Field(default_factory=dict)
 
 

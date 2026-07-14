@@ -57,7 +57,9 @@ def run_post_launch_assurance(
     _assert_input_unchanged(launch_input)
     launch = propagate_launch_with_backend(launch_template, scenario.launch_backend)
     tracking_input = _input_reference("tracking_scenario", scenario.tracking_scenario)
-    tracking_template = load_scenario(scenario.tracking_scenario)
+    tracking_template = _resolve_tracking_template(
+        load_scenario(scenario.tracking_scenario), scenario
+    )
     _assert_input_unchanged(tracking_input)
     _validate_schedule(scenario, tracking_template)
 
@@ -116,20 +118,45 @@ def run_post_launch_assurance(
             "maneuvers": [candidate],
         }
     )
+    execution_scale = (
+        1.0
+        if scenario.input_overrides is None
+        or scenario.input_overrides.correction_execution_scale is None
+        else float(scenario.input_overrides.correction_execution_scale)
+    )
+    executed_candidate = candidate.model_copy(
+        update={
+            "name": f"{candidate.name}-executed",
+            "delta_v_km_s": tuple(
+                execution_scale * float(component) for component in candidate.delta_v_km_s
+            ),
+            "metadata": {
+                **candidate.metadata,
+                "commanded_maneuver": candidate.name,
+                "execution_scale": execution_scale,
+                "evidence_scope": "simulation_truth",
+            },
+        }
+    )
     truth_corrected_scenario = truth_scenario.model_copy(
         update={
             "scenario_id": f"{scenario.scenario_id}-truth-corrected",
-            "maneuvers": [candidate],
+            "maneuvers": [executed_candidate],
         }
     )
     estimated_corrected = propagate_local(estimated_corrected_scenario)
     truth_corrected = propagate_local(truth_corrected_scenario)
     twin_input = _input_reference("twin_scenario", scenario.twin_scenario)
-    twin_template = load_twin_scenario(scenario.twin_scenario)
+    twin_template = _resolve_twin_template(load_twin_scenario(scenario.twin_scenario), scenario)
     _assert_input_unchanged(twin_input)
-    propellant_used_kg = _candidate_propellant_used_kg(
+    candidate_propellant_used_kg = _candidate_propellant_used_kg(
         twin_template,
         candidate.delta_v_km_s,
+        float(scenario.correction.specific_impulse_s),
+    )
+    propellant_used_kg = _candidate_propellant_used_kg(
+        twin_template,
+        executed_candidate.delta_v_km_s,
         float(scenario.correction.specific_impulse_s),
     )
     available_propellant_kg = float(twin_template.spacecraft.propellant_mass_kg)
@@ -168,6 +195,7 @@ def run_post_launch_assurance(
         truth_trajectory=truth_trajectory,
         estimate_state=estimate.estimated_state,
         candidate_delta_v_km_s=candidate.delta_v_km_s,
+        executed_delta_v_km_s=executed_candidate.delta_v_km_s,
         estimated_corrected=estimated_corrected,
         truth_corrected=truth_corrected,
         corrected_twin_template=corrected_twin_template,
@@ -184,6 +212,17 @@ def run_post_launch_assurance(
         "recovery_disposition": "candidate_for_manual_review",
         "tracking_source": "synthetic_simulation_truth",
         "tracking_visibility_filter": "station_elevation_mask",
+        "correction_execution_scale": execution_scale,
+        "executed_delta_v_km_s": float(
+            np.linalg.norm(np.asarray(executed_candidate.delta_v_km_s, dtype=np.float64))
+        ),
+        "candidate_propellant_used_kg": candidate_propellant_used_kg,
+        "executed_propellant_used_kg": propellant_used_kg,
+        "resolved_input_overrides": (
+            scenario.input_overrides.model_dump(mode="json")
+            if scenario.input_overrides is not None
+            else None
+        ),
     }
     warnings = [
         "Post-launch assurance v1 is deterministic simulation and design-screening evidence, "
@@ -239,6 +278,62 @@ def run_post_launch_assurance(
         metadata=metadata,
         warnings=warnings,
     )
+
+
+def _resolve_tracking_template(
+    template: Scenario,
+    scenario: PostLaunchAssuranceScenario,
+) -> Scenario:
+    overrides = scenario.input_overrides
+    if overrides is None:
+        return template
+    noise_payload = template.measurements.noise.model_dump(mode="python")
+    if overrides.tracking_range_sigma_km is not None:
+        noise_payload["range_sigma_km"] = overrides.tracking_range_sigma_km
+    if overrides.tracking_range_rate_sigma_km_s is not None:
+        noise_payload["range_rate_sigma_km_s"] = overrides.tracking_range_rate_sigma_km_s
+    measurements = template.measurements.model_copy(
+        update={"noise": type(template.measurements.noise).model_validate(noise_payload)}
+    )
+    return Scenario.model_validate(
+        template.model_copy(update={"measurements": measurements}).model_dump(mode="python")
+    )
+
+
+def _resolve_twin_template(
+    template: DigitalTwinScenario,
+    scenario: PostLaunchAssuranceScenario,
+) -> DigitalTwinScenario:
+    overrides = scenario.input_overrides
+    if overrides is None:
+        return template
+    payload = template.model_dump(mode="python")
+    if overrides.twin_solar_array_efficiency is not None:
+        payload["power"]["solar_array_efficiency"] = overrides.twin_solar_array_efficiency
+    if overrides.twin_battery_capacity_wh is not None:
+        payload["power"]["battery_capacity_wh"] = overrides.twin_battery_capacity_wh
+    positions = {node["name"]: index for index, node in enumerate(payload["thermal_nodes"])}
+    if len(positions) != len(payload["thermal_nodes"]):
+        raise MissionAssuranceError(
+            "digital twin thermal node names must be unique", phase="digital_twin"
+        )
+    for override in overrides.twin_thermal_node_overrides:
+        if override.node_name not in positions:
+            raise MissionAssuranceError(
+                f"digital twin thermal override references missing node: {override.node_name}",
+                phase="digital_twin",
+            )
+        node = payload["thermal_nodes"][positions[override.node_name]]
+        if override.emissivity is not None:
+            node["emissivity"] = override.emissivity
+        if override.internal_heat_fraction is not None:
+            node["internal_heat_fraction"] = override.internal_heat_fraction
+    try:
+        return DigitalTwinScenario.model_validate(payload)
+    except ValueError as exc:
+        raise MissionAssuranceError(
+            f"resolved digital twin scenario is invalid: {exc}", phase="digital_twin"
+        ) from exc
 
 
 def _validate_schedule(
@@ -491,6 +586,7 @@ def _margin_report(
     truth_trajectory: Trajectory,
     estimate_state: OrbitState,
     candidate_delta_v_km_s: tuple[float, float, float],
+    executed_delta_v_km_s: tuple[float, float, float],
     estimated_corrected: Trajectory,
     truth_corrected: Trajectory,
     corrected_twin_template: DigitalTwinScenario,
@@ -517,6 +613,7 @@ def _margin_report(
         1.0 - truth_position_error / pre_position_error if pre_position_error > 0.0 else 1.0
     )
     delta_v = float(np.linalg.norm(np.asarray(candidate_delta_v_km_s, dtype=np.float64)))
+    executed_delta_v = float(np.linalg.norm(np.asarray(executed_delta_v_km_s, dtype=np.float64)))
     reserve = float(corrected_twin_template.spacecraft.propellant_mass_kg)
     minimum_soc = min(sample.battery_soc_fraction for sample in corrected_twin.power)
     failed_twin_margin_count = sum(
@@ -544,6 +641,13 @@ def _margin_report(
             float(scenario.correction.maximum_total_delta_v_km_s),
             "km/s",
             "decision_available",
+        ),
+        _maximum_margin(
+            "executed_delta_v",
+            executed_delta_v,
+            float(scenario.correction.maximum_total_delta_v_km_s),
+            "km/s",
+            "simulation_truth",
         ),
         _maximum_margin(
             "truth_recovery_position_error",
@@ -608,7 +712,7 @@ def _margin_report(
             "truth_recovery_velocity_error_km_s": truth_velocity_error,
             "truth_position_error_reduction_fraction": reduction_fraction,
             "candidate_delta_v_km_s": delta_v,
-            "candidate_propellant_used_kg": propellant_used_kg,
+            "executed_propellant_used_kg": propellant_used_kg,
         },
     )
 

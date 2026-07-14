@@ -11,10 +11,15 @@ from typing import Annotated, Any
 
 import typer
 
+from astro_assurance.errors import MissionAssuranceError
+from astro_assurance.io import load_post_launch_assurance_scenario
+from astro_assurance.models import PostLaunchAssuranceScenario
+from astro_assurance.runner import run_post_launch_assurance
 from astro_core.errors import InvalidScenarioError
 from astro_core.io import load_scenario
-from astro_core.models import Scenario
+from astro_core.models import AstroModel, Scenario
 from astro_dynamics.backends import propagate_with_backend
+from astro_launch.io import load_launch_scenario
 from astro_mission.errors import MissionLifecycleError
 from astro_mission.io import load_mission_lifecycle_scenario
 from astro_mission.models import MissionLifecycleScenario
@@ -25,6 +30,7 @@ from astro_reentry.models import ReentryScenario
 from astro_twin.io import load_twin_scenario
 from astro_twin.models import DigitalTwinScenario
 from astro_twin.runner import run_digital_twin
+from astro_uq.adapters.assurance import assurance_metric_registry, assurance_parameter_registry
 from astro_uq.adapters.lifecycle import lifecycle_metric_registry, lifecycle_parameter_registry
 from astro_uq.adapters.orbit import orbit_metric_registry, orbit_parameter_registry
 from astro_uq.adapters.reentry import reentry_metric_registry, reentry_parameter_registry
@@ -57,7 +63,7 @@ from astro_uq.runner import CampaignRuntime, run_campaign
 from astro_uq.sensitivity import analyze_campaign_sensitivity
 from astro_uq.statistics import summarize_campaign
 
-SOFTWARE_COMPATIBILITY = {"astro-suite": "0.1.0", "campaign-runtime": "1.1"}
+SOFTWARE_COMPATIBILITY = {"astro-suite": "0.1.0", "campaign-runtime": "1.2"}
 _RESOLVED_DEPENDENCIES_KEY = "resolved_dependencies"
 
 
@@ -91,6 +97,16 @@ def _referenced_scenario_path(owner_path: Path, configured_path: str) -> Path:
 def _bind_resolved_dependencies(
     definition: CampaignDefinition, definition_path: Path
 ) -> CampaignDefinition:
+    if definition.workflow.kind == "mission_assurance":
+        scenario_path = _scenario_path(definition_path, definition.workflow.scenario)
+        scenario = _resolve_assurance_scenario(
+            scenario_path, load_post_launch_assurance_scenario(scenario_path)
+        )
+        metadata = dict(definition.metadata)
+        metadata[_RESOLVED_DEPENDENCIES_KEY] = _assurance_dependencies(scenario)
+        return CampaignDefinition.model_validate(
+            definition.model_copy(update={"metadata": metadata}).model_dump(mode="python")
+        )
     if definition.workflow.kind == "digital_twin":
         scenario_path = _scenario_path(definition_path, definition.workflow.scenario)
         twin_scenario = load_twin_scenario(scenario_path)
@@ -128,6 +144,31 @@ def _bind_resolved_dependencies(
 def _runtime(definition: CampaignDefinition, definition_path: Path) -> CampaignRuntime:
     scenario_path = _scenario_path(definition_path, definition.workflow.scenario)
     backend = definition.evaluator.backend or "local"
+    if definition.workflow.kind == "mission_assurance":
+        assurance_scenario = _resolve_assurance_scenario(
+            scenario_path, load_post_launch_assurance_scenario(scenario_path)
+        )
+        assurance_twin_scenario = load_twin_scenario(assurance_scenario.twin_scenario)
+        if definition.metadata.get(_RESOLVED_DEPENDENCIES_KEY) != _assurance_dependencies(
+            assurance_scenario
+        ):
+            raise CampaignIOError("resolved mission assurance dependency digest mismatch")
+
+        def evaluate(resolved: AstroModel) -> AstroModel:
+            parsed = PostLaunchAssuranceScenario.model_validate(resolved).model_copy(
+                update={
+                    "source_path": assurance_scenario.source_path,
+                    "source_digest": assurance_scenario.source_digest,
+                }
+            )
+            return run_post_launch_assurance(parsed)
+
+        return CampaignRuntime(
+            scenario=assurance_scenario,
+            parameters=assurance_parameter_registry(assurance_twin_scenario),
+            metrics=assurance_metric_registry(),
+            evaluate=evaluate,
+        )
     if definition.workflow.kind == "orbit":
         return CampaignRuntime(
             scenario=load_scenario(scenario_path),
@@ -140,7 +181,9 @@ def _runtime(definition: CampaignDefinition, definition_path: Path) -> CampaignR
     if definition.workflow.kind == "digital_twin":
         twin_template = load_twin_scenario(scenario_path)
         orbit_scenario_path = _referenced_scenario_path(scenario_path, twin_template.orbit_scenario)
-        scenario = twin_template.model_copy(update={"orbit_scenario": str(orbit_scenario_path)})
+        resolved_twin = twin_template.model_copy(
+            update={"orbit_scenario": str(orbit_scenario_path)}
+        )
         dependency = definition.metadata.get(_RESOLVED_DEPENDENCIES_KEY)
         expected_dependency = {
             "twin_template_digest": model_digest(twin_template),
@@ -150,9 +193,9 @@ def _runtime(definition: CampaignDefinition, definition_path: Path) -> CampaignR
         if dependency != expected_dependency:
             raise CampaignIOError("resolved digital twin dependency digest mismatch")
         return CampaignRuntime(
-            scenario=scenario,
-            parameters=twin_parameter_registry(scenario),
-            metrics=twin_metric_registry(scenario),
+            scenario=resolved_twin,
+            parameters=twin_parameter_registry(resolved_twin),
+            metrics=twin_metric_registry(resolved_twin),
             evaluate=lambda resolved: run_digital_twin(
                 DigitalTwinScenario.model_validate(resolved)
             ),
@@ -193,6 +236,43 @@ def _runtime(definition: CampaignDefinition, definition_path: Path) -> CampaignR
     raise CampaignIOError(f"unsupported campaign workflow {definition.workflow.kind!r}")
 
 
+def _assurance_dependencies(scenario: PostLaunchAssuranceScenario) -> dict[str, str]:
+    launch = load_launch_scenario(scenario.launch_scenario)
+    tracking = load_scenario(scenario.tracking_scenario)
+    twin = load_twin_scenario(scenario.twin_scenario)
+    if scenario.source_path is None or scenario.source_digest is None:
+        raise CampaignIOError("mission assurance scenario is missing source provenance")
+    return {
+        "assurance_scenario": scenario.source_path,
+        "assurance_scenario_digest": scenario.source_digest,
+        "launch_scenario": scenario.launch_scenario,
+        "launch_scenario_digest": model_digest(launch),
+        "tracking_scenario": scenario.tracking_scenario,
+        "tracking_scenario_digest": model_digest(tracking),
+        "twin_scenario": scenario.twin_scenario,
+        "twin_scenario_digest": model_digest(twin),
+    }
+
+
+def _resolve_assurance_scenario(
+    scenario_path: Path,
+    scenario: PostLaunchAssuranceScenario,
+) -> PostLaunchAssuranceScenario:
+    return scenario.model_copy(
+        update={
+            "launch_scenario": str(
+                _referenced_scenario_path(scenario_path, scenario.launch_scenario).resolve()
+            ),
+            "tracking_scenario": str(
+                _referenced_scenario_path(scenario_path, scenario.tracking_scenario).resolve()
+            ),
+            "twin_scenario": str(
+                _referenced_scenario_path(scenario_path, scenario.twin_scenario).resolve()
+            ),
+        }
+    )
+
+
 def _validate_registries(
     definition: CampaignDefinition,
     parameters: ParameterRegistry,
@@ -231,6 +311,7 @@ def validate_campaign(
         CampaignIOError,
         InvalidScenarioError,
         MetricError,
+        MissionAssuranceError,
         MissionLifecycleError,
         ParameterBindingError,
     ) as exc:
@@ -294,6 +375,7 @@ def run_campaign_command(
         CampaignIOError,
         InvalidScenarioError,
         MetricError,
+        MissionAssuranceError,
         MissionLifecycleError,
         ParameterBindingError,
         OSError,

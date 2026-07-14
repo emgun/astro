@@ -45,6 +45,11 @@ Latest post-launch mission-assurance integration evidence:
   public CLI run and verifier, wheel-content inspection, and sdist/wheel builds passed.
 - 2026-07-13: GitHub CI passed in `1m25s`; PR #17 merged the reviewed scope to `main` at
   `0d73d5b`.
+- 2026-07-13: mission-assurance uncertainty integration passed the focused assurance/UQ/campaign
+  gate (`207 passed`), the full suite (`935 passed, 11 skipped`), Ruff, strict MyPy across 128 source
+  files, `git diff --check`, a fresh two-worker 8-case public campaign, and sdist/wheel builds. The
+  reference reports all-completed-case design-space frequencies under illustrative bounds and
+  fixed-seed common random numbers, not calibrated operational probabilities.
 
 Latest optional validation refresh:
 

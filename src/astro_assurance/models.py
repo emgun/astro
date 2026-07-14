@@ -86,6 +86,36 @@ class AssuranceRequirements(AstroModel):
     minimum_battery_soc_fraction: FiniteFloat = Field(ge=0.0, le=1.0)
 
 
+class AssuranceThermalNodeInputOverride(AstroModel):
+    node_name: str = Field(min_length=1)
+    emissivity: FiniteFloat | None = Field(default=None, gt=0.0, le=1.0)
+    internal_heat_fraction: FiniteFloat | None = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def at_least_one_field_must_be_set(self) -> AssuranceThermalNodeInputOverride:
+        if self.emissivity is None and self.internal_heat_fraction is None:
+            raise ValueError("thermal node override must set at least one field")
+        return self
+
+
+class MissionAssuranceInputOverrides(AstroModel):
+    tracking_range_sigma_km: FiniteFloat | None = Field(default=None, gt=0.0)
+    tracking_range_rate_sigma_km_s: FiniteFloat | None = Field(default=None, gt=0.0)
+    correction_execution_scale: FiniteFloat | None = Field(default=None, ge=0.0, le=2.0)
+    twin_solar_array_efficiency: FiniteFloat | None = Field(default=None, gt=0.0, le=1.0)
+    twin_battery_capacity_wh: FiniteFloat | None = Field(default=None, gt=0.0)
+    twin_thermal_node_overrides: tuple[AssuranceThermalNodeInputOverride, ...] = Field(
+        default_factory=tuple
+    )
+
+    @model_validator(mode="after")
+    def thermal_node_overrides_must_be_unique(self) -> MissionAssuranceInputOverrides:
+        names = [override.node_name for override in self.twin_thermal_node_overrides]
+        if len(set(names)) != len(names):
+            raise ValueError("thermal node overrides must use unique node names")
+        return self
+
+
 class PostLaunchAssuranceScenario(AstroModel):
     scenario_id: str = Field(pattern=r"^[a-z0-9_-]+$")
     description: str = ""
@@ -97,6 +127,7 @@ class PostLaunchAssuranceScenario(AstroModel):
     dispersion: InsertionDispersion
     correction: CorrectionTargetingConfig
     requirements: AssuranceRequirements
+    input_overrides: MissionAssuranceInputOverrides | None = None
     source_path: str | None = Field(default=None, exclude=True)
     source_digest: str | None = Field(default=None, exclude=True)
     metadata: dict[str, Any] = Field(default_factory=dict)
