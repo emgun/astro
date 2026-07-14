@@ -168,6 +168,10 @@ class PowerSample(AstroModel):
     battery_energy_wh: FiniteFloat = Field(ge=0.0, default=0.0)
     battery_soc_fraction: FiniteFloat = Field(ge=0.0, le=1.0)
     net_power_w: float
+    battery_energy_change_wh: float = 0.0
+    unmet_load_w: FiniteFloat = Field(ge=0.0, default=0.0)
+    unmet_energy_wh: FiniteFloat = Field(ge=0.0, default=0.0)
+    curtailed_energy_wh: FiniteFloat = Field(ge=0.0, default=0.0)
 
 
 class ThermalSample(AstroModel):

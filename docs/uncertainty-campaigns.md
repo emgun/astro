@@ -21,6 +21,16 @@ astro analyze-campaign-sensitivity /tmp/astro-lifecycle-power-thermal \
   --requirement-margin battery_soc \
   --requirement-margin bus_hot \
   --output /tmp/astro-lifecycle-power-thermal-sensitivity.json
+
+astro validate-campaign examples/campaigns/leo_full_orbit_power_thermal.yaml
+astro run-campaign examples/campaigns/leo_full_orbit_power_thermal.yaml \
+  --output-dir /tmp/astro-full-orbit-power-thermal --workers 4
+astro analyze-campaign-sensitivity /tmp/astro-full-orbit-power-thermal \
+  --metric total_unmet_energy \
+  --requirement-margin battery_soc \
+  --requirement-margin no_unmet_energy \
+  --requirement-margin bus_hot \
+  --output /tmp/astro-full-orbit-power-thermal-sensitivity.json
 ```
 
 Its eight Latin-hypercube cases vary reviewed epistemic launch-thrust, shared-wet-mass, twin-power,
@@ -49,6 +59,20 @@ battery capacity, and the `bus` node's emissivity and internal-heat fraction. Th
 explicit downsizing trade from `0.4` to the reference `2.4 m^2`, not a calibrated uncertainty
 distribution. Named thermal targets keep hot and cold boundaries separate instead of attributing a
 switching envelope minimum.
+
+The standalone full-orbit campaign uses the same five inputs over a 6,000-second local orbit and
+adds explicit minimum/terminal battery energy, net battery-energy change, unmet load/energy,
+curtailed energy, eclipse duration, and sunlit-fraction metrics. Its checked 64-case run completed
+64/64 cases. Within the declared design space, 42.1875% met minimum SOC, 73.4375% had zero unmet
+energy, 65.625% met the bus hot limit, and all cases met the bus cold limit. The sampled eclipse was
+2,100 seconds with a 0.65 sunlit fraction. Battery capacity had the largest absolute PRCC for SOC
+and unmet-energy margins; emissivity and internal-heat fraction dominated bus hot margin. Unmet
+energy had only 18 unique values and a 0.71875 tie fraction, so those ranks are screening
+associations over a plateaued response, not a smooth risk model.
+
+Digital-twin campaign definitions bind both the loaded twin-template digest and referenced orbit
+scenario digest. Resume therefore rejects changed nested orbital inputs even when configured paths
+are unchanged.
 
 Campaign artifacts include the resolved definition and digest, sampled physical values, one typed
 outcome per requested case, aggregate statistics, evaluator timing, and a concise text summary.

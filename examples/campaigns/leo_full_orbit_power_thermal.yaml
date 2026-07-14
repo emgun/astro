@@ -1,0 +1,128 @@
+schema_version: "1.0"
+campaign_id: leo-full-orbit-power-thermal-v1
+workflow:
+  kind: digital_twin
+  scenario: ../twin/leo_full_orbit_power_thermal.yaml
+uncertainty:
+  parameters:
+    - parameter_id: solar_array_area
+      target: digital_twin.power.solar_array_area_m2
+      unit: m^2
+      uncertainty_kind: epistemic
+      distribution:
+        kind: triangular
+        low: 0.4
+        mode: 0.8
+        high: 1.6
+    - parameter_id: solar_array_efficiency
+      target: digital_twin.power.solar_array_efficiency
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.20
+        high: 0.30
+    - parameter_id: battery_capacity
+      target: digital_twin.power.battery_capacity_wh
+      unit: Wh
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 200.0
+        high: 700.0
+    - parameter_id: bus_emissivity
+      target: digital_twin.thermal_nodes.bus.emissivity
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.70
+        high: 0.86
+    - parameter_id: bus_internal_heat_fraction
+      target: digital_twin.thermal_nodes.bus.internal_heat_fraction
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution:
+        kind: uniform
+        low: 0.35
+        high: 0.55
+  correlations: []
+  model_variants: []
+sampler:
+  kind: latin_hypercube
+  samples: 64
+  seed: 7202026
+  scramble: true
+evaluator:
+  evaluator_id: local-full-orbit-power-thermal
+  kind: authoritative
+  workflow: digital_twin
+  implementation_version: integrated_twin_v1
+  backend: local
+  claim_boundary: deterministic_full_orbit_power_thermal_screening_not_eps_reliability_or_qualification
+metrics:
+  - metric_id: minimum_battery_soc
+    extractor: digital_twin.min_battery_soc_fraction
+    value_kind: numeric
+    unit: "1"
+  - metric_id: minimum_battery_energy
+    extractor: digital_twin.min_battery_energy_wh
+    value_kind: numeric
+    unit: Wh
+  - metric_id: terminal_battery_energy
+    extractor: digital_twin.terminal_battery_energy_wh
+    value_kind: numeric
+    unit: Wh
+  - metric_id: battery_energy_change
+    extractor: digital_twin.battery_energy_change_wh
+    value_kind: numeric
+    unit: Wh
+  - metric_id: total_unmet_energy
+    extractor: digital_twin.total_unmet_energy_wh
+    value_kind: numeric
+    unit: Wh
+  - metric_id: max_unmet_load
+    extractor: digital_twin.max_unmet_load_w
+    value_kind: numeric
+    unit: W
+  - metric_id: eclipse_duration
+    extractor: digital_twin.eclipse_duration_s
+    value_kind: numeric
+    unit: s
+  - metric_id: sunlit_fraction
+    extractor: digital_twin.sunlit_fraction
+    value_kind: numeric
+    unit: "1"
+  - metric_id: bus_cold_margin
+    extractor: digital_twin.thermal_nodes.bus.cold_margin_k
+    value_kind: numeric
+    unit: K
+  - metric_id: bus_hot_margin
+    extractor: digital_twin.thermal_nodes.bus.hot_margin_k
+    value_kind: numeric
+    unit: K
+requirements:
+  - requirement_id: battery_soc
+    metric_id: minimum_battery_soc
+    operator: ge
+    value: 0.25
+  - requirement_id: no_unmet_energy
+    metric_id: total_unmet_energy
+    operator: le
+    value: 0.0
+  - requirement_id: bus_cold
+    metric_id: bus_cold_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: bus_hot
+    metric_id: bus_hot_margin
+    operator: ge
+    value: 0.0
+stopping:
+  kind: fixed_count
+retention:
+  policy: none
+metadata:
+  purpose: eclipse_power_energy_and_lumped_bus_thermal_margin_screening
+  interpretation: configured_design_space_association_not_eps_reliability_or_thermal_qualification
+  power_policy: passive_shortage_accounting_without_active_load_shedding

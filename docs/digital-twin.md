@@ -14,7 +14,8 @@ The command writes a suite-owned `DigitalTwinResult` JSON product and, optionall
 summary. The result includes:
 
 - orbit-derived geometry samples with altitude and sunlight state
-- power generation, scheduled load, battery energy, and battery state-of-charge samples
+- power generation, scheduled load, battery energy/state-of-charge, interval battery-energy change,
+  unmet load/energy, and curtailed surplus-energy samples
 - lumped thermal node temperatures and per-node heat-balance screening values
 - ADCS pointing, torque, slew-rate, and actuator-utilization screening margins
 - ground-site access windows
@@ -54,7 +55,11 @@ Subsystem sections define the screening assumptions:
 - `power_loads`: optional named elapsed-time load additions layered on top of mode loads
 
 The subsystem fidelity pack keeps the model deterministic and low-order. Scheduled loads are summed
-with mode loads; battery energy applies charge/discharge efficiency. Thermal nodes remain lumped
+with mode loads; battery energy applies charge/discharge efficiency. When the battery cannot serve
+an interval's deficit, the result records unmet bus load and energy instead of hiding the deficit
+behind the zero-energy clamp. Surplus energy that a full battery cannot accept is recorded as
+curtailed energy. These are passive accounting products, not an active load-shedding policy.
+Thermal nodes remain lumped
 nodes but include direct solar, albedo, planetary IR, internal heat, and radiated heat in the
 reported heat balance. ADCS samples report fixed pointing, torque, slew-rate, and utilization
 screening margins from the scenario assumptions. Mass-budget rollups compare itemized
@@ -70,6 +75,24 @@ astro run-twin examples/twin/leo_observer.yaml \
   --summary-output /tmp/astro-twin-summary.txt
 python -m pytest tests/astro_twin -q
 ```
+
+The checked full-orbit power/thermal uncertainty gate is:
+
+```bash
+astro validate-campaign examples/campaigns/leo_full_orbit_power_thermal.yaml
+astro run-campaign examples/campaigns/leo_full_orbit_power_thermal.yaml \
+  --output-dir /tmp/astro-full-orbit-power-thermal --workers 4
+astro analyze-campaign-sensitivity /tmp/astro-full-orbit-power-thermal \
+  --metric total_unmet_energy \
+  --requirement-margin battery_soc \
+  --requirement-margin no_unmet_energy \
+  --requirement-margin bus_hot \
+  --output /tmp/astro-full-orbit-power-thermal-sensitivity.json
+```
+
+The orbit reference spans 6,000 seconds at 60-second resolution. Eclipse duration and sunlit
+fraction therefore remain sampled local-geometry screening quantities, not event-resolved shadow
+transitions or operational energy predictions.
 
 The gate validates the package-level models and deterministic subsystem products without requiring
 Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, JAX, or any external provider.

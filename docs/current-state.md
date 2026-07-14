@@ -127,6 +127,21 @@ not full-orbit energy balance, EPS reliability, or thermal certification.
 The integrated implementation passes 910 tests with 11 skipped, Ruff, strict MyPy across 121
 source files, and sdist/wheel builds.
 
+Full-Orbit Power/Thermal Campaign extends the standalone digital-twin product with interval battery
+energy change, unmet load/energy, and curtailed surplus-energy accounting plus UQ metrics for
+minimum and terminal battery energy, net battery-energy change, eclipse duration, sunlit fraction,
+and named thermal margins. Digital-twin campaigns now bind the twin template and referenced orbit
+scenario digests, so resume rejects nested-input drift. The checked 64-case, five-input LHS run
+completed 64/64 local evaluations over a 6,000-second orbit with a sampled 2,100-second eclipse.
+Requirement fractions were `0.421875` for minimum SOC, `0.734375` for zero unmet energy, `0.65625`
+for bus hot margin, and `1.0` for bus cold margin. Battery capacity had the largest absolute PRCC
+for SOC and unmet-energy margins; emissivity (`+0.9806`) and internal-heat fraction (`-0.9764`)
+dominated hot margin. Unmet-energy targets were highly tied (`0.71875`), so this remains passive
+shortage and lumped-thermal design screening, not active load shedding, EPS reliability, thermal
+qualification, or operational probability evidence.
+The completed implementation passes 914 tests with 11 optional-backend skips, Ruff, strict MyPy
+across 121 source files, packaging tests, and sdist/wheel builds.
+
 Independent review hardened the campaign boundary before integration: non-authoritative evaluator
 labels now fail closed, resume verifies the definition, samples, cases, statistics, and regenerated
 deterministic sample plan, and a non-resume run refuses to overwrite existing evidence. Requirement
