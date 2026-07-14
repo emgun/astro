@@ -14,7 +14,13 @@ from astro_assurance.models import (
     PostLaunchAssuranceScenario,
 )
 from astro_assurance.runner import run_post_launch_assurance
+from astro_assurance.validation_calibration_io import (
+    load_assurance_validation_calibration,
+    validate_calibration_against_protocol,
+)
 from astro_assurance.validation_models import (
+    AssuranceCalibrationPromotionStatus,
+    AssuranceValidationCalibrationManifest,
     AssuranceValidationPairResult,
     AssuranceValidationProfile,
     AssuranceValidationProfileResult,
@@ -38,7 +44,7 @@ _PROFILES = (
 
 def validate_paired_assurance_protocol(
     protocol: PairedAssuranceValidationProtocol,
-) -> None:
+) -> AssuranceValidationCalibrationManifest:
     _assert_protocol_source_unchanged(protocol)
     assurance_path = Path(protocol.assurance_scenario)
     scenario = _resolve_assurance_references(
@@ -48,12 +54,15 @@ def validate_paired_assurance_protocol(
     load_launch_scenario(scenario.launch_scenario)
     load_scenario(scenario.tracking_scenario)
     load_twin_scenario(scenario.twin_scenario)
+    calibration = load_assurance_validation_calibration(protocol.calibration_evidence)
+    validate_calibration_against_protocol(calibration, protocol)
+    return calibration
 
 
 def run_paired_assurance_validation(
     protocol: PairedAssuranceValidationProtocol,
 ) -> PairedAssuranceValidationResult:
-    validate_paired_assurance_protocol(protocol)
+    calibration = validate_paired_assurance_protocol(protocol)
     assurance_path = Path(protocol.assurance_scenario)
     base = _resolve_assurance_references(
         assurance_path,
@@ -63,15 +72,23 @@ def run_paired_assurance_validation(
         raise InvalidScenarioError("assurance scenario is missing source provenance")
     if protocol.source_path is None or protocol.source_digest is None:
         raise InvalidScenarioError("validation protocol is missing source provenance")
+    if calibration.source_path is None or calibration.source_digest is None:
+        raise InvalidScenarioError("validation calibration is missing source provenance")
 
     pairs = tuple(_run_pair(protocol, base, realization) for realization in protocol.realizations)
     _assert_protocol_source_unchanged(protocol)
+    _assert_calibration_source_unchanged(calibration)
     return PairedAssuranceValidationResult(
         protocol_id=protocol.protocol_id,
         protocol_source_path=protocol.source_path,
         protocol_source_digest=protocol.source_digest,
         assurance_source_path=base.source_path,
         assurance_source_digest=base.source_digest,
+        calibration_id=calibration.calibration_id,
+        calibration_source_path=calibration.source_path,
+        calibration_source_digest=calibration.source_digest,
+        calibration_promotion_status=calibration.promotion_status,
+        calibration_claim_boundary=calibration.claim_boundary,
         pairs=pairs,
         summary=summarize_validation_pairs(pairs),
         claim_boundary=protocol.claim_boundary,
@@ -81,12 +98,23 @@ def run_paired_assurance_validation(
             "Realization bounds are protocol inputs and require external evidence before any "
             "operational interpretation.",
             "Corrections remain simulation candidates for manual review, not flight commands.",
+            *(
+                (
+                    "Calibration evidence is not mission calibrated; configured envelopes remain "
+                    "screening assumptions.",
+                )
+                if calibration.promotion_status
+                is not AssuranceCalibrationPromotionStatus.MISSION_CALIBRATED
+                else ()
+            ),
         ),
         metadata={
             **protocol.metadata,
             "paired_coordinate_policy": "same_realization_and_noise_seed_across_profiles",
             "profile_order": [profile.value for profile in _PROFILES],
             "delta_convention": "truth_j2_estimator_two_body_minus_matched_two_body",
+            "calibration_parameter_count": len(calibration.parameter_bounds),
+            "calibration_coverage_policy": calibration.coverage_policy,
         },
     )
 
@@ -363,4 +391,22 @@ def _assert_protocol_source_unchanged(
     if current_digest != protocol.source_digest:
         raise MissionAssuranceError(
             "assurance validation protocol changed during execution", phase="input_integrity"
+        )
+
+
+def _assert_calibration_source_unchanged(
+    calibration: AssuranceValidationCalibrationManifest,
+) -> None:
+    if calibration.source_path is None or calibration.source_digest is None:
+        raise InvalidScenarioError("validation calibration is missing source provenance")
+    try:
+        current_digest = sha256(Path(calibration.source_path).read_bytes()).hexdigest()
+    except OSError as exc:
+        raise InvalidScenarioError(
+            f"Could not re-read assurance calibration evidence {calibration.source_path}: {exc}"
+        ) from exc
+    if current_digest != calibration.source_digest:
+        raise MissionAssuranceError(
+            "assurance calibration evidence changed during execution",
+            phase="input_integrity",
         )

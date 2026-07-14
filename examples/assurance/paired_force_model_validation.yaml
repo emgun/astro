@@ -1,5 +1,6 @@
 protocol_id: leo-paired-assurance-validation-v1
 assurance_scenario: post_launch_orbit_acquisition.yaml
+calibration_evidence: paired_force_model_calibration.yaml
 tracking_duration_s: 3600.0
 correction_elapsed_s: 1800.0
 verification_elapsed_s: 3600.0

@@ -76,6 +76,17 @@ Latest post-launch mission-assurance integration evidence:
   the causal OD cutoff. It completed 8/8 with all configured requirements passing, 64 pre-decision
   measurements per case, recovery-position q05/q95 of `0.4151/0.6741 km`, and unchanged bounded
   design-space rather than operational-probability interpretation.
+- 2026-07-14: paired assurance calibration evidence now covers all 26 configured numeric dimensions
+  with typed authority, source, rationale, limitations, units, and envelopes. Protocol loading and
+  result verification bind the manifest by path and digest and fail closed on incomplete coverage,
+  out-of-envelope values, incompatible source authority, or forged promotion. The overall status
+  remains `illustrative` because tracking biases and maneuver timing lack mission-specific test or
+  flight evidence; external references do not promote those bounds.
+- 2026-07-14: the calibrated-evidence public campaign ran from outside the repository and retained
+  the reviewed 8/8 matched and 0/8 mismatched dispositions while reporting `Calibration status:
+  illustrative`. Focused validation reported `21 passed`; the full suite reported `957 passed, 11
+  skipped`; Ruff, strict MyPy across 133 source files, `git diff --check`, 8 package/import tests,
+  and sdist/wheel builds passed.
 
 Latest optional validation refresh:
 

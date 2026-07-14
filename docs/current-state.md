@@ -1,6 +1,6 @@
 # Astro Suite Current State
 
-Date: 2026-07-13 00:00 PDT
+Date: 2026-07-14 00:00 PDT
 
 ## Canonical Workspace
 
@@ -105,6 +105,22 @@ The protocol applies a wider 50/80 m/s diagnostic solver envelope to both profil
 preserves the base 20/25 m/s authority in profile pass gates. This is an explicit comparison device,
 not expanded maneuver authority. Profile counts remain unpooled and coordinates remain illustrative.
 GitHub CI passed in `2m10s`; PR #19 merged the reviewed scope to `main` at `d7710f5`.
+
+Paired Assurance Calibration Evidence binds a separate manifest to the paired protocol and result.
+All 26 configured numeric dimensions have typed envelopes, units, rationale, limitations, and source
+authority. NASA/JPL tracking and maneuver references and a Vega C insertion reference inform some
+dimensions, but they do not calibrate Astro Suite's synthetic LEO network or spacecraft. Tracking
+biases and the configured maneuver timing error remain illustrative, so weakest-bound derivation
+keeps the manifest status `illustrative`. Promotion now has an executable gate: mission-specific
+station residuals, insertion covariance semantics, propulsion execution residuals, and reviewed
+subsystem evidence must cover every configured dimension. More samples or more model profiles do
+not change that evidence class.
+The checked public campaign ran from outside the repository, retained the reviewed 8/8 matched and
+0/8 mismatched dispositions, and passed result verification with an explicit `illustrative` status.
+Focused validation passes 21 tests; the full suite passes `957 tests with 11 optional-backend skips`;
+Ruff, strict MyPy across 133 source files, `git diff --check`, 8 package/import tests, and sdist/wheel
+builds pass. Independent subagent review was attempted but could not start because its usage quota
+was exhausted; local adversarial review added and tested end-of-run calibration drift rejection.
 
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
@@ -428,13 +444,14 @@ Post-MVP / external-campaign items:
 | post-launch-mission-assurance | done | productize/verify | steward | `src/astro_assurance`, `astro run-mission-assurance`, `examples/assurance`, assurance tests and docs | Connects launch insertion, visibility-filtered simulation tracking, OD, a bounded manual-review correction, estimate/truth replay, and the corrected digital twin through one suite-owned evidence case. Independent review, focused and release-scale local gates, public digest verification, GitHub CI, and merged-main integration pass; PR #17 merged at `0d73d5b`. |
 | mission-assurance-uncertainty | done | productize/verify | steward | `src/astro_uq/adapters/assurance.py`, `examples/campaigns/leo_mission_assurance_robustness.yaml`, assurance/UQ tests and docs | Adds a bounded first campaign over insertion, tracking sigma, execution magnitude, and subsystem margins. The checked 8-case run, full release gates, independent review, and GitHub CI pass; PR #18 merged at `c10268e`. |
 | paired-assurance-validation | done | productize/verify | steward | `src/astro_assurance/validation_*`, paired validation CLI, explicit protocol fixture, tests and docs | Separates matched two-body and truth-J2/two-body-estimator profiles over shared coordinates. Independent review found and the implementation fixed noncausal OD, forged-derived-evidence acceptance, swallowed source drift, duplicate coordinate seeds, omitted executed-component authority, coordinate/profile substitution, and output-path collision. The corrected checked result completes 8/8 pairs with eight regressions; `951 passed, 11 skipped`, lint, typing, packaging, builds, outside-repository public run/verifier, GitHub CI, and integration pass. PR #19 merged at `d7710f5`. |
+| assurance-calibration-evidence | active | calibrate/verify | steward | `examples/assurance/paired_force_model_calibration.yaml`, calibration contracts, paired runner/verifier, assurance docs and tests | Every configured numeric dimension has one digest-bound evidence envelope and promotion derives from the weakest authority. Current status remains illustrative. Public campaign verification and all local release gates pass; GitHub review and CI integration are pending. |
 
 ## Next Best Paths
 
-1. Calibrate the paired protocol's insertion, sensor, propulsion, execution, and subsystem bounds
-   from reviewed evidence before scaling case count or interpreting frequencies. Add external
-   tracking fixtures and measured maneuver-execution evidence when a specific release claim and
-   acceptance criteria justify them.
+1. Acquire mission-specific station residuals and propulsion execution residuals, including timing,
+   then replace illustrative calibration bounds only where reviewed evidence supports promotion.
+   Add insertion covariance with explicit frame/correlation semantics and subsystem test evidence
+   before considering a mission-calibrated protocol claim.
 2. Introduce additional model-form profiles only as separately validated comparisons; keep profile
    counts and paired deltas unpooled rather than creating a weighted model-success probability.
 3. Add AI-native planning, evidence review, anomaly triage, and decision explanation over typed

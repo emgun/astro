@@ -14,6 +14,10 @@ from astro_assurance.io import (
     verify_mission_assurance_case_integrity,
 )
 from astro_assurance.models import MissionAssuranceCase, PostLaunchAssuranceScenario
+from astro_assurance.validation_calibration_io import (
+    load_assurance_validation_calibration,
+    validate_calibration_against_protocol,
+)
 from astro_assurance.validation_models import (
     AssuranceValidationProfileResult,
     AssuranceValidationStatus,
@@ -50,9 +54,11 @@ def load_paired_assurance_validation_protocol(
     try:
         protocol = PairedAssuranceValidationProtocol.model_validate(raw)
         assurance_path = _resolve_reference(protocol_path, protocol.assurance_scenario)
+        calibration_path = _resolve_reference(protocol_path, protocol.calibration_evidence)
         return protocol.model_copy(
             update={
                 "assurance_scenario": str(assurance_path.resolve()),
+                "calibration_evidence": str(calibration_path.resolve()),
                 "source_path": str(protocol_path.resolve()),
                 "source_digest": sha256(source_bytes).hexdigest(),
             }
@@ -84,6 +90,7 @@ def verify_paired_assurance_validation_result(
     sources = (
         ("protocol", result.protocol_source_path, result.protocol_source_digest),
         ("assurance", result.assurance_source_path, result.assurance_source_digest),
+        ("calibration", result.calibration_source_path, result.calibration_source_digest),
     )
     for role, source_path, expected_digest in sources:
         try:
@@ -96,12 +103,26 @@ def verify_paired_assurance_validation_result(
             raise InvalidScenarioError(f"{role} source digest mismatch: {source_path}")
     protocol = load_paired_assurance_validation_protocol(result.protocol_source_path)
     base = load_post_launch_assurance_scenario(result.assurance_source_path)
+    calibration = load_assurance_validation_calibration(result.calibration_source_path)
+    validate_calibration_against_protocol(calibration, protocol)
     if protocol.protocol_id != result.protocol_id:
         raise InvalidScenarioError("validation result protocol id does not match its source")
     if protocol.claim_boundary != result.claim_boundary:
         raise InvalidScenarioError("validation result claim boundary does not match its protocol")
     if Path(protocol.assurance_scenario).resolve() != Path(result.assurance_source_path).resolve():
         raise InvalidScenarioError("validation result assurance source does not match its protocol")
+    if Path(protocol.calibration_evidence).resolve() != Path(
+        result.calibration_source_path
+    ).resolve():
+        raise InvalidScenarioError(
+            "validation result calibration source does not match its protocol"
+        )
+    if (
+        calibration.calibration_id != result.calibration_id
+        or calibration.promotion_status is not result.calibration_promotion_status
+        or calibration.claim_boundary != result.calibration_claim_boundary
+    ):
+        raise InvalidScenarioError("validation result calibration evidence does not match")
     expected_realizations = tuple(realization for realization in protocol.realizations)
     actual_realizations = tuple(pair.realization for pair in result.pairs)
     if actual_realizations != expected_realizations:
@@ -292,6 +313,7 @@ def format_paired_assurance_validation_summary(
         f"Mismatched passed: {summary.mismatched_passed}/{summary.requested_pairs}",
         f"Pass regressions: {summary.pass_regressions}",
         f"Pass improvements: {summary.pass_improvements}",
+        f"Calibration status: {result.calibration_promotion_status.value}",
         f"Claim boundary: {result.claim_boundary}",
     ]
     return "\n".join(lines) + "\n"

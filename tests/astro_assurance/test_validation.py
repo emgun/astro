@@ -12,6 +12,10 @@ import astro_assurance.validation_cli as validation_cli
 import astro_assurance.validation_runner as validation_runner
 from astro_assurance.errors import MissionAssuranceError
 from astro_assurance.models import MissionAssuranceCase
+from astro_assurance.validation_calibration_io import (
+    load_assurance_validation_calibration,
+    validate_calibration_against_protocol,
+)
 from astro_assurance.validation_io import (
     load_paired_assurance_validation_protocol,
     load_paired_assurance_validation_result,
@@ -19,6 +23,9 @@ from astro_assurance.validation_io import (
     write_paired_assurance_validation_result,
 )
 from astro_assurance.validation_models import (
+    AssuranceCalibrationAuthority,
+    AssuranceCalibrationPromotionStatus,
+    AssuranceValidationCalibrationManifest,
     AssuranceValidationProfile,
     AssuranceValidationStatus,
     PairedAssuranceValidationProtocol,
@@ -30,6 +37,7 @@ from astro_core.errors import InvalidScenarioError
 from astro_core.models import ForceModelName
 
 PROTOCOL = Path("examples/assurance/paired_force_model_validation.yaml")
+CALIBRATION = Path("examples/assurance/paired_force_model_calibration.yaml")
 
 
 @pytest.fixture(scope="module")
@@ -115,6 +123,57 @@ def test_summary_keeps_profiles_unpooled_and_reports_paired_deltas(one_pair_resu
     assert one_pair_result.pairs[0].matched.passed is True
 
 
+def test_calibration_covers_protocol_and_keeps_weakest_claim_boundary() -> None:
+    protocol = load_paired_assurance_validation_protocol(PROTOCOL)
+    calibration = load_assurance_validation_calibration(CALIBRATION)
+    validate_calibration_against_protocol(calibration, protocol)
+
+    bounds = {bound.parameter: bound for bound in calibration.parameter_bounds}
+    assert len(bounds) == 26
+    assert calibration.promotion_status is AssuranceCalibrationPromotionStatus.ILLUSTRATIVE
+    assert (
+        bounds["input_overrides.tracking_range_sigma_km"].authority
+        is AssuranceCalibrationAuthority.EXTERNAL_REFERENCE_INFORMED
+    )
+    assert (
+        bounds["input_overrides.correction_execution_epoch_offset_s"].authority
+        is AssuranceCalibrationAuthority.ILLUSTRATIVE
+    )
+
+
+def test_calibration_rejects_missing_parameter_and_outside_value() -> None:
+    protocol = load_paired_assurance_validation_protocol(PROTOCOL)
+    calibration = load_assurance_validation_calibration(CALIBRATION)
+    incomplete = calibration.model_copy(
+        update={"parameter_bounds": calibration.parameter_bounds[:-1]}
+    )
+    with pytest.raises(InvalidScenarioError, match="parameter coverage mismatch"):
+        validate_calibration_against_protocol(incomplete, protocol)
+
+    payload = protocol.model_dump(mode="python")
+    payload["realizations"][0]["input_overrides"]["tracking_range_sigma_km"] = 1.0
+    outside = PairedAssuranceValidationProtocol.model_validate(payload)
+    with pytest.raises(InvalidScenarioError, match="exceed calibration envelope"):
+        validate_calibration_against_protocol(calibration, outside)
+
+
+def test_calibration_rejects_forged_promotion() -> None:
+    calibration = load_assurance_validation_calibration(CALIBRATION)
+    payload = calibration.model_dump(mode="python")
+    payload["promotion_status"] = "mission_calibrated"
+    with pytest.raises(ValueError, match="promotion status must match"):
+        AssuranceValidationCalibrationManifest.model_validate(payload)
+
+
+def test_result_reports_bound_calibration_evidence(one_pair_result) -> None:
+    assert one_pair_result.calibration_id == "leo-paired-assurance-calibration-v1"
+    assert (
+        one_pair_result.calibration_promotion_status
+        is AssuranceCalibrationPromotionStatus.ILLUSTRATIVE
+    )
+    assert one_pair_result.metadata["calibration_parameter_count"] == 26
+
+
 def test_result_verification_rejects_embedded_case_tampering(
     tmp_path: Path, full_result
 ) -> None:
@@ -142,6 +201,18 @@ def test_result_verification_rejects_forged_manifest_digest(
     result_path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(InvalidScenarioError, match="embedded artifact digest mismatch"):
+        verify_paired_assurance_validation_result(result_path)
+
+
+def test_result_verification_rejects_forged_calibration_digest(
+    tmp_path: Path, full_result
+) -> None:
+    payload = full_result.model_dump(mode="json")
+    payload["calibration_source_digest"] = "0" * 64
+    result_path = tmp_path / "forged-calibration.json"
+    result_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(InvalidScenarioError, match="calibration source digest mismatch"):
         verify_paired_assurance_validation_result(result_path)
 
 
@@ -296,6 +367,33 @@ def test_source_integrity_failure_aborts_protocol_and_cli_without_output(
     )
     assert result.exit_code == 2
     assert not output.exists()
+
+
+def test_calibration_drift_during_execution_aborts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied_calibration = tmp_path / "calibration.yaml"
+    copied_calibration.write_bytes(CALIBRATION.read_bytes())
+    protocol = load_paired_assurance_validation_protocol(PROTOCOL)
+    limited = protocol.model_copy(
+        update={
+            "calibration_evidence": str(copied_calibration),
+            "realizations": protocol.realizations[:1],
+        }
+    )
+    original_run_pair = validation_runner._run_pair
+
+    def mutate_calibration(*args: object, **kwargs: object):
+        result = original_run_pair(*args, **kwargs)
+        copied_calibration.write_text("changed during campaign\n", encoding="utf-8")
+        return result
+
+    monkeypatch.setattr(validation_runner, "_run_pair", mutate_calibration)
+    with pytest.raises(
+        MissionAssuranceError, match="calibration evidence changed during execution"
+    ):
+        run_paired_assurance_validation(limited)
 
 
 def test_validation_command_resolves_protocol_outside_repository(

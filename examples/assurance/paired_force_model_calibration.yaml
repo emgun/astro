@@ -1,0 +1,280 @@
+calibration_id: leo-paired-assurance-calibration-v1
+protocol_id: leo-paired-assurance-validation-v1
+promotion_status: illustrative
+sources:
+  - source_id: astro-assurance-design
+    title: Astro post-launch assurance configured design
+    publisher: Astro Suite
+    document_id: post_launch_orbit_acquisition-v1
+    revision_or_date: "2026-07-14"
+    location: examples/assurance/post_launch_orbit_acquisition.yaml
+    source_kind: project_configuration
+    applicability: Defines the local screening timeline, maneuver authority, and twin configuration.
+    limitations: [Project configuration is not external test or flight evidence.]
+  - source_id: nasa-nsn-2021
+    title: Near Space Network Interfaces and Capabilities
+    publisher: NASA
+    document_id: NSN-Brochure
+    revision_or_date: 2021-05
+    location: https://explorers.larc.nasa.gov/2022ESE/pdf_files/NSN%20Brochure.pdf
+    source_kind: official_technical_reference
+    applicability: Publishes near-space S-band and X-band range and Doppler service performance.
+    limitations: [Performance depends on band, tracking mode, asset, geometry, atmosphere, and mission signal.]
+  - source_id: nasa-lro-tracking-2010
+    title: Tracking Data Certification for the Lunar Reconnaissance Orbiter
+    publisher: NASA Goddard Space Flight Center
+    document_id: "20100017175"
+    revision_or_date: "2010"
+    location: https://ntrs.nasa.gov/citations/20100017175
+    source_kind: official_technical_reference
+    applicability: Provides a 10 m coherent S-band range requirement and repeated-pass certification method.
+    limitations: [LRO stations, coherent mode, count interval, truth orbit, and residual tests do not match this synthetic network.]
+  - source_id: jpl-radiometric-2000
+    title: Radiometric Tracking Techniques for Deep-Space Navigation
+    publisher: NASA Jet Propulsion Laboratory
+    document_id: JPL-Publication-00-11
+    revision_or_date: 2000-10
+    location: https://descanso.jpl.nasa.gov/monograph/series1/Descanso1_all.pdf
+    source_kind: official_technical_reference
+    applicability: Establishes separate radiometric random, instrumental-bias, media, clock, station, and model errors.
+    limitations: [Historical deep-space X-band performance is not a LEO station-network calibration.]
+  - source_id: avio-vega-c-issue1
+    title: Vega C User's Manual
+    publisher: Avio
+    document_id: Vega-C-UM-Issue-1-Rev-0
+    revision_or_date: Issue 1 Rev 0
+    location: https://www.avio.com/sites/avio.com/files/downloads/UM%20Vega%20C%20-%20Iss1%20Rev0%20Erratum_1.pdf
+    source_kind: official_technical_reference
+    applicability: Publishes a primary launch-provider LEO injection envelope in orbital elements.
+    limitations: [No Cartesian covariance, correlations, mission mapping, or applicable launcher selection is provided.]
+  - source_id: nasa-tess-monte-carlo-2016
+    title: TESS Monte Carlo Analysis as a Trajectory Design Driver
+    publisher: NASA Goddard Space Flight Center
+    document_id: "20160013327"
+    revision_or_date: 2016-09
+    location: https://ntrs.nasa.gov/api/citations/20160013327/downloads/20160013327.pdf
+    source_kind: official_technical_reference
+    applicability: Publishes pre- and post-calibration proportional maneuver-magnitude assumptions.
+    limitations: [TESS propulsion, pointing data, confidence convention, and mission regime do not match Astro.]
+  - source_id: jpl-cassini-navigation-2021
+    title: Cassini Navigation Performance Assessment
+    publisher: NASA Jet Propulsion Laboratory
+    document_id: DESCANSO-Article-17-Rev-A
+    revision_or_date: 2021-03
+    location: https://descanso.jpl.nasa.gov/DPSummary/DESCANSO17_Cassini_RevA.pdf
+    source_kind: official_technical_reference
+    applicability: Demonstrates flight-derived fixed-plus-proportional magnitude and pointing models by propulsion class.
+    limitations: [Cassini main-engine and RCS error models do not calibrate an unspecified LEO spacecraft.]
+parameter_bounds:
+  - parameter: tracking_duration_s
+    minimum: 3600
+    maximum: 3600
+    unit: s
+    authority: project_derived
+    source_ids: [astro-assurance-design]
+    rationale: One-hour local screening arc.
+    limitations: [Not derived from an operational acquisition timeline.]
+  - parameter: correction_elapsed_s
+    minimum: 1800
+    maximum: 1800
+    unit: s
+    authority: project_derived
+    source_ids: [astro-assurance-design]
+    rationale: Preserves a causal 30-minute pre-decision tracking arc.
+    limitations: [Not tied to command generation or ground-system latency.]
+  - parameter: verification_elapsed_s
+    minimum: 3600
+    maximum: 3600
+    unit: s
+    authority: project_derived
+    source_ids: [astro-assurance-design]
+    rationale: Provides a separate 30-minute truth-verification interval.
+    limitations: [Not an operational recovery assessment horizon.]
+  - parameter: diagnostic_maximum_component_delta_v_km_s
+    minimum: 0.05
+    maximum: 0.05
+    unit: km/s
+    authority: project_derived
+    source_ids: [astro-assurance-design]
+    rationale: Diagnostic solver envelope wider than the separately enforced base authority.
+    limitations: [Not maneuver authority or propulsion capability.]
+  - parameter: diagnostic_maximum_total_delta_v_km_s
+    minimum: 0.08
+    maximum: 0.08
+    unit: km/s
+    authority: project_derived
+    source_ids: [astro-assurance-design]
+    rationale: Diagnostic solver envelope for comparable profile trajectories.
+    limitations: [Not maneuver authority or propulsion capability.]
+  - parameter: dispersion.position_delta_km[0]
+    minimum: 1.82
+    maximum: 2.18
+    unit: km
+    authority: external_reference_informed
+    source_ids: [avio-vega-c-issue1]
+    rationale: Bounded Cartesian sensitivity coordinate informed by public LEO insertion scales.
+    limitations: [Public element-space accuracy cannot calibrate this inertial Cartesian component.]
+  - parameter: dispersion.position_delta_km[1]
+    minimum: -1.08
+    maximum: -0.92
+    unit: km
+    authority: external_reference_informed
+    source_ids: [avio-vega-c-issue1]
+    rationale: Bounded Cartesian sensitivity coordinate informed by public LEO insertion scales.
+    limitations: [Public element-space accuracy cannot calibrate this inertial Cartesian component.]
+  - parameter: dispersion.position_delta_km[2]
+    minimum: 0.42
+    maximum: 0.58
+    unit: km
+    authority: external_reference_informed
+    source_ids: [avio-vega-c-issue1]
+    rationale: Bounded Cartesian sensitivity coordinate informed by public LEO insertion scales.
+    limitations: [Public element-space accuracy cannot calibrate this inertial Cartesian component.]
+  - parameter: dispersion.velocity_delta_km_s[0]
+    minimum: 0.00091
+    maximum: 0.00109
+    unit: km/s
+    authority: external_reference_informed
+    source_ids: [avio-vega-c-issue1]
+    rationale: Bounded velocity sensitivity coordinate informed by public launch-service envelopes.
+    limitations: [No launcher-specific Cartesian covariance or confidence mapping is available.]
+  - parameter: dispersion.velocity_delta_km_s[1]
+    minimum: -0.00162
+    maximum: -0.00138
+    unit: km/s
+    authority: external_reference_informed
+    source_ids: [avio-vega-c-issue1]
+    rationale: Bounded velocity sensitivity coordinate informed by public launch-service envelopes.
+    limitations: [No launcher-specific Cartesian covariance or confidence mapping is available.]
+  - parameter: dispersion.velocity_delta_km_s[2]
+    minimum: 0.00073
+    maximum: 0.00087
+    unit: km/s
+    authority: external_reference_informed
+    source_ids: [avio-vega-c-issue1]
+    rationale: Bounded velocity sensitivity coordinate informed by public launch-service envelopes.
+    limitations: [No launcher-specific Cartesian covariance or confidence mapping is available.]
+  - parameter: input_overrides.tracking_range_sigma_km
+    minimum: 0.0084
+    maximum: 0.0116
+    unit: km
+    authority: external_reference_informed
+    source_ids: [nasa-nsn-2021, nasa-lro-tracking-2010]
+    rationale: Envelope is centered on the published 10 m LRO coherent S-band requirement.
+    limitations: [Synthetic stations do not declare matching band, mode, integration, SNR, or residual certification.]
+  - parameter: input_overrides.tracking_range_rate_sigma_km_s
+    minimum: 0.0000083
+    maximum: 0.0000117
+    unit: km/s
+    authority: external_reference_informed
+    source_ids: [nasa-nsn-2021]
+    rationale: Lies within the published near-space coherent S-band service scale.
+    limitations: [The protocol does not specify band, coherent mode, count interval, SNR, or station asset.]
+  - parameter: input_overrides.tracking_range_bias_km
+    minimum: -0.0035
+    maximum: 0.0035
+    unit: km
+    authority: illustrative
+    source_ids: [jpl-radiometric-2000]
+    rationale: Symmetric sensitivity envelope reflects that instrumental and media biases exist.
+    limitations: [No matching station residuals support this symmetric magnitude or distribution.]
+  - parameter: input_overrides.tracking_range_rate_bias_km_s
+    minimum: -0.0000035
+    maximum: 0.0000035
+    unit: km/s
+    authority: illustrative
+    source_ids: [jpl-radiometric-2000]
+    rationale: Symmetric sensitivity envelope separates systematic bias from random noise.
+    limitations: [No matching station residuals support this symmetric magnitude or distribution.]
+  - parameter: input_overrides.estimation_range_sigma_km
+    minimum: 0.0084
+    maximum: 0.0116
+    unit: km
+    authority: external_reference_informed
+    source_ids: [nasa-lro-tracking-2010]
+    rationale: Estimator weights bracket the published 10 m LRO range assumption.
+    limitations: [No residual fit or station-specific covariance calibrates these weights.]
+  - parameter: input_overrides.estimation_range_rate_sigma_km_s
+    minimum: 0.0000087
+    maximum: 0.0000113
+    unit: km/s
+    authority: external_reference_informed
+    source_ids: [nasa-nsn-2021]
+    rationale: Estimator weights remain inside a published near-space S-band service scale.
+    limitations: [They are not derived from this protocol's residuals or declared tracking mode.]
+  - parameter: input_overrides.estimation_range_bias_km
+    minimum: -0.001
+    maximum: 0.001
+    unit: km
+    authority: illustrative
+    source_ids: [jpl-radiometric-2000]
+    rationale: Sensitivity coordinate for estimator bias mismatch.
+    limitations: [No source supports these exact symmetric estimator-bias values.]
+  - parameter: input_overrides.estimation_range_rate_bias_km_s
+    minimum: -0.0000012
+    maximum: 0.0000012
+    unit: km/s
+    authority: illustrative
+    source_ids: [jpl-radiometric-2000]
+    rationale: Sensitivity coordinate for estimator bias mismatch.
+    limitations: [No source supports these exact symmetric estimator-bias values.]
+  - parameter: input_overrides.correction_execution_scale
+    minimum: 0.992
+    maximum: 1.008
+    unit: ratio
+    authority: external_reference_informed
+    source_ids: [nasa-tess-monte-carlo-2016, jpl-cassini-navigation-2021]
+    rationale: Proportional magnitude scale is informed by published calibrated maneuver models.
+    limitations: [No propulsion architecture or fixed impulse-error term is specified.]
+  - parameter: input_overrides.correction_execution_epoch_offset_s
+    minimum: -4
+    maximum: 4
+    unit: s
+    authority: illustrative
+    source_ids: []
+    rationale: Sensitivity-only command execution timing offset.
+    limitations: [No matching flight-software, telemetry, sequencing, or thruster timing evidence was found.]
+  - parameter: input_overrides.correction_execution_pointing_1_deg
+    minimum: -0.08
+    maximum: 0.08
+    unit: deg
+    authority: external_reference_informed
+    source_ids: [jpl-cassini-navigation-2021]
+    rationale: Cross-axis pointing scale is informed by flight-derived maneuver-error model forms.
+    limitations: [Published pointing performance varies strongly between main engines and RCS.]
+  - parameter: input_overrides.correction_execution_pointing_2_deg
+    minimum: -0.07
+    maximum: 0.07
+    unit: deg
+    authority: external_reference_informed
+    source_ids: [jpl-cassini-navigation-2021]
+    rationale: Cross-axis pointing scale is informed by flight-derived maneuver-error model forms.
+    limitations: [Published pointing performance varies strongly between main engines and RCS.]
+  - parameter: input_overrides.twin_solar_array_efficiency
+    minimum: 0.286
+    maximum: 0.294
+    unit: ratio
+    authority: project_derived
+    source_ids: [astro-assurance-design]
+    rationale: Local sensitivity range around the configured twin design point.
+    limitations: [Not supported by component qualification or degradation data.]
+  - parameter: input_overrides.twin_battery_capacity_wh
+    minimum: 1160
+    maximum: 1240
+    unit: W*h
+    authority: project_derived
+    source_ids: [astro-assurance-design]
+    rationale: Local sensitivity range around the configured twin design point.
+    limitations: [Not supported by cell characterization, age, temperature, or qualification data.]
+  - parameter: input_overrides.twin_thermal_node_overrides.bus.emissivity
+    minimum: 0.765
+    maximum: 0.8
+    unit: ratio
+    authority: project_derived
+    source_ids: [astro-assurance-design]
+    rationale: Local sensitivity range around the configured lumped bus thermal node.
+    limitations: [Not supported by coating measurements, geometry correlation, or thermal-vacuum data.]
+metadata:
+  evidence_review_date: 2026-07-14
+  conclusion: reference_informed_model_form_with_illustrative_numeric_dimensions
+  reopen_requirement: mission_specific_launcher_covariance_tracking_residuals_and_maneuver_history

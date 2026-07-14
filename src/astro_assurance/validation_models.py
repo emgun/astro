@@ -25,6 +25,122 @@ class AssuranceValidationStatus(StrEnum):
     EXECUTION_FAILURE = "execution_failure"
 
 
+class AssuranceCalibrationAuthority(StrEnum):
+    ILLUSTRATIVE = "illustrative"
+    PROJECT_DERIVED = "project_derived"
+    EXTERNAL_REFERENCE_INFORMED = "external_reference_informed"
+    MISSION_TEST_CALIBRATED = "mission_test_calibrated"
+    FLIGHT_CALIBRATED = "flight_calibrated"
+
+
+class AssuranceCalibrationPromotionStatus(StrEnum):
+    ILLUSTRATIVE = "illustrative"
+    REFERENCE_INFORMED = "reference_informed"
+    MISSION_CALIBRATED = "mission_calibrated"
+
+
+class AssuranceCalibrationSourceKind(StrEnum):
+    OFFICIAL_TECHNICAL_REFERENCE = "official_technical_reference"
+    PROJECT_CONFIGURATION = "project_configuration"
+    MISSION_TEST_DATA = "mission_test_data"
+    FLIGHT_DATA = "flight_data"
+
+
+class AssuranceCalibrationSource(AstroModel):
+    source_id: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
+    title: str = Field(min_length=1)
+    publisher: str = Field(min_length=1)
+    document_id: str = Field(min_length=1)
+    revision_or_date: str = Field(min_length=1)
+    location: str = Field(min_length=1)
+    source_kind: AssuranceCalibrationSourceKind
+    applicability: str = Field(min_length=1)
+    limitations: tuple[str, ...] = Field(min_length=1)
+
+
+class AssuranceCalibrationBound(AstroModel):
+    parameter: str = Field(min_length=1)
+    minimum: FiniteFloat
+    maximum: FiniteFloat
+    unit: str = Field(min_length=1)
+    authority: AssuranceCalibrationAuthority
+    source_ids: tuple[str, ...] = Field(default_factory=tuple)
+    rationale: str = Field(min_length=1)
+    limitations: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def range_and_sources_must_be_valid(self) -> AssuranceCalibrationBound:
+        if self.minimum > self.maximum:
+            raise ValueError("calibration bound minimum must not exceed maximum")
+        if len(set(self.source_ids)) != len(self.source_ids):
+            raise ValueError("calibration bound source ids must be unique")
+        if self.authority is not AssuranceCalibrationAuthority.ILLUSTRATIVE and not self.source_ids:
+            raise ValueError("non-illustrative calibration bounds require a source")
+        return self
+
+
+class AssuranceValidationCalibrationManifest(AstroModel):
+    calibration_id: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
+    protocol_id: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
+    sources: tuple[AssuranceCalibrationSource, ...] = Field(min_length=1)
+    parameter_bounds: tuple[AssuranceCalibrationBound, ...] = Field(min_length=1)
+    promotion_status: AssuranceCalibrationPromotionStatus
+    coverage_policy: Literal["all_configured_values_within_declared_envelopes"] = (
+        "all_configured_values_within_declared_envelopes"
+    )
+    claim_boundary: Literal[
+        "parameter_envelope_traceability_not_operational_calibration_or_probability"
+    ] = "parameter_envelope_traceability_not_operational_calibration_or_probability"
+    source_path: str | None = Field(default=None, exclude=True)
+    source_digest: str | None = Field(default=None, exclude=True)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def references_and_promotion_must_be_consistent(
+        self,
+    ) -> AssuranceValidationCalibrationManifest:
+        source_ids = [source.source_id for source in self.sources]
+        if len(set(source_ids)) != len(source_ids):
+            raise ValueError("calibration source ids must be unique")
+        parameters = [bound.parameter for bound in self.parameter_bounds]
+        if len(set(parameters)) != len(parameters):
+            raise ValueError("calibration parameters must be unique")
+        sources = {source.source_id: source for source in self.sources}
+        required_source_kind = {
+            AssuranceCalibrationAuthority.PROJECT_DERIVED: (
+                AssuranceCalibrationSourceKind.PROJECT_CONFIGURATION
+            ),
+            AssuranceCalibrationAuthority.EXTERNAL_REFERENCE_INFORMED: (
+                AssuranceCalibrationSourceKind.OFFICIAL_TECHNICAL_REFERENCE
+            ),
+            AssuranceCalibrationAuthority.MISSION_TEST_CALIBRATED: (
+                AssuranceCalibrationSourceKind.MISSION_TEST_DATA
+            ),
+            AssuranceCalibrationAuthority.FLIGHT_CALIBRATED: (
+                AssuranceCalibrationSourceKind.FLIGHT_DATA
+            ),
+        }
+        for bound in self.parameter_bounds:
+            unknown = set(bound.source_ids) - set(sources)
+            if unknown:
+                raise ValueError(
+                    f"calibration bound {bound.parameter} references unknown sources: "
+                    f"{sorted(unknown)}"
+                )
+            required_kind = required_source_kind.get(bound.authority)
+            if required_kind is not None and not any(
+                sources[source_id].source_kind is required_kind
+                for source_id in bound.source_ids
+            ):
+                raise ValueError(
+                    f"calibration bound {bound.parameter} lacks a source for its authority"
+                )
+        expected = derive_calibration_promotion_status(self.parameter_bounds)
+        if self.promotion_status is not expected:
+            raise ValueError("calibration promotion status must match bound authority")
+        return self
+
+
 class AssuranceValidationRealization(AstroModel):
     case_id: str = Field(pattern=r"^[a-z0-9_-]+$")
     dispersion: InsertionDispersion
@@ -44,6 +160,7 @@ class AssuranceValidationRealization(AstroModel):
 class PairedAssuranceValidationProtocol(AstroModel):
     protocol_id: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
     assurance_scenario: str = Field(min_length=1)
+    calibration_evidence: str = Field(min_length=1)
     tracking_duration_s: FiniteFloat = Field(gt=0.0)
     correction_elapsed_s: FiniteFloat = Field(gt=0.0)
     verification_elapsed_s: FiniteFloat = Field(gt=0.0)
@@ -186,6 +303,13 @@ class PairedAssuranceValidationResult(AstroModel):
     protocol_source_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     assurance_source_path: str = Field(min_length=1)
     assurance_source_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    calibration_id: str = Field(min_length=1)
+    calibration_source_path: str = Field(min_length=1)
+    calibration_source_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    calibration_promotion_status: AssuranceCalibrationPromotionStatus
+    calibration_claim_boundary: Literal[
+        "parameter_envelope_traceability_not_operational_calibration_or_probability"
+    ]
     pairs: tuple[AssuranceValidationPairResult, ...] = Field(min_length=1)
     summary: AssuranceValidationSummary
     claim_boundary: Literal[
@@ -242,3 +366,18 @@ def summarize_validation_pairs(
         unchanged_pass_disposition=sum(pair.pass_reversal == "unchanged" for pair in pairs),
         paired_metric_deltas=metric_deltas,
     )
+
+
+def derive_calibration_promotion_status(
+    bounds: tuple[AssuranceCalibrationBound, ...],
+) -> AssuranceCalibrationPromotionStatus:
+    authorities = {bound.authority for bound in bounds}
+    if AssuranceCalibrationAuthority.ILLUSTRATIVE in authorities:
+        return AssuranceCalibrationPromotionStatus.ILLUSTRATIVE
+    calibrated = {
+        AssuranceCalibrationAuthority.MISSION_TEST_CALIBRATED,
+        AssuranceCalibrationAuthority.FLIGHT_CALIBRATED,
+    }
+    if authorities and authorities <= calibrated:
+        return AssuranceCalibrationPromotionStatus.MISSION_CALIBRATED
+    return AssuranceCalibrationPromotionStatus.REFERENCE_INFORMED
