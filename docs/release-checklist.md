@@ -45,7 +45,8 @@ Latest post-launch mission-assurance integration evidence:
   findings and an `additional_evidence_required` disposition for the illustrative calibration.
   The public `/tmp` workflow, 12 focused tests, `970 passed, 11 skipped`, Ruff, strict MyPy across
   137 source files, 9 package/import tests, builds, and `git diff --check` pass. Unlike-unit metrics
-  are preserved but not ranked by raw magnitude. GitHub review and CI integration are pending.
+  are preserved but not ranked by raw magnitude. GitHub CI passed in `2m30s`; PR #22 merged at
+  `0d1f32b`.
 
 - 2026-07-13: `codex/post-launch-mission-assurance` added the suite-owned launch insertion,
   simulated tracking, OD, bounded candidate correction, estimate/truth replay, corrected digital
