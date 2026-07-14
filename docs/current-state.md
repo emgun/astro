@@ -174,6 +174,7 @@ verify/review/re-verify commands, and `git diff --check` pass. Independent revie
 lifecycle-failure handling, protected assistant plan ids, exact-byte parsing, five-file digest
 binding with staged captured-input execution, numeric-id normalization, and private
 verified-evidence-only derivation.
+GitHub CI passed in `2m58s`; PR #24 merged the scope to `main` at `beb0b81`.
 
 Project-specific steward learning: distinguish physics pass state from review readiness. A passing
 lifecycle can still require bounded evidence-quality action, and free-text model caveats must not be
@@ -505,7 +506,7 @@ Post-MVP / external-campaign items:
 | v0.2.0-rc.1 | done | release/verify | steward | package metadata, campaign compatibility, release notes, merged-main and detached-worktree gates | Package metadata, built-wheel public workflow, local gates, GitHub CI, merged-commit detached verification, and annotated tag agree at `f1baa02`. |
 | assurance-review-operator | done | productize/verify | steward | deterministic paired-assurance review, public CLI, typed assistant plan, tests and docs | Public artifact, local gates, GitHub CI, and integration pass. Findings remain deterministic and non-operational; PR #22 merged at `0d1f32b`. |
 | assurance-review-comparison | done | productize/verify | steward | review re-verification, deterministic cross-run comparison, public CLI, typed assistant plan, tests and docs | Public compare/verify artifacts, independent review, local release gates, GitHub CI, and integration pass. Comparison avoids heterogeneous scalarization, claim promotion, and recommendation execution; PR #23 merged at `1564549`. |
-| lifecycle-assurance-review | active | productize/verify | steward | lifecycle result re-verification, deterministic findings and triage, public CLI, typed assistant plan, tests and docs | V1 is scoped to exact re-execution of local lifecycle evidence, stable continuity/margin/warning findings, and non-executing triage. Optional backends, causal diagnosis, provider explanation, and remediation remain closed. |
+| lifecycle-assurance-review | done | productize/verify | steward | lifecycle result re-verification, deterministic findings and triage, public CLI, typed assistant plan, tests and docs | Exact staged-input re-execution, five-file digest binding, stable findings, one bounded unit-quality action, public artifacts, independent review, 1,000-test local gates, GitHub CI, and integration pass; PR #24 merged at `beb0b81`. |
 
 ## Next Best Paths
 
@@ -515,12 +516,15 @@ Post-MVP / external-campaign items:
    before considering a mission-calibrated protocol claim.
 2. Introduce additional model-form profiles only as separately validated comparisons; keep profile
    counts and paired deltas unpooled rather than creating a weighted model-success probability.
-3. Extend deterministic review to mission-assurance lifecycle cases and bounded anomaly triage,
-   then add optional evidence-bound explanations over verified finding ids. Keep autonomous
-   execution closed, and keep surrogate acceleration closed unless a measured assurance teacher or
-   other evaluator passes the cost and fidelity gate.
-4. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+3. Resolve the lifecycle review's checked evidence-quality warning by replacing the promoted twin
+   margin unit `native` with an explicit physical-unit contract, then rerun and compare the review.
+4. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
+   needed; do not infer bundle integrity from result re-execution.
+5. Add optional evidence-bound explanations over verified finding ids only after deterministic
+   triage is sufficient. Keep autonomous execution closed, and keep surrogate acceleration closed
+   unless a measured assurance teacher or other evaluator passes the cost and fidelity gate.
+6. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-5. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+7. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.
