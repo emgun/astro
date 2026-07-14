@@ -153,6 +153,7 @@ tests pass 20 tests; release-scale gates pass `984 tests with 11 optional-backen
 strict MyPy across 138 source files, 9 package/import tests, sdist/wheel builds, and
 `git diff --check`. Independent review drove comparison re-verification, exact-byte digest binding,
 hard-link collision rejection, semantic metric finding ids, and complete assistant path checks.
+GitHub CI passed in `3m31s`; PR #23 merged the scope to `main` at `1564549`.
 
 Project-specific steward learning: compare digests must cover the same bytes that were verified,
 and added or removed metrics are real transitions even when no numeric delta exists. Evidence
@@ -483,7 +484,7 @@ Post-MVP / external-campaign items:
 | assurance-calibration-evidence | done | calibrate/verify | steward | `examples/assurance/paired_force_model_calibration.yaml`, calibration contracts, paired runner/verifier, assurance docs and tests | Every configured numeric dimension has one digest-bound evidence envelope and promotion derives from the weakest authority. Current status remains illustrative. Public campaign verification, all local release gates, GitHub CI, and integration pass; PR #20 merged at `f84dee7`. |
 | v0.2.0-rc.1 | done | release/verify | steward | package metadata, campaign compatibility, release notes, merged-main and detached-worktree gates | Package metadata, built-wheel public workflow, local gates, GitHub CI, merged-commit detached verification, and annotated tag agree at `f1baa02`. |
 | assurance-review-operator | done | productize/verify | steward | deterministic paired-assurance review, public CLI, typed assistant plan, tests and docs | Public artifact, local gates, GitHub CI, and integration pass. Findings remain deterministic and non-operational; PR #22 merged at `0d1f32b`. |
-| assurance-review-comparison | active | productize/verify | steward | review re-verification, deterministic cross-run comparison, public CLI, typed assistant plan, tests and docs | Implementation and focused verification are in progress. Exit requires comparison without heterogeneous scalarization, claim promotion, or recommendation execution, plus public and release-scale gates. |
+| assurance-review-comparison | done | productize/verify | steward | review re-verification, deterministic cross-run comparison, public CLI, typed assistant plan, tests and docs | Public compare/verify artifacts, independent review, local release gates, GitHub CI, and integration pass. Comparison avoids heterogeneous scalarization, claim promotion, and recommendation execution; PR #23 merged at `1564549`. |
 
 ## Next Best Paths
 
@@ -493,9 +494,10 @@ Post-MVP / external-campaign items:
    before considering a mission-calibrated protocol claim.
 2. Introduce additional model-form profiles only as separately validated comparisons; keep profile
    counts and paired deltas unpooled rather than creating a weighted model-success probability.
-3. Add AI-native planning, evidence review, anomaly triage, and decision explanation over typed
-   assurance products before considering autonomous execution. Keep surrogate acceleration closed
-   unless a measured assurance teacher or other evaluator passes the cost and fidelity gate.
+3. Extend deterministic review to mission-assurance lifecycle cases and bounded anomaly triage,
+   then add optional evidence-bound explanations over verified finding ids. Keep autonomous
+   execution closed, and keep surrogate acceleration closed unless a measured assurance teacher or
+   other evaluator passes the cost and fidelity gate.
 4. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
 5. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
