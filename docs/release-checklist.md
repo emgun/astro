@@ -50,6 +50,8 @@ Latest post-launch mission-assurance integration evidence:
   files, `git diff --check`, a fresh two-worker 8-case public campaign, and sdist/wheel builds. The
   reference reports all-completed-case design-space frequencies under illustrative bounds and
   fixed-seed common random numbers, not calibrated operational probabilities.
+- 2026-07-13: GitHub CI passed in `1m51s`; PR #18 merged the mission-assurance uncertainty scope to
+  `main` at `c10268e`.
 
 Latest optional validation refresh:
 
