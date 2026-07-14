@@ -122,7 +122,30 @@ matched. Failed physics profiles remain visible and are never removed from reque
 Each successful profile reports both the embedded case decision under the diagnostic solver envelope
 and the stricter protocol pass after reapplying the base scenario's maneuver-authority limits. The
 verifier rechecks the protocol and assurance sources, every nested assurance input, each embedded
-case digest, and every manifest product digest against the embedded product.
+case digest, and every manifest product digest against the embedded product. It also loads the
+protocol's calibration manifest, verifies its file digest, and requires exact parameter coverage,
+matching units, and containment of every configured value within its declared envelope.
+
+### Calibration Evidence
+
+`examples/assurance/paired_force_model_calibration.yaml` gives all 26 configured numeric dimensions
+an executable evidence record. Each bound declares its authority, source identifiers, rationale,
+limitations, unit, and allowed envelope. Promotion derives from the weakest bound and cannot be set
+independently:
+
+- `illustrative` means at least one bound is illustrative.
+- `reference_informed` means every bound has project or external-reference support, but at least one
+  lacks mission-test or flight calibration.
+- `mission_calibrated` requires every bound to be backed by mission-test or flight data.
+
+The current manifest remains `illustrative`. NASA Near Space Network and LRO tracking references
+inform range and range-rate noise envelopes; a Vega C user manual informs insertion scale; NASA TESS
+and JPL Cassini navigation reports inform maneuver-magnitude and pointing categories. These sources
+do not calibrate this synthetic LEO network, spacecraft, propulsion system, or thermal/power model.
+The configured tracking biases and four-second maneuver timing error remain illustrative. Promotion
+therefore requires mission-specific station residuals, insertion covariance with frame and
+correlation semantics, propulsion execution residuals including timing, and reviewed subsystem
+acceptance evidence. A larger case count cannot promote the evidence class.
 
 The checked eight-coordinate, one-hour protocol uses 30 minutes of causal pre-decision tracking and
 30 minutes of post-decision truth verification. It completed all eight pairs. All eight matched
@@ -137,6 +160,6 @@ profiles can produce comparable trajectories. Profile pass disposition separatel
 original assurance scenario's `20 m/s` component and `25 m/s` total authority. The wider diagnostic
 envelope is not an authorized maneuver bound. Results report profile counts, physics-complete pair
 counts, paired metric deltas, and reversal counts. They contain no pooled success probability.
-Coordinates and bounds remain illustrative until launch, sensor, propulsion, and subsystem evidence
-calibrates them; the product is simulation design-space validation, not navigation certification or
-flight authority.
+Coordinates and the overall manifest remain illustrative until launch, sensor, propulsion, and
+subsystem evidence calibrates every bound; the product is simulation design-space validation, not
+navigation certification or flight authority.
