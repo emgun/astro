@@ -14,8 +14,11 @@ Latest merged-main evidence:
   strict MyPy across 133 source files, `git diff --check`, 9 package/import tests, sdist/wheel
   builds, wheel metadata/content inspection, and an isolated wheel-installed public paired-assurance
   validate/run/verify workflow from `/tmp`. The candidate reports 8/8 matched passes, 0/8
-  mismatched passes, eight regressions, and `Calibration status: illustrative`. GitHub CI, merge,
-  detached merged-commit verification, and tagging are pending.
+  mismatched passes, eight regressions, and `Calibration status: illustrative`.
+- 2026-07-14: GitHub CI passed in `2m5s`; PR #21 merged at `f1baa02`. A detached worktree at that
+  exact merge commit repeated `958 passed, 11 skipped`, Ruff, strict MyPy across 133 source files,
+  clean-tree review, package builds and metadata inspection, and the isolated wheel-installed
+  paired-assurance workflow. Annotated tag `v0.2.0-rc.1` was published at `f1baa02`.
 
 - 2026-07-10: annotated final tag `v0.1.0` was published at `6cc7d2f`, exactly matching the reviewed
   `v0.1.0-rc.2` commit. A detached release worktree repeated Ruff, strict MyPy across 97 source
