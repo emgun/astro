@@ -3,6 +3,8 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
+from astro_uq.cli import SOFTWARE_COMPATIBILITY
+
 
 def test_dependency_pins_keep_optional_launch_stack_numpy_1_compatible() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
@@ -20,12 +22,20 @@ def test_dependency_pins_keep_optional_launch_stack_numpy_1_compatible() -> None
 def test_public_package_metadata_declares_license_and_classifiers() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
+    assert pyproject["project"]["version"] == "0.2.0rc1"
     assert pyproject["project"]["license"] == {"text": "Apache-2.0"}
     assert Path("LICENSE").exists()
     assert "License :: OSI Approved :: Apache Software License" in pyproject["project"][
         "classifiers"
     ]
     assert "Topic :: Scientific/Engineering :: Astronomy" in pyproject["project"]["classifiers"]
+
+
+def test_campaign_compatibility_tracks_package_version() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+
+    assert SOFTWARE_COMPATIBILITY["astro-suite"] == pyproject["project"]["version"]
+    assert SOFTWARE_COMPATIBILITY["campaign-runtime"] == "1.2"
 
 
 def test_dev_dependencies_keep_ci_type_checking_stable() -> None:

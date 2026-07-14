@@ -1,10 +1,21 @@
 # Release Checklist
 
-Date: 2026-07-10
+Date: 2026-07-14
 
 Use this checklist before tagging or publishing a release candidate.
 
 Latest merged-main evidence:
+
+- 2026-07-14: `v0.2.0-rc.1` preparation scopes the post-`v0.1.0` reentry, mission-lifecycle,
+  uncertainty-campaign, digital-twin campaign, and evidence-bound mission-assurance increment.
+  Package metadata and campaign software compatibility advance to `0.2.0rc1`; artifact schema and
+  campaign-runtime versions remain independent contracts.
+- 2026-07-14: candidate verification passed `958 tests with 11 optional-backend skips`, Ruff,
+  strict MyPy across 133 source files, `git diff --check`, 9 package/import tests, sdist/wheel
+  builds, wheel metadata/content inspection, and an isolated wheel-installed public paired-assurance
+  validate/run/verify workflow from `/tmp`. The candidate reports 8/8 matched passes, 0/8
+  mismatched passes, eight regressions, and `Calibration status: illustrative`. GitHub CI, merge,
+  detached merged-commit verification, and tagging are pending.
 
 - 2026-07-10: annotated final tag `v0.1.0` was published at `6cc7d2f`, exactly matching the reviewed
   `v0.1.0-rc.2` commit. A detached release worktree repeated Ruff, strict MyPy across 97 source
