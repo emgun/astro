@@ -3,16 +3,18 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import Field, FiniteFloat, model_validator
+from pydantic import Field, FiniteFloat, field_validator, model_validator
 
 from astro_core.models import (
     AstroModel,
     EstimateResult,
+    ForceModelName,
     Maneuver,
     MeasurementRecord,
     Scenario,
     Trajectory,
     Vector3,
+    _integer_input_must_be_int,
 )
 from astro_launch.models import LaunchTrajectory
 from astro_twin.models import DigitalTwinResult
@@ -99,20 +101,47 @@ class AssuranceThermalNodeInputOverride(AstroModel):
 
 
 class MissionAssuranceInputOverrides(AstroModel):
+    tracking_duration_s: FiniteFloat | None = Field(default=None, gt=0.0)
     tracking_range_sigma_km: FiniteFloat | None = Field(default=None, gt=0.0)
     tracking_range_rate_sigma_km_s: FiniteFloat | None = Field(default=None, gt=0.0)
+    tracking_noise_seed: int | None = None
+    tracking_range_bias_km: FiniteFloat | None = None
+    tracking_range_rate_bias_km_s: FiniteFloat | None = None
+    estimation_range_sigma_km: FiniteFloat | None = Field(default=None, gt=0.0)
+    estimation_range_rate_sigma_km_s: FiniteFloat | None = Field(default=None, gt=0.0)
+    estimation_range_bias_km: FiniteFloat | None = None
+    estimation_range_rate_bias_km_s: FiniteFloat | None = None
+    truth_force_model: ForceModelName | None = None
+    estimation_force_model: ForceModelName | None = None
     correction_execution_scale: FiniteFloat | None = Field(default=None, ge=0.0, le=2.0)
+    correction_execution_epoch_offset_s: FiniteFloat | None = Field(
+        default=None, ge=-300.0, le=300.0
+    )
+    correction_execution_pointing_1_deg: FiniteFloat | None = Field(default=None, ge=-10.0, le=10.0)
+    correction_execution_pointing_2_deg: FiniteFloat | None = Field(default=None, ge=-10.0, le=10.0)
     twin_solar_array_efficiency: FiniteFloat | None = Field(default=None, gt=0.0, le=1.0)
     twin_battery_capacity_wh: FiniteFloat | None = Field(default=None, gt=0.0)
     twin_thermal_node_overrides: tuple[AssuranceThermalNodeInputOverride, ...] = Field(
         default_factory=tuple
     )
 
+    @field_validator("tracking_noise_seed", mode="before")
+    @classmethod
+    def tracking_seed_must_be_exact_integer(cls, value: Any) -> Any:
+        if value is None:
+            return value
+        return _integer_input_must_be_int(value, "Mission assurance tracking noise seed")
+
     @model_validator(mode="after")
     def thermal_node_overrides_must_be_unique(self) -> MissionAssuranceInputOverrides:
         names = [override.node_name for override in self.twin_thermal_node_overrides]
         if len(set(names)) != len(names):
             raise ValueError("thermal node overrides must use unique node names")
+        local_models = {ForceModelName.TWO_BODY, ForceModelName.J2, None}
+        if self.truth_force_model not in local_models:
+            raise ValueError("truth force model override must be two_body or j2")
+        if self.estimation_force_model not in local_models:
+            raise ValueError("estimation force model override must be two_body or j2")
         return self
 
 

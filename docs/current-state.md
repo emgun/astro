@@ -55,17 +55,18 @@ candidate correction, estimate/truth replay, and a corrected digital twin in one
 merged the implementation to `main` at `0d73d5b`; it remains deterministic local design screening
 and does not claim RF acquisition, operational navigation, or flight-command authority.
 
-The first uncertainty layer over the deterministic assurance reference is now implemented through
-the generic campaign engine. The next layer is a paired assurance-validation protocol for
-independent tracking realizations, estimator-noise mismatch, execution timing/pointing, and
-force-model mismatch. AI should
+The first uncertainty layer over the deterministic assurance reference is implemented through the
+generic campaign engine. A paired assurance-validation protocol now separates independent tracking
+realizations, estimator-noise mismatch, execution timing/pointing, and force-model mismatch. AI should
 enter through typed planning, evidence review, anomaly triage, and bounded decision support before
 any autonomous execution. Surrogate training remains stopped for current cheap local evaluators
 unless a mission-assurance teacher or other evaluator passes the existing cost and fidelity gate.
 
 Branch verification on 2026-07-13 passed the visibility-filtered reference with 130 above-mask
-synthetic measurements from 1,452 candidates, converged OD, a `0.004065448 km/s` candidate impulse,
-and truth position-error reduction from `8.558551 km` to `0.568642 km`. Failed embedded twin margins
+synthetic measurements from 1,452 candidates. Causal hardening limits OD to the 64 measurements
+available by the correction decision and reserves 66 later records for truth verification. The
+updated case converges with a `0.004060974 km/s` candidate impulse and reduces truth position error
+from `8.558551 km` to `0.528331 km`. Failed embedded twin margins
 now fail the assurance case, correction propellant depletion updates the returned twin, and the
 17-file bundle binds four inputs plus 16 artifacts with a public verifier and atomic publication.
 Focused assurance and packaging tests pass `21` tests; the full suite passes `930 tests with 11
@@ -79,15 +80,30 @@ capacity, and named thermal-node properties. The truth replay now distinguishes 
 candidate from the executed impulse, depletes executed propellant, and gates executed delta-v.
 Model alternatives carry an explicit `model_form` classification, while the checked reference
 declares no alternate model. A fresh two-worker 8-case LHS run completed 8/8 cases with all ten
-configured requirements passing inside illustrative bounds. Recovery position error was
-`0.4471` to `0.7189 km` at q05/q95, recovery velocity error was `0.002814` to `0.004071 km/s`, and
-propellant reserve was `49.1010` to `49.5189 kg`. The fixed tracking seed provides common random
+configured requirements passing inside illustrative bounds. The causal refresh retains 64
+pre-decision measurements per case. Recovery position error is `0.4151` to `0.6741 km` at q05/q95,
+recovery velocity error is `0.002841` to `0.004101 km/s`, and propellant reserve is `49.1017` to
+`49.5196 kg`. The fixed tracking seed provides common random
 numbers, not independent measurement-noise draws; these are all-completed-case design-space
 frequencies, not calibrated success probabilities or operational authority. Independent review
 found and the implementation fixed missing top-level assurance-source binding and repository-CWD
 path dependence. The final local gate passes `935 tests with 11 optional-backend skips`, Ruff,
 strict MyPy across 128 source files, `git diff --check`, package builds, and the public campaign from
 outside the repository.
+
+Paired Mission-Assurance Validation v1 adds a suite-owned protocol/result surface and public
+validate, run, and verify commands. Eight explicit coordinates use unique tracking seeds across
+cases and common random numbers within each matched/mismatched pair. The one-hour arc reserves the
+first 30 minutes for causal OD before the correction decision and the second 30 minutes for truth
+verification. All eight pairs complete.
+Matched two-body profiles pass 8/8; truth-J2/two-body-estimator profiles pass 0/8, yielding eight
+pass-to-fail reversals. Median mismatched-minus-matched shifts are `+13.246 km` for OD position
+error, `+36.785 km` for truth-recovery position error, and `+43.861` for normalized residual RMS.
+Mismatched candidate targeting requires `3.375` to `7.729 m/s` beyond the original total delta-v
+authority, and executed components exceed the original component limit by `7.795` to `11.446 m/s`.
+The protocol applies a wider 50/80 m/s diagnostic solver envelope to both profiles but separately
+preserves the base 20/25 m/s authority in profile pass gates. This is an explicit comparison device,
+not expanded maneuver authority. Profile counts remain unpooled and coordinates remain illustrative.
 
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
@@ -410,17 +426,16 @@ Post-MVP / external-campaign items:
 | lifecycle-power-thermal-inputs | done | productize/verify | steward | typed lifecycle overrides, dynamic named-node bindings and metrics, checked five-input campaign, tests and docs | Screens solar-array, battery-capacity, and bus thermal design inputs against battery-SOC and separate hot/cold margins. The checked campaign records the battery tie warning and short-sunlit-window boundary instead of claiming full-orbit EPS or thermal authority. |
 | post-launch-mission-assurance | done | productize/verify | steward | `src/astro_assurance`, `astro run-mission-assurance`, `examples/assurance`, assurance tests and docs | Connects launch insertion, visibility-filtered simulation tracking, OD, a bounded manual-review correction, estimate/truth replay, and the corrected digital twin through one suite-owned evidence case. Independent review, focused and release-scale local gates, public digest verification, GitHub CI, and merged-main integration pass; PR #17 merged at `0d73d5b`. |
 | mission-assurance-uncertainty | done | productize/verify | steward | `src/astro_uq/adapters/assurance.py`, `examples/campaigns/leo_mission_assurance_robustness.yaml`, assurance/UQ tests and docs | Adds a bounded first campaign over insertion, tracking sigma, execution magnitude, and subsystem margins. The checked 8-case run, full release gates, independent review, and GitHub CI pass; PR #18 merged at `c10268e`. |
+| paired-assurance-validation | active | productize/verify | steward | `src/astro_assurance/validation_*`, paired validation CLI, explicit protocol fixture, tests and docs | Separates matched two-body and truth-J2/two-body-estimator profiles over shared coordinates. Independent review found and the implementation fixed noncausal OD, forged-derived-evidence acceptance, swallowed source drift, duplicate coordinate seeds, omitted executed-component authority, coordinate/profile substitution, and output-path collision. The corrected checked result completes 8/8 pairs with eight regressions; `951 passed, 11 skipped`, lint, typing, packaging, builds, and the outside-repository public run/verifier pass. Integration remains active. |
 
 ## Next Best Paths
 
-1. Run the paired assurance-validation protocol: independent tracking-noise realizations, separate
-   truth and estimator sigma/bias assumptions, maneuver timing and pointing errors, and matched
-   versus truth-J2/estimator-two-body profiles. Preserve paired deltas and both all-case and
-   physics-complete denominators; do not pool model profiles into one probability. Derive bounds
-   from reviewed launch, sensor, propulsion, and subsystem evidence before scaling case count.
-2. Introduce external tracking fixtures and maneuver-execution validation only when a specific
-   release claim and reviewed acceptance criteria justify the campaign. This is the route toward
-   real acquisition/recovery evidence; more synthetic cases are not a substitute.
+1. Calibrate the paired protocol's insertion, sensor, propulsion, execution, and subsystem bounds
+   from reviewed evidence before scaling case count or interpreting frequencies. Add external
+   tracking fixtures and measured maneuver-execution evidence when a specific release claim and
+   acceptance criteria justify them.
+2. Introduce additional model-form profiles only as separately validated comparisons; keep profile
+   counts and paired deltas unpooled rather than creating a weighted model-success probability.
 3. Add AI-native planning, evidence review, anomaly triage, and decision explanation over typed
    assurance products before considering autonomous execution. Keep surrogate acceleration closed
    unless a measured assurance teacher or other evaluator passes the cost and fidelity gate.

@@ -21,6 +21,11 @@ from astro_assurance.io import (
     write_mission_assurance_artifact_bundle,
 )
 from astro_assurance.runner import run_post_launch_assurance
+from astro_assurance.validation_cli import (
+    run_assurance_validation_command,
+    validate_assurance_validation_command,
+    verify_assurance_validation_command,
+)
 from astro_backends.dymos import (
     optimize_launch_dymos,
     run_dymos_multistage_pitch_program_optimization,
@@ -129,6 +134,9 @@ app.command("run-campaign")(run_campaign_command)
 app.command("summarize-campaign")(summarize_campaign_command)
 app.command("profile-campaign")(profile_campaign_command)
 app.command("analyze-campaign-sensitivity")(analyze_campaign_sensitivity_command)
+app.command("validate-assurance-validation")(validate_assurance_validation_command)
+app.command("run-assurance-validation")(run_assurance_validation_command)
+app.command("verify-assurance-validation")(verify_assurance_validation_command)
 
 INITIAL_GUESS_POSITION_DELTA_KM = (1.0, -0.8, 0.6)
 INITIAL_GUESS_VELOCITY_DELTA_KM_S = (0.0005, -0.001, 0.0008)

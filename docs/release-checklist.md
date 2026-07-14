@@ -52,6 +52,28 @@ Latest post-launch mission-assurance integration evidence:
   fixed-seed common random numbers, not calibrated operational probabilities.
 - 2026-07-13: GitHub CI passed in `1m51s`; PR #18 merged the mission-assurance uncertainty scope to
   `main` at `c10268e`.
+- 2026-07-13: paired mission-assurance validation added an explicit one-hour protocol with 30
+  minutes of causal pre-decision tracking and 30 minutes of truth verification. The corrected
+  eight-pair run completed 8/8 matched profiles passing and 0/8 J2-truth/two-body-estimator
+  profiles passing. Counts remain unpooled simulation design-space evidence, not probability or
+  operational authority.
+- 2026-07-13: independent review hardening made paired verification recompute profile metrics,
+  force roles, pass dispositions, deltas, reversals, coordinates, and summaries from bound sources
+  and embedded cases; source drift aborts the campaign, coordinate seeds must be unique, and both
+  commanded and executed component/total authority limits are preserved separately from the wider
+  diagnostic solver envelope.
+- 2026-07-13: the corrected public campaign ran from outside the repository and its 14.3 MB result
+  passed the strengthened verifier. Focused assurance/OD tests, `951 passed, 11 skipped`, Ruff,
+  strict MyPy across 132 source files, `git diff --check`, 6 packaging tests, and sdist/wheel builds
+  passed locally.
+- 2026-07-13: final rereview closed coordinate substitution and profile-slot swap gaps by binding
+  each embedded case to its protocol identity, resolved overrides, insertion dispersion, timing,
+  diagnostic limits, tracking duration, seed, and fixed profile slot. The CLI also rejects aliased
+  primary and summary output paths before writing either artifact.
+- 2026-07-13: the dependent eight-case mission-assurance uncertainty campaign was refreshed after
+  the causal OD cutoff. It completed 8/8 with all configured requirements passing, 64 pre-decision
+  measurements per case, recovery-position q05/q95 of `0.4151/0.6741 km`, and unchanged bounded
+  design-space rather than operational-probability interpretation.
 
 Latest optional validation refresh:
 

@@ -29,9 +29,20 @@ def test_reference_post_launch_assurance_closes_the_truth_replay() -> None:
         "correction_twin_mass",
     }
     assert result.estimate.converged
-    assert len(result.measurements) == 130
+    assert all(
+        measurement.epoch <= result.correction_maneuver.epoch
+        for measurement in result.measurements
+    )
+    assert len(result.measurements) == result.metadata["measurement_count"]
     assert result.metadata["generated_measurement_count"] == 1452
-    assert result.metadata["rejected_below_mask_measurement_count"] == 1322
+    assert result.metadata["visible_measurement_count"] == (
+        result.metadata["measurement_count"]
+        + result.metadata["rejected_after_decision_measurement_count"]
+    )
+    assert result.metadata["generated_measurement_count"] == (
+        result.metadata["visible_measurement_count"]
+        + result.metadata["rejected_below_mask_measurement_count"]
+    )
     assert result.correction_maneuver.metadata["disposition"] == "candidate_for_manual_review"
     assert result.corrected_digital_twin.metadata["orbit_trajectory_source"] == (
         "trajectory_override"
@@ -67,6 +78,27 @@ def test_reference_post_launch_assurance_closes_the_truth_replay() -> None:
         )
     assert any("not a flight command" in warning for warning in result.warnings)
     assert any("do not prove RF contact" in warning for warning in result.warnings)
+
+
+def test_reference_assurance_does_not_apply_unrequested_force_role_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = load_post_launch_assurance_scenario(
+        "examples/assurance/post_launch_orbit_acquisition.yaml"
+    )
+
+    def reject_unrequested_override(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("force-role override should not run")
+
+    monkeypatch.setattr(
+        assurance_runner,
+        "_scenario_with_force_model",
+        reject_unrequested_override,
+    )
+
+    result = run_post_launch_assurance(scenario)
+
+    assert result.passed
 
 
 def test_assurance_completes_with_failed_status_when_requirement_is_missed() -> None:
