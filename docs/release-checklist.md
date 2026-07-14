@@ -70,6 +70,8 @@ Latest post-launch mission-assurance integration evidence:
   each embedded case to its protocol identity, resolved overrides, insertion dispersion, timing,
   diagnostic limits, tracking duration, seed, and fixed profile slot. The CLI also rejects aliased
   primary and summary output paths before writing either artifact.
+- 2026-07-13: GitHub CI passed in `2m10s`; PR #19 merged paired mission-assurance validation to
+  `main` at `d7710f5`.
 - 2026-07-13: the dependent eight-case mission-assurance uncertainty campaign was refreshed after
   the causal OD cutoff. It completed 8/8 with all configured requirements passing, 64 pre-decision
   measurements per case, recovery-position q05/q95 of `0.4151/0.6741 km`, and unchanged bounded
