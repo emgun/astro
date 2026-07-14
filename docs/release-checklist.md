@@ -296,6 +296,21 @@ the message is actionable.
 - [x] Ruff, strict MyPy across 138 source files, 9 package/import tests, `git diff --check`, and
   sdist/wheel builds pass.
 
+## Lifecycle Assurance Review Gate
+
+- [x] Public verification reproduces the local lifecycle and rejects schema-valid result tampering.
+- [x] Review binds result, lifecycle, launch, twin, and reentry scenario-file digests and executes
+  against staged copies of the captured referenced bytes.
+- [x] Stored review verification re-derives findings and rejects review tampering.
+- [x] Structured continuity and margin issues produce non-executing triage; model caveats remain
+  informational.
+- [x] The checked lifecycle passes while review records one `native`-unit evidence warning and one
+  bounded action.
+- [x] Focused lifecycle-review and assistant tests pass 16 tests; affected surfaces pass 183 tests.
+- [x] Full tests pass 1000 tests with 11 optional-backend skips.
+- [x] Ruff, strict MyPy across 142 source files, 9 package/import tests, `git diff --check`, and
+  sdist/wheel builds pass.
+
 ## Packaging Gate
 
 - [x] Build succeeds with `python -m build` when build tooling is installed.

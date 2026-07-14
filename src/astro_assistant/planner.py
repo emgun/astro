@@ -166,3 +166,44 @@ def assurance_review_comparison_plan(
             )
         ],
     )
+
+
+def mission_lifecycle_review_plan(
+    user_intent: str,
+    *,
+    result_path: str,
+    scenario_path: str,
+    output: str,
+    summary_output: str | None = None,
+) -> AstroWorkflowPlan:
+    review_inputs: dict[str, object] = {
+        "result_path": result_path,
+        "scenario_path": scenario_path,
+        "output": output,
+    }
+    if summary_output is not None:
+        review_inputs["summary_output"] = summary_output
+    return AstroWorkflowPlan(
+        plan_id="mission-lifecycle-review",
+        title="Mission Lifecycle Evidence Review",
+        user_intent=user_intent,
+        steps=[
+            WorkflowStep(
+                step_id="verify_mission_lifecycle_result",
+                tool=AstroToolName.VERIFY_MISSION_LIFECYCLE_RESULT,
+                description="Re-run and verify exact local lifecycle evidence.",
+                inputs={"result_path": result_path, "scenario_path": scenario_path},
+                risk=RiskLevel.READ_ONLY,
+            ),
+            WorkflowStep(
+                step_id="review_mission_lifecycle",
+                tool=AstroToolName.REVIEW_MISSION_LIFECYCLE,
+                description="Write deterministic lifecycle findings and bounded triage.",
+                inputs=review_inputs,
+                outputs=[
+                    WorkflowArtifact(path=output, kind=ArtifactKind.MISSION_LIFECYCLE_REVIEW)
+                ],
+                risk=RiskLevel.WRITES_ARTIFACTS,
+            ),
+        ],
+    )

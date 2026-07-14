@@ -15,6 +15,8 @@ class AstroToolName(StrEnum):
     VERIFY_ASSURANCE_VALIDATION = "verify_assurance_validation"
     REVIEW_ASSURANCE_VALIDATION = "review_assurance_validation"
     COMPARE_ASSURANCE_REVIEWS = "compare_assurance_reviews"
+    VERIFY_MISSION_LIFECYCLE_RESULT = "verify_mission_lifecycle_result"
+    REVIEW_MISSION_LIFECYCLE = "review_mission_lifecycle"
 
 
 class RiskLevel(StrEnum):
@@ -35,6 +37,7 @@ class ArtifactKind(StrEnum):
     ASSURANCE_VALIDATION_RESULT = "assurance_validation_result"
     ASSURANCE_REVIEW = "assurance_review"
     ASSURANCE_REVIEW_COMPARISON = "assurance_review_comparison"
+    MISSION_LIFECYCLE_REVIEW = "mission_lifecycle_review"
 
 
 class _CampaignInputs(BaseModel):
@@ -75,6 +78,16 @@ class ReviewAssuranceValidationInputs(_CampaignInputs):
 class CompareAssuranceReviewsInputs(_CampaignInputs):
     baseline_path: str
     candidate_path: str
+    output: str
+    summary_output: str | None = None
+
+
+class VerifyMissionLifecycleResultInputs(_CampaignInputs):
+    result_path: str
+    scenario_path: str
+
+
+class ReviewMissionLifecycleInputs(VerifyMissionLifecycleResultInputs):
     output: str
     summary_output: str | None = None
 

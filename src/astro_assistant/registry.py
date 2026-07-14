@@ -5,10 +5,12 @@ from astro_assistant.models import (
     CommandSpec,
     CompareAssuranceReviewsInputs,
     ReviewAssuranceValidationInputs,
+    ReviewMissionLifecycleInputs,
     RunCampaignInputs,
     SummarizeCampaignInputs,
     ValidateCampaignInputs,
     VerifyAssuranceValidationInputs,
+    VerifyMissionLifecycleResultInputs,
     WorkflowStep,
 )
 
@@ -177,6 +179,37 @@ def _compare_assurance_reviews(step: WorkflowStep, cwd: str | None) -> CommandSp
     return CommandSpec(step_id=step.step_id, argv=argv, cwd=cwd, writes=writes)
 
 
+def _verify_mission_lifecycle_result(step: WorkflowStep, cwd: str | None) -> CommandSpec:
+    inputs = VerifyMissionLifecycleResultInputs.model_validate(step.inputs)
+    return CommandSpec(
+        step_id=step.step_id,
+        argv=[
+            "astro",
+            "verify-mission-lifecycle-result",
+            inputs.result_path,
+            inputs.scenario_path,
+        ],
+        cwd=cwd,
+    )
+
+
+def _review_mission_lifecycle(step: WorkflowStep, cwd: str | None) -> CommandSpec:
+    inputs = ReviewMissionLifecycleInputs.model_validate(step.inputs)
+    argv = [
+        "astro",
+        "review-mission-lifecycle",
+        inputs.result_path,
+        inputs.scenario_path,
+        "--output",
+        inputs.output,
+    ]
+    writes = [inputs.output]
+    if inputs.summary_output is not None:
+        argv.extend(["--summary-output", inputs.summary_output])
+        writes.append(inputs.summary_output)
+    return CommandSpec(step_id=step.step_id, argv=argv, cwd=cwd, writes=writes)
+
+
 _BUILDERS: dict[AstroToolName, Callable[[WorkflowStep, str | None], CommandSpec]] = {
     AstroToolName.VALIDATE_SCENARIO: _validate_scenario,
     AstroToolName.SYNTH_MEASUREMENTS: _synth_measurements,
@@ -188,6 +221,8 @@ _BUILDERS: dict[AstroToolName, Callable[[WorkflowStep, str | None], CommandSpec]
     AstroToolName.VERIFY_ASSURANCE_VALIDATION: _verify_assurance_validation,
     AstroToolName.REVIEW_ASSURANCE_VALIDATION: _review_assurance_validation,
     AstroToolName.COMPARE_ASSURANCE_REVIEWS: _compare_assurance_reviews,
+    AstroToolName.VERIFY_MISSION_LIFECYCLE_RESULT: _verify_mission_lifecycle_result,
+    AstroToolName.REVIEW_MISSION_LIFECYCLE: _review_mission_lifecycle,
 }
 
 

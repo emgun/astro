@@ -17,6 +17,13 @@ astro run-mission-lifecycle examples/lifecycle/leo_round_trip.yaml \
   --output /tmp/astro-mission-lifecycle.json \
   --summary-output /tmp/astro-mission-lifecycle.txt \
   --artifacts-dir /tmp/astro-mission-lifecycle-artifacts
+astro verify-mission-lifecycle-result /tmp/astro-mission-lifecycle.json \
+  examples/lifecycle/leo_round_trip.yaml
+astro review-mission-lifecycle /tmp/astro-mission-lifecycle.json \
+  examples/lifecycle/leo_round_trip.yaml \
+  --output /tmp/astro-mission-lifecycle-review.json \
+  --summary-output /tmp/astro-mission-lifecycle-review.txt
+astro verify-mission-lifecycle-review /tmp/astro-mission-lifecycle-review.json
 ```
 
 The checked reference uses deterministic local models throughout. Its launch fixture satisfies its
@@ -68,6 +75,34 @@ Execution stops before downstream phases when:
 The result reports launch insertion margins, the twin limiting margin, deorbit reserve and
 interface margins, and every reentry requirement margin. Warnings remain visible without being
 promoted to failures.
+
+## Deterministic Assurance Review
+
+Lifecycle review v1 supports local launch and reentry backends. It binds the exact result and
+scenario bytes, re-runs the authoritative five-phase lifecycle, and requires canonical product
+payload equality before deriving findings. It also binds the exact launch, twin, and reentry
+scenario-file digests and rejects changes during verification. The verifier executes against
+temporary staged copies of those captured bytes, so concurrent replacement of the original files
+cannot change the evidence being reproduced. The review covers integrity, manifest order,
+continuity, typed margins, model caveats, and claim boundaries. Structured failed continuity checks
+and `warn`/`fail` margins produce stable blocker or warning findings and one non-executing triage
+action per unresolved finding.
+
+The checked reference also reports one evidence-quality warning: its promoted digital-twin limiting
+margin uses the generic unit label `native`. The lifecycle itself passes, but the review requires an
+explicit physical unit before that margin is used in unit-specific design decisions.
+
+Free-text lifecycle, twin, and reentry warnings remain informational evidence-boundary findings.
+The reviewer does not infer anomaly severity or root cause from prose or rank unlike margins by raw
+magnitude. Typed status and the lifecycle runner's limiting-margin identity remain authoritative.
+`verify-mission-lifecycle-review` repeats the complete chain and rejects stored review tampering.
+
+This v1 proves exact output reproducibility against the captured top-level and referenced scenario
+files under the current local runtime. The existing lifecycle artifact manifest has no file
+digests, so the review does not claim
+cryptographic integrity for a separately copied artifact bundle. It does not establish probability,
+causality, flight qualification, subsystem certification, operational diagnosis, or remediation
+authority.
 
 ## Claim Boundary
 

@@ -22,6 +22,8 @@ def evaluate_plan(plan: AstroWorkflowPlan, *, dry_run: bool, approved: bool) -> 
         AstroToolName.VERIFY_ASSURANCE_VALIDATION: RiskLevel.READ_ONLY,
         AstroToolName.REVIEW_ASSURANCE_VALIDATION: RiskLevel.WRITES_ARTIFACTS,
         AstroToolName.COMPARE_ASSURANCE_REVIEWS: RiskLevel.WRITES_ARTIFACTS,
+        AstroToolName.VERIFY_MISSION_LIFECYCLE_RESULT: RiskLevel.READ_ONLY,
+        AstroToolName.REVIEW_MISSION_LIFECYCLE: RiskLevel.WRITES_ARTIFACTS,
     }
     for step in plan.steps:
         expected_risk = campaign_risks.get(step.tool)
@@ -39,6 +41,7 @@ def evaluate_plan(plan: AstroWorkflowPlan, *, dry_run: bool, approved: bool) -> 
             AstroToolName.RUN_CAMPAIGN,
             AstroToolName.REVIEW_ASSURANCE_VALIDATION,
             AstroToolName.COMPARE_ASSURANCE_REVIEWS,
+            AstroToolName.REVIEW_MISSION_LIFECYCLE,
         }
         for step in plan.steps
     )

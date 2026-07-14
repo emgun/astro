@@ -94,3 +94,12 @@ interpret profile counts as probability; those rules remain in `astro_assurance`
 comparison step. Baseline and candidate review paths must differ, and the declared output must match
 the command input. The command re-verifies both reviews and their bound paired evidence before
 writing a comparison. Its evidence recommendations remain non-executing decision support.
+
+## Mission Lifecycle Review Plan
+
+`astro_assistant.planner.mission_lifecycle_review_plan` compiles a fixed two-step workflow: verify
+one local lifecycle result against its scenario, then publish deterministic findings and triage.
+Result and scenario paths remain fixed across both steps; all inputs, output, and optional summary
+paths must be distinct; and the declared review output must match the command input. Verification is
+read-only. Review publication requires explicit approval, and artifact validation re-verifies the
+stored review rather than accepting parseable JSON alone.
