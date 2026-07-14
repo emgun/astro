@@ -87,6 +87,8 @@ Latest post-launch mission-assurance integration evidence:
   illustrative`. Focused validation reported `21 passed`; the full suite reported `957 passed, 11
   skipped`; Ruff, strict MyPy across 133 source files, `git diff --check`, 8 package/import tests,
   and sdist/wheel builds passed.
+- 2026-07-14: GitHub CI passed in `2m10s`; PR #20 merged assurance calibration evidence to `main`
+  at `f84dee7`.
 
 Latest optional validation refresh:
 
