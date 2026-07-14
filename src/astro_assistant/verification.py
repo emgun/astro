@@ -23,6 +23,24 @@ LOCAL_OD_STEP_IDS = (
 
 
 def verify_plan(plan: AstroWorkflowPlan) -> VerificationResult:
+    lifecycle_tools = {
+        AstroToolName.VERIFY_MISSION_LIFECYCLE_RESULT,
+        AstroToolName.REVIEW_MISSION_LIFECYCLE,
+    }
+    if plan.plan_id != "mission-lifecycle-review" and any(
+        step.tool in lifecycle_tools for step in plan.steps
+    ):
+        return VerificationResult(
+            passed=False,
+            diagnostics=[
+                _diagnostic(
+                    "protected_plan_id",
+                    "lifecycle review tools require the fixed mission-lifecycle-review plan",
+                )
+            ],
+        )
+    if plan.plan_id == "mission-lifecycle-review":
+        return _verify_mission_lifecycle_review_plan(plan)
     if plan.plan_id == "paired-assurance-review-comparison":
         return _verify_assurance_review_comparison_plan(plan)
     if plan.plan_id == "paired-assurance-review":
@@ -43,6 +61,58 @@ def verify_plan(plan: AstroWorkflowPlan) -> VerificationResult:
     if len(plan.steps) == len(LOCAL_OD_STEP_IDS):
         _verify_local_od_steps(plan.steps, resolved, diagnostics)
 
+    return VerificationResult(passed=not diagnostics, diagnostics=diagnostics)
+
+
+def _verify_mission_lifecycle_review_plan(plan: AstroWorkflowPlan) -> VerificationResult:
+    diagnostics: list[VerificationDiagnostic] = []
+    if len(plan.steps) != 2:
+        diagnostics.append(
+            _diagnostic("unexpected_step_order", "lifecycle review requires two steps")
+        )
+        return VerificationResult(passed=False, diagnostics=diagnostics)
+    verify_step, review_step = plan.steps
+    if (
+        verify_step.tool is not AstroToolName.VERIFY_MISSION_LIFECYCLE_RESULT
+        or review_step.tool is not AstroToolName.REVIEW_MISSION_LIFECYCLE
+    ):
+        diagnostics.append(
+            _diagnostic(
+                "unexpected_step_order",
+                "lifecycle review must verify evidence before writing review",
+            )
+        )
+    for key in ("result_path", "scenario_path"):
+        if verify_step.inputs.get(key) != review_step.inputs.get(key):
+            diagnostics.append(
+                _diagnostic("source_discontinuity", f"lifecycle {key} must remain fixed")
+            )
+    paths = [
+        review_step.inputs.get("result_path"),
+        review_step.inputs.get("scenario_path"),
+        review_step.inputs.get("output"),
+    ]
+    summary_output = review_step.inputs.get("summary_output")
+    if summary_output is not None:
+        paths.append(summary_output)
+    if not _paths_are_distinct(paths):
+        diagnostics.append(
+            _diagnostic("path_collision", "lifecycle review paths must all differ")
+        )
+    if (
+        len(review_step.outputs) != 1
+        or review_step.outputs[0].kind is not ArtifactKind.MISSION_LIFECYCLE_REVIEW
+    ):
+        diagnostics.append(
+            _diagnostic(
+                "unexpected_step_output",
+                "lifecycle review must declare one lifecycle review artifact",
+            )
+        )
+    elif review_step.inputs.get("output") != review_step.outputs[0].path:
+        diagnostics.append(
+            _diagnostic("output_discontinuity", "lifecycle review output must remain fixed")
+        )
     return VerificationResult(passed=not diagnostics, diagnostics=diagnostics)
 
 

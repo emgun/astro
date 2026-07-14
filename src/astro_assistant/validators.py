@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from astro_assistant.models import ArtifactKind, WorkflowArtifact
+from astro_assurance.lifecycle_review import verify_mission_lifecycle_review
 from astro_assurance.review_comparison import verify_assurance_review_comparison
 from astro_core.errors import InvalidScenarioError
 
@@ -11,6 +12,7 @@ _JSON_KINDS = {
     ArtifactKind.TRACE_JSON,
     ArtifactKind.ASSURANCE_REVIEW,
     ArtifactKind.ASSURANCE_REVIEW_COMPARISON,
+    ArtifactKind.MISSION_LIFECYCLE_REVIEW,
 }
 
 
@@ -26,6 +28,11 @@ def validate_artifact(artifact: WorkflowArtifact) -> bool:
     if artifact.kind is ArtifactKind.ASSURANCE_REVIEW_COMPARISON:
         try:
             verify_assurance_review_comparison(path)
+        except (InvalidScenarioError, OSError, ValueError):
+            return False
+    if artifact.kind is ArtifactKind.MISSION_LIFECYCLE_REVIEW:
+        try:
+            verify_mission_lifecycle_review(path)
         except (InvalidScenarioError, OSError, ValueError):
             return False
     return True

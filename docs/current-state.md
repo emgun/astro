@@ -159,6 +159,26 @@ Project-specific steward learning: compare digests must cover the same bytes tha
 and added or removed metrics are real transitions even when no numeric delta exists. Evidence
 recommendations remain deterministic copies of unresolved findings, never executable actions.
 
+Lifecycle Assurance Review v1 adds exact local output-reproducibility verification and bounded
+anomaly triage over `MissionLifecycleResult`. The review binds the result, lifecycle scenario, and
+referenced launch, twin, and reentry scenario digests; requires canonical product equality against
+a fresh local run; and derives stable integrity, manifest, continuity, margin, evidence-boundary,
+and claim-boundary findings. The checked lifecycle physically passes, while review disposition is
+`additional_review_required` because the promoted digital-twin limiting margin still uses the
+non-specific unit `native`. The artifact contains 13 findings, one warning, and one non-executing
+triage action to publish an explicit physical unit. Seven model caveats remain informational rather
+than inferred anomalies. Focused lifecycle-review tests pass 16 tests; affected mission, assurance,
+and assistant tests pass 183 tests; the full suite passes `1000 tests with 11 optional-backend
+skips`; Ruff, strict MyPy across 142 source files, 9 package/import tests, sdist/wheel builds, public
+verify/review/re-verify commands, and `git diff --check` pass. Independent review drove structured
+lifecycle-failure handling, protected assistant plan ids, exact-byte parsing, five-file digest
+binding with staged captured-input execution, numeric-id normalization, and private
+verified-evidence-only derivation.
+
+Project-specific steward learning: distinguish physics pass state from review readiness. A passing
+lifecycle can still require bounded evidence-quality action, and free-text model caveats must not be
+promoted into anomaly severity or causal diagnosis.
+
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
 the executable plan is
@@ -485,6 +505,7 @@ Post-MVP / external-campaign items:
 | v0.2.0-rc.1 | done | release/verify | steward | package metadata, campaign compatibility, release notes, merged-main and detached-worktree gates | Package metadata, built-wheel public workflow, local gates, GitHub CI, merged-commit detached verification, and annotated tag agree at `f1baa02`. |
 | assurance-review-operator | done | productize/verify | steward | deterministic paired-assurance review, public CLI, typed assistant plan, tests and docs | Public artifact, local gates, GitHub CI, and integration pass. Findings remain deterministic and non-operational; PR #22 merged at `0d1f32b`. |
 | assurance-review-comparison | done | productize/verify | steward | review re-verification, deterministic cross-run comparison, public CLI, typed assistant plan, tests and docs | Public compare/verify artifacts, independent review, local release gates, GitHub CI, and integration pass. Comparison avoids heterogeneous scalarization, claim promotion, and recommendation execution; PR #23 merged at `1564549`. |
+| lifecycle-assurance-review | active | productize/verify | steward | lifecycle result re-verification, deterministic findings and triage, public CLI, typed assistant plan, tests and docs | V1 is scoped to exact re-execution of local lifecycle evidence, stable continuity/margin/warning findings, and non-executing triage. Optional backends, causal diagnosis, provider explanation, and remediation remain closed. |
 
 ## Next Best Paths
 
