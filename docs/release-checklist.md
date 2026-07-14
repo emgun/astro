@@ -25,6 +25,25 @@ Latest merged-main evidence:
   RocketPy, Dymos/OpenMDAO, TudatPy, and JAX. These smoke checks do not replace optional live
   propagation, launch, optimization, covariance, or OD campaign gates.
 
+Latest post-launch mission-assurance branch evidence:
+
+- 2026-07-13: `codex/post-launch-mission-assurance` added the suite-owned launch insertion,
+  simulated tracking, OD, bounded candidate correction, estimate/truth replay, corrected digital
+  twin, continuity, margin, digest-manifest, and artifact-bundle workflow.
+- 2026-07-13: the checked six-site geodetic reference retained 130 above-mask measurements from
+  1,452 deterministic candidates, converged OD, used a `0.004065448 km/s` candidate impulse, and
+  reduced truth position error from `8.558551 km` to `0.568642 km`. All embedded twin margins pass,
+  and correction propellant depletion is reflected in the returned twin.
+  These are simulation and design-screening results, not RF acquisition, operational navigation,
+  or flight-command authority.
+- 2026-07-13: review hardening made below-mask tracking ineligible, promoted embedded twin failures,
+  bound four source inputs and 16 emitted artifacts by digest, added public verification and
+  tamper rejection, rejected input drift during execution and manifest omissions, and made 17-file
+  bundle publication atomic for exclusive Astro writers with stale/concurrent-destination refusal.
+- 2026-07-13: focused assurance and packaging tests reported `21 passed`; the full suite reported
+  `930 passed, 11 skipped`; Ruff, strict MyPy across 127 source files, `git diff --check`, the fresh
+  public CLI run and verifier, wheel-content inspection, and sdist/wheel builds passed.
+
 Latest optional validation refresh:
 
 - 2026-07-09: `codex/orekit-validation-refresh` refreshed optional backend smoke on the current
@@ -116,6 +135,9 @@ Latest mission lifecycle branch evidence:
 - [x] `astro handoff-reentry /tmp/astro-local-trajectory.json examples/reentry/ballistic_capsule.yaml --sample-index 0 --output /tmp/astro-reentry-handoff.yaml`
 - [x] `astro run-mission-lifecycle examples/lifecycle/leo_round_trip.yaml --output /tmp/astro-mission-lifecycle.json --summary-output /tmp/astro-mission-lifecycle.txt --artifacts-dir /tmp/astro-mission-lifecycle-artifacts`
 - [x] `python -m pytest tests/astro_mission -q`
+- [x] `astro run-mission-assurance examples/assurance/post_launch_orbit_acquisition.yaml --output /tmp/astro-mission-assurance.json --summary-output /tmp/astro-mission-assurance.txt --artifacts-dir /tmp/astro-mission-assurance-artifacts`
+- [x] `astro verify-mission-assurance /tmp/astro-mission-assurance-artifacts`
+- [x] `python -m pytest tests/astro_assurance tests/test_packaging.py -q`
 - [x] `python -m pytest tests/astro_reentry tests/astro_cli/test_reentry_cli.py -q`
 - [x] `python -m pytest tests/astro_launch/test_launch_io.py::test_load_rocketpy_configured_launch_scenario -q`
 - [x] `astro optimize-launch examples/launch/pitch_program_two_stage.yaml --backend local --point-indices 2,3 --iterations 1 --radial-velocity-weight 1 --output /tmp/astro-optimized-launch.json`
@@ -202,3 +224,4 @@ the message is actionable.
   `research`.
 - [x] Wheel contents include the suite-owned `astro_reentry` package.
 - [x] Wheel contents include the suite-owned `astro_mission` package.
+- [x] Wheel contents include the suite-owned `astro_assurance` package.

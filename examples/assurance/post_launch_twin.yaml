@@ -1,0 +1,68 @@
+scenario_id: post-launch-assurance-twin
+orbit_scenario: examples/scenarios/leo_two_body.yaml
+spacecraft:
+  name: LifecycleObserver
+  dry_mass_kg: 300.0
+  payload_mass_kg: 150.0
+  propellant_mass_kg: 50.0
+  mass_margin_fraction_required: 0.04
+  mass_budget_items:
+    - {name: primary-structure, category: bus, mass_kg: 180.0, contingency_fraction: 0.1}
+    - {name: avionics, category: bus, mass_kg: 45.0, contingency_fraction: 0.1}
+    - {name: power-system, category: power, mass_kg: 40.0, contingency_fraction: 0.1}
+    - {name: payload, category: payload, mass_kg: 125.0, contingency_fraction: 0.05}
+    - {name: adcs, category: adcs, mass_kg: 20.0, contingency_fraction: 0.1}
+power:
+  solar_array_area_m2: 2.4
+  solar_array_efficiency: 0.29
+  battery_capacity_wh: 1200.0
+  initial_battery_soc_fraction: 0.85
+  minimum_battery_soc_fraction: 0.35
+  idle_load_w: 120.0
+  payload_load_w: 260.0
+  downlink_load_w: 360.0
+  battery_charge_efficiency: 0.92
+  battery_discharge_efficiency: 0.9
+thermal_nodes:
+  - name: bus
+    thermal_mass_j_k: 45000.0
+    radiator_area_m2: 1.25
+    absorptivity: 0.30
+    emissivity: 0.78
+    initial_temperature_k: 293.0
+    minimum_temperature_k: 273.0
+    maximum_temperature_k: 313.0
+    internal_heat_fraction: 0.45
+    albedo_flux_w_m2: 120.0
+    planet_ir_flux_w_m2: 220.0
+    mode_internal_heat_scale: {payload: 1.15, downlink: 1.25}
+adcs:
+  pointing_mode: nadir
+  max_pointing_error_deg: 0.08
+  pointing_requirement_deg: 0.15
+  max_torque_n_m: 0.08
+  required_slew_torque_n_m: 0.03
+  max_slew_rate_deg_s: 0.2
+  required_slew_rate_deg_s: 0.05
+  maximum_actuator_utilization_fraction: 0.7
+ground_sites:
+  - name: equator-eci
+    latitude_deg: 0.0
+    longitude_deg: 0.0
+    altitude_m: 0.0
+    minimum_elevation_deg: 10.0
+links:
+  - name: xband-downlink
+    ground_site: equator-eci
+    frequency_ghz: 8.4
+    eirp_dbw: 18.0
+    receiver_g_over_t_db_k: 22.0
+    data_rate_bps: 2000000.0
+    required_ebn0_db: 6.5
+    implementation_loss_db: 2.0
+mode_schedule:
+  - {mode: payload, start_s: 120.0, end_s: 300.0}
+  - {mode: downlink, start_s: 300.0, end_s: 600.0}
+power_loads:
+  - {name: payload-heater, start_s: 120.0, end_s: 300.0, additional_load_w: 35.0}
+  - {name: transmitter-overhead, start_s: 300.0, end_s: 600.0, additional_load_w: 60.0}

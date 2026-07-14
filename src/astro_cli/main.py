@@ -13,6 +13,14 @@ from astro_assistant.models import VerificationDiagnostic, VerificationResult
 from astro_assistant.planner import DeterministicPlanner
 from astro_assistant.reports import build_workflow_report, format_workflow_report
 from astro_assistant.verification import verify_plan
+from astro_assurance.errors import MissionAssuranceError
+from astro_assurance.io import (
+    format_mission_assurance_summary,
+    load_post_launch_assurance_scenario,
+    verify_mission_assurance_artifact_bundle,
+    write_mission_assurance_artifact_bundle,
+)
+from astro_assurance.runner import run_post_launch_assurance
 from astro_backends.dymos import (
     optimize_launch_dymos,
     run_dymos_multistage_pitch_program_optimization,
@@ -305,8 +313,7 @@ def _with_estimation_demo_metadata(
     measurement_count: int,
 ) -> dict[str, object]:
     added_station_payloads = [
-        station.model_dump(mode="json", exclude_none=True)
-        for station in demo_added_ground_stations
+        station.model_dump(mode="json", exclude_none=True) for station in demo_added_ground_stations
     ]
     return {
         **result_metadata,
@@ -686,6 +693,87 @@ def run_mission_lifecycle_command(
         typer.echo(f"wrote mission lifecycle summary: {summary_output}")
     if artifacts_dir is not None:
         typer.echo(f"wrote mission artifact bundle: {artifacts_dir}")
+
+
+@app.command("run-mission-assurance")
+def run_mission_assurance_command(
+    scenario_path: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            readable=True,
+            help="Post-launch assurance scenario YAML path.",
+        ),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Write assurance case JSON result.")],
+    summary_output: Annotated[
+        Path | None,
+        typer.Option("--summary-output", help="Write a concise text summary."),
+    ] = None,
+    artifacts_dir: Annotated[
+        Path | None,
+        typer.Option("--artifacts-dir", help="Write the assurance artifact bundle."),
+    ] = None,
+) -> None:
+    """Run deterministic post-launch acquisition and recovery screening."""
+    try:
+        scenario = load_post_launch_assurance_scenario(scenario_path)
+        result = run_post_launch_assurance(scenario)
+        _ensure_parent_or_exit(output, "mission assurance result")
+        _write_text_or_exit(
+            output,
+            result.model_dump_json(indent=2),
+            "mission assurance result",
+        )
+        if summary_output is not None:
+            _ensure_parent_or_exit(summary_output, "mission assurance summary")
+            _write_text_or_exit(
+                summary_output,
+                format_mission_assurance_summary(result),
+                "mission assurance summary",
+            )
+        if artifacts_dir is not None:
+            write_mission_assurance_artifact_bundle(artifacts_dir, result)
+    except (
+        InvalidScenarioError,
+        MissionAssuranceError,
+        NumericalConvergenceError,
+        UnsupportedBackendError,
+    ) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+
+    typer.echo(f"wrote mission assurance result: {output}")
+    if summary_output is not None:
+        typer.echo(f"wrote mission assurance summary: {summary_output}")
+    if artifacts_dir is not None:
+        typer.echo(f"wrote mission assurance artifact bundle: {artifacts_dir}")
+    if not result.passed:
+        raise typer.Exit(code=1)
+
+
+@app.command("verify-mission-assurance")
+def verify_mission_assurance_command(
+    artifacts_dir: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            file_okay=False,
+            readable=True,
+            help="Mission assurance artifact bundle directory.",
+        ),
+    ],
+) -> None:
+    """Verify mission-assurance artifact and input digests."""
+    try:
+        manifest = verify_mission_assurance_artifact_bundle(artifacts_dir)
+    except InvalidScenarioError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"verified mission assurance bundle: {manifest.scenario_id} "
+        f"({len(manifest.entries)} artifacts, {len(manifest.inputs)} inputs)"
+    )
 
 
 @app.command("run-constellation-twin")
@@ -1404,10 +1492,7 @@ def optimize_launch(
         str,
         typer.Option(
             "--dymos-mode",
-            help=(
-                "Dymos optimization mode: phase, pitch-program, "
-                "or multistage-pitch-program."
-            ),
+            help=("Dymos optimization mode: phase, pitch-program, or multistage-pitch-program."),
         ),
     ] = "phase",
 ) -> None:

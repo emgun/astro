@@ -1,0 +1,66 @@
+scenario_id: post-launch-assurance-tracking
+description: Two-station radiometric campaign for deterministic post-launch assurance.
+spacecraft:
+  name: lifecycle-observer
+  mass_kg: 500.0
+  area_m2: 2.5
+  drag_coefficient: 2.2
+  reflectivity_coefficient: 1.3
+initial_state:
+  epoch: "2026-01-01T00:00:00+00:00"
+  time_scale: UTC
+  frame: EME2000
+  central_body: earth
+  representation: cartesian
+  cartesian:
+    position_km: [7000.0, 0.0, 0.0]
+    velocity_km_s: [0.0, 7.5, 1.0]
+force_model:
+  gravity: two_body
+propagation:
+  duration_s: 3600.0
+  step_s: 30.0
+ground_stations:
+  - name: kourou
+    latitude_deg: 5.236
+    longitude_deg: -52.775
+    altitude_km: 0.0
+    frame: EME2000
+    elevation_mask_deg: 0.0
+  - name: canaveral
+    latitude_deg: 28.4889
+    longitude_deg: -80.5778
+    altitude_km: 0.0
+    frame: EME2000
+    elevation_mask_deg: 0.0
+  - name: hawaii
+    latitude_deg: 19.8206
+    longitude_deg: -155.4681
+    altitude_km: 0.0
+    frame: EME2000
+    elevation_mask_deg: 0.0
+  - name: equator-greenwich
+    latitude_deg: 0.0
+    longitude_deg: 0.0
+    altitude_km: 0.0
+    frame: EME2000
+    elevation_mask_deg: 0.0
+  - name: equator-east
+    latitude_deg: 0.0
+    longitude_deg: 90.0
+    altitude_km: 0.0
+    frame: EME2000
+    elevation_mask_deg: 0.0
+  - name: australia
+    latitude_deg: -23.698
+    longitude_deg: 133.88
+    altitude_km: 0.0
+    frame: EME2000
+    elevation_mask_deg: 0.0
+measurements:
+  types: [range, range_rate]
+  cadence_s: 30.0
+  noise:
+    range_sigma_km: 0.01
+    range_rate_sigma_km_s: 0.00001
+    seed: 42
