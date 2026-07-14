@@ -114,6 +114,11 @@ astro verify-assurance-validation /tmp/astro-paired-assurance.json
 astro review-assurance-validation /tmp/astro-paired-assurance.json \
   --output /tmp/astro-paired-assurance-review.json \
   --summary-output /tmp/astro-paired-assurance-review.txt
+astro compare-assurance-reviews /tmp/astro-review-baseline.json \
+  /tmp/astro-review-candidate.json \
+  --output /tmp/astro-review-comparison.json \
+  --summary-output /tmp/astro-review-comparison.txt
+astro verify-assurance-review-comparison /tmp/astro-review-comparison.json
 ```
 
 Each explicit coordinate carries its own tracking-noise seed, truth sigma and bias, estimator sigma
@@ -162,6 +167,17 @@ The review disposition is `additional_evidence_required` when calibration or com
 claim promotion; otherwise it is `design_review_ready`. Neither disposition authorizes navigation,
 probability, autonomous action, or a flight command. A later AI explainer may reference finding ids,
 but cannot create, remove, downgrade, or modify deterministic findings.
+
+`compare-assurance-reviews` re-verifies both review files against their original paired results
+before deriving any transition. It reports finding changes by stable id and nonzero per-metric
+median shifts by stable metric name. Overall direction uses an ordered evidence-risk vector:
+disposition, calibration authority, blocker count, then warning count. These unlike dimensions are
+not collapsed into a scalar score. Evidence recommendations are deterministic copies of unresolved
+candidate blocker or warning actions; they do not execute work, infer causality or probability, or
+promote a claim.
+
+`verify-assurance-review-comparison` repeats that complete chain and rejects any stored comparison
+whose derived fields or bound digests no longer match.
 
 The checked eight-coordinate, one-hour protocol uses 30 minutes of causal pre-decision tracking and
 30 minutes of post-decision truth verification. It completed all eight pairs. All eight matched

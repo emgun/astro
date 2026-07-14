@@ -14,13 +14,27 @@ from astro_assurance.models import (
     MissionAssuranceInputOverrides,
     PostLaunchAssuranceScenario,
 )
-from astro_assurance.review import review_assurance_validation
+from astro_assurance.review import (
+    review_assurance_validation,
+    verify_assurance_validation_review,
+)
+from astro_assurance.review_comparison import (
+    compare_assurance_validation_reviews,
+    verify_assurance_review_comparison,
+)
 from astro_assurance.review_io import (
+    format_assurance_review_comparison,
     format_assurance_validation_review,
+    load_assurance_review_comparison,
     load_assurance_validation_review,
+    write_assurance_review_comparison,
+    write_assurance_review_summary,
     write_assurance_validation_review,
 )
-from astro_assurance.review_models import AssuranceValidationReview
+from astro_assurance.review_models import (
+    AssuranceReviewComparison,
+    AssuranceValidationReview,
+)
 from astro_assurance.runner import run_post_launch_assurance
 from astro_assurance.validation_calibration_io import (
     load_assurance_validation_calibration,
@@ -48,15 +62,20 @@ __all__ = [
     "PairedAssuranceValidationProtocol",
     "PairedAssuranceValidationResult",
     "AssuranceValidationReview",
+    "AssuranceReviewComparison",
     "format_mission_assurance_summary",
     "format_paired_assurance_validation_summary",
     "format_assurance_validation_review",
+    "format_assurance_review_comparison",
     "load_mission_assurance_result",
     "load_assurance_validation_calibration",
     "load_post_launch_assurance_scenario",
     "load_paired_assurance_validation_protocol",
     "load_paired_assurance_validation_result",
     "load_assurance_validation_review",
+    "load_assurance_review_comparison",
+    "compare_assurance_validation_reviews",
+    "verify_assurance_review_comparison",
     "review_assurance_validation",
     "run_paired_assurance_validation",
     "run_post_launch_assurance",
@@ -64,8 +83,11 @@ __all__ = [
     "verify_mission_assurance_case_integrity",
     "validate_calibration_against_protocol",
     "verify_paired_assurance_validation_result",
+    "verify_assurance_validation_review",
     "write_mission_assurance_artifact_bundle",
     "write_mission_assurance_result",
     "write_paired_assurance_validation_result",
     "write_assurance_validation_review",
+    "write_assurance_review_comparison",
+    "write_assurance_review_summary",
 ]

@@ -1,3 +1,6 @@
+import os
+from pathlib import Path
+
 from astro_assistant.models import (
     ArtifactKind,
     AstroToolName,
@@ -20,6 +23,8 @@ LOCAL_OD_STEP_IDS = (
 
 
 def verify_plan(plan: AstroWorkflowPlan) -> VerificationResult:
+    if plan.plan_id == "paired-assurance-review-comparison":
+        return _verify_assurance_review_comparison_plan(plan)
     if plan.plan_id == "paired-assurance-review":
         return _verify_assurance_review_plan(plan)
     if plan.plan_id != "local-od-demo":
@@ -39,6 +44,55 @@ def verify_plan(plan: AstroWorkflowPlan) -> VerificationResult:
         _verify_local_od_steps(plan.steps, resolved, diagnostics)
 
     return VerificationResult(passed=not diagnostics, diagnostics=diagnostics)
+
+
+def _verify_assurance_review_comparison_plan(
+    plan: AstroWorkflowPlan,
+) -> VerificationResult:
+    diagnostics: list[VerificationDiagnostic] = []
+    if len(plan.steps) != 1 or plan.steps[0].tool is not AstroToolName.COMPARE_ASSURANCE_REVIEWS:
+        diagnostics.append(
+            _diagnostic("unexpected_step_order", "assurance comparison requires one compare step")
+        )
+        return VerificationResult(passed=False, diagnostics=diagnostics)
+    step = plan.steps[0]
+    comparison_paths = [
+        step.inputs.get("baseline_path"),
+        step.inputs.get("candidate_path"),
+        step.inputs.get("output"),
+    ]
+    summary_output = step.inputs.get("summary_output")
+    if summary_output is not None:
+        comparison_paths.append(summary_output)
+    if not _paths_are_distinct(comparison_paths):
+        diagnostics.append(
+            _diagnostic("path_collision", "assurance comparison paths must all differ")
+        )
+    if (
+        len(step.outputs) != 1
+        or step.outputs[0].kind is not ArtifactKind.ASSURANCE_REVIEW_COMPARISON
+    ):
+        diagnostics.append(
+            _diagnostic("unexpected_step_output", "comparison must declare one comparison artifact")
+        )
+    elif step.inputs.get("output") != step.outputs[0].path:
+        diagnostics.append(
+            _diagnostic("output_discontinuity", "comparison output must match command input")
+        )
+    return VerificationResult(passed=not diagnostics, diagnostics=diagnostics)
+
+
+def _paths_are_distinct(values: list[object]) -> bool:
+    if not all(isinstance(value, str) and value for value in values):
+        return False
+    paths = [Path(value).resolve() for value in values if isinstance(value, str)]
+    for index, path in enumerate(paths):
+        for other in paths[index + 1 :]:
+            if path == other:
+                return False
+            if path.exists() and other.exists() and os.path.samefile(path, other):
+                return False
+    return True
 
 
 def _verify_assurance_review_plan(plan: AstroWorkflowPlan) -> VerificationResult:

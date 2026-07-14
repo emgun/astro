@@ -87,3 +87,10 @@ assurance result, then write its deterministic review. Both steps must use the s
 the declared review output must match the command input. Verification is read-only; review output
 requires explicit approval. The assistant does not derive findings, alter calibration status, or
 interpret profile counts as probability; those rules remain in `astro_assurance`.
+
+## Assurance Review Comparison Plan
+
+`astro_assistant.planner.assurance_review_comparison_plan` compiles one fixed, approval-gated
+comparison step. Baseline and candidate review paths must differ, and the declared output must match
+the command input. The command re-verifies both reviews and their bound paired evidence before
+writing a comparison. Its evidence recommendations remain non-executing decision support.

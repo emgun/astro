@@ -284,6 +284,18 @@ the message is actionable.
 - [x] Roadmap plan statuses distinguish implemented product boundaries from live backend work that
   still requires external configuration.
 
+## Assurance Review Comparison Gate
+
+- [x] `astro compare-assurance-reviews` re-verifies both reviews and their bound paired evidence.
+- [x] The checked identical-review artifact reports zero finding and metric changes without
+  scalarizing heterogeneous evidence.
+- [x] Recommendations preserve candidate finding ids and remain non-executing.
+- [x] Stored comparison verification re-derives the product and rejects field or digest tampering.
+- [x] Focused comparison and assistant tests pass 20 tests.
+- [x] Full tests pass 984 tests with 11 optional-backend skips.
+- [x] Ruff, strict MyPy across 138 source files, 9 package/import tests, `git diff --check`, and
+  sdist/wheel builds pass.
+
 ## Packaging Gate
 
 - [x] Build succeeds with `python -m build` when build tooling is installed.

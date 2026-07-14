@@ -143,6 +143,21 @@ Project-specific steward learning: never rank heterogeneous assurance metrics by
 Preserve all signed values and use an explicit decision-metric priority so units and engineering
 meaning remain visible.
 
+Assurance Review Comparison v1 re-verifies two deterministic reviews and their original paired
+evidence, binds the exact verified review and source digests, and compares findings and metrics by
+stable identifiers. Direction uses an ordered risk vector of disposition, calibration authority,
+blockers, and warnings instead of a mixed-unit scalar score. The checked identical-review public
+artifact reports `unchanged`, zero finding changes, zero metric changes, and three unresolved
+evidence recommendations under a non-operational claim boundary. Focused comparison/assistant
+tests pass 20 tests; release-scale gates pass `984 tests with 11 optional-backend skips`, Ruff,
+strict MyPy across 138 source files, 9 package/import tests, sdist/wheel builds, and
+`git diff --check`. Independent review drove comparison re-verification, exact-byte digest binding,
+hard-link collision rejection, semantic metric finding ids, and complete assistant path checks.
+
+Project-specific steward learning: compare digests must cover the same bytes that were verified,
+and added or removed metrics are real transitions even when no numeric delta exists. Evidence
+recommendations remain deterministic copies of unresolved findings, never executable actions.
+
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
 the executable plan is
@@ -468,6 +483,7 @@ Post-MVP / external-campaign items:
 | assurance-calibration-evidence | done | calibrate/verify | steward | `examples/assurance/paired_force_model_calibration.yaml`, calibration contracts, paired runner/verifier, assurance docs and tests | Every configured numeric dimension has one digest-bound evidence envelope and promotion derives from the weakest authority. Current status remains illustrative. Public campaign verification, all local release gates, GitHub CI, and integration pass; PR #20 merged at `f84dee7`. |
 | v0.2.0-rc.1 | done | release/verify | steward | package metadata, campaign compatibility, release notes, merged-main and detached-worktree gates | Package metadata, built-wheel public workflow, local gates, GitHub CI, merged-commit detached verification, and annotated tag agree at `f1baa02`. |
 | assurance-review-operator | done | productize/verify | steward | deterministic paired-assurance review, public CLI, typed assistant plan, tests and docs | Public artifact, local gates, GitHub CI, and integration pass. Findings remain deterministic and non-operational; PR #22 merged at `0d1f32b`. |
+| assurance-review-comparison | active | productize/verify | steward | review re-verification, deterministic cross-run comparison, public CLI, typed assistant plan, tests and docs | Implementation and focused verification are in progress. Exit requires comparison without heterogeneous scalarization, claim promotion, or recommendation execution, plus public and release-scale gates. |
 
 ## Next Best Paths
 

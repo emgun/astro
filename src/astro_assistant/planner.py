@@ -129,3 +129,40 @@ def assurance_review_plan(
             ),
         ],
     )
+
+
+def assurance_review_comparison_plan(
+    user_intent: str,
+    *,
+    baseline_path: str,
+    candidate_path: str,
+    output: str,
+    summary_output: str | None = None,
+) -> AstroWorkflowPlan:
+    inputs: dict[str, object] = {
+        "baseline_path": baseline_path,
+        "candidate_path": candidate_path,
+        "output": output,
+    }
+    if summary_output is not None:
+        inputs["summary_output"] = summary_output
+    return AstroWorkflowPlan(
+        plan_id="paired-assurance-review-comparison",
+        title="Paired Assurance Review Comparison",
+        user_intent=user_intent,
+        steps=[
+            WorkflowStep(
+                step_id="compare_assurance_reviews",
+                tool=AstroToolName.COMPARE_ASSURANCE_REVIEWS,
+                description="Re-verify and compare two deterministic assurance reviews.",
+                inputs=inputs,
+                outputs=[
+                    WorkflowArtifact(
+                        path=output,
+                        kind=ArtifactKind.ASSURANCE_REVIEW_COMPARISON,
+                    )
+                ],
+                risk=RiskLevel.WRITES_ARTIFACTS,
+            )
+        ],
+    )

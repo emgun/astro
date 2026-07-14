@@ -3,6 +3,7 @@ from collections.abc import Callable
 from astro_assistant.models import (
     AstroToolName,
     CommandSpec,
+    CompareAssuranceReviewsInputs,
     ReviewAssuranceValidationInputs,
     RunCampaignInputs,
     SummarizeCampaignInputs,
@@ -159,6 +160,23 @@ def _review_assurance_validation(step: WorkflowStep, cwd: str | None) -> Command
     return CommandSpec(step_id=step.step_id, argv=argv, cwd=cwd, writes=writes)
 
 
+def _compare_assurance_reviews(step: WorkflowStep, cwd: str | None) -> CommandSpec:
+    inputs = CompareAssuranceReviewsInputs.model_validate(step.inputs)
+    argv = [
+        "astro",
+        "compare-assurance-reviews",
+        inputs.baseline_path,
+        inputs.candidate_path,
+        "--output",
+        inputs.output,
+    ]
+    writes = [inputs.output]
+    if inputs.summary_output is not None:
+        argv.extend(["--summary-output", inputs.summary_output])
+        writes.append(inputs.summary_output)
+    return CommandSpec(step_id=step.step_id, argv=argv, cwd=cwd, writes=writes)
+
+
 _BUILDERS: dict[AstroToolName, Callable[[WorkflowStep, str | None], CommandSpec]] = {
     AstroToolName.VALIDATE_SCENARIO: _validate_scenario,
     AstroToolName.SYNTH_MEASUREMENTS: _synth_measurements,
@@ -169,6 +187,7 @@ _BUILDERS: dict[AstroToolName, Callable[[WorkflowStep, str | None], CommandSpec]
     AstroToolName.SUMMARIZE_CAMPAIGN: _summarize_campaign,
     AstroToolName.VERIFY_ASSURANCE_VALIDATION: _verify_assurance_validation,
     AstroToolName.REVIEW_ASSURANCE_VALIDATION: _review_assurance_validation,
+    AstroToolName.COMPARE_ASSURANCE_REVIEWS: _compare_assurance_reviews,
 }
 
 
