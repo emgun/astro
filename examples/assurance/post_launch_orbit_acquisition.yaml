@@ -1,0 +1,29 @@
+scenario_id: post-launch-orbit-acquisition
+description: Deterministic post-launch acquisition and candidate-recovery screening reference.
+launch_scenario: examples/launch/lifecycle_reference.yaml
+launch_backend: local
+tracking_scenario: examples/assurance/post_launch_tracking.yaml
+tracking_backend: local
+twin_scenario: examples/assurance/post_launch_twin.yaml
+dispersion:
+  position_delta_km: [2.0, -1.0, 0.5]
+  velocity_delta_km_s: [0.001, -0.0015, 0.0008]
+correction:
+  correction_elapsed_s: 1800.0
+  verification_elapsed_s: 3600.0
+  maximum_component_delta_v_km_s: 0.02
+  maximum_total_delta_v_km_s: 0.025
+  position_scale_km: 0.47
+  velocity_scale_km_s: 0.001
+  specific_impulse_s: 300.0
+requirements:
+  maximum_od_position_error_km: 0.1
+  maximum_od_velocity_error_km_s: 0.0001
+  maximum_truth_recovery_position_error_km: 1.0
+  maximum_truth_recovery_velocity_error_km_s: 0.005
+  minimum_position_error_reduction_fraction: 0.5
+  minimum_propellant_reserve_kg: 45.0
+  minimum_battery_soc_fraction: 0.35
+metadata:
+  claim_boundary: deterministic_simulation_and_design_screening
+  recovery_authority: candidate_for_manual_review

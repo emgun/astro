@@ -67,6 +67,7 @@ packages = [
   "src/astro_mission",
   "src/astro_uq",
   "src/astro_surrogates",
+  "src/astro_assurance",
 ]
 
 [tool.pytest.ini_options]
@@ -103,4 +104,5 @@ packages = [
   "astro_mission",
   "astro_uq",
   "astro_surrogates",
+  "astro_assurance",
 ]
