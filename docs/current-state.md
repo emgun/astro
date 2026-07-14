@@ -16,6 +16,11 @@ Integrated `main` state after the post-launch mission-assurance merge:
 - Pre-lifecycle release baseline: annotated tag `v0.1.0-rc.1` at `1182493`.
 - Lifecycle-inclusive release candidate: annotated tag `v0.1.0-rc.2` at `6cc7d2f`.
 - Final release: annotated tag `v0.1.0` at the reviewed candidate commit `6cc7d2f`.
+- Next candidate: `v0.2.0-rc.1` is active on `codex/v0.2.0-rc.1`, covering the integrated reentry,
+  lifecycle, uncertainty, digital-twin campaign, and mission-assurance increment after `v0.1.0`.
+  Local candidate gates pass `958 tests with 11 optional-backend skips`, Ruff, strict MyPy across
+  133 source files, package builds and inspection, and the public paired-assurance workflow from an
+  isolated wheel installation. GitHub CI, merge, detached verification, and tagging remain.
 - Branch: `main`; Mission Lifecycle Workflow merge commit `d37b9a6` and state commit `6cc7d2f`.
 - Required local release gates: passed on merged `main` after PR #9.
 - Optional backend smoke refresh on 2026-07-09: Orekit, RocketPy, Dymos/OpenMDAO, and JAX
@@ -446,6 +451,7 @@ Post-MVP / external-campaign items:
 | mission-assurance-uncertainty | done | productize/verify | steward | `src/astro_uq/adapters/assurance.py`, `examples/campaigns/leo_mission_assurance_robustness.yaml`, assurance/UQ tests and docs | Adds a bounded first campaign over insertion, tracking sigma, execution magnitude, and subsystem margins. The checked 8-case run, full release gates, independent review, and GitHub CI pass; PR #18 merged at `c10268e`. |
 | paired-assurance-validation | done | productize/verify | steward | `src/astro_assurance/validation_*`, paired validation CLI, explicit protocol fixture, tests and docs | Separates matched two-body and truth-J2/two-body-estimator profiles over shared coordinates. Independent review found and the implementation fixed noncausal OD, forged-derived-evidence acceptance, swallowed source drift, duplicate coordinate seeds, omitted executed-component authority, coordinate/profile substitution, and output-path collision. The corrected checked result completes 8/8 pairs with eight regressions; `951 passed, 11 skipped`, lint, typing, packaging, builds, outside-repository public run/verifier, GitHub CI, and integration pass. PR #19 merged at `d7710f5`. |
 | assurance-calibration-evidence | done | calibrate/verify | steward | `examples/assurance/paired_force_model_calibration.yaml`, calibration contracts, paired runner/verifier, assurance docs and tests | Every configured numeric dimension has one digest-bound evidence envelope and promotion derives from the weakest authority. Current status remains illustrative. Public campaign verification, all local release gates, GitHub CI, and integration pass; PR #20 merged at `f84dee7`. |
+| v0.2.0-rc.1 | active | release/verify | steward | package metadata, campaign compatibility, release notes, merged-main and detached-worktree gates | Candidate version and scope are explicit; package metadata, built-wheel public workflow, and full local gates pass. GitHub CI, merge, detached verification, and annotated tag must agree before completion. |
 
 ## Next Best Paths
 
