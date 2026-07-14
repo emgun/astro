@@ -132,7 +132,21 @@ def _write_mission_assurance_staging_bundle(
     staging_directory: Path,
     result: MissionAssuranceCase,
 ) -> None:
-    json_artifacts = {
+    json_artifacts, yaml_artifacts = _mission_assurance_artifact_payloads(result)
+    for name, payload in json_artifacts.items():
+        _write_text(staging_directory / name, json.dumps(payload, indent=2) + "\n")
+    for name, payload in yaml_artifacts.items():
+        _write_text(staging_directory / name, yaml.safe_dump(payload, sort_keys=False))
+    _write_text(
+        staging_directory / "manifest.json",
+        json.dumps(result.manifest.model_dump(mode="json"), indent=2) + "\n",
+    )
+
+
+def _mission_assurance_artifact_payloads(
+    result: MissionAssuranceCase,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    json_artifacts: dict[str, Any] = {
         "launch.json": result.launch_trajectory.model_dump(mode="json"),
         "measurements.json": {
             "scenario_id": result.truth_scenario.scenario_id,
@@ -159,7 +173,7 @@ def _write_mission_assurance_staging_bundle(
             "warnings": result.warnings,
         },
     }
-    yaml_artifacts = {
+    yaml_artifacts: dict[str, Any] = {
         "nominal-scenario.yaml": result.nominal_scenario.model_dump(mode="json"),
         "truth-scenario.yaml": result.truth_scenario.model_dump(mode="json"),
         "estimated-corrected-scenario.yaml": result.estimated_corrected_scenario.model_dump(
@@ -167,14 +181,7 @@ def _write_mission_assurance_staging_bundle(
         ),
         "truth-corrected-scenario.yaml": result.truth_corrected_scenario.model_dump(mode="json"),
     }
-    for name, payload in json_artifacts.items():
-        _write_text(staging_directory / name, json.dumps(payload, indent=2) + "\n")
-    for name, payload in yaml_artifacts.items():
-        _write_text(staging_directory / name, yaml.safe_dump(payload, sort_keys=False))
-    _write_text(
-        staging_directory / "manifest.json",
-        json.dumps(result.manifest.model_dump(mode="json"), indent=2) + "\n",
-    )
+    return json_artifacts, yaml_artifacts
 
 
 def verify_mission_assurance_artifact_bundle(directory: Path | str) -> AssuranceManifest:
@@ -217,6 +224,28 @@ def verify_mission_assurance_artifact_bundle(directory: Path | str) -> Assurance
         if digest != reference.file_digest:
             raise InvalidScenarioError(f"Mission assurance input digest mismatch: {reference.role}")
     return manifest
+
+
+def verify_mission_assurance_case_integrity(result: MissionAssuranceCase) -> None:
+    """Verify an embedded case against its input files and manifest product digests."""
+    json_artifacts, yaml_artifacts = _mission_assurance_artifact_payloads(result)
+    payloads = {**json_artifacts, **yaml_artifacts}
+    for entry in result.manifest.entries:
+        payload = payloads.get(entry.artifact_name)
+        if payload is None or _canonical_payload_digest(payload) != entry.source_digest:
+            raise InvalidScenarioError(
+                f"Mission assurance embedded artifact digest mismatch: {entry.artifact_name}"
+            )
+    for reference in result.manifest.inputs:
+        input_path = Path(reference.path)
+        try:
+            digest = _file_digest(input_path)
+        except OSError as exc:
+            raise InvalidScenarioError(
+                f"Could not verify mission assurance input {input_path}: {exc}"
+            ) from exc
+        if digest != reference.file_digest:
+            raise InvalidScenarioError(f"Mission assurance input digest mismatch: {reference.role}")
 
 
 def _load_artifact_payload(path: Path) -> Any:

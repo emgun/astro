@@ -220,9 +220,15 @@ def _angle_delta_deg(predicted_deg: float, observed_deg: float) -> float:
 
 
 def _measurement_residual(predicted: float, measurement: MeasurementRecord) -> float:
+    estimator_bias_raw = measurement.metadata.get("estimator_bias", 0.0)
+    if isinstance(estimator_bias_raw, bool) or not isinstance(estimator_bias_raw, int | float):
+        raise ValueError("measurement estimator_bias metadata must be numeric")
+    estimator_bias = float(estimator_bias_raw)
+    if not np.isfinite(estimator_bias):
+        raise ValueError("measurement estimator_bias metadata must be finite")
     if measurement.measurement_type in {MeasurementType.RIGHT_ASCENSION, MeasurementType.AZIMUTH}:
-        return _angle_delta_deg(predicted, measurement.value) / measurement.sigma
-    return (predicted - measurement.value) / measurement.sigma
+        return _angle_delta_deg(predicted + estimator_bias, measurement.value) / measurement.sigma
+    return (predicted + estimator_bias - measurement.value) / measurement.sigma
 
 
 def residual_vector(

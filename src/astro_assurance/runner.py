@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from hashlib import sha256
-from math import exp
+from math import exp, radians, tan
 from pathlib import Path
 from typing import Any
 
@@ -27,7 +27,9 @@ from astro_core.io import load_scenario
 from astro_core.models import (
     AstroModel,
     CartesianState,
+    ForceModelName,
     MeasurementRecord,
+    MeasurementType,
     OrbitState,
     Scenario,
     Trajectory,
@@ -45,6 +47,16 @@ from astro_twin.runner import run_digital_twin
 _STANDARD_GRAVITY_M_S2 = 9.80665
 _STATE_TOLERANCE = 1.0e-12
 _MASS_TOLERANCE_KG = 1.0e-6
+_RANGE_TYPES = {
+    MeasurementType.RANGE,
+    MeasurementType.TWO_WAY_RANGE,
+    MeasurementType.THREE_WAY_RANGE,
+}
+_RANGE_RATE_TYPES = {
+    MeasurementType.RANGE_RATE,
+    MeasurementType.TWO_WAY_RANGE_RATE,
+    MeasurementType.THREE_WAY_RANGE_RATE,
+}
 
 
 def run_post_launch_assurance(
@@ -69,6 +81,9 @@ def run_post_launch_assurance(
         launch.samples[-1].mass_kg,
         scenario_id=f"{scenario.scenario_id}-nominal",
     )
+    estimation_force_model = _configured_force_model(scenario, truth=False)
+    if estimation_force_model is not None:
+        nominal_scenario = _scenario_with_force_model(nominal_scenario, estimation_force_model)
     truth_scenario = nominal_scenario.model_copy(
         update={
             "scenario_id": f"{scenario.scenario_id}-truth",
@@ -80,16 +95,31 @@ def run_post_launch_assurance(
             },
         }
     )
+    truth_force_model = _configured_force_model(scenario, truth=True)
+    if truth_force_model is not None:
+        truth_scenario = _scenario_with_force_model(truth_scenario, truth_force_model)
     nominal_trajectory = propagate_local(nominal_scenario)
     truth_trajectory = propagate_local(truth_scenario)
     generated_measurements = tuple(
         generate_synthetic_measurements(truth_scenario, truth_trajectory)
     )
-    measurements = _visible_measurements(
+    visible_measurements = _visible_measurements(
         truth_scenario,
         truth_trajectory,
         generated_measurements,
     )
+    decision_epoch = truth_scenario.initial_state.epoch + timedelta(
+        seconds=float(scenario.correction.correction_elapsed_s)
+    )
+    decision_measurements = tuple(
+        measurement for measurement in visible_measurements if measurement.epoch <= decision_epoch
+    )
+    if not decision_measurements:
+        raise MissionAssuranceError(
+            "no visible tracking measurements are available by the correction decision epoch",
+            phase="tracking",
+        )
+    measurements = _measurements_for_estimation(decision_measurements, scenario)
     estimate = estimate_initial_state(
         nominal_scenario,
         list(measurements),
@@ -124,16 +154,33 @@ def run_post_launch_assurance(
         or scenario.input_overrides.correction_execution_scale is None
         else float(scenario.input_overrides.correction_execution_scale)
     )
+    executed_delta_v, pointing_basis = _executed_delta_v(candidate.delta_v_km_s, scenario)
+    execution_epoch_offset_s = _execution_override(
+        scenario, "correction_execution_epoch_offset_s", 0.0
+    )
+    _validate_execution_epoch(
+        truth_scenario,
+        candidate.epoch,
+        execution_epoch_offset_s,
+        float(scenario.correction.verification_elapsed_s),
+    )
     executed_candidate = candidate.model_copy(
         update={
             "name": f"{candidate.name}-executed",
-            "delta_v_km_s": tuple(
-                execution_scale * float(component) for component in candidate.delta_v_km_s
-            ),
+            "epoch": candidate.epoch + timedelta(seconds=execution_epoch_offset_s),
+            "delta_v_km_s": executed_delta_v,
             "metadata": {
                 **candidate.metadata,
                 "commanded_maneuver": candidate.name,
                 "execution_scale": execution_scale,
+                "execution_epoch_offset_s": execution_epoch_offset_s,
+                "execution_pointing_1_deg": _execution_override(
+                    scenario, "correction_execution_pointing_1_deg", 0.0
+                ),
+                "execution_pointing_2_deg": _execution_override(
+                    scenario, "correction_execution_pointing_2_deg", 0.0
+                ),
+                "execution_pointing_basis": pointing_basis,
                 "evidence_scope": "simulation_truth",
             },
         }
@@ -208,11 +255,30 @@ def run_post_launch_assurance(
         **metrics,
         "measurement_count": len(measurements),
         "generated_measurement_count": len(generated_measurements),
-        "rejected_below_mask_measurement_count": len(generated_measurements) - len(measurements),
+        "visible_measurement_count": len(visible_measurements),
+        "rejected_below_mask_measurement_count": (
+            len(generated_measurements) - len(visible_measurements)
+        ),
+        "rejected_after_decision_measurement_count": (
+            len(visible_measurements) - len(measurements)
+        ),
+        "tracking_decision_epoch": decision_epoch.isoformat(),
         "recovery_disposition": "candidate_for_manual_review",
         "tracking_source": "synthetic_simulation_truth",
         "tracking_visibility_filter": "station_elevation_mask",
+        "tracking_noise_seed": int(truth_scenario.measurements.noise.seed),
+        "truth_force_model": truth_scenario.force_model.gravity.value,
+        "estimation_force_model": nominal_scenario.force_model.gravity.value,
+        "truth_force_model_config": truth_scenario.force_model.model_dump(mode="json"),
+        "estimation_force_model_config": nominal_scenario.force_model.model_dump(mode="json"),
         "correction_execution_scale": execution_scale,
+        "correction_execution_epoch_offset_s": execution_epoch_offset_s,
+        "correction_elapsed_s": float(scenario.correction.correction_elapsed_s),
+        "verification_elapsed_s": float(scenario.correction.verification_elapsed_s),
+        "maximum_component_delta_v_km_s": float(
+            scenario.correction.maximum_component_delta_v_km_s
+        ),
+        "maximum_total_delta_v_km_s": float(scenario.correction.maximum_total_delta_v_km_s),
         "executed_delta_v_km_s": float(
             np.linalg.norm(np.asarray(executed_candidate.delta_v_km_s, dtype=np.float64))
         ),
@@ -292,11 +358,153 @@ def _resolve_tracking_template(
         noise_payload["range_sigma_km"] = overrides.tracking_range_sigma_km
     if overrides.tracking_range_rate_sigma_km_s is not None:
         noise_payload["range_rate_sigma_km_s"] = overrides.tracking_range_rate_sigma_km_s
+    if overrides.tracking_noise_seed is not None:
+        noise_payload["seed"] = overrides.tracking_noise_seed
     measurements = template.measurements.model_copy(
         update={"noise": type(template.measurements.noise).model_validate(noise_payload)}
     )
+    propagation = template.propagation
+    if overrides.tracking_duration_s is not None:
+        propagation = propagation.model_copy(update={"duration_s": overrides.tracking_duration_s})
     return Scenario.model_validate(
-        template.model_copy(update={"measurements": measurements}).model_dump(mode="python")
+        template.model_copy(
+            update={"measurements": measurements, "propagation": propagation}
+        ).model_dump(mode="python")
+    )
+
+
+def _configured_force_model(
+    scenario: PostLaunchAssuranceScenario,
+    *,
+    truth: bool,
+) -> ForceModelName | None:
+    overrides = scenario.input_overrides
+    if overrides is None:
+        return None
+    return overrides.truth_force_model if truth else overrides.estimation_force_model
+
+
+def _scenario_with_force_model(scenario: Scenario, gravity: ForceModelName) -> Scenario:
+    if scenario.force_model.enabled_high_fidelity_flags():
+        raise MissionAssuranceError(
+            "paired local assurance force-model overrides do not support high-fidelity flags",
+            phase="configuration",
+        )
+    payload = scenario.force_model.model_dump(mode="python")
+    payload["gravity"] = gravity
+    if gravity is ForceModelName.J2:
+        payload["gravity_degree"] = 2
+        payload["gravity_order"] = 0
+    else:
+        payload["gravity_degree"] = None
+        payload["gravity_order"] = None
+    force_model = type(scenario.force_model).model_validate(payload)
+    return Scenario.model_validate(
+        scenario.model_copy(update={"force_model": force_model}).model_dump(mode="python")
+    )
+
+
+def _measurements_for_estimation(
+    measurements: tuple[MeasurementRecord, ...],
+    scenario: PostLaunchAssuranceScenario,
+) -> tuple[MeasurementRecord, ...]:
+    overrides = scenario.input_overrides
+    resolved: list[MeasurementRecord] = []
+    for measurement in measurements:
+        truth_bias = 0.0
+        estimator_bias = 0.0
+        assumed_sigma = float(measurement.sigma)
+        if overrides is not None and measurement.measurement_type in _RANGE_TYPES:
+            truth_bias = float(overrides.tracking_range_bias_km or 0.0)
+            estimator_bias = float(overrides.estimation_range_bias_km or 0.0)
+            if overrides.estimation_range_sigma_km is not None:
+                assumed_sigma = float(overrides.estimation_range_sigma_km)
+        elif overrides is not None and measurement.measurement_type in _RANGE_RATE_TYPES:
+            truth_bias = float(overrides.tracking_range_rate_bias_km_s or 0.0)
+            estimator_bias = float(overrides.estimation_range_rate_bias_km_s or 0.0)
+            if overrides.estimation_range_rate_sigma_km_s is not None:
+                assumed_sigma = float(overrides.estimation_range_rate_sigma_km_s)
+        ideal_truth = float(measurement.metadata.get("truth", measurement.value))
+        noise_realization = float(measurement.value) - ideal_truth
+        resolved.append(
+            measurement.model_copy(
+                update={
+                    "value": float(measurement.value) + truth_bias,
+                    "sigma": assumed_sigma,
+                    "metadata": {
+                        **measurement.metadata,
+                        "simulation_truth_sigma": float(measurement.sigma),
+                        "simulation_truth_bias": truth_bias,
+                        "simulation_noise_realization": noise_realization,
+                        "simulation_noise_seed": (
+                            None if overrides is None else overrides.tracking_noise_seed
+                        ),
+                        "estimator_assumed_sigma": assumed_sigma,
+                        "estimator_bias": estimator_bias,
+                    },
+                }
+            )
+        )
+    return tuple(resolved)
+
+
+def _execution_override(scenario: PostLaunchAssuranceScenario, field: str, default: float) -> float:
+    overrides = scenario.input_overrides
+    value = None if overrides is None else getattr(overrides, field)
+    return default if value is None else float(value)
+
+
+def _validate_execution_epoch(
+    truth_scenario: Scenario,
+    commanded_epoch: datetime,
+    offset_s: float,
+    verification_elapsed_s: float,
+) -> None:
+    executed_epoch = commanded_epoch + timedelta(seconds=offset_s)
+    verification_epoch = truth_scenario.initial_state.epoch + timedelta(
+        seconds=verification_elapsed_s
+    )
+    if executed_epoch < truth_scenario.initial_state.epoch:
+        raise MissionAssuranceError(
+            "executed correction precedes the truth scenario epoch", phase="configuration"
+        )
+    if executed_epoch >= verification_epoch:
+        raise MissionAssuranceError(
+            "executed correction must precede the verification epoch", phase="configuration"
+        )
+
+
+def _executed_delta_v(
+    commanded_delta_v_km_s: tuple[float, float, float],
+    scenario: PostLaunchAssuranceScenario,
+) -> tuple[tuple[float, float, float], dict[str, Any]]:
+    commanded = np.asarray(commanded_delta_v_km_s, dtype=np.float64)
+    magnitude = float(np.linalg.norm(commanded))
+    if magnitude <= 0.0:
+        raise MissionAssuranceError("candidate correction has zero delta-v", phase="correction")
+    direction = commanded / magnitude
+    reference = np.eye(3, dtype=np.float64)[int(np.argmin(np.abs(direction)))]
+    axis_1 = np.cross(direction, reference)
+    axis_1 /= np.linalg.norm(axis_1)
+    axis_2 = np.cross(direction, axis_1)
+    pointing_1 = radians(_execution_override(scenario, "correction_execution_pointing_1_deg", 0.0))
+    pointing_2 = radians(_execution_override(scenario, "correction_execution_pointing_2_deg", 0.0))
+    perturbed = direction + tan(pointing_1) * axis_1 + tan(pointing_2) * axis_2
+    perturbed /= np.linalg.norm(perturbed)
+    scale = _execution_override(scenario, "correction_execution_scale", 1.0)
+    executed = magnitude * scale * perturbed
+    return (
+        (float(executed[0]), float(executed[1]), float(executed[2])),
+        {
+            "command_direction": direction.tolist(),
+            "axis_1": axis_1.tolist(),
+            "axis_2": axis_2.tolist(),
+            "convention": [
+                "command_frame",
+                "axis_1_cross_command_with_least_aligned_inertial_axis",
+                "axis_2_cross_command_with_axis_1",
+            ],
+        },
     )
 
 

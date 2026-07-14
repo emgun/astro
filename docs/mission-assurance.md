@@ -34,8 +34,10 @@ The reference performs these phases in order:
 8. Return continuity checks, margins, product digests, warnings, and a derived decision.
 
 The checked example uses a one-hour, six-site geodetic acquisition network. It generates 1,452
-deterministic range and range-rate candidates and retains 130 records that meet each station's
-elevation mask. Its correction objective balances terminal position and velocity because one
+deterministic range and range-rate candidates; 130 meet each station's elevation mask, and OD uses
+the 64 available by the 30-minute correction decision. The 66 later visible observations remain
+truth-verification evidence and cannot influence targeting. Its correction objective balances
+terminal position and velocity because one
 three-component impulse cannot independently satisfy all six terminal state components.
 
 ## Products And Evidence
@@ -96,3 +98,45 @@ or probabilistic claims still require independent and calibrated tracking noise/
 separate truth and estimator noise assumptions, maneuver timing and pointing errors, paired
 force-model mismatch, external tracking fixtures, and reviewed acceptance criteria. Monte Carlo
 volume alone does not supply that authority.
+
+## Paired Model Validation
+
+The paired validation protocol separates model-form mismatch from continuous realization inputs:
+
+```bash
+astro validate-assurance-validation \
+  examples/assurance/paired_force_model_validation.yaml
+astro run-assurance-validation \
+  examples/assurance/paired_force_model_validation.yaml \
+  --output /tmp/astro-paired-assurance.json \
+  --summary-output /tmp/astro-paired-assurance.txt
+astro verify-assurance-validation /tmp/astro-paired-assurance.json
+```
+
+Each explicit coordinate carries its own tracking-noise seed, truth sigma and bias, estimator sigma
+and bias, insertion dispersion, correction magnitude/timing/two-axis pointing errors, and selected
+power/thermal inputs. The same coordinate and seed run through two profiles: matched two-body truth
+and estimation, then J2 truth with two-body estimation and targeting. Every successful profile
+embeds its complete `MissionAssuranceCase`; paired deltas use the convention mismatched minus
+matched. Failed physics profiles remain visible and are never removed from requested-case counts.
+Each successful profile reports both the embedded case decision under the diagnostic solver envelope
+and the stricter protocol pass after reapplying the base scenario's maneuver-authority limits. The
+verifier rechecks the protocol and assurance sources, every nested assurance input, each embedded
+case digest, and every manifest product digest against the embedded product.
+
+The checked eight-coordinate, one-hour protocol uses 30 minutes of causal pre-decision tracking and
+30 minutes of post-decision truth verification. It completed all eight pairs. All eight matched
+profiles passed the preserved base authority and all mismatched profiles failed, producing eight
+pass-to-fail reversals. Relative to matched cases, model mismatch added a median `13.246 km` of OD
+position error, `36.785 km` of truth-recovery position error, and `43.861` of normalized residual
+RMS. Mismatched candidates required `3.375` to `7.729 m/s` beyond the original total authority;
+their executed impulses exceeded the original component limit by `7.795` to `11.446 m/s`.
+
+The protocol uses a `50 m/s` component and `80 m/s` total diagnostic targeting envelope so both
+profiles can produce comparable trajectories. Profile pass disposition separately enforces the
+original assurance scenario's `20 m/s` component and `25 m/s` total authority. The wider diagnostic
+envelope is not an authorized maneuver bound. Results report profile counts, physics-complete pair
+counts, paired metric deltas, and reversal counts. They contain no pooled success probability.
+Coordinates and bounds remain illustrative until launch, sensor, propulsion, and subsystem evidence
+calibrates them; the product is simulation design-space validation, not navigation certification or
+flight authority.

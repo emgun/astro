@@ -24,6 +24,8 @@ request -> typed plan -> allow-listed commands -> deterministic artifacts -> ver
   propellant-reserve, entry-interface, provenance, and margin evidence across every phase.
 - Runs post-launch mission assurance from dispersed insertion through tracking, OD, a bounded
   candidate correction, truth replay, and an updated digital twin.
+- Runs paired assurance validation over shared tracking and execution realizations with separate
+  matched-model and truth-J2/estimator-two-body evidence.
 - Provides optional adapter boundaries for Orekit, RocketPy, Dymos/OpenMDAO, TudatPy, and JAX.
 - Exposes assistant workflows for scenario-bound local OD requests.
 
