@@ -8,6 +8,7 @@ import yaml
 from typer.testing import CliRunner
 
 from astro_cli.main import app
+from astro_core.io import load_scenario
 from astro_mission.io import load_mission_lifecycle_scenario
 from astro_mission.runner import resolve_lifecycle_twin_scenario
 from astro_twin.io import load_twin_scenario
@@ -334,6 +335,49 @@ def test_checked_power_thermal_campaign_binds_dependency_and_sensitivity(
             "--resume",
         ],
     )
+    assert resumed.exit_code == 2
+    assert "campaign definition digest is incompatible with resume" in resumed.output
+
+
+def test_digital_twin_campaign_binds_template_and_orbit_dependency(tmp_path: Path) -> None:
+    orbit_path = tmp_path / "orbit.yaml"
+    orbit_payload = yaml.safe_load(Path("examples/scenarios/leo_full_orbit.yaml").read_text())
+    orbit_path.write_text(yaml.safe_dump(orbit_payload, sort_keys=False))
+    twin_path = tmp_path / "twin.yaml"
+    twin_payload = yaml.safe_load(
+        Path("examples/twin/leo_full_orbit_power_thermal.yaml").read_text()
+    )
+    twin_payload["orbit_scenario"] = str(orbit_path)
+    twin_path.write_text(yaml.safe_dump(twin_payload, sort_keys=False))
+    definition = tmp_path / "campaign.yaml"
+    definition_payload = yaml.safe_load(
+        Path("examples/campaigns/leo_full_orbit_power_thermal.yaml").read_text()
+    )
+    definition_payload["workflow"]["scenario"] = str(twin_path)
+    definition_payload["sampler"]["samples"] = 2
+    definition.write_text(yaml.safe_dump(definition_payload, sort_keys=False))
+    output = tmp_path / "campaign"
+
+    run = runner.invoke(
+        app,
+        ["run-campaign", str(definition), "--output-dir", str(output)],
+    )
+
+    assert run.exit_code == 0, run.output
+    dependency = json.loads((output / "campaign.json").read_text())["definition"]["metadata"][
+        "resolved_dependencies"
+    ]
+    assert dependency["twin_template_digest"] == model_digest(load_twin_scenario(twin_path))
+    assert dependency["orbit_scenario"] == str(orbit_path)
+    assert dependency["orbit_scenario_digest"] == model_digest(load_scenario(orbit_path))
+
+    orbit_payload["initial_state"]["cartesian"]["position_km"][0] = 7001.0
+    orbit_path.write_text(yaml.safe_dump(orbit_payload, sort_keys=False))
+    resumed = runner.invoke(
+        app,
+        ["run-campaign", str(definition), "--output-dir", str(output), "--resume"],
+    )
+
     assert resumed.exit_code == 2
     assert "campaign definition digest is incompatible with resume" in resumed.output
 

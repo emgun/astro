@@ -110,6 +110,7 @@ def _validated_scenario_update(
 
 def register_twin_parameters(registry: ParameterRegistry, scenario: DigitalTwinScenario) -> None:
     scalar_bindings = (
+        ("power", "solar_array_area_m2", "m^2", 0.0, None),
         ("power", "solar_array_efficiency", "1", 0.0, 1.0),
         ("power", "battery_capacity_wh", "Wh", 0.0, None),
         ("power", "battery_charge_efficiency", "1", 0.0, 1.0),
@@ -134,18 +135,19 @@ def register_twin_parameters(registry: ParameterRegistry, scenario: DigitalTwinS
         )
 
     for name in _unique_named(scenario.thermal_nodes, collection="thermal_nodes"):
-        registry.register(
-            ParameterBinding(
-                target=f"digital_twin.thermal_nodes.{name}.emissivity",
-                workflow=WORKFLOW,
-                unit="1",
-                value_type=float,
-                getter=_named_field("thermal_nodes", name, "emissivity"),
-                updater=_replace_named_field("thermal_nodes", name, "emissivity"),
-                lower=0.0,
-                upper=1.0,
+        for field in ("emissivity", "internal_heat_fraction"):
+            registry.register(
+                ParameterBinding(
+                    target=f"digital_twin.thermal_nodes.{name}.{field}",
+                    workflow=WORKFLOW,
+                    unit="1",
+                    value_type=float,
+                    getter=_named_field("thermal_nodes", name, field),
+                    updater=_replace_named_field("thermal_nodes", name, field),
+                    lower=0.0,
+                    upper=1.0,
+                )
             )
-        )
     for name in _unique_named(scenario.links, collection="links"):
         registry.register(
             ParameterBinding(
@@ -176,6 +178,27 @@ def _named_max_temperature(name: str) -> Callable[[AstroModel], float]:
         return max(values)
 
     return extract
+
+
+def _named_temperature_margin(name: str, boundary: str) -> Callable[[AstroModel], float]:
+    return _margin(f"thermal_{name}_{boundary}_margin_k")
+
+
+def _eclipse_duration_s(model: AstroModel) -> float:
+    geometry = _result(model).geometry
+    return sum(
+        max(0.0, sample.elapsed_s - previous.elapsed_s)
+        for previous, sample in zip(geometry, geometry[1:], strict=False)
+        if not sample.sunlit
+    )
+
+
+def _sunlit_fraction(model: AstroModel) -> float:
+    geometry = _result(model).geometry
+    if len(geometry) < 2:
+        return 1.0 if geometry and geometry[0].sunlit else 0.0
+    duration_s = geometry[-1].elapsed_s - geometry[0].elapsed_s
+    return 1.0 - _eclipse_duration_s(model) / duration_s if duration_s > 0.0 else 0.0
 
 
 def _named_worst_link_margin(name: str) -> Callable[[AstroModel], MetricValue]:
@@ -212,6 +235,56 @@ def register_twin_metrics(
             lambda model: min(
                 float(sample.battery_soc_fraction) for sample in _result(model).power
             ),
+        ),
+        (
+            "digital_twin.min_battery_energy_wh",
+            MetricValueKind.NUMERIC,
+            "Wh",
+            lambda model: min(float(sample.battery_energy_wh) for sample in _result(model).power),
+        ),
+        (
+            "digital_twin.terminal_battery_energy_wh",
+            MetricValueKind.NUMERIC,
+            "Wh",
+            lambda model: float(_result(model).power[-1].battery_energy_wh),
+        ),
+        (
+            "digital_twin.battery_energy_change_wh",
+            MetricValueKind.NUMERIC,
+            "Wh",
+            lambda model: sum(
+                float(sample.battery_energy_change_wh) for sample in _result(model).power
+            ),
+        ),
+        (
+            "digital_twin.total_unmet_energy_wh",
+            MetricValueKind.NUMERIC,
+            "Wh",
+            lambda model: sum(float(sample.unmet_energy_wh) for sample in _result(model).power),
+        ),
+        (
+            "digital_twin.max_unmet_load_w",
+            MetricValueKind.NUMERIC,
+            "W",
+            lambda model: max(float(sample.unmet_load_w) for sample in _result(model).power),
+        ),
+        (
+            "digital_twin.total_curtailed_energy_wh",
+            MetricValueKind.NUMERIC,
+            "Wh",
+            lambda model: sum(float(sample.curtailed_energy_wh) for sample in _result(model).power),
+        ),
+        (
+            "digital_twin.eclipse_duration_s",
+            MetricValueKind.NUMERIC,
+            "s",
+            _eclipse_duration_s,
+        ),
+        (
+            "digital_twin.sunlit_fraction",
+            MetricValueKind.NUMERIC,
+            "1",
+            _sunlit_fraction,
         ),
         (
             "digital_twin.min_torque_margin_n_m",
@@ -289,6 +362,16 @@ def register_twin_metrics(
                 _named_max_temperature(name),
             )
         )
+        for boundary in ("cold", "hot"):
+            registry.register(
+                MetricExtractor(
+                    f"digital_twin.thermal_nodes.{name}.{boundary}_margin_k",
+                    WORKFLOW,
+                    MetricValueKind.NUMERIC,
+                    "K",
+                    _named_temperature_margin(name, boundary),
+                )
+            )
 
     for name in link_names:
         registry.register(

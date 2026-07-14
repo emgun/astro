@@ -77,9 +77,35 @@ def _scenario_path(definition_path: Path, configured_path: str) -> Path:
     return definition_path.parent / configured
 
 
+def _referenced_scenario_path(owner_path: Path, configured_path: str) -> Path:
+    configured = Path(configured_path)
+    if configured.is_absolute():
+        return configured
+    for parent in owner_path.resolve().parents:
+        candidate = parent / configured
+        if candidate.exists():
+            return candidate
+    return configured
+
+
 def _bind_resolved_dependencies(
     definition: CampaignDefinition, definition_path: Path
 ) -> CampaignDefinition:
+    if definition.workflow.kind == "digital_twin":
+        scenario_path = _scenario_path(definition_path, definition.workflow.scenario)
+        twin_scenario = load_twin_scenario(scenario_path)
+        orbit_scenario = load_scenario(
+            _referenced_scenario_path(scenario_path, twin_scenario.orbit_scenario)
+        )
+        metadata = dict(definition.metadata)
+        metadata[_RESOLVED_DEPENDENCIES_KEY] = {
+            "twin_template_digest": model_digest(twin_scenario),
+            "orbit_scenario": twin_scenario.orbit_scenario,
+            "orbit_scenario_digest": model_digest(orbit_scenario),
+        }
+        return CampaignDefinition.model_validate(
+            definition.model_copy(update={"metadata": metadata}).model_dump(mode="python")
+        )
     if definition.workflow.kind != "mission_lifecycle":
         return definition
     scenario_path = _scenario_path(definition_path, definition.workflow.scenario)
@@ -112,7 +138,17 @@ def _runtime(definition: CampaignDefinition, definition_path: Path) -> CampaignR
             ),
         )
     if definition.workflow.kind == "digital_twin":
-        scenario = load_twin_scenario(scenario_path)
+        twin_template = load_twin_scenario(scenario_path)
+        orbit_scenario_path = _referenced_scenario_path(scenario_path, twin_template.orbit_scenario)
+        scenario = twin_template.model_copy(update={"orbit_scenario": str(orbit_scenario_path)})
+        dependency = definition.metadata.get(_RESOLVED_DEPENDENCIES_KEY)
+        expected_dependency = {
+            "twin_template_digest": model_digest(twin_template),
+            "orbit_scenario": twin_template.orbit_scenario,
+            "orbit_scenario_digest": model_digest(load_scenario(orbit_scenario_path)),
+        }
+        if dependency != expected_dependency:
+            raise CampaignIOError("resolved digital twin dependency digest mismatch")
         return CampaignRuntime(
             scenario=scenario,
             parameters=twin_parameter_registry(scenario),

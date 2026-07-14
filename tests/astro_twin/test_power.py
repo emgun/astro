@@ -92,3 +92,55 @@ def test_compute_power_timeline_applies_scheduled_load_and_battery_efficiency() 
     assert samples[1].load_w == 200.0
     assert samples[1].battery_energy_wh == 600.0
     assert samples[1].battery_soc_fraction == 0.6
+
+
+def test_compute_power_timeline_accounts_for_unmet_and_curtailed_energy() -> None:
+    start = datetime(2026, 1, 1, tzinfo=UTC)
+    geometry = (
+        TimelineGeometrySample(
+            epoch=start,
+            elapsed_s=0.0,
+            position_km=(7000.0, 0.0, 0.0),
+            altitude_km=621.863,
+            sunlit=True,
+        ),
+        TimelineGeometrySample(
+            epoch=start.replace(hour=1),
+            elapsed_s=3600.0,
+            position_km=(7000.0, 0.0, 0.0),
+            altitude_km=621.863,
+            sunlit=True,
+        ),
+        TimelineGeometrySample(
+            epoch=start.replace(hour=2),
+            elapsed_s=7200.0,
+            position_km=(-7000.0, 0.0, 0.0),
+            altitude_km=621.863,
+            sunlit=False,
+        ),
+    )
+    config = PowerConfig(
+        solar_array_area_m2=1.0,
+        solar_array_efficiency=1.0,
+        battery_capacity_wh=1000.0,
+        initial_battery_soc_fraction=0.9,
+        minimum_battery_soc_fraction=0.2,
+        idle_load_w=100.0,
+        payload_load_w=600.0,
+        downlink_load_w=100.0,
+        battery_charge_efficiency=0.5,
+        battery_discharge_efficiency=0.5,
+    )
+
+    samples = compute_power_timeline(
+        config,
+        geometry,
+        {7200.0: MissionMode.PAYLOAD},
+    )
+
+    assert samples[1].battery_energy_change_wh == 100.0
+    assert samples[1].curtailed_energy_wh == 1061.0
+    assert samples[2].battery_energy_change_wh == -1000.0
+    assert samples[2].battery_energy_wh == 0.0
+    assert samples[2].unmet_energy_wh == 100.0
+    assert samples[2].unmet_load_w == 100.0
