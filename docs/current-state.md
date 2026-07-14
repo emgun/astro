@@ -11,7 +11,7 @@ The sibling checkout at `/Users/emerygunselman/Documents/astro` is stale for thi
 `docs/research/2026-06-20-verifiable-ai-space-workflows.md` file. Do not edit or merge from that
 checkout unless the user explicitly asks to sync the old workspace.
 
-Integrated `main` state before the active post-launch assurance branch:
+Integrated `main` state after the post-launch mission-assurance merge:
 
 - Pre-lifecycle release baseline: annotated tag `v0.1.0-rc.1` at `1182493`.
 - Lifecycle-inclusive release candidate: annotated tag `v0.1.0-rc.2` at `6cc7d2f`.
@@ -51,9 +51,9 @@ The broader product direction is now **evidence-bound mission assurance**: conne
 existing physics, estimation, uncertainty, and digital-twin products into closed-loop decisions
 with explicit continuity, provenance, claim boundaries, and review authority. The first flagship is
 post-launch orbit acquisition and recovery: launch insertion, simulated tracking, OD, a bounded
-candidate correction, estimate/truth replay, and a corrected digital twin in one result. Active
-implementation is on `codex/post-launch-mission-assurance`; it remains deterministic local design
-screening and does not claim RF acquisition, operational navigation, or flight-command authority.
+candidate correction, estimate/truth replay, and a corrected digital twin in one result. PR #17
+merged the implementation to `main` at `0d73d5b`; it remains deterministic local design screening
+and does not claim RF acquisition, operational navigation, or flight-command authority.
 
 The next layer after this deterministic reference is an uncertainty campaign over the full
 assurance loop, followed by external tracking fixtures and execution-error validation. AI should
@@ -68,8 +68,8 @@ now fail the assurance case, correction propellant depletion updates the returne
 17-file bundle binds four inputs plus 16 artifacts with a public verifier and atomic publication.
 Focused assurance and packaging tests pass `21` tests; the full suite passes `930 tests with 11
 optional-backend skips`; Ruff, strict MyPy across 127 source files, `git diff --check`, the fresh
-public CLI run and verifier, wheel inspection, and sdist/wheel builds pass. Release-scale evidence
-remains branch-scoped until final review and integration.
+public CLI run and verifier, wheel inspection, and sdist/wheel builds pass. GitHub CI passed in
+`1m25s` before PR #17 merged the scope at `0d73d5b`.
 
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
@@ -390,23 +390,21 @@ Post-MVP / external-campaign items:
 | lifecycle-sensitivity-attribution | done | productize/verify | steward | `astro_uq.sensitivity`, `astro analyze-campaign-sensitivity`, checked 64-case lifecycle campaign, sensitivity docs and tests | Produces digest-bound Spearman and PRCC association evidence for numeric metrics and signed requirement margins with sample-size, residual-DF, tie, weight, failure, and conditioning gates. The checked lifecycle campaign completes 64/64 cases and records bounded design-space attribution without causal, Sobol-index, operational-probability, or certification claims. |
 | lifecycle-subsystem-margin-targets | done | productize/verify | steward | lifecycle UQ adapter, checked lifecycle campaigns, subsystem requirement tests and docs | Exposes unit-stable battery, thermal-envelope, ADCS, worst-observed-link, propellant-fraction, and mass-budget margins plus contact metrics through lifecycle campaigns. The checked 64-case run passes every subsystem requirement and attributes only the two nonconstant targets, preserving practical-effect, no-contact, constant-target, and coverage claim boundaries. |
 | lifecycle-power-thermal-inputs | done | productize/verify | steward | typed lifecycle overrides, dynamic named-node bindings and metrics, checked five-input campaign, tests and docs | Screens solar-array, battery-capacity, and bus thermal design inputs against battery-SOC and separate hot/cold margins. The checked campaign records the battery tie warning and short-sunlit-window boundary instead of claiming full-orbit EPS or thermal authority. |
-| post-launch-mission-assurance | review | productize/verify | steward | `src/astro_assurance`, `astro run-mission-assurance`, `examples/assurance`, assurance tests and docs | Connects launch insertion, simulation truth, synthetic tracking, OD, a bounded manual-review correction, estimate/truth replay, and the corrected digital twin through one suite-owned evidence case. Focused and release-scale local gates pass; independent review and integration remain. |
+| post-launch-mission-assurance | done | productize/verify | steward | `src/astro_assurance`, `astro run-mission-assurance`, `examples/assurance`, assurance tests and docs | Connects launch insertion, visibility-filtered simulation tracking, OD, a bounded manual-review correction, estimate/truth replay, and the corrected digital twin through one suite-owned evidence case. Independent review, focused and release-scale local gates, public digest verification, GitHub CI, and merged-main integration pass; PR #17 merged at `0d73d5b`. |
 
 ## Next Best Paths
 
-1. Complete review and integration of the deterministic post-launch assurance reference. Preserve
-   its manual-review correction authority and simulation-truth evidence scopes.
-2. Add a dedicated assurance uncertainty campaign over insertion, tracking, estimation, maneuver
+1. Add a dedicated assurance uncertainty campaign over insertion, tracking, estimation, maneuver
    execution, and subsystem margins. Keep aleatory, epistemic, and model-form inputs distinguishable
    and report design-space frequencies rather than operational probabilities.
-3. Introduce external tracking fixtures and maneuver-execution validation only when a specific
+2. Introduce external tracking fixtures and maneuver-execution validation only when a specific
    release claim and reviewed acceptance criteria justify the campaign. This is the route toward
    real acquisition/recovery evidence; more synthetic cases are not a substitute.
-4. Add AI-native planning, evidence review, anomaly triage, and decision explanation over typed
+3. Add AI-native planning, evidence review, anomaly triage, and decision explanation over typed
    assurance products before considering autonomous execution. Keep surrogate acceleration closed
    unless a measured assurance teacher or other evaluator passes the cost and fidelity gate.
-5. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+4. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-6. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+5. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.

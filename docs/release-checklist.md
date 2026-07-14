@@ -25,7 +25,7 @@ Latest merged-main evidence:
   RocketPy, Dymos/OpenMDAO, TudatPy, and JAX. These smoke checks do not replace optional live
   propagation, launch, optimization, covariance, or OD campaign gates.
 
-Latest post-launch mission-assurance branch evidence:
+Latest post-launch mission-assurance integration evidence:
 
 - 2026-07-13: `codex/post-launch-mission-assurance` added the suite-owned launch insertion,
   simulated tracking, OD, bounded candidate correction, estimate/truth replay, corrected digital
@@ -43,6 +43,8 @@ Latest post-launch mission-assurance branch evidence:
 - 2026-07-13: focused assurance and packaging tests reported `21 passed`; the full suite reported
   `930 passed, 11 skipped`; Ruff, strict MyPy across 127 source files, `git diff --check`, the fresh
   public CLI run and verifier, wheel-content inspection, and sdist/wheel builds passed.
+- 2026-07-13: GitHub CI passed in `1m25s`; PR #17 merged the reviewed scope to `main` at
+  `0d73d5b`.
 
 Latest optional validation refresh:
 
