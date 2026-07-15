@@ -94,6 +94,25 @@ generic/high-fidelity covariance, and native OD live gates with the explicit Jav
 Live validation results:
 
 ```text
+2026-07-15 independent native covariance campaign:
+
+TudatPy 1.0.0 was installed from the official tudat-team Conda channel in an isolated Python 3.12
+environment. `astro tudat-smoke` returned available=true, and both native producers wrote 11-epoch
+high-fidelity trajectories covering drag, SRP, Sun/Moon third-body gravity, and white-acceleration
+process noise. The preregistered comparison passed 11/11 epochs and returned
+additional_evidence_required with only empirical_consistency_missing.
+
+Maximum relative covariance Frobenius error: 5.111963828665972e-07
+Maximum accumulated STM Frobenius error: 3.745912006784206e-07
+Covariance trace ratio range: 0.9999999988119669 to 1.000000014265602
+Generalized eigenvalue range: 0.9999990254865714 to 1.0000017379393566
+Maximum state position delta: 0.0006552344418782137 km
+Maximum state velocity delta: 9.795988339714687e-07 km/s
+
+Checked inputs are under examples/covariance_validation/live_orekit_tudat_native/. This is
+machine- and environment-scoped comparison evidence. It is not an empirical truth-error campaign,
+production certification, flight qualification, navigation authority, or operational authority.
+
 2026-07-15 native variational prerequisite:
 
 JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" PYTHONPATH=src astro propagate examples/scenarios/leo_orekit_variational_covariance.yaml --backend orekit --output /tmp/astro-orekit-native-variational.json
