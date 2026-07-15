@@ -239,6 +239,7 @@ result-level calibration-protocol binding, and thin adversarial verification cov
 matrix tests pass 13 tests; the full suite passes `1028 tests with 11 optional-backend skips`; Ruff,
 strict MyPy across 146 source files, seven packaging tests, sdist/wheel builds, `git diff --check`,
 and the checked public run and exact verifier pass.
+GitHub CI passed in `3m0s`; PR #27 merged the scope to `main` at `6c2e606`.
 
 Project-specific steward learning: a derived validation product that reuses another protocol's
 calibration must bind both identities, and long-running evidence generation must recheck every
@@ -573,7 +574,7 @@ Post-MVP / external-campaign items:
 | lifecycle-assurance-review | done | productize/verify | steward | lifecycle result re-verification, deterministic findings and triage, public CLI, typed assistant plan, tests and docs | Exact staged-input re-execution, five-file digest binding, stable findings, one bounded unit-quality action, public artifacts, independent review, 1,000-test local gates, GitHub CI, and integration pass; PR #24 merged at `beb0b81`. |
 | lifecycle-margin-units | done | productize/verify | steward | `DesignMargin` unit contract, twin and constellation producers, lifecycle promotion, checked review | Required source-level units are preserved into lifecycle evidence; checked review is warning-free without physics changes; affected, full-release, public, independent-review, GitHub CI, and integration gates pass; PR #25 merged at `45e4d11`. |
 | mission-calibration-evidence | done | calibrate/verify | steward | typed station residuals, propulsion execution residuals, insertion covariance, inspection CLI, checked synthetic fixture | Evidence schemas and fail-closed promotion prerequisites are implemented; focused/full/public/package, independent-review, GitHub CI, and integration gates pass; PR #26 merged at `aa98d1f`. Actual mission evidence acquisition remains external work. |
-| assurance-model-form-matrix | in_progress | productize/verify | steward | four-cell truth/estimator protocol, contrasts, public CLI, exact verifier, checked fixture | Four profiles remain separate and unpooled; local source/calibration, exact reexecution, focused/full, public, package, and independent-review gates pass without changing paired v1. GitHub CI and integration remain. |
+| assurance-model-form-matrix | done | productize/verify | steward | four-cell truth/estimator protocol, contrasts, public CLI, exact verifier, checked fixture | Four profiles remain separate and unpooled; local source/calibration, exact reexecution, focused/full, public, package, independent-review, GitHub CI, and integration gates pass without changing paired v1. PR #27 merged at `6c2e606`. |
 
 ## Next Best Paths
 
