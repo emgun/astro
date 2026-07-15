@@ -20,7 +20,9 @@ from astro_core.models import AstroModel, Body, ForceModelName, Frame, Measureme
 
 class AssuranceValidationProfile(StrEnum):
     MATCHED_TWO_BODY = "matched_two_body"
+    TRUTH_TWO_BODY_ESTIMATOR_J2 = "truth_two_body_estimator_j2"
     TRUTH_J2_ESTIMATOR_TWO_BODY = "truth_j2_estimator_two_body"
+    MATCHED_J2 = "matched_j2"
 
 
 class AssuranceValidationStatus(StrEnum):

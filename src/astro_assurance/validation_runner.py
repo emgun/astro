@@ -125,7 +125,8 @@ def _run_pair(
     realization: AssuranceValidationRealization,
 ) -> AssuranceValidationPairResult:
     profile_results = {
-        profile: _run_profile(protocol, base, realization, profile) for profile in _PROFILES
+        profile: run_assurance_validation_profile(protocol, base, realization, profile)
+        for profile in _PROFILES
     }
     matched = profile_results[AssuranceValidationProfile.MATCHED_TWO_BODY]
     mismatched = profile_results[AssuranceValidationProfile.TRUTH_J2_ESTIMATOR_TWO_BODY]
@@ -161,7 +162,7 @@ def _run_pair(
     )
 
 
-def _run_profile(
+def run_assurance_validation_profile(
     protocol: PairedAssuranceValidationProtocol,
     base: PostLaunchAssuranceScenario,
     realization: AssuranceValidationRealization,
@@ -243,12 +244,24 @@ def build_assurance_validation_scenario(
 def validation_profile_force_models(
     profile: AssuranceValidationProfile,
 ) -> tuple[ForceModelName, ForceModelName]:
-    truth = (
-        ForceModelName.TWO_BODY
-        if profile is AssuranceValidationProfile.MATCHED_TWO_BODY
-        else ForceModelName.J2
-    )
-    return truth, ForceModelName.TWO_BODY
+    return {
+        AssuranceValidationProfile.MATCHED_TWO_BODY: (
+            ForceModelName.TWO_BODY,
+            ForceModelName.TWO_BODY,
+        ),
+        AssuranceValidationProfile.TRUTH_TWO_BODY_ESTIMATOR_J2: (
+            ForceModelName.TWO_BODY,
+            ForceModelName.J2,
+        ),
+        AssuranceValidationProfile.TRUTH_J2_ESTIMATOR_TWO_BODY: (
+            ForceModelName.J2,
+            ForceModelName.TWO_BODY,
+        ),
+        AssuranceValidationProfile.MATCHED_J2: (
+            ForceModelName.J2,
+            ForceModelName.J2,
+        ),
+    }[profile]
 
 
 def derive_assurance_validation_profile_evidence(

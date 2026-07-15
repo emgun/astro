@@ -1,6 +1,6 @@
 # Astro Suite Current State
 
-Date: 2026-07-14 00:00 PDT
+Date: 2026-07-15 00:00 PDT
 
 ## Canonical Workspace
 
@@ -224,6 +224,25 @@ GitHub CI passed in `2m35s`; PR #26 merged the scope to `main` at `aa98d1f`.
 Project-specific steward learning: evidence acquisition and authority promotion must remain separate
 operations. Typed residuals make prerequisites reviewable, but synthetic completeness, sample count,
 or a source-kind label cannot promote a calibration bound without applicable evidence and derivation.
+
+Assurance Model-Form Matrix v1 adds a separate four-cell truth/estimator factorial without changing
+paired validation v1. Each of eight explicit realizations runs two-body/two-body, two-body/J2,
+J2/two-body, and J2/J2 with one shared seed per realization, and reports two same-truth estimator
+contrasts plus a difference-in-differences interaction. The checked run completes all 32 cells and
+all 24 contrasts: both matched profiles pass 8/8 and both cross-model profiles pass 0/8. Under
+two-body truth, switching the estimator to J2 increases median OD position error by `11.369 km`;
+under J2 truth, switching the estimator to J2 reduces it by `13.247 km`. The interaction median is
+`-24.616 km`. Counts and contrasts remain unpooled, calibration status remains `illustrative`, and
+matched J2 behavior is internal consistency rather than physical-truth or flight authority.
+Independent review found and the implementation fixed post-execution input-drift exposure, missing
+result-level calibration-protocol binding, and thin adversarial verification coverage. Focused
+matrix tests pass 13 tests; the full suite passes `1028 tests with 11 optional-backend skips`; Ruff,
+strict MyPy across 146 source files, seven packaging tests, sdist/wheel builds, `git diff --check`,
+and the checked public run and exact verifier pass.
+
+Project-specific steward learning: a derived validation product that reuses another protocol's
+calibration must bind both identities, and long-running evidence generation must recheck every
+mutable source after execution before publishing its result.
 
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
@@ -554,6 +573,7 @@ Post-MVP / external-campaign items:
 | lifecycle-assurance-review | done | productize/verify | steward | lifecycle result re-verification, deterministic findings and triage, public CLI, typed assistant plan, tests and docs | Exact staged-input re-execution, five-file digest binding, stable findings, one bounded unit-quality action, public artifacts, independent review, 1,000-test local gates, GitHub CI, and integration pass; PR #24 merged at `beb0b81`. |
 | lifecycle-margin-units | done | productize/verify | steward | `DesignMargin` unit contract, twin and constellation producers, lifecycle promotion, checked review | Required source-level units are preserved into lifecycle evidence; checked review is warning-free without physics changes; affected, full-release, public, independent-review, GitHub CI, and integration gates pass; PR #25 merged at `45e4d11`. |
 | mission-calibration-evidence | done | calibrate/verify | steward | typed station residuals, propulsion execution residuals, insertion covariance, inspection CLI, checked synthetic fixture | Evidence schemas and fail-closed promotion prerequisites are implemented; focused/full/public/package, independent-review, GitHub CI, and integration gates pass; PR #26 merged at `aa98d1f`. Actual mission evidence acquisition remains external work. |
+| assurance-model-form-matrix | in_progress | productize/verify | steward | four-cell truth/estimator protocol, contrasts, public CLI, exact verifier, checked fixture | Four profiles remain separate and unpooled; local source/calibration, exact reexecution, focused/full, public, package, and independent-review gates pass without changing paired v1. GitHub CI and integration remain. |
 
 ## Next Best Paths
 
@@ -561,8 +581,8 @@ Post-MVP / external-campaign items:
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
    before considering a mission-calibrated protocol claim.
-2. Introduce additional model-form profiles only as separately validated comparisons; keep profile
-   counts and paired deltas unpooled rather than creating a weighted model-success probability.
+2. Use the separate model-form matrix for bounded local sensitivity comparisons; do not promote its
+   matched J2 cell or interaction into physical-truth, operational-risk, or probability claims.
 3. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
    needed; do not infer bundle integrity from result re-execution.
 4. Add optional evidence-bound explanations over verified finding ids only after deterministic
