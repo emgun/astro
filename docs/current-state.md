@@ -219,6 +219,7 @@ across 142 source files, five package/import tests, sdist/wheel builds, public a
 envelopes, observable/unit mapping, scale-aware covariance validation, derived propulsion pointing,
 protocol/context binding, explicit coordinate allowlists, and protocol-completeness disclosure;
 final re-review found no P1/P2 issues.
+GitHub CI passed in `2m35s`; PR #26 merged the scope to `main` at `aa98d1f`.
 
 Project-specific steward learning: evidence acquisition and authority promotion must remain separate
 operations. Typed residuals make prerequisites reviewable, but synthetic completeness, sample count,
@@ -552,7 +553,7 @@ Post-MVP / external-campaign items:
 | assurance-review-comparison | done | productize/verify | steward | review re-verification, deterministic cross-run comparison, public CLI, typed assistant plan, tests and docs | Public compare/verify artifacts, independent review, local release gates, GitHub CI, and integration pass. Comparison avoids heterogeneous scalarization, claim promotion, and recommendation execution; PR #23 merged at `1564549`. |
 | lifecycle-assurance-review | done | productize/verify | steward | lifecycle result re-verification, deterministic findings and triage, public CLI, typed assistant plan, tests and docs | Exact staged-input re-execution, five-file digest binding, stable findings, one bounded unit-quality action, public artifacts, independent review, 1,000-test local gates, GitHub CI, and integration pass; PR #24 merged at `beb0b81`. |
 | lifecycle-margin-units | done | productize/verify | steward | `DesignMargin` unit contract, twin and constellation producers, lifecycle promotion, checked review | Required source-level units are preserved into lifecycle evidence; checked review is warning-free without physics changes; affected, full-release, public, independent-review, GitHub CI, and integration gates pass; PR #25 merged at `45e4d11`. |
-| mission-calibration-evidence | review | calibrate/verify | steward | typed station residuals, propulsion execution residuals, insertion covariance, inspection CLI, checked synthetic fixture | Evidence schemas and fail-closed promotion prerequisites are implemented; focused/full/public/package gates pass; independent review and PR/CI integration are pending. Actual mission evidence acquisition remains external work. |
+| mission-calibration-evidence | done | calibrate/verify | steward | typed station residuals, propulsion execution residuals, insertion covariance, inspection CLI, checked synthetic fixture | Evidence schemas and fail-closed promotion prerequisites are implemented; focused/full/public/package, independent-review, GitHub CI, and integration gates pass; PR #26 merged at `aa98d1f`. Actual mission evidence acquisition remains external work. |
 
 ## Next Best Paths
 
