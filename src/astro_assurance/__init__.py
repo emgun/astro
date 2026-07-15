@@ -20,6 +20,18 @@ from astro_assurance.lifecycle_review_io import (
     write_mission_lifecycle_review,
 )
 from astro_assurance.lifecycle_review_models import MissionLifecycleReview
+from astro_assurance.model_form_io import (
+    format_model_form_factorial_summary,
+    load_model_form_factorial_protocol,
+    load_model_form_factorial_result,
+    verify_model_form_factorial_result,
+    write_model_form_factorial_result,
+)
+from astro_assurance.model_form_models import (
+    ModelFormFactorialProtocol,
+    ModelFormFactorialResult,
+)
+from astro_assurance.model_form_runner import run_model_form_factorial
 from astro_assurance.models import (
     MissionAssuranceCase,
     MissionAssuranceInputOverrides,
@@ -80,11 +92,14 @@ __all__ = [
     "InsertionCovarianceEvidence",
     "PairedAssuranceValidationProtocol",
     "PairedAssuranceValidationResult",
+    "ModelFormFactorialProtocol",
+    "ModelFormFactorialResult",
     "AssuranceValidationReview",
     "AssuranceReviewComparison",
     "format_mission_assurance_summary",
     "format_mission_lifecycle_review",
     "format_paired_assurance_validation_summary",
+    "format_model_form_factorial_summary",
     "format_assurance_validation_review",
     "format_assurance_review_comparison",
     "load_mission_assurance_result",
@@ -94,6 +109,8 @@ __all__ = [
     "load_post_launch_assurance_scenario",
     "load_paired_assurance_validation_protocol",
     "load_paired_assurance_validation_result",
+    "load_model_form_factorial_protocol",
+    "load_model_form_factorial_result",
     "load_assurance_validation_review",
     "load_assurance_review_comparison",
     "compare_assurance_validation_reviews",
@@ -101,6 +118,7 @@ __all__ = [
     "review_assurance_validation",
     "review_mission_lifecycle",
     "run_paired_assurance_validation",
+    "run_model_form_factorial",
     "run_post_launch_assurance",
     "verify_mission_assurance_artifact_bundle",
     "verify_mission_assurance_case_integrity",
@@ -108,11 +126,13 @@ __all__ = [
     "verify_mission_lifecycle_review",
     "validate_calibration_against_protocol",
     "verify_paired_assurance_validation_result",
+    "verify_model_form_factorial_result",
     "verify_assurance_validation_review",
     "write_mission_assurance_artifact_bundle",
     "write_mission_assurance_result",
     "write_mission_lifecycle_review",
     "write_paired_assurance_validation_result",
+    "write_model_form_factorial_result",
     "write_assurance_validation_review",
     "write_assurance_review_comparison",
     "write_assurance_review_summary",

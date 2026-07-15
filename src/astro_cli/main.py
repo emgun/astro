@@ -25,6 +25,11 @@ from astro_assurance.lifecycle_review_cli import (
     verify_mission_lifecycle_result_command,
     verify_mission_lifecycle_review_command,
 )
+from astro_assurance.model_form_cli import (
+    run_model_form_matrix_command,
+    validate_model_form_matrix_command,
+    verify_model_form_matrix_command,
+)
 from astro_assurance.review_cli import (
     compare_assurance_reviews_command,
     review_assurance_validation_command,
@@ -149,6 +154,9 @@ app.command("validate-assurance-validation")(validate_assurance_validation_comma
 app.command("inspect-assurance-calibration")(inspect_assurance_calibration_command)
 app.command("run-assurance-validation")(run_assurance_validation_command)
 app.command("verify-assurance-validation")(verify_assurance_validation_command)
+app.command("validate-model-form-matrix")(validate_model_form_matrix_command)
+app.command("run-model-form-matrix")(run_model_form_matrix_command)
+app.command("verify-model-form-matrix")(verify_model_form_matrix_command)
 app.command("review-assurance-validation")(review_assurance_validation_command)
 app.command("compare-assurance-reviews")(compare_assurance_reviews_command)
 app.command("verify-assurance-review-comparison")(

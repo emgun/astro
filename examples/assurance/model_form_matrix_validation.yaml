@@ -1,0 +1,171 @@
+protocol_id: leo-model-form-matrix-validation-v1
+calibration_protocol_id: leo-paired-assurance-validation-v1
+assurance_scenario: post_launch_orbit_acquisition.yaml
+calibration_evidence: paired_force_model_calibration.yaml
+tracking_duration_s: 3600.0
+correction_elapsed_s: 1800.0
+verification_elapsed_s: 3600.0
+diagnostic_maximum_component_delta_v_km_s: 0.05
+diagnostic_maximum_total_delta_v_km_s: 0.08
+profiles:
+  - matched_two_body
+  - truth_two_body_estimator_j2
+  - truth_j2_estimator_two_body
+  - matched_j2
+realizations:
+  - case_id: case-01
+    dispersion: {position_delta_km: [1.82, -1.08, 0.46], velocity_delta_km_s: [0.00091, -0.00162, 0.00073]}
+    input_overrides:
+      tracking_noise_seed: 7301
+      tracking_range_sigma_km: 0.0084
+      tracking_range_rate_sigma_km_s: 0.0000083
+      tracking_range_bias_km: -0.0035
+      tracking_range_rate_bias_km_s: 0.0000015
+      estimation_range_sigma_km: 0.0092
+      estimation_range_rate_sigma_km_s: 0.0000091
+      estimation_range_bias_km: -0.0010
+      estimation_range_rate_bias_km_s: 0.0000005
+      correction_execution_scale: 0.992
+      correction_execution_epoch_offset_s: -4.0
+      correction_execution_pointing_1_deg: -0.08
+      correction_execution_pointing_2_deg: 0.03
+      twin_solar_array_efficiency: 0.286
+      twin_battery_capacity_wh: 1160.0
+      twin_thermal_node_overrides: [{node_name: bus, emissivity: 0.765}]
+  - case_id: case-02
+    dispersion: {position_delta_km: [2.18, -0.92, 0.54], velocity_delta_km_s: [0.00109, -0.00138, 0.00087]}
+    input_overrides:
+      tracking_noise_seed: 7302
+      tracking_range_sigma_km: 0.0116
+      tracking_range_rate_sigma_km_s: 0.0000117
+      tracking_range_bias_km: 0.0035
+      tracking_range_rate_bias_km_s: -0.0000015
+      estimation_range_sigma_km: 0.0108
+      estimation_range_rate_sigma_km_s: 0.0000109
+      estimation_range_bias_km: 0.0010
+      estimation_range_rate_bias_km_s: -0.0000005
+      correction_execution_scale: 1.008
+      correction_execution_epoch_offset_s: 4.0
+      correction_execution_pointing_1_deg: 0.08
+      correction_execution_pointing_2_deg: -0.03
+      twin_solar_array_efficiency: 0.294
+      twin_battery_capacity_wh: 1240.0
+      twin_thermal_node_overrides: [{node_name: bus, emissivity: 0.795}]
+  - case_id: case-03
+    dispersion: {position_delta_km: [1.90, -0.96, 0.58], velocity_delta_km_s: [0.00095, -0.00158, 0.00081]}
+    input_overrides:
+      tracking_noise_seed: 7303
+      tracking_range_sigma_km: 0.0091
+      tracking_range_rate_sigma_km_s: 0.0000108
+      tracking_range_bias_km: -0.0015
+      tracking_range_rate_bias_km_s: -0.0000025
+      estimation_range_sigma_km: 0.0112
+      estimation_range_rate_sigma_km_s: 0.0000095
+      estimation_range_bias_km: 0.0005
+      estimation_range_rate_bias_km_s: -0.0000010
+      correction_execution_scale: 0.996
+      correction_execution_epoch_offset_s: 2.0
+      correction_execution_pointing_1_deg: -0.04
+      correction_execution_pointing_2_deg: -0.07
+      twin_solar_array_efficiency: 0.288
+      twin_battery_capacity_wh: 1220.0
+      twin_thermal_node_overrides: [{node_name: bus, emissivity: 0.785}]
+  - case_id: case-04
+    dispersion: {position_delta_km: [2.10, -1.04, 0.42], velocity_delta_km_s: [0.00105, -0.00142, 0.00079]}
+    input_overrides:
+      tracking_noise_seed: 7304
+      tracking_range_sigma_km: 0.0109
+      tracking_range_rate_sigma_km_s: 0.0000092
+      tracking_range_bias_km: 0.0015
+      tracking_range_rate_bias_km_s: 0.0000025
+      estimation_range_sigma_km: 0.0088
+      estimation_range_rate_sigma_km_s: 0.0000105
+      estimation_range_bias_km: -0.0005
+      estimation_range_rate_bias_km_s: 0.0000010
+      correction_execution_scale: 1.004
+      correction_execution_epoch_offset_s: -2.0
+      correction_execution_pointing_1_deg: 0.04
+      correction_execution_pointing_2_deg: 0.07
+      twin_solar_array_efficiency: 0.292
+      twin_battery_capacity_wh: 1180.0
+      twin_thermal_node_overrides: [{node_name: bus, emissivity: 0.775}]
+  - case_id: case-05
+    dispersion: {position_delta_km: [1.86, -1.02, 0.50], velocity_delta_km_s: [0.00098, -0.00148, 0.00075]}
+    input_overrides:
+      tracking_noise_seed: 7305
+      tracking_range_sigma_km: 0.0096
+      tracking_range_rate_sigma_km_s: 0.0000112
+      tracking_range_bias_km: -0.0025
+      tracking_range_rate_bias_km_s: 0.0000005
+      estimation_range_sigma_km: 0.0104
+      estimation_range_rate_sigma_km_s: 0.0000087
+      estimation_range_bias_km: -0.0008
+      estimation_range_rate_bias_km_s: 0.0000002
+      correction_execution_scale: 0.994
+      correction_execution_epoch_offset_s: -1.0
+      correction_execution_pointing_1_deg: 0.02
+      correction_execution_pointing_2_deg: -0.05
+      twin_solar_array_efficiency: 0.289
+      twin_battery_capacity_wh: 1190.0
+      twin_thermal_node_overrides: [{node_name: bus, emissivity: 0.790}]
+  - case_id: case-06
+    dispersion: {position_delta_km: [2.14, -0.98, 0.44], velocity_delta_km_s: [0.00102, -0.00152, 0.00085]}
+    input_overrides:
+      tracking_noise_seed: 7306
+      tracking_range_sigma_km: 0.0104
+      tracking_range_rate_sigma_km_s: 0.0000088
+      tracking_range_bias_km: 0.0025
+      tracking_range_rate_bias_km_s: -0.0000005
+      estimation_range_sigma_km: 0.0096
+      estimation_range_rate_sigma_km_s: 0.0000113
+      estimation_range_bias_km: 0.0008
+      estimation_range_rate_bias_km_s: -0.0000002
+      correction_execution_scale: 1.006
+      correction_execution_epoch_offset_s: 1.0
+      correction_execution_pointing_1_deg: -0.02
+      correction_execution_pointing_2_deg: 0.05
+      twin_solar_array_efficiency: 0.291
+      twin_battery_capacity_wh: 1210.0
+      twin_thermal_node_overrides: [{node_name: bus, emissivity: 0.770}]
+  - case_id: case-07
+    dispersion: {position_delta_km: [1.94, -1.06, 0.56], velocity_delta_km_s: [0.00093, -0.00145, 0.00083]}
+    input_overrides:
+      tracking_noise_seed: 7307
+      tracking_range_sigma_km: 0.0088
+      tracking_range_rate_sigma_km_s: 0.0000097
+      tracking_range_bias_km: -0.0005
+      tracking_range_rate_bias_km_s: 0.0000035
+      estimation_range_sigma_km: 0.0116
+      estimation_range_rate_sigma_km_s: 0.0000102
+      estimation_range_bias_km: 0.0002
+      estimation_range_rate_bias_km_s: 0.0000012
+      correction_execution_scale: 0.998
+      correction_execution_epoch_offset_s: 3.0
+      correction_execution_pointing_1_deg: 0.06
+      correction_execution_pointing_2_deg: 0.01
+      twin_solar_array_efficiency: 0.287
+      twin_battery_capacity_wh: 1230.0
+      twin_thermal_node_overrides: [{node_name: bus, emissivity: 0.780}]
+  - case_id: case-08
+    dispersion: {position_delta_km: [2.06, -0.94, 0.48], velocity_delta_km_s: [0.00107, -0.00155, 0.00077]}
+    input_overrides:
+      tracking_noise_seed: 7308
+      tracking_range_sigma_km: 0.0112
+      tracking_range_rate_sigma_km_s: 0.0000103
+      tracking_range_bias_km: 0.0005
+      tracking_range_rate_bias_km_s: -0.0000035
+      estimation_range_sigma_km: 0.0084
+      estimation_range_rate_sigma_km_s: 0.0000098
+      estimation_range_bias_km: -0.0002
+      estimation_range_rate_bias_km_s: -0.0000012
+      correction_execution_scale: 1.002
+      correction_execution_epoch_offset_s: -3.0
+      correction_execution_pointing_1_deg: -0.06
+      correction_execution_pointing_2_deg: -0.01
+      twin_solar_array_efficiency: 0.293
+      twin_battery_capacity_wh: 1170.0
+      twin_thermal_node_overrides: [{node_name: bus, emissivity: 0.800}]
+metadata:
+  coordinate_design: explicit_bounded_eight_case_four_cell_factorial
+  bounds_authority: illustrative_not_calibrated_flight_distributions
+  profile_policy: four_profile_counts_and_contrasts_remain_unpooled
