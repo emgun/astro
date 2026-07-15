@@ -195,6 +195,7 @@ found and drove explicit v2 workflow identifiers, current UQ documentation, and 
 mapping assertions; re-review found no P1/P2 issues.
 Previously serialized v1 twin results without a margin `unit` do not satisfy the v2 schema and must
 be regenerated rather than assigned an inferred fallback unit.
+GitHub CI passed in `3m7s`; PR #25 merged the scope to `main` at `45e4d11`.
 
 Project-specific steward learning: unit authority belongs where a numeric engineering quantity is
 created. Downstream lifecycle and assurance products should preserve structured units, never infer
@@ -527,7 +528,7 @@ Post-MVP / external-campaign items:
 | assurance-review-operator | done | productize/verify | steward | deterministic paired-assurance review, public CLI, typed assistant plan, tests and docs | Public artifact, local gates, GitHub CI, and integration pass. Findings remain deterministic and non-operational; PR #22 merged at `0d1f32b`. |
 | assurance-review-comparison | done | productize/verify | steward | review re-verification, deterministic cross-run comparison, public CLI, typed assistant plan, tests and docs | Public compare/verify artifacts, independent review, local release gates, GitHub CI, and integration pass. Comparison avoids heterogeneous scalarization, claim promotion, and recommendation execution; PR #23 merged at `1564549`. |
 | lifecycle-assurance-review | done | productize/verify | steward | lifecycle result re-verification, deterministic findings and triage, public CLI, typed assistant plan, tests and docs | Exact staged-input re-execution, five-file digest binding, stable findings, one bounded unit-quality action, public artifacts, independent review, 1,000-test local gates, GitHub CI, and integration pass; PR #24 merged at `beb0b81`. |
-| lifecycle-margin-units | review | productize/verify | steward | `DesignMargin` unit contract, twin and constellation producers, lifecycle promotion, checked review | Required source-level units are preserved into lifecycle evidence; checked review is warning-free without physics changes; affected, full-release, public, and independent-review gates pass; PR/CI integration is pending. |
+| lifecycle-margin-units | done | productize/verify | steward | `DesignMargin` unit contract, twin and constellation producers, lifecycle promotion, checked review | Required source-level units are preserved into lifecycle evidence; checked review is warning-free without physics changes; affected, full-release, public, independent-review, GitHub CI, and integration gates pass; PR #25 merged at `45e4d11`. |
 
 ## Next Best Paths
 
