@@ -1,0 +1,91 @@
+calibration_id: synthetic-mission-evidence-v1
+protocol_id: synthetic-mission-evidence-protocol-v1
+promotion_status: illustrative
+sources:
+  - source_id: synthetic-evidence
+    title: Synthetic mission calibration evidence contract example
+    publisher: Astro Suite
+    document_id: synthetic-mission-evidence-v1
+    revision_or_date: "2026-07-14"
+    location: examples/assurance/mission_calibration_evidence_example.yaml
+    source_kind: project_configuration
+    applicability: Exercises typed evidence parsing and inspection only.
+    limitations:
+      - Synthetic values are not mission test or flight evidence.
+parameter_bounds:
+  - parameter: input_overrides.tracking_range_sigma_km
+    minimum: 0.009
+    maximum: 0.011
+    unit: km
+    authority: illustrative
+    source_ids: [synthetic-evidence]
+    rationale: Keeps the checked product non-promoting.
+    limitations:
+      - The bound is not approved mission calibration.
+evidence_products:
+  - kind: station_residuals
+    evidence_id: synthetic-station-range
+    source_ids: [synthetic-evidence]
+    authority: illustrative
+    assurance_scenario_id: synthetic-assurance
+    tracking_scenario_id: synthetic-tracking
+    station_id: synthetic-sband-1
+    measurement_type: range
+    unit: km
+    band: S
+    tracking_mode: coherent_two_way
+    integration_time_s: 10
+    arc_start: "2026-01-01T00:00:00Z"
+    arc_end: "2026-01-01T01:00:00Z"
+    sample_count: 120
+    mean_residual: 0.001
+    sample_standard_deviation: 0.010
+    rms: 0.01005
+    data_selection_policy: All synthetic visible samples in the checked arc.
+    outlier_policy: No rejection in the synthetic example.
+    limitations:
+      - Does not represent a physical station or calibrated media model.
+  - kind: propulsion_execution_residuals
+    evidence_id: synthetic-propulsion-execution
+    source_ids: [synthetic-evidence]
+    authority: illustrative
+    assurance_scenario_id: synthetic-assurance
+    maneuver_id: synthetic-correction-1
+    propulsion_class: synthetic_monopropellant
+    vector_frame: EME2000
+    commanded_epoch: "2026-01-01T02:00:00Z"
+    achieved_epoch: "2026-01-01T02:00:02Z"
+    commanded_delta_v_km_s: [0.001, 0.0, 0.0]
+    achieved_delta_v_km_s: [0.00101, 0.0, 0.0]
+    timing_residual_s: 2.0
+    magnitude_scale: 1.01
+    pointing_basis: axis_1_cross_command_with_least_aligned_inertial_axis_then_axis_2
+    pointing_residual_1_deg: 0.0
+    pointing_residual_2_deg: 0.0
+    reconstruction_method: Synthetic vector comparison in the declared frame.
+    limitations:
+      - Does not represent propulsion telemetry or reconstructed flight performance.
+  - kind: insertion_covariance
+    evidence_id: synthetic-insertion-covariance
+    source_ids: [synthetic-evidence]
+    authority: illustrative
+    assurance_scenario_id: synthetic-assurance
+    tracking_scenario_id: synthetic-tracking
+    epoch: "2026-01-01T00:00:00Z"
+    time_scale: UTC
+    central_body: earth
+    frame: EME2000
+    state_order: [x, y, z, vx, vy, vz]
+    state_units: [km, km, km, km/s, km/s, km/s]
+    covariance:
+      - [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      - [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+      - [0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+      - [0.0, 0.0, 0.0, 0.000001, 0.0, 0.0]
+      - [0.0, 0.0, 0.0, 0.0, 0.000001, 0.0]
+      - [0.0, 0.0, 0.0, 0.0, 0.0, 0.000001]
+    confidence_convention: one_sigma_covariance
+    population_definition: Synthetic Cartesian insertion population.
+    launcher_configuration: synthetic-launcher
+    limitations:
+      - Does not represent a selected launcher, mission, or covariance reconstruction.

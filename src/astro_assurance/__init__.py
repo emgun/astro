@@ -48,6 +48,7 @@ from astro_assurance.review_models import (
 )
 from astro_assurance.runner import run_post_launch_assurance
 from astro_assurance.validation_calibration_io import (
+    inspect_assurance_validation_calibration,
     load_assurance_validation_calibration,
     validate_calibration_against_protocol,
 )
@@ -60,8 +61,11 @@ from astro_assurance.validation_io import (
 )
 from astro_assurance.validation_models import (
     AssuranceValidationCalibrationManifest,
+    InsertionCovarianceEvidence,
     PairedAssuranceValidationProtocol,
     PairedAssuranceValidationResult,
+    PropulsionExecutionResidualEvidence,
+    StationResidualEvidence,
 )
 from astro_assurance.validation_runner import run_paired_assurance_validation
 
@@ -71,6 +75,9 @@ __all__ = [
     "MissionAssuranceInputOverrides",
     "PostLaunchAssuranceScenario",
     "AssuranceValidationCalibrationManifest",
+    "StationResidualEvidence",
+    "PropulsionExecutionResidualEvidence",
+    "InsertionCovarianceEvidence",
     "PairedAssuranceValidationProtocol",
     "PairedAssuranceValidationResult",
     "AssuranceValidationReview",
@@ -83,6 +90,7 @@ __all__ = [
     "load_mission_assurance_result",
     "load_mission_lifecycle_review",
     "load_assurance_validation_calibration",
+    "inspect_assurance_validation_calibration",
     "load_post_launch_assurance_scenario",
     "load_paired_assurance_validation_protocol",
     "load_paired_assurance_validation_result",

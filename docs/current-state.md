@@ -201,6 +201,29 @@ Project-specific steward learning: unit authority belongs where a numeric engine
 created. Downstream lifecycle and assurance products should preserve structured units, never infer
 them from metric names or substitute a heterogeneous placeholder.
 
+Mission Calibration Evidence Pack v1 adds optional typed evidence products to the existing
+digest-bound assurance calibration manifest. Station residual evidence binds observable, unit,
+station, band/mode/integration context, arc, selection/outlier policies, and summary statistics;
+propulsion execution evidence binds command and achieved epochs and vectors in EME2000 plus timing,
+magnitude, pointing, class, and reconstruction semantics; insertion covariance binds epoch, time
+scale, body, EME2000 frame, Cartesian state order/units, population/confidence semantics, and a
+symmetric positive-semidefinite 6x6 matrix with derived correlations. Mission-test and flight
+authority now fail closed unless calibrated bounds cite matching-source, applicable typed evidence
+and a declared derivation. `astro inspect-assurance-calibration` reports evidence counts, authority
+coverage, blockers, digest, and claim boundary without mutating or promoting evidence. The checked
+synthetic fixture contains all three families but correctly remains illustrative with zero calibrated
+bounds. Focused evidence/validation gates pass 36 tests; the full suite passes `1015 tests with 11
+optional-backend skips`, including host multiprocessing cases; Ruff, strict MyPy
+across 142 source files, five package/import tests, sdist/wheel builds, public artifact parsing, and
+`git diff --check` pass. Independent adversarial review found and drove exact evidence-derived
+envelopes, observable/unit mapping, scale-aware covariance validation, derived propulsion pointing,
+protocol/context binding, explicit coordinate allowlists, and protocol-completeness disclosure;
+final re-review found no P1/P2 issues.
+
+Project-specific steward learning: evidence acquisition and authority promotion must remain separate
+operations. Typed residuals make prerequisites reviewable, but synthetic completeness, sample count,
+or a source-kind label cannot promote a calibration bound without applicable evidence and derivation.
+
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
 the executable plan is
@@ -529,12 +552,13 @@ Post-MVP / external-campaign items:
 | assurance-review-comparison | done | productize/verify | steward | review re-verification, deterministic cross-run comparison, public CLI, typed assistant plan, tests and docs | Public compare/verify artifacts, independent review, local release gates, GitHub CI, and integration pass. Comparison avoids heterogeneous scalarization, claim promotion, and recommendation execution; PR #23 merged at `1564549`. |
 | lifecycle-assurance-review | done | productize/verify | steward | lifecycle result re-verification, deterministic findings and triage, public CLI, typed assistant plan, tests and docs | Exact staged-input re-execution, five-file digest binding, stable findings, one bounded unit-quality action, public artifacts, independent review, 1,000-test local gates, GitHub CI, and integration pass; PR #24 merged at `beb0b81`. |
 | lifecycle-margin-units | done | productize/verify | steward | `DesignMargin` unit contract, twin and constellation producers, lifecycle promotion, checked review | Required source-level units are preserved into lifecycle evidence; checked review is warning-free without physics changes; affected, full-release, public, independent-review, GitHub CI, and integration gates pass; PR #25 merged at `45e4d11`. |
+| mission-calibration-evidence | review | calibrate/verify | steward | typed station residuals, propulsion execution residuals, insertion covariance, inspection CLI, checked synthetic fixture | Evidence schemas and fail-closed promotion prerequisites are implemented; focused/full/public/package gates pass; independent review and PR/CI integration are pending. Actual mission evidence acquisition remains external work. |
 
 ## Next Best Paths
 
-1. Acquire mission-specific station residuals and propulsion execution residuals, including timing,
-   then replace illustrative calibration bounds only where reviewed evidence supports promotion.
-   Add insertion covariance with explicit frame/correlation semantics and subsystem test evidence
+1. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
+   timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
+   only where applicability and derivation review support promotion. Add subsystem test evidence
    before considering a mission-calibrated protocol claim.
 2. Introduce additional model-form profiles only as separately validated comparisons; keep profile
    counts and paired deltas unpooled rather than creating a weighted model-success probability.

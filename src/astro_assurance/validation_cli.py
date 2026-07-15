@@ -7,6 +7,10 @@ from typing import Annotated
 import typer
 
 from astro_assurance.errors import MissionAssuranceError
+from astro_assurance.validation_calibration_io import (
+    inspect_assurance_validation_calibration,
+    load_assurance_validation_calibration,
+)
 from astro_assurance.validation_io import (
     format_paired_assurance_validation_summary,
     load_paired_assurance_validation_protocol,
@@ -34,6 +38,27 @@ def validate_assurance_validation_command(
         typer.echo(json.dumps({"error": str(exc), "protocol_id": protocol_id}), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(json.dumps({"protocol_id": protocol_id, "valid": True}, sort_keys=True))
+
+
+def inspect_assurance_calibration_command(
+    calibration_path: Annotated[Path, typer.Argument(exists=True, readable=True)],
+    protocol_path: Annotated[
+        Path | None, typer.Option("--protocol", exists=True, readable=True)
+    ] = None,
+) -> None:
+    """Inspect typed evidence, authority coverage, and promotion blockers."""
+    try:
+        calibration = load_assurance_validation_calibration(calibration_path)
+        protocol = (
+            None
+            if protocol_path is None
+            else load_paired_assurance_validation_protocol(protocol_path)
+        )
+        report = inspect_assurance_validation_calibration(calibration, protocol)
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(json.dumps({"error": str(exc)}), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(json.dumps(report, indent=2, sort_keys=True))
 
 
 def run_assurance_validation_command(

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from hashlib import sha256
+from math import atan2, degrees, isclose, sqrt
 from statistics import median
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
+import numpy as np
 from pydantic import Field, FiniteFloat, model_validator
 
 from astro_assurance.models import (
@@ -12,7 +15,7 @@ from astro_assurance.models import (
     MissionAssuranceCase,
     MissionAssuranceInputOverrides,
 )
-from astro_core.models import AstroModel, ForceModelName
+from astro_core.models import AstroModel, Body, ForceModelName, Frame, MeasurementType, TimeScale
 
 
 class AssuranceValidationProfile(StrEnum):
@@ -58,6 +61,195 @@ class AssuranceCalibrationSource(AstroModel):
     limitations: tuple[str, ...] = Field(min_length=1)
 
 
+class AssuranceCalibrationDerivation(AstroModel):
+    method: Literal[
+        "residual_summary_envelope",
+        "execution_residual_envelope",
+        "symmetric_covariance_sigma_envelope",
+    ]
+    sigma_multiplier: FiniteFloat | None = Field(default=None, gt=0.0)
+    rationale: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def multiplier_matches_method(self) -> AssuranceCalibrationDerivation:
+        covariance_method = self.method == "symmetric_covariance_sigma_envelope"
+        if covariance_method != (self.sigma_multiplier is not None):
+            raise ValueError("only covariance sigma derivations require sigma_multiplier")
+        return self
+
+
+class StationResidualEvidence(AstroModel):
+    kind: Literal["station_residuals"] = "station_residuals"
+    evidence_id: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
+    source_ids: tuple[str, ...] = Field(min_length=1)
+    authority: AssuranceCalibrationAuthority
+    assurance_scenario_id: str = Field(min_length=1)
+    tracking_scenario_id: str = Field(min_length=1)
+    station_id: str = Field(min_length=1)
+    measurement_type: Literal[MeasurementType.RANGE, MeasurementType.RANGE_RATE]
+    unit: Literal["km", "km/s"]
+    band: str = Field(min_length=1)
+    tracking_mode: str = Field(min_length=1)
+    integration_time_s: FiniteFloat = Field(gt=0.0)
+    arc_start: datetime
+    arc_end: datetime
+    sample_count: int = Field(ge=2)
+    mean_residual: FiniteFloat
+    sample_standard_deviation: FiniteFloat = Field(ge=0.0)
+    rms: FiniteFloat = Field(ge=0.0)
+    data_selection_policy: str = Field(min_length=1)
+    outlier_policy: str = Field(min_length=1)
+    limitations: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def residual_semantics_are_consistent(self) -> StationResidualEvidence:
+        expected_unit = (
+            "km" if self.measurement_type is MeasurementType.RANGE else "km/s"
+        )
+        if self.unit != expected_unit:
+            raise ValueError("station residual unit does not match measurement type")
+        if self.arc_start.tzinfo is None or self.arc_end.tzinfo is None:
+            raise ValueError("station residual arc epochs must include timezone information")
+        if self.arc_end <= self.arc_start:
+            raise ValueError("station residual arc end must follow its start")
+        if float(self.rms) + 1e-15 < abs(float(self.mean_residual)):
+            raise ValueError("station residual RMS must be at least the absolute mean")
+        return self
+
+
+class PropulsionExecutionResidualEvidence(AstroModel):
+    kind: Literal["propulsion_execution_residuals"] = "propulsion_execution_residuals"
+    evidence_id: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
+    source_ids: tuple[str, ...] = Field(min_length=1)
+    authority: AssuranceCalibrationAuthority
+    assurance_scenario_id: str = Field(min_length=1)
+    maneuver_id: str = Field(min_length=1)
+    propulsion_class: str = Field(min_length=1)
+    vector_frame: Frame
+    commanded_epoch: datetime
+    achieved_epoch: datetime
+    commanded_delta_v_km_s: tuple[FiniteFloat, FiniteFloat, FiniteFloat]
+    achieved_delta_v_km_s: tuple[FiniteFloat, FiniteFloat, FiniteFloat]
+    timing_residual_s: FiniteFloat
+    magnitude_scale: FiniteFloat = Field(gt=0.0)
+    pointing_basis: Literal[
+        "axis_1_cross_command_with_least_aligned_inertial_axis_then_axis_2"
+    ]
+    pointing_residual_1_deg: FiniteFloat
+    pointing_residual_2_deg: FiniteFloat
+    reconstruction_method: str = Field(min_length=1)
+    limitations: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def execution_residuals_match_bound_vectors(
+        self,
+    ) -> PropulsionExecutionResidualEvidence:
+        if self.commanded_epoch.tzinfo is None or self.achieved_epoch.tzinfo is None:
+            raise ValueError("propulsion epochs must include timezone information")
+        expected_timing = (self.achieved_epoch - self.commanded_epoch).total_seconds()
+        if not isclose(float(self.timing_residual_s), expected_timing, abs_tol=1e-9):
+            raise ValueError("timing residual must equal achieved minus commanded epoch")
+        commanded_norm = sqrt(sum(float(value) ** 2 for value in self.commanded_delta_v_km_s))
+        achieved_norm = sqrt(sum(float(value) ** 2 for value in self.achieved_delta_v_km_s))
+        if commanded_norm <= 0.0:
+            raise ValueError("commanded delta-v must have non-zero magnitude")
+        if not isclose(
+            float(self.magnitude_scale), achieved_norm / commanded_norm, rel_tol=1e-9
+        ):
+            raise ValueError("magnitude scale does not match the bound delta-v vectors")
+        commanded = np.asarray(self.commanded_delta_v_km_s, dtype=np.float64)
+        achieved = np.asarray(self.achieved_delta_v_km_s, dtype=np.float64)
+        direction = commanded / commanded_norm
+        achieved_direction = achieved / achieved_norm
+        reference = np.eye(3, dtype=np.float64)[int(np.argmin(np.abs(direction)))]
+        axis_1 = np.cross(direction, reference)
+        axis_1 /= np.linalg.norm(axis_1)
+        axis_2 = np.cross(direction, axis_1)
+        denominator = float(np.dot(achieved_direction, direction))
+        expected_pointing_1 = degrees(
+            atan2(float(np.dot(achieved_direction, axis_1)), denominator)
+        )
+        expected_pointing_2 = degrees(
+            atan2(float(np.dot(achieved_direction, axis_2)), denominator)
+        )
+        if not isclose(
+            float(self.pointing_residual_1_deg), expected_pointing_1, abs_tol=1e-9
+        ) or not isclose(
+            float(self.pointing_residual_2_deg), expected_pointing_2, abs_tol=1e-9
+        ):
+            raise ValueError("pointing residuals do not match the bound delta-v vectors")
+        return self
+
+
+class InsertionCovarianceEvidence(AstroModel):
+    kind: Literal["insertion_covariance"] = "insertion_covariance"
+    evidence_id: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
+    source_ids: tuple[str, ...] = Field(min_length=1)
+    authority: AssuranceCalibrationAuthority
+    assurance_scenario_id: str = Field(min_length=1)
+    tracking_scenario_id: str = Field(min_length=1)
+    epoch: datetime
+    time_scale: TimeScale
+    central_body: Body
+    frame: Frame
+    state_order: tuple[Literal["x", "y", "z", "vx", "vy", "vz"], ...]
+    state_units: tuple[Literal["km", "km/s"], ...]
+    covariance: tuple[tuple[FiniteFloat, ...], ...]
+    confidence_convention: Literal["one_sigma_covariance"]
+    population_definition: str = Field(min_length=1)
+    launcher_configuration: str = Field(min_length=1)
+    limitations: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def covariance_semantics_are_complete(self) -> InsertionCovarianceEvidence:
+        if self.epoch.tzinfo is None:
+            raise ValueError("insertion covariance epoch must include timezone information")
+        if self.state_order != ("x", "y", "z", "vx", "vy", "vz"):
+            raise ValueError("insertion covariance state order must be x,y,z,vx,vy,vz")
+        if self.state_units != ("km", "km", "km", "km/s", "km/s", "km/s"):
+            raise ValueError("insertion covariance state units are invalid")
+        if len(self.covariance) != 6 or any(len(row) != 6 for row in self.covariance):
+            raise ValueError("insertion covariance must be 6x6")
+        matrix = np.asarray(self.covariance, dtype=np.float64)
+        if not np.allclose(matrix, matrix.T, rtol=0.0, atol=1e-15):
+            raise ValueError("insertion covariance must be symmetric")
+        if np.any(np.diag(matrix) <= 0.0):
+            raise ValueError("insertion covariance diagonal must be positive")
+        eigenvalues = np.linalg.eigvalsh(matrix)
+        scale = max(float(np.max(np.abs(eigenvalues))), float(np.finfo(np.float64).tiny))
+        tolerance = 100.0 * float(np.finfo(np.float64).eps) * scale
+        if float(np.min(eigenvalues)) < -tolerance:
+            raise ValueError("insertion covariance must be positive semidefinite")
+        correlations = np.asarray(self.correlation_matrix, dtype=np.float64)
+        if not np.all(np.isfinite(correlations)) or np.any(np.abs(correlations) > 1.0 + 1e-12):
+            raise ValueError("insertion covariance implies invalid correlations")
+        return self
+
+    @property
+    def standard_deviations(self) -> tuple[float, ...]:
+        return tuple(sqrt(float(self.covariance[index][index])) for index in range(6))
+
+    @property
+    def correlation_matrix(self) -> tuple[tuple[float, ...], ...]:
+        deviations = self.standard_deviations
+        return tuple(
+            tuple(
+                float(self.covariance[row][column])
+                / (deviations[row] * deviations[column])
+                for column in range(6)
+            )
+            for row in range(6)
+        )
+
+
+AssuranceCalibrationEvidence = Annotated[
+    StationResidualEvidence
+    | PropulsionExecutionResidualEvidence
+    | InsertionCovarianceEvidence,
+    Field(discriminator="kind"),
+]
+
+
 class AssuranceCalibrationBound(AstroModel):
     parameter: str = Field(min_length=1)
     minimum: FiniteFloat
@@ -65,6 +257,8 @@ class AssuranceCalibrationBound(AstroModel):
     unit: str = Field(min_length=1)
     authority: AssuranceCalibrationAuthority
     source_ids: tuple[str, ...] = Field(default_factory=tuple)
+    evidence_ids: tuple[str, ...] = Field(default_factory=tuple)
+    derivation: AssuranceCalibrationDerivation | None = None
     rationale: str = Field(min_length=1)
     limitations: tuple[str, ...] = Field(min_length=1)
 
@@ -76,6 +270,14 @@ class AssuranceCalibrationBound(AstroModel):
             raise ValueError("calibration bound source ids must be unique")
         if self.authority is not AssuranceCalibrationAuthority.ILLUSTRATIVE and not self.source_ids:
             raise ValueError("non-illustrative calibration bounds require a source")
+        calibrated = self.authority in {
+            AssuranceCalibrationAuthority.MISSION_TEST_CALIBRATED,
+            AssuranceCalibrationAuthority.FLIGHT_CALIBRATED,
+        }
+        if calibrated != bool(self.evidence_ids and self.derivation is not None):
+            raise ValueError(
+                "mission or flight calibrated bounds require evidence ids and derivation"
+            )
         return self
 
 
@@ -84,6 +286,7 @@ class AssuranceValidationCalibrationManifest(AstroModel):
     protocol_id: str = Field(pattern=r"^[a-z][a-z0-9_-]*$")
     sources: tuple[AssuranceCalibrationSource, ...] = Field(min_length=1)
     parameter_bounds: tuple[AssuranceCalibrationBound, ...] = Field(min_length=1)
+    evidence_products: tuple[AssuranceCalibrationEvidence, ...] = Field(default_factory=tuple)
     promotion_status: AssuranceCalibrationPromotionStatus
     coverage_policy: Literal["all_configured_values_within_declared_envelopes"] = (
         "all_configured_values_within_declared_envelopes"
@@ -106,6 +309,34 @@ class AssuranceValidationCalibrationManifest(AstroModel):
         if len(set(parameters)) != len(parameters):
             raise ValueError("calibration parameters must be unique")
         sources = {source.source_id: source for source in self.sources}
+        evidence_ids = [evidence.evidence_id for evidence in self.evidence_products]
+        if len(set(evidence_ids)) != len(evidence_ids):
+            raise ValueError("calibration evidence ids must be unique")
+        evidence_by_id = {
+            evidence.evidence_id: evidence for evidence in self.evidence_products
+        }
+        for evidence in self.evidence_products:
+            unknown = set(evidence.source_ids) - set(sources)
+            if unknown:
+                raise ValueError(
+                    f"calibration evidence {evidence.evidence_id} references unknown sources: "
+                    f"{sorted(unknown)}"
+                )
+            required_kind = {
+                AssuranceCalibrationAuthority.MISSION_TEST_CALIBRATED: (
+                    AssuranceCalibrationSourceKind.MISSION_TEST_DATA
+                ),
+                AssuranceCalibrationAuthority.FLIGHT_CALIBRATED: (
+                    AssuranceCalibrationSourceKind.FLIGHT_DATA
+                ),
+            }.get(evidence.authority)
+            if required_kind is not None and not any(
+                sources[source_id].source_kind is required_kind
+                for source_id in evidence.source_ids
+            ):
+                raise ValueError(
+                    f"calibration evidence {evidence.evidence_id} lacks a source for its authority"
+                )
         required_source_kind = {
             AssuranceCalibrationAuthority.PROJECT_DERIVED: (
                 AssuranceCalibrationSourceKind.PROJECT_CONFIGURATION
@@ -135,10 +366,126 @@ class AssuranceValidationCalibrationManifest(AstroModel):
                 raise ValueError(
                     f"calibration bound {bound.parameter} lacks a source for its authority"
                 )
+            unknown_evidence = set(bound.evidence_ids) - set(evidence_by_id)
+            if unknown_evidence:
+                raise ValueError(
+                    f"calibration bound {bound.parameter} references unknown evidence: "
+                    f"{sorted(unknown_evidence)}"
+                )
+            for evidence_id in bound.evidence_ids:
+                evidence = evidence_by_id[evidence_id]
+                if evidence.authority is not bound.authority:
+                    raise ValueError(
+                        f"calibration bound {bound.parameter} evidence authority does not match"
+                    )
+                if not _evidence_applies_to_parameter(evidence, bound.parameter):
+                    raise ValueError(
+                        f"calibration evidence {evidence_id} does not apply to {bound.parameter}"
+                    )
+                if not set(evidence.source_ids).issubset(bound.source_ids):
+                    raise ValueError(
+                        f"calibration bound {bound.parameter} does not cite its evidence sources"
+                    )
+            if bound.evidence_ids:
+                _validate_bound_derivation(bound, evidence_by_id)
         expected = derive_calibration_promotion_status(self.parameter_bounds)
         if self.promotion_status is not expected:
             raise ValueError("calibration promotion status must match bound authority")
         return self
+
+
+def _evidence_applies_to_parameter(
+    evidence: AssuranceCalibrationEvidence, parameter: str
+) -> bool:
+    if isinstance(evidence, StationResidualEvidence):
+        expected = {
+            MeasurementType.RANGE: {
+                "input_overrides.tracking_range_sigma_km",
+                "input_overrides.tracking_range_bias_km",
+                "input_overrides.estimation_range_sigma_km",
+                "input_overrides.estimation_range_bias_km",
+            },
+            MeasurementType.RANGE_RATE: {
+                "input_overrides.tracking_range_rate_sigma_km_s",
+                "input_overrides.tracking_range_rate_bias_km_s",
+                "input_overrides.estimation_range_rate_sigma_km_s",
+                "input_overrides.estimation_range_rate_bias_km_s",
+            },
+        }
+        return parameter in expected[evidence.measurement_type]
+    if isinstance(evidence, PropulsionExecutionResidualEvidence):
+        return parameter in {
+            "input_overrides.correction_execution_scale",
+            "input_overrides.correction_execution_epoch_offset_s",
+            "input_overrides.correction_execution_pointing_1_deg",
+            "input_overrides.correction_execution_pointing_2_deg",
+        }
+    return parameter in {
+        *(f"dispersion.position_delta_km[{index}]" for index in range(3)),
+        *(f"dispersion.velocity_delta_km_s[{index}]" for index in range(3)),
+    }
+
+
+def _validate_bound_derivation(
+    bound: AssuranceCalibrationBound,
+    evidence_by_id: dict[str, AssuranceCalibrationEvidence],
+) -> None:
+    if bound.derivation is None:
+        raise ValueError(f"calibration bound {bound.parameter} lacks a derivation")
+    evidence = [evidence_by_id[evidence_id] for evidence_id in bound.evidence_ids]
+    first = evidence[0]
+    expected_unit: str
+    if isinstance(first, StationResidualEvidence):
+        if bound.derivation.method != "residual_summary_envelope":
+            raise ValueError(f"calibration bound {bound.parameter} has wrong derivation method")
+        expected_unit = first.unit
+        values = [
+            float(item.sample_standard_deviation)
+            if "sigma" in bound.parameter
+            else float(item.mean_residual)
+            for item in evidence
+            if isinstance(item, StationResidualEvidence)
+        ]
+    elif isinstance(first, PropulsionExecutionResidualEvidence):
+        if bound.derivation.method != "execution_residual_envelope":
+            raise ValueError(f"calibration bound {bound.parameter} has wrong derivation method")
+        field, expected_unit = {
+            "input_overrides.correction_execution_scale": ("magnitude_scale", "ratio"),
+            "input_overrides.correction_execution_epoch_offset_s": ("timing_residual_s", "s"),
+            "input_overrides.correction_execution_pointing_1_deg": (
+                "pointing_residual_1_deg",
+                "deg",
+            ),
+            "input_overrides.correction_execution_pointing_2_deg": (
+                "pointing_residual_2_deg",
+                "deg",
+            ),
+        }[bound.parameter]
+        values = [
+            float(getattr(item, field))
+            for item in evidence
+            if isinstance(item, PropulsionExecutionResidualEvidence)
+        ]
+    else:
+        if bound.derivation.method != "symmetric_covariance_sigma_envelope":
+            raise ValueError(f"calibration bound {bound.parameter} has wrong derivation method")
+        index = int(bound.parameter.rsplit("[", 1)[1][:-1])
+        expected_unit = "km" if "position_delta" in bound.parameter else "km/s"
+        multiplier = float(bound.derivation.sigma_multiplier or 0.0)
+        magnitudes = [
+            item.standard_deviations[index] * multiplier
+            for item in evidence
+            if isinstance(item, InsertionCovarianceEvidence)
+        ]
+        values = [-max(magnitudes), max(magnitudes)]
+    if bound.unit != expected_unit:
+        raise ValueError(f"calibration bound {bound.parameter} unit does not match its evidence")
+    if not isclose(float(bound.minimum), min(values), rel_tol=1e-9, abs_tol=1e-15) or not isclose(
+        float(bound.maximum), max(values), rel_tol=1e-9, abs_tol=1e-15
+    ):
+        raise ValueError(
+            f"calibration bound {bound.parameter} does not equal its evidence-derived envelope"
+        )
 
 
 class AssuranceValidationRealization(AstroModel):
