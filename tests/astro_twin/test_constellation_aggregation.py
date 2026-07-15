@@ -241,6 +241,7 @@ def test_build_fleet_margin_report_uses_coverage_link_and_member_margins() -> No
                 value=0.24,
                 threshold=0.2,
                 margin=0.04,
+                unit="1",
                 status=TwinMarginStatus.WARN,
             )
         },
@@ -251,6 +252,14 @@ def test_build_fleet_margin_report_uses_coverage_link_and_member_margins() -> No
     assert "fleet_longest_gap_s_equator-eci" in margin_by_name
     assert "fleet_link_margin_db_equator-eci" in margin_by_name
     assert "member_plane-a_mass_margin_fraction" in margin_by_name
+    assert {
+        name: margin.unit for name, margin in margin_by_name.items()
+    } == {
+        "fleet_coverage_fraction_equator-eci": "1",
+        "fleet_longest_gap_s_equator-eci": "s",
+        "fleet_link_margin_db_equator-eci": "dB",
+        "member_plane-a_mass_margin_fraction": "1",
+    }
     assert report.limiting_margin.name == "fleet_coverage_fraction_equator-eci"
     assert report.limiting_margin.status is TwinMarginStatus.FAIL
 
@@ -513,6 +522,8 @@ def test_build_fleet_margin_report_uses_coverage_map_requirements() -> None:
     margin_by_name = {margin.name: margin for margin in report.margins}
     assert margin_by_name["coverage_map_min_fraction_target-grid"].status is TwinMarginStatus.FAIL
     assert margin_by_name["coverage_map_max_gap_s_target-grid"].status is TwinMarginStatus.FAIL
+    assert margin_by_name["coverage_map_min_fraction_target-grid"].unit == "1"
+    assert margin_by_name["coverage_map_max_gap_s_target-grid"].unit == "s"
     assert report.limiting_margin.name == "coverage_map_min_fraction_target-grid"
 
 

@@ -411,6 +411,7 @@ def build_fleet_margin_report(
                 value=coverage_fraction,
                 threshold=coverage_threshold,
                 margin=coverage_margin,
+                unit="1",
                 status=_status(coverage_margin, warn_threshold=0.05),
             )
         )
@@ -427,6 +428,7 @@ def build_fleet_margin_report(
                     value=longest_gap_s,
                     threshold=requirement.maximum_revisit_gap_s,
                     margin=revisit_margin_s,
+                    unit="s",
                     status=_status(revisit_margin_s, warn_threshold=60.0),
                 )
             )
@@ -446,6 +448,7 @@ def build_fleet_margin_report(
                 value=minimum_target_coverage_fraction,
                 threshold=coverage_map.minimum_target_coverage_fraction,
                 margin=coverage_margin,
+                unit="1",
                 status=_status(coverage_margin, warn_threshold=0.05),
             )
         )
@@ -465,6 +468,7 @@ def build_fleet_margin_report(
                     value=maximum_target_gap_s,
                     threshold=coverage_map.maximum_target_revisit_gap_s,
                     margin=revisit_margin_s,
+                    unit="s",
                     status=_status(revisit_margin_s, warn_threshold=60.0),
                 )
             )
@@ -489,6 +493,7 @@ def build_fleet_margin_report(
                 value=0.0,
                 threshold=0.0,
                 margin=0.0,
+                unit="1",
                 status=TwinMarginStatus.PASS,
             )
         )
@@ -712,6 +717,7 @@ def _link_margin(
             value=0.0,
             threshold=0.0,
             margin=-1.0,
+            unit="dB",
             status=TwinMarginStatus.FAIL,
         )
 
@@ -721,6 +727,7 @@ def _link_margin(
         value=margin_db,
         threshold=0.0,
         margin=margin_db,
+        unit="dB",
         status=_status(margin_db, warn_threshold=3.0),
     )
 
@@ -731,6 +738,7 @@ def _member_margin(member_name: str, margin: DesignMargin) -> DesignMargin:
         value=margin.value,
         threshold=margin.threshold,
         margin=margin.margin,
+        unit=margin.unit,
         status=margin.status,
     )
 

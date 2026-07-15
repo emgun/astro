@@ -514,7 +514,7 @@ def _build_margin_report(
             value=twin_limiting.value,
             threshold=twin_limiting.threshold,
             margin=twin_limiting.margin,
-            unit="native",
+            unit=twin_limiting.unit,
             status=_lifecycle_status(twin_limiting.status),
         )
     )

@@ -51,8 +51,11 @@ The legacy generic `lifecycle.twin_limiting_margin` extractor remains available 
 but checked campaigns do not use it for quantitative analysis because its subsystem and unit can
 change between cases.
 
-The adapter's margin-name-to-unit mapping is a versioned v1 contract because the underlying twin
-margin model does not yet carry units directly.
+Integrated and constellation twin v2 results carry required source-level units on every design
+margin. Named UQ extractors retain explicit expected units as an adapter-contract check; the legacy
+generic limiting-margin extractor remains labeled `native` because its subsystem can switch between
+cases and it is excluded from checked quantitative campaigns. Twin v1 artifacts predate this field
+and must be regenerated rather than assigned inferred units.
 
 The separate checked power/thermal campaign uses five inputs: solar-array area and efficiency,
 battery capacity, and the `bus` node's emissivity and internal-heat fraction. The array range is an

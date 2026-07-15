@@ -30,7 +30,7 @@ def test_run_constellation_twin_returns_fleet_result() -> None:
 
     result = constellation.run_constellation_twin(scenario)
 
-    assert result.workflow == "constellation_digital_twin_v1"
+    assert result.workflow == "constellation_digital_twin_v2"
     assert [member.member_name for member in result.members] == ["plane-a", "plane-b"]
     assert result.metadata["analysis_window_s"] == {
         "start_s": 0.0,
@@ -287,6 +287,7 @@ def _digital_twin_result(
         value=0.3,
         threshold=0.2,
         margin=0.1,
+        unit="1",
         status=TwinMarginStatus.PASS,
     )
     return DigitalTwinResult(

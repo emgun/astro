@@ -9,7 +9,7 @@ def test_run_digital_twin_returns_integrated_result() -> None:
 
     result = run_digital_twin(scenario)
 
-    assert result.workflow == "integrated_digital_twin_v1"
+    assert result.workflow == "integrated_digital_twin_v2"
     assert len(result.geometry) > 1
     assert len(result.power) == len(result.geometry)
     assert len(result.thermal) == len(result.geometry)

@@ -214,6 +214,7 @@ class DesignMargin(AstroModel):
     value: float
     threshold: float
     margin: float
+    unit: str = Field(min_length=1)
     status: TwinMarginStatus
 
 
@@ -237,7 +238,7 @@ class MassBudgetSummary(AstroModel):
 
 class DigitalTwinResult(AstroModel):
     scenario_id: str
-    workflow: str = "integrated_digital_twin_v1"
+    workflow: str = "integrated_digital_twin_v2"
     geometry: tuple[TimelineGeometrySample, ...]
     power: tuple[PowerSample, ...]
     thermal: tuple[ThermalSample, ...]
