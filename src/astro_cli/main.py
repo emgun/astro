@@ -13,6 +13,11 @@ from astro_assistant.models import VerificationDiagnostic, VerificationResult
 from astro_assistant.planner import DeterministicPlanner
 from astro_assistant.reports import build_workflow_report, format_workflow_report
 from astro_assistant.verification import verify_plan
+from astro_assurance.covariance_validation_cli import (
+    assess_covariance_validation_command,
+    validate_covariance_validation_command,
+    verify_covariance_validation_command,
+)
 from astro_assurance.errors import MissionAssuranceError
 from astro_assurance.io import (
     format_mission_assurance_summary,
@@ -151,6 +156,9 @@ app.command("summarize-campaign")(summarize_campaign_command)
 app.command("profile-campaign")(profile_campaign_command)
 app.command("analyze-campaign-sensitivity")(analyze_campaign_sensitivity_command)
 app.command("validate-assurance-validation")(validate_assurance_validation_command)
+app.command("validate-covariance-validation")(validate_covariance_validation_command)
+app.command("assess-covariance-validation")(assess_covariance_validation_command)
+app.command("verify-covariance-validation")(verify_covariance_validation_command)
 app.command("inspect-assurance-calibration")(inspect_assurance_calibration_command)
 app.command("run-assurance-validation")(run_assurance_validation_command)
 app.command("verify-assurance-validation")(verify_assurance_validation_command)

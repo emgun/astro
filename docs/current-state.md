@@ -245,6 +245,31 @@ Project-specific steward learning: a derived validation product that reuses anot
 calibration must bind both identities, and long-running evidence generation must recheck every
 mutable source after execution before publishing its result.
 
+Production Covariance Validation Criteria v1 defines a suite-owned acceptance contract over
+candidate/reference covariance trajectories and optional raw empirical consistency samples. Exact
+epoch alignment, state agreement, symmetry, positive definiteness, conditioning, normalized
+Frobenius covariance error, generalized eigenvalue ratios, and aggregate/pointwise NEES are
+recomputed from bound evidence. Passing numerical agreement is kept separate from implementation
+independence, high-fidelity force coverage, empirical truth independence, and sample sufficiency.
+The checked duplicate-local fixture passes 11/11 numerical epochs but correctly returns
+`additional_evidence_required` with four blockers: no independent implementation, no bound
+trajectory covariance semantics, no drag/SRP/third-body coverage, and no empirical consistency
+evidence. The result explicitly makes no
+flight or operational certification claim.
+Independent adversarial review found and the implementation fixed missing trace/STM criteria,
+duplicate empirical-sample sufficiency, covariance definiteness ambiguity, unbound trajectory
+semantics, parse-before-digest races, partial multi-output publication, underpowered-campaign
+misclassification, and unaudited independence declarations. The final review found no remaining
+P1/P2 issues. Focused covariance tests pass 11 tests; affected assurance/CLI tests pass 196 tests;
+the full suite passes `1039 tests with 11 optional-backend skips`; Ruff, strict MyPy across 150
+source files, seven packaging tests, sdist/wheel builds, `git diff --check`, and the checked public
+assessment and exact verifier pass.
+
+Project-specific steward learning: covariance agreement and covariance consistency are independent
+evidence classes. Promotion criteria must bind raw errors, the covariance used for each error,
+realization independence, implementation-independence review, force coverage, units, and exact input
+bytes; repeating one observation or comparing shared code cannot manufacture authority.
+
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
 the executable plan is
@@ -575,6 +600,7 @@ Post-MVP / external-campaign items:
 | lifecycle-margin-units | done | productize/verify | steward | `DesignMargin` unit contract, twin and constellation producers, lifecycle promotion, checked review | Required source-level units are preserved into lifecycle evidence; checked review is warning-free without physics changes; affected, full-release, public, independent-review, GitHub CI, and integration gates pass; PR #25 merged at `45e4d11`. |
 | mission-calibration-evidence | done | calibrate/verify | steward | typed station residuals, propulsion execution residuals, insertion covariance, inspection CLI, checked synthetic fixture | Evidence schemas and fail-closed promotion prerequisites are implemented; focused/full/public/package, independent-review, GitHub CI, and integration gates pass; PR #26 merged at `aa98d1f`. Actual mission evidence acquisition remains external work. |
 | assurance-model-form-matrix | done | productize/verify | steward | four-cell truth/estimator protocol, contrasts, public CLI, exact verifier, checked fixture | Four profiles remain separate and unpooled; local source/calibration, exact reexecution, focused/full, public, package, independent-review, GitHub CI, and integration gates pass without changing paired v1. PR #27 merged at `6c2e606`. |
+| production-covariance-criteria | in_progress | define/verify | steward | typed covariance comparison and empirical consistency criteria, public assess/verify CLI, checked local blocker fixture | Numerical agreement, independence, force coverage, and raw NEES evidence remain separate; focused/full/public/package, independent review, GitHub CI, and integration must pass without promoting screening evidence to certification. |
 
 ## Next Best Paths
 
@@ -582,8 +608,9 @@ Post-MVP / external-campaign items:
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
    before considering a mission-calibrated protocol claim.
-2. Use the separate model-form matrix for bounded local sensitivity comparisons; do not promote its
-   matched J2 cell or interaction into physical-truth, operational-risk, or probability claims.
+2. Acquire an independent high-fidelity covariance comparison covering drag, SRP, and third-body
+   dynamics plus a raw empirical truth-error campaign before attempting to satisfy the new
+   production covariance criteria. Criteria satisfaction still does not confer flight certification.
 3. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
    needed; do not infer bundle integrity from result re-execution.
 4. Add optional evidence-bound explanations over verified finding ids only after deterministic

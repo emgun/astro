@@ -1,5 +1,17 @@
 """Suite-owned post-launch mission-assurance workflow."""
 
+from astro_assurance.covariance_validation_io import (
+    format_covariance_validation_summary,
+    load_covariance_validation_protocol,
+    load_covariance_validation_result,
+    run_covariance_validation,
+    verify_covariance_validation_result,
+    write_covariance_validation_result,
+)
+from astro_assurance.covariance_validation_models import (
+    CovarianceValidationProtocol,
+    CovarianceValidationResult,
+)
 from astro_assurance.io import (
     format_mission_assurance_summary,
     load_mission_assurance_result,
@@ -82,6 +94,8 @@ from astro_assurance.validation_models import (
 from astro_assurance.validation_runner import run_paired_assurance_validation
 
 __all__ = [
+    "CovarianceValidationProtocol",
+    "CovarianceValidationResult",
     "MissionAssuranceCase",
     "MissionLifecycleReview",
     "MissionAssuranceInputOverrides",
@@ -97,12 +111,15 @@ __all__ = [
     "AssuranceValidationReview",
     "AssuranceReviewComparison",
     "format_mission_assurance_summary",
+    "format_covariance_validation_summary",
     "format_mission_lifecycle_review",
     "format_paired_assurance_validation_summary",
     "format_model_form_factorial_summary",
     "format_assurance_validation_review",
     "format_assurance_review_comparison",
     "load_mission_assurance_result",
+    "load_covariance_validation_protocol",
+    "load_covariance_validation_result",
     "load_mission_lifecycle_review",
     "load_assurance_validation_calibration",
     "inspect_assurance_validation_calibration",
@@ -120,7 +137,9 @@ __all__ = [
     "run_paired_assurance_validation",
     "run_model_form_factorial",
     "run_post_launch_assurance",
+    "run_covariance_validation",
     "verify_mission_assurance_artifact_bundle",
+    "verify_covariance_validation_result",
     "verify_mission_assurance_case_integrity",
     "verify_mission_lifecycle_result",
     "verify_mission_lifecycle_review",
@@ -129,6 +148,7 @@ __all__ = [
     "verify_model_form_factorial_result",
     "verify_assurance_validation_review",
     "write_mission_assurance_artifact_bundle",
+    "write_covariance_validation_result",
     "write_mission_assurance_result",
     "write_mission_lifecycle_review",
     "write_paired_assurance_validation_result",

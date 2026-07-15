@@ -1,0 +1,32 @@
+protocol_id: local-covariance-screening-v1
+candidate_trajectory_path: examples/covariance_validation/local_finite_difference_candidate.json
+reference_trajectory_path: examples/covariance_validation/local_finite_difference_reference.json
+empirical_evidence_path: null
+units_policy: {}
+thresholds:
+  minimum_epochs: 10
+  symmetry_tolerance: 1.0e-12
+  minimum_eigenvalue: 1.0e-16
+  maximum_condition_number: 1.0e12
+  maximum_relative_covariance_frobenius_error: 1.0e-12
+  covariance_trace_ratio_minimum: 0.999999
+  covariance_trace_ratio_maximum: 1.000001
+  maximum_accumulated_state_transition_frobenius_error: 1.0e-12
+  generalized_eigenvalue_minimum: 0.999999
+  generalized_eigenvalue_maximum: 1.000001
+  maximum_state_position_delta_km: 1.0e-12
+  maximum_state_velocity_delta_km_s: 1.0e-12
+  confidence_level: 0.95
+  minimum_empirical_samples: 30
+  minimum_coverage: 0.9
+independence:
+  candidate_implementation: astro-local-finite-difference-a
+  reference_implementation: astro-local-finite-difference-b
+  independent_implementations: false
+  shared_code_paths: [src/astro_dynamics/local.py]
+  shared_data_sources: [examples/scenarios/leo_covariance.yaml]
+  rationale: Both checked trajectories are duplicate local screening artifacts.
+required_force_features:
+  - atmospheric_drag
+  - solar_radiation_pressure
+  - third_body_gravity
