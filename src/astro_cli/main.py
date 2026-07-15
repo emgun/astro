@@ -32,6 +32,7 @@ from astro_assurance.review_cli import (
 )
 from astro_assurance.runner import run_post_launch_assurance
 from astro_assurance.validation_cli import (
+    inspect_assurance_calibration_command,
     run_assurance_validation_command,
     validate_assurance_validation_command,
     verify_assurance_validation_command,
@@ -145,6 +146,7 @@ app.command("summarize-campaign")(summarize_campaign_command)
 app.command("profile-campaign")(profile_campaign_command)
 app.command("analyze-campaign-sensitivity")(analyze_campaign_sensitivity_command)
 app.command("validate-assurance-validation")(validate_assurance_validation_command)
+app.command("inspect-assurance-calibration")(inspect_assurance_calibration_command)
 app.command("run-assurance-validation")(run_assurance_validation_command)
 app.command("verify-assurance-validation")(verify_assurance_validation_command)
 app.command("review-assurance-validation")(review_assurance_validation_command)

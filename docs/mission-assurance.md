@@ -155,6 +155,27 @@ therefore requires mission-specific station residuals, insertion covariance with
 correlation semantics, propulsion execution residuals including timing, and reviewed subsystem
 acceptance evidence. A larger case count cannot promote the evidence class.
 
+Mission Calibration Evidence Pack v1 makes those prerequisites typed and inspectable. Calibration
+manifests may embed discriminated station-residual, propulsion-execution-residual, and insertion-
+covariance products. Station evidence binds observable-specific units and tracking context;
+propulsion evidence binds command/achievement timing and vectors in one declared frame; covariance
+evidence binds epoch, frame, time scale, state order, units, confidence convention, and population.
+Covariance symmetry, positive diagonal, and positive-semidefinite structure are checked, and the
+correlation matrix is derived rather than independently authored.
+
+```bash
+astro inspect-assurance-calibration \
+  examples/assurance/mission_calibration_evidence_example.yaml
+```
+
+The checked example contains all three evidence families but remains `illustrative` because its
+source is synthetic. Mission-test or flight authority requires matching source kinds, applicable
+typed evidence identifiers, and an explicit reproducible derivation on every promoted bound. Pass
+`--protocol` to check complete parameter coverage and evidence context; without it, inspection marks
+protocol completeness unchecked. Inspection reports remaining blockers; it does not edit bounds,
+promote authority, transform frames, infer operational probabilities, or accept the suite's
+truth-tagged station-calibration product as external evidence.
+
 ### Deterministic Review
 
 `review-assurance-validation` verifies the complete paired result before deriving a suite-owned
