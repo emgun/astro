@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -275,6 +276,59 @@ def test_native_provenance_cannot_be_satisfied_by_relabeling_local_products(
     assert {blocker.blocker_id for blocker in result.blockers} == {
         "implementation_provenance_mismatch"
     }
+
+
+def test_checked_native_orekit_tudat_campaign_only_requires_empirical_evidence() -> None:
+    campaign_directory = Path(
+        "examples/covariance_validation/live_orekit_tudat_native"
+    )
+    manifest = json.loads(
+        (campaign_directory / "campaign_manifest.json").read_text(encoding="utf-8")
+    )
+    for relative_path, expected_digest in manifest["files"].items():
+        assert sha256((campaign_directory / relative_path).read_bytes()).hexdigest() == (
+            expected_digest
+        )
+    for relative_path, expected_digest in manifest["source_scenarios"].items():
+        assert sha256(Path(relative_path).read_bytes()).hexdigest() == expected_digest
+    protocol = load_covariance_validation_protocol(
+        campaign_directory / "protocol.yaml"
+    )
+
+    result = run_covariance_validation(protocol)
+
+    assert result.comparison_summary.requested_epochs == 11
+    assert result.comparison_summary.passed_epochs == 11
+    assert result.disposition is CovarianceValidationDisposition.ADDITIONAL_EVIDENCE_REQUIRED
+    assert {blocker.blocker_id for blocker in result.blockers} == {
+        "empirical_consistency_missing"
+    }
+    summary = result.comparison_summary
+    expected = manifest["expected"]
+    assert summary.maximum_relative_covariance_frobenius_error <= expected[
+        "maximum_relative_covariance_frobenius_error"
+    ]
+    assert summary.maximum_accumulated_state_transition_frobenius_error <= expected[
+        "maximum_accumulated_state_transition_frobenius_error"
+    ]
+    assert summary.covariance_trace_ratio_minimum >= expected[
+        "covariance_trace_ratio_minimum"
+    ]
+    assert summary.covariance_trace_ratio_maximum <= expected[
+        "covariance_trace_ratio_maximum"
+    ]
+    assert summary.generalized_eigenvalue_minimum >= expected[
+        "generalized_eigenvalue_minimum"
+    ]
+    assert summary.generalized_eigenvalue_maximum <= expected[
+        "generalized_eigenvalue_maximum"
+    ]
+    assert summary.maximum_state_position_delta_km <= expected[
+        "maximum_state_position_delta_km"
+    ]
+    assert summary.maximum_state_velocity_delta_km_s <= expected[
+        "maximum_state_velocity_delta_km_s"
+    ]
 
 
 def test_underdispersed_empirical_covariance_fails_criteria(tmp_path: Path) -> None:

@@ -1,0 +1,19 @@
+{
+  "review_id": "orekit-tudat-native-covariance-independence-v1",
+  "reviewer": "astro-suite-steward",
+  "reviewed_at": "2026-07-15T23:30:00Z",
+  "candidate_implementation": "orekit_native_variational",
+  "reference_implementation": "tudat_native_variational",
+  "evidence_reviewed": [
+    "Orekit setupMatricesComputation and MatricesHarvester producer path",
+    "TudatPy create_variational_equations_solver producer path",
+    "Astro producer provenance and fail-closed validation contracts"
+  ],
+  "conclusion": "independent_implementations",
+  "rationale": "Orekit and Tudat solve variational equations in separate external engine implementations and expose independently generated accumulated state-transition histories.",
+  "limitations": [
+    "Astro maps both engine outputs into one suite-owned covariance schema.",
+    "Force, atmosphere, ephemeris, and integration model implementations are not identical.",
+    "This review does not establish flight or operational certification."
+  ]
+}

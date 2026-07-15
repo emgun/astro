@@ -1,0 +1,44 @@
+{
+  "campaign_id": "orekit-tudat-native-high-fidelity-v1",
+  "generated_at": "2026-07-15T23:30:00Z",
+  "source_commit": "91ab68e3985e386ff60697988074f4ee3f2c5f70",
+  "working_directory": "repository_root",
+  "environment": {
+    "platform": "macos-arm64",
+    "orekit_jpype": "13.1.5.0",
+    "java_home": "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
+    "tudatpy": "1.0.0",
+    "tudat_python": "3.12.13",
+    "tudat_conda_channel": "tudat-team"
+  },
+  "commands": [
+    "JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PYTHONPATH=src /opt/anaconda3/bin/astro propagate examples/scenarios/leo_orekit_variational_covariance.yaml --backend orekit --output examples/covariance_validation/live_orekit_tudat_native/orekit_trajectory.json",
+    "/tmp/astro-tudat-live-env/bin/astro propagate examples/scenarios/leo_tudat_variational_covariance.yaml --backend tudat --output examples/covariance_validation/live_orekit_tudat_native/tudat_trajectory.json",
+    "PYTHONPATH=src /opt/anaconda3/bin/astro assess-covariance-validation examples/covariance_validation/live_orekit_tudat_native/protocol.yaml --output /tmp/astro-native-covariance-assessment.json",
+    "PYTHONPATH=src /opt/anaconda3/bin/astro verify-covariance-validation /tmp/astro-native-covariance-assessment.json"
+  ],
+  "files": {
+    "independence_review.json": "d9f3d3bbe6f62919f82d487ff4194086f33d979a79ca7d6cae8d99700e268e8a",
+    "orekit_trajectory.json": "a44e7a68ed4af1d6a5e1ef7ea8b38aafba91b9376817f856caa4b393553cc3e3",
+    "protocol.yaml": "31fd45133aaff6b7e1eec59387d856ba1e8627f74572699e20071724d6178db5",
+    "tudat_trajectory.json": "5ab3d33f33d3cb66c3c40970a89c28a3418a15926c2559fe3e3d0cb1a5663651"
+  },
+  "source_scenarios": {
+    "examples/scenarios/leo_orekit_variational_covariance.yaml": "88c169bf3390de4c1b35eca9d99160a9f7dda6336b1ab01ac73b8ab0e73dbc51",
+    "examples/scenarios/leo_tudat_variational_covariance.yaml": "977498c9a0c594616202c236e32dbcef46d1d07bb3e6735f132b2d78547f723e"
+  },
+  "expected": {
+    "requested_epochs": 11,
+    "passed_epochs": 11,
+    "blockers": ["empirical_consistency_missing"],
+    "maximum_relative_covariance_frobenius_error": 1.0e-6,
+    "maximum_accumulated_state_transition_frobenius_error": 1.0e-6,
+    "covariance_trace_ratio_minimum": 0.999999,
+    "covariance_trace_ratio_maximum": 1.000002,
+    "generalized_eigenvalue_minimum": 0.99999,
+    "generalized_eigenvalue_maximum": 1.00001,
+    "maximum_state_position_delta_km": 0.001,
+    "maximum_state_velocity_delta_km_s": 2.0e-6
+  },
+  "claim_boundary": "machine_scoped_comparison_evidence_not_empirical_consistency_or_certification"
+}

@@ -602,7 +602,7 @@ Post-MVP / external-campaign items:
 | mission-calibration-evidence | done | calibrate/verify | steward | typed station residuals, propulsion execution residuals, insertion covariance, inspection CLI, checked synthetic fixture | Evidence schemas and fail-closed promotion prerequisites are implemented; focused/full/public/package, independent-review, GitHub CI, and integration gates pass; PR #26 merged at `aa98d1f`. Actual mission evidence acquisition remains external work. |
 | assurance-model-form-matrix | done | productize/verify | steward | four-cell truth/estimator protocol, contrasts, public CLI, exact verifier, checked fixture | Four profiles remain separate and unpooled; local source/calibration, exact reexecution, focused/full, public, package, independent-review, GitHub CI, and integration gates pass without changing paired v1. PR #27 merged at `6c2e606`. |
 | production-covariance-criteria | done | define/verify | steward | typed covariance comparison and empirical consistency criteria, public assess/verify CLI, checked local blocker fixture | Numerical agreement, independence, force coverage, and raw NEES evidence remain separate; focused/full/public/package, independent review, GitHub CI, and integration pass without promoting screening evidence to certification. PR #29 merged at `d22fde6`. |
-| covariance-evidence-acquisition | active | implement/verify | steward | native Orekit STM, producer provenance hardening, independent Tudat comparison | Orekit native variational covariance now runs against the live 13.1.5 wrapper and fails closed when unavailable. Cross-backend acquisition remains open: TudatPy 1.0.0 exists for this machine, but environment creation is blocked by disk pressure; raw empirical NEES evidence is also still required. |
+| covariance-evidence-acquisition | active | acquire/verify | steward | native Orekit/Tudat comparison and raw empirical consistency evidence | The checked native Orekit/Tudat high-fidelity campaign passes 11/11 preregistered numerical epochs with drag, SRP, and third-body coverage. Independence and producer provenance gates pass. Only the separate raw empirical NEES campaign remains before the typed criteria can be satisfied. |
 
 ## Next Best Paths
 
@@ -610,11 +610,9 @@ Post-MVP / external-campaign items:
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
    before considering a mission-calibrated protocol claim.
-2. Free sufficient working space, recreate the isolated TudatPy 1.0.0 environment, and run a
-   preregistered native Orekit-versus-native Tudat high-fidelity covariance comparison covering
-   drag, SRP, and third-body dynamics. Then acquire a separate raw empirical truth-error campaign
-   before attempting to satisfy the production covariance criteria. Criteria satisfaction still
-   does not confer flight certification.
+2. Define and execute a raw empirical truth-error covariance campaign with at least 30 independent
+   realizations and preregistered 95% NEES coverage criteria. Keep it separate from the now-passing
+   native Orekit/Tudat comparison. Criteria satisfaction still does not confer flight certification.
 3. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
    needed; do not infer bundle integrity from result re-execution.
 4. Add optional evidence-bound explanations over verified finding ids only after deterministic
