@@ -171,7 +171,7 @@ def test_load_orekit_third_body_example_scenario() -> None:
 def test_load_tudat_variational_covariance_example_scenario() -> None:
     scenario = load_scenario(Path("examples/scenarios/leo_tudat_variational_covariance.yaml"))
 
-    assert scenario.scenario_id == "leo-tudat-variational-covariance"
+    assert scenario.scenario_id == "leo-high-fidelity-native-variational-covariance"
     assert scenario.force_model.gravity is ForceModelName.OREKIT_HIGH_FIDELITY
     assert scenario.force_model.enabled_high_fidelity_flags() == (
         "atmospheric_drag",

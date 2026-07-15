@@ -61,6 +61,10 @@ def _validate_orekit_scenario(scenario: Scenario) -> None:
         raise UnsupportedBackendError(
             "Orekit propagation supports two_body, j2, and orekit_high_fidelity gravity"
         )
+    if scenario.covariance_state_transition_model == "tudat_variational":
+        raise UnsupportedBackendError(
+            "Orekit backend cannot execute tudat_variational covariance"
+        )
 
 
 def _initial_orbit(scenario: Scenario, runtime: OrekitRuntime, frame: Any) -> Any:
@@ -416,6 +420,34 @@ def _covariance_metadata(
     }
 
 
+def _native_orekit_stm(propagator: Any, spacecraft_state: Any) -> FloatArray:
+    try:
+        matrix = propagator.getStateTransitionMatrix(spacecraft_state)
+        data = matrix.getData() if hasattr(matrix, "getData") else matrix
+        transition = np.asarray(data, dtype=np.float64)
+    except Exception as exc:
+        raise UnsupportedBackendError(
+            "Orekit native variational STM extraction failed"
+        ) from exc
+    if transition.shape != (6, 6) or not np.all(np.isfinite(transition)):
+        raise UnsupportedBackendError("Orekit native variational STM must be finite 6x6")
+    return cast(FloatArray, transition)
+
+
+def _setup_native_orekit_stm(propagator: Any) -> Any:
+    setup = getattr(propagator, "setupMatricesComputation", None)
+    if setup is None:
+        raise UnsupportedBackendError(
+            "Orekit native variational covariance requires setupMatricesComputation"
+        )
+    try:
+        return setup("astro-suite-stm", None, None)
+    except Exception as exc:
+        raise UnsupportedBackendError(
+            "Orekit native variational covariance setup failed"
+        ) from exc
+
+
 def propagate_orekit(
     scenario: Scenario,
     *,
@@ -426,6 +458,9 @@ def propagate_orekit(
     frame = runtime.frames_factory.getEME2000()
     orbit = _initial_orbit(scenario, runtime, frame)
     propagator_config = _build_propagator_config(scenario, runtime, orbit)
+    native_harvester = None
+    if scenario.covariance_state_transition_model == "orekit_variational":
+        native_harvester = _setup_native_orekit_stm(propagator_config.propagator)
     covariance_matrix = _initial_covariance_matrix(scenario)
     process_noise = _process_noise_covariance(
         scenario.covariance_process_noise_acceleration_km_s2,
@@ -465,9 +500,17 @@ def propagate_orekit(
                         "covariance_sample_role": (
                             "initial" if step_index == 0 else "propagated"
                         ),
-                        "covariance_model": "orekit_finite_difference_state_transition",
+                        "covariance_model": (
+                            "orekit_native_variational_equations"
+                            if native_harvester is not None
+                            else "orekit_finite_difference_state_transition"
+                        ),
                         "state_transition_model": (
-                            "identity" if step_index == 0 else "orekit_finite_difference"
+                            "identity"
+                            if step_index == 0
+                            else "orekit_native_variational"
+                            if native_harvester is not None
+                            else "orekit_finite_difference"
                         ),
                         "transition_step_s": previous_transition_step_s,
                         "process_noise_model": (
@@ -512,7 +555,17 @@ def propagate_orekit(
                         target_epoch,
                     )
 
-                transition = _finite_difference_state_transition(state_vector, advance_trial)
+                if native_harvester is not None:
+                    next_state = propagator_config.propagator.propagate(
+                        absolute_date_from_datetime(runtime, next_epoch)
+                    )
+                    next_accumulated = _native_orekit_stm(native_harvester, next_state)
+                    transition = cast(
+                        FloatArray,
+                        next_accumulated @ np.linalg.inv(accumulated_transition),
+                    )
+                else:
+                    transition = _finite_difference_state_transition(state_vector, advance_trial)
                 covariance_matrix = _propagate_covariance(
                     covariance_matrix,
                     transition,
@@ -539,6 +592,28 @@ def propagate_orekit(
                 scenario,
                 _initial_covariance_matrix(scenario),
                 propagator_config.metadata,
+            ),
+            **(
+                {
+                    "covariance_model": "orekit_native_variational_equations",
+                    "covariance_implementation": "orekit_native_variational",
+                    "covariance_native_variational_api": "setupMatricesComputation",
+                    "covariance_native_variational_harvester": "MatricesHarvester",
+                    "covariance_units_policy": {
+                        "frame": "EME2000",
+                        "representation": "cartesian",
+                        "time_scale": "UTC",
+                        "state_order": ["x", "y", "z", "vx", "vy", "vz"],
+                        "state_units": ["km", "km", "km", "km/s", "km/s", "km/s"],
+                        "covariance_units_policy": "outer_product_of_state_units",
+                    },
+                }
+                if native_harvester is not None
+                else (
+                    {"covariance_implementation": "orekit_finite_difference"}
+                    if covariance_matrix is not None
+                    else {}
+                )
             ),
         },
     )

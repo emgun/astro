@@ -1,4 +1,5 @@
 import os
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -128,6 +129,47 @@ def test_load_orekit_high_fidelity_covariance_example() -> None:
     assert scenario.force_model.third_body_gravity is True
     assert scenario.initial_covariance is not None
     assert scenario.covariance_process_noise_acceleration_km_s2 > 0.0
+
+
+def test_propagate_orekit_uses_native_variational_stm_when_requested() -> None:
+    scenario = load_scenario(
+        Path("examples/scenarios/leo_orekit_variational_covariance.yaml")
+    )
+
+    trajectory = propagate_orekit(scenario, runtime_loader=_fake_runtime)
+
+    assert trajectory.metadata["covariance_model"] == (
+        "orekit_native_variational_equations"
+    )
+    assert trajectory.metadata["covariance_implementation"] == (
+        "orekit_native_variational"
+    )
+    assert trajectory.metadata["covariance_native_variational_api"] == (
+        "setupMatricesComputation"
+    )
+    propagated = trajectory.covariance_history[1]
+    assert propagated.metadata["state_transition_model"] == "orekit_native_variational"
+    assert propagated.state_transition_matrix[0][3] == pytest.approx(
+        scenario.propagation.step_s
+    )
+
+
+def test_propagate_orekit_native_variational_fails_closed_without_api() -> None:
+    scenario = load_scenario(
+        Path("examples/scenarios/leo_orekit_variational_covariance.yaml")
+    )
+    runtime = _fake_runtime()
+    runtime = replace(runtime, numerical_propagator=_FakeNumericalPropagatorWithoutMatrices)
+
+    with pytest.raises(UnsupportedBackendError, match="setupMatricesComputation"):
+        propagate_orekit(scenario, runtime_loader=lambda: runtime)
+
+
+def test_propagate_orekit_rejects_tudat_variational_mode() -> None:
+    scenario = load_scenario(Path("examples/scenarios/leo_tudat_variational_covariance.yaml"))
+
+    with pytest.raises(UnsupportedBackendError, match="tudat_variational"):
+        propagate_orekit(scenario, runtime_loader=_fake_runtime)
 
 
 def test_load_orekit_high_order_gravity_example() -> None:
@@ -668,10 +710,44 @@ class _FakeNumericalPropagator(_FakeKeplerianPropagator):
     def addForceModel(self, force_model: object) -> None:
         self.force_models.append(force_model)
 
+    def setupMatricesComputation(
+        self, _name: str, _initial_stm: object, _initial_jacobians: object
+    ) -> "_FakeMatricesHarvester":
+        return _FakeMatricesHarvester(self)
+
     def propagate(self, target_date: _FakeAbsoluteDate) -> _FakeSpacecraftState:
         if self._orbit is None:
             raise AssertionError("initial state was not configured")
         return _FakeKeplerianPropagator(self._orbit).propagate(target_date)
+
+
+class _FakeMatrix:
+    def __init__(self, data: np.ndarray) -> None:
+        self._data = data
+
+    def getData(self) -> list[list[float]]:
+        return self._data.tolist()
+
+
+class _FakeMatricesHarvester:
+    def __init__(self, propagator: _FakeNumericalPropagator) -> None:
+        self.propagator = propagator
+        self.sample_index = 0
+
+    def getStateTransitionMatrix(self, state: _FakeSpacecraftState) -> _FakeMatrix:
+        if self.propagator._orbit is None:
+            raise AssertionError("initial state was not configured")
+        self.sample_index += 1
+        elapsed = 60.0 * self.sample_index
+        transition = np.eye(6)
+        transition[0, 3] = elapsed
+        transition[1, 4] = elapsed
+        transition[2, 5] = elapsed
+        return _FakeMatrix(transition)
+
+
+class _FakeNumericalPropagatorWithoutMatrices(_FakeNumericalPropagator):
+    setupMatricesComputation = None
 
 
 class _FakeNumericalPropagatorBuilder:

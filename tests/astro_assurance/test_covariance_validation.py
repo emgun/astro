@@ -41,9 +41,24 @@ def _write_trajectory_pair(tmp_path: Path) -> tuple[Path, Path]:
     )
     candidate = tmp_path / "candidate.json"
     reference = tmp_path / "reference.json"
-    payload = trajectory.model_dump_json(indent=2)
-    candidate.write_text(payload, encoding="utf-8")
-    reference.write_text(payload, encoding="utf-8")
+    candidate_trajectory = trajectory.model_copy(
+        update={
+            "metadata": {
+                **trajectory.metadata,
+                "covariance_implementation": "candidate-implementation",
+            }
+        }
+    )
+    reference_trajectory = trajectory.model_copy(
+        update={
+            "metadata": {
+                **trajectory.metadata,
+                "covariance_implementation": "reference-implementation",
+            }
+        }
+    )
+    candidate.write_text(candidate_trajectory.model_dump_json(indent=2), encoding="utf-8")
+    reference.write_text(reference_trajectory.model_dump_json(indent=2), encoding="utf-8")
     return candidate, reference
 
 
@@ -189,6 +204,77 @@ def test_complete_consistent_evidence_satisfies_only_preregistered_criteria(
     assert result.empirical_nees_summary.coverage == 1.0
     assert not result.blockers
     assert "not_flight_certification" in result.claim_boundary
+
+
+def test_independent_evidence_rejects_mismatched_producer_provenance(
+    tmp_path: Path,
+) -> None:
+    candidate, reference = _write_trajectory_pair(tmp_path)
+    payload = json.loads(candidate.read_text(encoding="utf-8"))
+    payload["metadata"]["covariance_implementation"] = "relabeled-implementation"
+    candidate.write_text(json.dumps(payload), encoding="utf-8")
+    empirical = _write_empirical(tmp_path)
+    review = _write_independence_review(tmp_path)
+    protocol = load_covariance_validation_protocol(
+        _write_protocol(
+            tmp_path,
+            _protocol_payload(
+                candidate,
+                reference,
+                empirical=empirical,
+                independence_review=review,
+                independent=True,
+            ),
+        )
+    )
+
+    result = run_covariance_validation(protocol)
+
+    assert result.disposition is CovarianceValidationDisposition.ADDITIONAL_EVIDENCE_REQUIRED
+    assert {blocker.blocker_id for blocker in result.blockers} == {
+        "implementation_provenance_mismatch"
+    }
+
+
+def test_native_provenance_cannot_be_satisfied_by_relabeling_local_products(
+    tmp_path: Path,
+) -> None:
+    candidate, reference = _write_trajectory_pair(tmp_path)
+    for path, implementation in (
+        (candidate, "orekit_native_variational"),
+        (reference, "tudat_native_variational"),
+    ):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["metadata"]["covariance_implementation"] = implementation
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    empirical = _write_empirical(tmp_path)
+    review = _write_independence_review(tmp_path)
+    review_payload = json.loads(review.read_text(encoding="utf-8"))
+    review_payload["candidate_implementation"] = "orekit_native_variational"
+    review_payload["reference_implementation"] = "tudat_native_variational"
+    review.write_text(json.dumps(review_payload), encoding="utf-8")
+    protocol_payload = _protocol_payload(
+        candidate,
+        reference,
+        empirical=empirical,
+        independence_review=review,
+        independent=True,
+    )
+    protocol_payload["independence"]["candidate_implementation"] = (
+        "orekit_native_variational"
+    )
+    protocol_payload["independence"]["reference_implementation"] = (
+        "tudat_native_variational"
+    )
+    protocol = load_covariance_validation_protocol(
+        _write_protocol(tmp_path, protocol_payload)
+    )
+
+    result = run_covariance_validation(protocol)
+
+    assert {blocker.blocker_id for blocker in result.blockers} == {
+        "implementation_provenance_mismatch"
+    }
 
 
 def test_underdispersed_empirical_covariance_fails_criteria(tmp_path: Path) -> None:

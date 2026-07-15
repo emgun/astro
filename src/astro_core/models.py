@@ -1159,6 +1159,7 @@ class Scenario(AstroModel):
         "two_body_variational",
         "j2_variational",
         "tudat_variational",
+        "orekit_variational",
     ] = "finite_difference"
     ground_stations: list[GroundStation] = Field(default_factory=list)
     measurements: MeasurementConfig = Field(default_factory=MeasurementConfig)

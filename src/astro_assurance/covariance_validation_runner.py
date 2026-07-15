@@ -268,6 +268,41 @@ def _force_features(force_model: ForceModelConfig) -> set[ForceFeature]:
     return features
 
 
+def _producer_provenance_matches(trajectory: Trajectory, implementation: str) -> bool:
+    if trajectory.metadata.get("covariance_implementation") != implementation:
+        return False
+    native_contracts = {
+        "orekit_native_variational": (
+            "orekit",
+            "orekit_native_variational_equations",
+            "orekit_native_variational",
+            "covariance_native_variational_api",
+        ),
+        "tudat_native_variational": (
+            "tudat",
+            "tudat_native_variational_equations",
+            "tudat_native_variational",
+            "native_variational_solver",
+        ),
+    }
+    contract = native_contracts.get(implementation)
+    if contract is None:
+        return True
+    backend, model, sample_model, api_field = contract
+    return (
+        trajectory.backend == backend
+        and trajectory.metadata.get("covariance_model") == model
+        and bool(trajectory.metadata.get(api_field))
+        and bool(trajectory.covariance_history)
+        and all(
+            sample.metadata.get("state_transition_model")
+            == ("identity" if index == 0 else sample_model)
+            and sample.metadata.get("covariance_model") == model
+            for index, sample in enumerate(trajectory.covariance_history)
+        )
+    )
+
+
 def _evidence_blockers(
     protocol: CovarianceValidationProtocol,
     candidate: Trajectory,
@@ -307,6 +342,36 @@ def _evidence_blockers(
                 category="independence",
                 statement="No reviewed independence artifact is bound.",
                 required_evidence="A typed, digest-bound implementation-independence review.",
+            )
+        )
+    elif (
+        not _producer_provenance_matches(
+            candidate, protocol.independence.candidate_implementation
+        )
+        or not _producer_provenance_matches(
+            reference, protocol.independence.reference_implementation
+        )
+        or (
+            {
+                protocol.independence.candidate_implementation,
+                protocol.independence.reference_implementation,
+            }
+            == {"orekit_native_variational", "tudat_native_variational"}
+            and candidate.backend == reference.backend
+        )
+    ):
+        blockers.append(
+            CovarianceValidationBlocker(
+                blocker_id="implementation_provenance_mismatch",
+                category="independence",
+                statement=(
+                    "Trajectory producer provenance does not match the preregistered "
+                    "implementations."
+                ),
+                required_evidence=(
+                    "Producer-emitted covariance_implementation identities matching "
+                    "the protocol."
+                ),
             )
         )
     elif (
