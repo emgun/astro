@@ -298,6 +298,13 @@ def test_propagate_tudat_requires_native_variational_runner_when_requested(
         propagate_tudat(scenario, runtime_loader=_fake_runtime)
 
 
+def test_propagate_tudat_rejects_orekit_variational_mode() -> None:
+    scenario = load_scenario("examples/scenarios/leo_orekit_variational_covariance.yaml")
+
+    with pytest.raises(UnsupportedBackendError, match="orekit_variational"):
+        propagate_tudat(scenario, runtime_loader=_fake_runtime)
+
+
 def test_propagate_tudat_uses_default_native_variational_runner_when_requested(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -338,6 +345,16 @@ def test_propagate_tudat_uses_default_native_variational_runner_when_requested(
     )
     first_transition = np.array(trajectory.covariance_history[1].state_transition_matrix)
     assert first_transition[0, 0] == pytest.approx(1.01)
+    second_covariance = np.array(trajectory.covariance_history[2].covariance)
+    second_step = np.array(trajectory.covariance_history[2].state_transition_matrix)
+    first_covariance = np.array(trajectory.covariance_history[1].covariance)
+    second_process_noise = np.array(
+        trajectory.covariance_history[2].process_noise_covariance
+    )
+    np.testing.assert_allclose(
+        second_covariance,
+        second_step @ first_covariance @ second_step.T + second_process_noise,
+    )
 
 
 def test_propagate_tudat_uses_native_variational_runner_when_requested(

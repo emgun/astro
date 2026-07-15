@@ -1,5 +1,5 @@
 scenario_id: leo-high-fidelity-native-variational-covariance
-description: LEO Tudat native variational covariance example with high-fidelity force-model metadata.
+description: LEO Orekit high-fidelity propagation with a native variational covariance STM.
 spacecraft:
   name: demo-sat
   mass_kg: 120.0
@@ -30,17 +30,5 @@ initial_covariance:
   - [0.0, 0.0, 0.0, 0.000001, 0.0, 0.0]
   - [0.0, 0.0, 0.0, 0.0, 0.000001, 0.0]
   - [0.0, 0.0, 0.0, 0.0, 0.0, 0.000001]
-covariance_state_transition_model: tudat_variational
 covariance_process_noise_acceleration_km_s2: 0.000000001
-ground_stations:
-  - name: equator-eci
-    position_eci_km: [6378.1363, 0.0, 0.0]
-    frame: EME2000
-    elevation_mask_deg: 0.0
-measurements:
-  types: [range, range_rate]
-  cadence_s: 60.0
-  noise:
-    range_sigma_km: 0.01
-    range_rate_sigma_km_s: 0.00001
-    seed: 42
+covariance_state_transition_model: orekit_variational

@@ -89,6 +89,10 @@ def _load_tudat_variational_api() -> dict[str, Any]:
 
 
 def _validate_default_tudat_scenario(scenario: Scenario) -> None:
+    if scenario.covariance_state_transition_model == "orekit_variational":
+        raise UnsupportedBackendError(
+            "Tudat backend cannot execute orekit_variational covariance"
+        )
     if scenario.force_model.gravity not in _SUPPORTED_DEFAULT_TUDAT_FORCE_MODELS:
         supported = ", ".join(
             force_model.value for force_model in _SUPPORTED_DEFAULT_TUDAT_FORCE_MODELS
@@ -578,9 +582,11 @@ def _run_tudat_native_variational_covariance(
     )
     zero_process_noise = np.zeros((6, 6), dtype=np.float64)
     covariance_history: list[CovarianceSample] = []
+    covariance = initial_covariance
+    previous_accumulated = np.eye(6, dtype=np.float64)
     for sample_index, sample in enumerate(trajectory.samples):
         elapsed_s = sample_index * scenario.propagation.step_s
-        transition = cast(
+        accumulated_transition = cast(
             FloatArray,
             np.asarray(
                 _nearest_history_value(transition_history, start_epoch + elapsed_s),
@@ -588,17 +594,23 @@ def _run_tudat_native_variational_covariance(
             ),
         )
         sample_process_noise = zero_process_noise if sample_index == 0 else process_noise
-        covariance = _propagate_covariance(
-            initial_covariance,
-            transition,
-            sample_process_noise,
+        step_transition = (
+            np.eye(6, dtype=np.float64)
+            if sample_index == 0
+            else accumulated_transition @ np.linalg.inv(previous_accumulated)
         )
+        if sample_index > 0:
+            covariance = _propagate_covariance(
+                covariance,
+                cast(FloatArray, step_transition),
+                sample_process_noise,
+            )
         covariance_history.append(
             _covariance_sample(
                 sample.epoch,
                 covariance,
-                state_transition_matrix=transition,
-                accumulated_state_transition_matrix=transition,
+                state_transition_matrix=cast(FloatArray, step_transition),
+                accumulated_state_transition_matrix=accumulated_transition,
                 process_noise_covariance=sample_process_noise,
                 metadata={
                     "covariance_sample_role": (
@@ -608,7 +620,9 @@ def _run_tudat_native_variational_covariance(
                     "state_transition_model": (
                         "identity" if sample_index == 0 else "tudat_native_variational"
                     ),
-                    "transition_step_s": elapsed_s,
+                    "transition_step_s": (
+                        0.0 if sample_index == 0 else scenario.propagation.step_s
+                    ),
                     "process_noise_model": (
                         "none"
                         if sample_index == 0
@@ -628,6 +642,7 @@ def _run_tudat_native_variational_covariance(
                 },
             )
         )
+        previous_accumulated = accumulated_transition
 
     return covariance_history, {
         "covariance_native_variational_runner": "default_tudatpy",
@@ -673,6 +688,15 @@ def _trajectory_with_covariance_history(
                     ),
                     "covariance_process_noise_storage": "per_sample_matrix",
                     "covariance_native_variational_runner": "provided",
+                    "covariance_implementation": "tudat_native_variational",
+                    "covariance_units_policy": {
+                        "frame": "EME2000",
+                        "representation": "cartesian",
+                        "time_scale": "UTC",
+                        "state_order": ["x", "y", "z", "vx", "vy", "vz"],
+                        "state_units": ["km", "km", "km", "km/s", "km/s", "km/s"],
+                        "covariance_units_policy": "outer_product_of_state_units",
+                    },
                     **_covariance_transition_metadata(
                         trajectory.metadata,
                         prefix="covariance_transition_",

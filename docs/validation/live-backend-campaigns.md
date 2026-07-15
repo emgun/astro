@@ -94,6 +94,21 @@ generic/high-fidelity covariance, and native OD live gates with the explicit Jav
 Live validation results:
 
 ```text
+2026-07-15 native variational prerequisite:
+
+JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" PYTHONPATH=src astro propagate examples/scenarios/leo_orekit_variational_covariance.yaml --backend orekit --output /tmp/astro-orekit-native-variational.json
+wrote trajectory: /tmp/astro-orekit-native-variational.json
+
+The product contains 11 trajectory and covariance epochs, records
+covariance_model=orekit_native_variational_equations and
+covariance_implementation=orekit_native_variational, and obtains accumulated Cartesian STMs from
+Orekit's setupMatricesComputation/MatricesHarvester API. The first propagated sample has
+Phi[0,3]=60.083772660328265. This closes the native Orekit STM implementation prerequisite only;
+it does not supply the independent Tudat comparison or raw empirical NEES campaign.
+
+An official-channel TudatPy 1.0.0 osx-arm64 package was located, but isolated environment creation
+stopped with Errno 28 because the machine had about 213 MiB free. No Tudat evidence was refreshed.
+
 2026-07-09 refresh:
 
 JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PATH="/opt/homebrew/opt/openjdk/bin:$PATH" ASTRO_RUN_OREKIT_LIVE=1 python -m pytest tests/astro_backends/test_orekit_propagation.py::test_live_orekit_covariance_history_returns_suite_product tests/astro_backends/test_orekit_propagation.py::test_live_orekit_high_fidelity_covariance_records_force_models -q
