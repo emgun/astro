@@ -180,6 +180,26 @@ Project-specific steward learning: distinguish physics pass state from review re
 lifecycle can still require bounded evidence-quality action, and free-text model caveats must not be
 promoted into anomaly severity or causal diagnosis.
 
+Lifecycle Margin Units v1 transitions integrated and constellation twin result workflows to v2 and
+makes `DesignMargin.unit` a required source-level contract. Dimensionless values use `1`; physical margins
+carry `kg`, `K`, `deg`, `N*m`, `deg/s`, `dB`, or `s`, and constellation member aggregation preserves
+the originating unit. Lifecycle promotion now copies that structured field instead of emitting
+`native`. The checked lifecycle still passes with the same `5.25 kg` limiting mass-budget margin,
+while its deterministic review moves from `additional_review_required` with 13 findings, one
+warning, and one triage action to `design_review_ready` with 12 findings and no warnings or triage.
+Affected twin, mission, assurance, UQ, and CLI tests pass 243 tests; the full suite passes `1000
+tests with 11 optional-backend skips`; Ruff, strict MyPy across 142 source files, five package/import
+tests, sdist/wheel builds, and `git diff --check` pass. The public run, result verifier, review, and
+review verifier pass with artifacts under `/tmp/astro-lifecycle-margin-units/`. Independent review
+found and drove explicit v2 workflow identifiers, current UQ documentation, and metric-to-unit
+mapping assertions; re-review found no P1/P2 issues.
+Previously serialized v1 twin results without a margin `unit` do not satisfy the v2 schema and must
+be regenerated rather than assigned an inferred fallback unit.
+
+Project-specific steward learning: unit authority belongs where a numeric engineering quantity is
+created. Downstream lifecycle and assurance products should preserve structured units, never infer
+them from metric names or substitute a heterogeneous placeholder.
+
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
 the executable plan is
@@ -507,6 +527,7 @@ Post-MVP / external-campaign items:
 | assurance-review-operator | done | productize/verify | steward | deterministic paired-assurance review, public CLI, typed assistant plan, tests and docs | Public artifact, local gates, GitHub CI, and integration pass. Findings remain deterministic and non-operational; PR #22 merged at `0d1f32b`. |
 | assurance-review-comparison | done | productize/verify | steward | review re-verification, deterministic cross-run comparison, public CLI, typed assistant plan, tests and docs | Public compare/verify artifacts, independent review, local release gates, GitHub CI, and integration pass. Comparison avoids heterogeneous scalarization, claim promotion, and recommendation execution; PR #23 merged at `1564549`. |
 | lifecycle-assurance-review | done | productize/verify | steward | lifecycle result re-verification, deterministic findings and triage, public CLI, typed assistant plan, tests and docs | Exact staged-input re-execution, five-file digest binding, stable findings, one bounded unit-quality action, public artifacts, independent review, 1,000-test local gates, GitHub CI, and integration pass; PR #24 merged at `beb0b81`. |
+| lifecycle-margin-units | review | productize/verify | steward | `DesignMargin` unit contract, twin and constellation producers, lifecycle promotion, checked review | Required source-level units are preserved into lifecycle evidence; checked review is warning-free without physics changes; affected, full-release, public, and independent-review gates pass; PR/CI integration is pending. |
 
 ## Next Best Paths
 
@@ -516,15 +537,13 @@ Post-MVP / external-campaign items:
    before considering a mission-calibrated protocol claim.
 2. Introduce additional model-form profiles only as separately validated comparisons; keep profile
    counts and paired deltas unpooled rather than creating a weighted model-success probability.
-3. Resolve the lifecycle review's checked evidence-quality warning by replacing the promoted twin
-   margin unit `native` with an explicit physical-unit contract, then rerun and compare the review.
-4. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
+3. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
    needed; do not infer bundle integrity from result re-execution.
-5. Add optional evidence-bound explanations over verified finding ids only after deterministic
+4. Add optional evidence-bound explanations over verified finding ids only after deterministic
    triage is sufficient. Keep autonomous execution closed, and keep surrogate acceleration closed
    unless a measured assurance teacher or other evaluator passes the cost and fidelity gate.
-6. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+5. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-7. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+6. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.

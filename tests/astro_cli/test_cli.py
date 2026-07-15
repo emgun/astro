@@ -247,7 +247,7 @@ def test_run_twin_command_writes_json_and_summary(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     payload = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["workflow"] == "integrated_digital_twin_v1"
+    assert payload["workflow"] == "integrated_digital_twin_v2"
     assert "Limiting margin:" in summary.read_text(encoding="utf-8")
 
 
@@ -271,7 +271,7 @@ def test_run_constellation_twin_command_writes_json_and_summary(tmp_path: Path) 
     assert f"wrote constellation digital twin result: {output}" in result.stdout
     assert f"wrote constellation digital twin summary: {summary}" in result.stdout
     payload = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["workflow"] == "constellation_digital_twin_v1"
+    assert payload["workflow"] == "constellation_digital_twin_v2"
     assert len(payload["members"]) == 2
     assert [member["member_name"] for member in payload["members"]] == ["plane-a", "plane-b"]
     assert payload["coverage_map_summaries"][0]["name"] == "equatorial-targets"

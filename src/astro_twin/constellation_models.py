@@ -128,7 +128,7 @@ class CoverageMapSummary(AstroModel):
 
 class ConstellationTwinResult(AstroModel):
     scenario_id: str
-    workflow: str = "constellation_digital_twin_v1"
+    workflow: str = "constellation_digital_twin_v2"
     members: tuple[MemberTwinResult, ...]
     access_summaries: tuple[FleetAccessSummary, ...]
     link_summaries: tuple[FleetLinkSummary, ...]

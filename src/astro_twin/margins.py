@@ -54,6 +54,7 @@ def _mass_margin(spacecraft: SpacecraftBusConfig) -> DesignMargin:
         value=value,
         threshold=spacecraft.mass_margin_fraction_required,
         margin=margin,
+        unit="1",
         status=_status(margin, warn_threshold=0.05),
     )
 
@@ -66,6 +67,7 @@ def _battery_margin(power_config: PowerConfig, power: tuple[PowerSample, ...]) -
         value=min_soc,
         threshold=power_config.minimum_battery_soc_fraction,
         margin=margin,
+        unit="1",
         status=_status(margin, warn_threshold=0.05),
     )
 
@@ -77,6 +79,7 @@ def _mass_budget_margins(mass_budget: MassBudgetSummary) -> list[DesignMargin]:
             value=mass_budget.itemized_total_mass_kg,
             threshold=mass_budget.dry_payload_reference_mass_kg,
             margin=mass_budget.dry_payload_margin_kg,
+            unit="kg",
             status=_status(mass_budget.dry_payload_margin_kg, warn_threshold=5.0),
         )
     ]
@@ -100,6 +103,7 @@ def _thermal_margins(
                     value=min_temp,
                     threshold=node.minimum_temperature_k,
                     margin=cold_margin,
+                    unit="K",
                     status=_status(cold_margin, warn_threshold=2.0),
                 ),
                 DesignMargin(
@@ -107,6 +111,7 @@ def _thermal_margins(
                     value=max_temp,
                     threshold=node.maximum_temperature_k,
                     margin=hot_margin,
+                    unit="K",
                     status=_status(hot_margin, warn_threshold=2.0),
                 ),
             ]
@@ -122,6 +127,7 @@ def _pointing_margin(adcs_config: ADCSConfig, adcs: tuple[ADCSSample, ...]) -> D
         value=value,
         threshold=adcs_config.pointing_requirement_deg,
         margin=margin,
+        unit="deg",
         status=_status(margin, warn_threshold=0.01),
     )
 
@@ -133,6 +139,7 @@ def _torque_margin(adcs_config: ADCSConfig, adcs: tuple[ADCSSample, ...]) -> Des
         value=adcs_config.required_slew_torque_n_m,
         threshold=adcs_config.max_torque_n_m,
         margin=margin,
+        unit="N*m",
         status=_status(margin, warn_threshold=0.005),
     )
 
@@ -144,6 +151,7 @@ def _slew_rate_margin(adcs_config: ADCSConfig, adcs: tuple[ADCSSample, ...]) -> 
         value=adcs_config.required_slew_rate_deg_s,
         threshold=adcs_config.max_slew_rate_deg_s,
         margin=margin,
+        unit="deg/s",
         status=_status(margin, warn_threshold=0.01),
     )
 
@@ -159,6 +167,7 @@ def _actuator_utilization_margin(
         value=value,
         threshold=adcs_config.maximum_actuator_utilization_fraction,
         margin=margin,
+        unit="1",
         status=_status(margin, warn_threshold=0.05),
     )
 
@@ -170,6 +179,7 @@ def _link_margin(link_windows: tuple[LinkBudgetWindow, ...]) -> DesignMargin:
             value=float("-inf"),
             threshold=0.0,
             margin=-1.0,
+            unit="dB",
             status=TwinMarginStatus.FAIL,
         )
     margin = min(window.worst_ebn0_margin_db for window in link_windows)
@@ -178,6 +188,7 @@ def _link_margin(link_windows: tuple[LinkBudgetWindow, ...]) -> DesignMargin:
         value=margin,
         threshold=0.0,
         margin=margin,
+        unit="dB",
         status=_status(margin, warn_threshold=3.0),
     )
 

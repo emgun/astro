@@ -108,3 +108,16 @@ def test_build_margin_report_identifies_limiting_margin() -> None:
     assert "slew_rate_margin_deg_s" in margin_by_name
     assert "actuator_utilization_margin_fraction" in margin_by_name
     assert "mass_budget_rollup_margin_kg" in margin_by_name
+    expected_units = {
+        "mass_margin_fraction": "1",
+        "battery_soc_margin_fraction": "1",
+        "mass_budget_rollup_margin_kg": "kg",
+        "thermal_bus_cold_margin_k": "K",
+        "thermal_bus_hot_margin_k": "K",
+        "pointing_margin_deg": "deg",
+        "torque_margin_n_m": "N*m",
+        "slew_rate_margin_deg_s": "deg/s",
+        "actuator_utilization_margin_fraction": "1",
+        "link_margin_db": "dB",
+    }
+    assert {name: margin.unit for name, margin in margin_by_name.items()} == expected_units

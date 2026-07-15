@@ -47,12 +47,9 @@ def test_checked_lifecycle_review_is_verified_and_bounded(
 
     assert review.integrity_verified
     assert review.lifecycle_passed
-    assert review.disposition is LifecycleReviewDisposition.ADDITIONAL_REVIEW_REQUIRED
-    assert len(review.triage_actions) == 1
-    assert review.triage_actions[0].source_finding_id == (
-        "margin_unit_digital_twin_mass_budget_rollup_margin_kg"
-    )
-    assert len(review.findings) == 13
+    assert review.disposition is LifecycleReviewDisposition.DESIGN_REVIEW_READY
+    assert review.triage_actions == ()
+    assert len(review.findings) == 12
     assert {reference.role for reference in review.referenced_inputs} == {
         "launch_scenario",
         "twin_scenario",
@@ -195,7 +192,7 @@ def test_lifecycle_review_commands_write_and_verify_artifact(
     )
 
     assert result.exit_code == 0
-    assert "Disposition: additional_review_required" in result.stdout
+    assert "Disposition: design_review_ready" in result.stdout
     assert load_mission_lifecycle_review(output).integrity_verified
     verification = CliRunner().invoke(
         app, ["verify-mission-lifecycle-review", str(output)]

@@ -89,6 +89,7 @@ def test_write_load_and_format_constellation_result(tmp_path: Path) -> None:
                     value=3.0,
                     threshold=0.0,
                     margin=3.0,
+                    unit="dB",
                     status=TwinMarginStatus.WARN,
                 ),
             ),
@@ -97,6 +98,7 @@ def test_write_load_and_format_constellation_result(tmp_path: Path) -> None:
                 value=3.0,
                 threshold=0.0,
                 margin=3.0,
+                unit="dB",
                 status=TwinMarginStatus.WARN,
             ),
         ),
@@ -110,7 +112,7 @@ def test_write_load_and_format_constellation_result(tmp_path: Path) -> None:
     summary = format_constellation_summary(loaded)
 
     assert json.loads(output.read_text(encoding="utf-8"))["workflow"] == (
-        "constellation_digital_twin_v1"
+        "constellation_digital_twin_v2"
     )
     assert loaded.scenario_id == "leo-observers"
     assert "Constellation twin: leo-observers" in summary
@@ -136,6 +138,7 @@ def test_write_constellation_twin_result_wraps_write_errors(
                     value=3.0,
                     threshold=0.0,
                     margin=3.0,
+                    unit="dB",
                     status=TwinMarginStatus.WARN,
                 ),
             ),
@@ -144,6 +147,7 @@ def test_write_constellation_twin_result_wraps_write_errors(
                 value=3.0,
                 threshold=0.0,
                 margin=3.0,
+                unit="dB",
                 status=TwinMarginStatus.WARN,
             ),
         ),
