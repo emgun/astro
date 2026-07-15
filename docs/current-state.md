@@ -264,6 +264,7 @@ P1/P2 issues. Focused covariance tests pass 11 tests; affected assurance/CLI tes
 the full suite passes `1039 tests with 11 optional-backend skips`; Ruff, strict MyPy across 150
 source files, seven packaging tests, sdist/wheel builds, `git diff --check`, and the checked public
 assessment and exact verifier pass.
+GitHub CI passed in `4m50s`; PR #29 merged the scope to `main` at `d22fde6`.
 
 Project-specific steward learning: covariance agreement and covariance consistency are independent
 evidence classes. Promotion criteria must bind raw errors, the covariance used for each error,
@@ -600,7 +601,7 @@ Post-MVP / external-campaign items:
 | lifecycle-margin-units | done | productize/verify | steward | `DesignMargin` unit contract, twin and constellation producers, lifecycle promotion, checked review | Required source-level units are preserved into lifecycle evidence; checked review is warning-free without physics changes; affected, full-release, public, independent-review, GitHub CI, and integration gates pass; PR #25 merged at `45e4d11`. |
 | mission-calibration-evidence | done | calibrate/verify | steward | typed station residuals, propulsion execution residuals, insertion covariance, inspection CLI, checked synthetic fixture | Evidence schemas and fail-closed promotion prerequisites are implemented; focused/full/public/package, independent-review, GitHub CI, and integration gates pass; PR #26 merged at `aa98d1f`. Actual mission evidence acquisition remains external work. |
 | assurance-model-form-matrix | done | productize/verify | steward | four-cell truth/estimator protocol, contrasts, public CLI, exact verifier, checked fixture | Four profiles remain separate and unpooled; local source/calibration, exact reexecution, focused/full, public, package, independent-review, GitHub CI, and integration gates pass without changing paired v1. PR #27 merged at `6c2e606`. |
-| production-covariance-criteria | in_progress | define/verify | steward | typed covariance comparison and empirical consistency criteria, public assess/verify CLI, checked local blocker fixture | Numerical agreement, independence, force coverage, and raw NEES evidence remain separate; focused/full/public/package, independent review, GitHub CI, and integration must pass without promoting screening evidence to certification. |
+| production-covariance-criteria | done | define/verify | steward | typed covariance comparison and empirical consistency criteria, public assess/verify CLI, checked local blocker fixture | Numerical agreement, independence, force coverage, and raw NEES evidence remain separate; focused/full/public/package, independent review, GitHub CI, and integration pass without promoting screening evidence to certification. PR #29 merged at `d22fde6`. |
 
 ## Next Best Paths
 
