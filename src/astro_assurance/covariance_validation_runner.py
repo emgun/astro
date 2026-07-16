@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 from numpy.typing import NDArray
 from scipy.linalg import eigvalsh  # type: ignore[import-untyped]
-from scipy.stats import chi2  # type: ignore[import-untyped]
+from scipy.stats import beta, chi2  # type: ignore[import-untyped]
 
 from astro_assurance.covariance_validation_models import (
     CovarianceComparisonSummary,
@@ -36,6 +36,10 @@ def assess_covariance_validation(
 ) -> CovarianceValidationResult:
     if protocol.source_path is None or protocol.source_digest is None:
         raise InvalidScenarioError("covariance validation protocol lacks source provenance")
+    if empirical is not None:
+        _validate_empirical_applicability(
+            protocol, candidate, reference, empirical, bindings
+        )
     diagnostics, requested_epochs = _compare_trajectories(protocol, candidate, reference)
     summary = _comparison_summary(diagnostics, requested_epochs)
     blockers = _evidence_blockers(
@@ -62,6 +66,58 @@ def assess_covariance_validation(
         disposition=disposition,
         claim_boundary=protocol.claim_boundary,
     )
+
+
+def _validate_empirical_applicability(
+    protocol: CovarianceValidationProtocol,
+    candidate: Trajectory,
+    reference: Trajectory,
+    empirical: EmpiricalCovarianceArtifact,
+    bindings: tuple[CovarianceSourceBinding, ...],
+) -> None:
+    provenance = empirical.campaign_provenance
+    candidate_binding = next(
+        (binding for binding in bindings if binding.role == "candidate_trajectory"), None
+    )
+    scenario_binding = next(
+        (binding for binding in bindings if binding.role == "empirical_scenario"), None
+    )
+    candidate_initial_covariance = (
+        candidate.covariance_history[0].covariance
+        if candidate.covariance_history
+        else None
+    )
+    process_noise_is_zero = all(
+        sample.process_noise_covariance is not None
+        and not np.any(np.asarray(sample.process_noise_covariance, dtype=np.float64))
+        for trajectory in (candidate, reference)
+        for sample in trajectory.covariance_history
+    )
+    if (
+        candidate_binding is None
+        or scenario_binding is None
+        or provenance.scenario_sha256 != scenario_binding.sha256
+        or provenance.predictor_trajectory_sha256 != candidate_binding.sha256
+        or provenance.scenario_id != candidate.scenario_id
+        or provenance.predictor_backend != candidate.backend
+        or provenance.predictor_implementation
+        != protocol.independence.candidate_implementation
+        or provenance.truth_backend != reference.backend
+        or provenance.force_model != candidate.force_model
+        or provenance.force_model != reference.force_model
+        or candidate_initial_covariance is None
+        or not np.array_equal(
+            np.asarray(provenance.initial_covariance, dtype=np.float64),
+            np.asarray(candidate_initial_covariance, dtype=np.float64),
+        )
+        or (
+            provenance.process_noise_realization == "none"
+            and not process_noise_is_zero
+        )
+    ):
+        raise InvalidScenarioError(
+            "empirical campaign provenance does not match comparison applicability"
+        )
 
 def _compare_trajectories(
     protocol: CovarianceValidationProtocol,
@@ -469,6 +525,11 @@ def _assess_empirical(
     mean_upper = float(chi2.ppf(1.0 - alpha / 2.0, df=6 * count) / count)
     within = sum(individual_lower <= value <= individual_upper for value in values)
     coverage = within / count
+    coverage_lower_bound = (
+        0.0
+        if within == 0
+        else float(beta.ppf(alpha, within, count - within + 1))
+    )
     mean_nees = float(np.mean(values))
     return EmpiricalNEESSummary(
         sample_count=count,
@@ -480,8 +541,13 @@ def _assess_empirical(
         mean_nees=mean_nees,
         samples_within_bounds=within,
         coverage=coverage,
+        coverage_lower_confidence_bound=coverage_lower_bound,
         criteria_satisfied=(
             mean_lower <= mean_nees <= mean_upper
-            and coverage >= protocol.thresholds.minimum_coverage
+            and (
+                coverage >= protocol.thresholds.minimum_coverage
+                if count < protocol.thresholds.minimum_empirical_samples
+                else coverage_lower_bound >= protocol.thresholds.minimum_coverage
+            )
         ),
     )

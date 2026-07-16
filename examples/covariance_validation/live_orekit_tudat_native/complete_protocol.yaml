@@ -1,0 +1,37 @@
+protocol_id: orekit-tudat-native-high-fidelity-with-empirical-v1
+candidate_trajectory_path: orekit_zero_q_predictor.json
+reference_trajectory_path: tudat_zero_q_reference.json
+empirical_evidence_path: empirical_covariance_512.json
+empirical_scenario_path: ../../scenarios/leo_native_covariance_empirical.yaml
+independence_review_path: independence_review.json
+units_policy: {}
+thresholds:
+  minimum_epochs: 10
+  symmetry_tolerance: 1.0e-10
+  minimum_eigenvalue: 1.0e-16
+  maximum_condition_number: 1.0e14
+  maximum_relative_covariance_frobenius_error: 0.25
+  covariance_trace_ratio_minimum: 0.8
+  covariance_trace_ratio_maximum: 1.25
+  maximum_accumulated_state_transition_frobenius_error: 0.25
+  generalized_eigenvalue_minimum: 0.5
+  generalized_eigenvalue_maximum: 2.0
+  maximum_state_position_delta_km: 1.0
+  maximum_state_velocity_delta_km_s: 0.01
+  confidence_level: 0.95
+  minimum_empirical_samples: 30
+  minimum_coverage: 0.9
+independence:
+  candidate_implementation: orekit_native_variational
+  reference_implementation: tudat_native_variational
+  independent_implementations: true
+  shared_code_paths:
+    - src/astro_core/models.py
+    - src/astro_assurance/covariance_validation_runner.py
+  shared_data_sources:
+    - paired high-fidelity scenario semantics
+  rationale: External Orekit and Tudat engines independently produce native variational state-transition histories before suite-owned normalization.
+required_force_features:
+  - atmospheric_drag
+  - solar_radiation_pressure
+  - third_body_gravity

@@ -1,6 +1,6 @@
 {
-  "campaign_id": "orekit-tudat-native-high-fidelity-v1",
-  "generated_at": "2026-07-15T23:30:00Z",
+  "campaign_id": "orekit-tudat-native-high-fidelity-empirical-v1",
+  "generated_at": "2026-07-16T00:00:00Z",
   "source_commit": "91ab68e3985e386ff60697988074f4ee3f2c5f70",
   "working_directory": "repository_root",
   "environment": {
@@ -14,18 +14,29 @@
   "commands": [
     "JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PYTHONPATH=src /opt/anaconda3/bin/astro propagate examples/scenarios/leo_orekit_variational_covariance.yaml --backend orekit --output examples/covariance_validation/live_orekit_tudat_native/orekit_trajectory.json",
     "/tmp/astro-tudat-live-env/bin/astro propagate examples/scenarios/leo_tudat_variational_covariance.yaml --backend tudat --output examples/covariance_validation/live_orekit_tudat_native/tudat_trajectory.json",
+    "JAVA_HOME=/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home PYTHONPATH=src /opt/anaconda3/bin/astro propagate examples/scenarios/leo_native_covariance_empirical.yaml --backend orekit --output examples/covariance_validation/live_orekit_tudat_native/orekit_zero_q_predictor.json",
+    "PYTHONPATH=src /tmp/astro-tudat-live-env/bin/astro propagate examples/scenarios/leo_native_covariance_empirical_tudat.yaml --backend tudat --output examples/covariance_validation/live_orekit_tudat_native/tudat_zero_q_reference.json",
+    "PYTHONPATH=src /tmp/astro-tudat-live-env/bin/astro run-empirical-covariance-campaign examples/scenarios/leo_native_covariance_empirical.yaml examples/covariance_validation/live_orekit_tudat_native/orekit_zero_q_predictor.json --truth-backend tudat --samples 512 --seed 817 --output examples/covariance_validation/live_orekit_tudat_native/empirical_covariance_512.json",
     "PYTHONPATH=src /opt/anaconda3/bin/astro assess-covariance-validation examples/covariance_validation/live_orekit_tudat_native/protocol.yaml --output /tmp/astro-native-covariance-assessment.json",
-    "PYTHONPATH=src /opt/anaconda3/bin/astro verify-covariance-validation /tmp/astro-native-covariance-assessment.json"
+    "PYTHONPATH=src /opt/anaconda3/bin/astro verify-covariance-validation /tmp/astro-native-covariance-assessment.json",
+    "PYTHONPATH=src /opt/anaconda3/bin/astro assess-covariance-validation examples/covariance_validation/live_orekit_tudat_native/complete_protocol.yaml --output /tmp/astro-native-covariance-complete-assessment.json",
+    "PYTHONPATH=src /opt/anaconda3/bin/astro verify-covariance-validation /tmp/astro-native-covariance-complete-assessment.json"
   ],
   "files": {
+    "complete_protocol.yaml": "b42909f460ebc376f00df3c2625d1cdc364a58dedcf0897df348a74ec5408682",
+    "empirical_covariance_512.json": "4d6d7594b0abc2627e3876271a2cfeefae6dbfadd1d155d4e0e2cc374cc750b0",
     "independence_review.json": "d9f3d3bbe6f62919f82d487ff4194086f33d979a79ca7d6cae8d99700e268e8a",
     "orekit_trajectory.json": "a44e7a68ed4af1d6a5e1ef7ea8b38aafba91b9376817f856caa4b393553cc3e3",
+    "orekit_zero_q_predictor.json": "a7e62dce4103869fbb192ef97ea12b3c12ce06f317d00e8a06f6c864fd7cc204",
     "protocol.yaml": "31fd45133aaff6b7e1eec59387d856ba1e8627f74572699e20071724d6178db5",
-    "tudat_trajectory.json": "5ab3d33f33d3cb66c3c40970a89c28a3418a15926c2559fe3e3d0cb1a5663651"
+    "tudat_trajectory.json": "5ab3d33f33d3cb66c3c40970a89c28a3418a15926c2559fe3e3d0cb1a5663651",
+    "tudat_zero_q_reference.json": "45421007c486fee6598a1b472337c0667abd2ab8bc8e9243f19f56fc00c0eec4"
   },
   "source_scenarios": {
     "examples/scenarios/leo_orekit_variational_covariance.yaml": "88c169bf3390de4c1b35eca9d99160a9f7dda6336b1ab01ac73b8ab0e73dbc51",
-    "examples/scenarios/leo_tudat_variational_covariance.yaml": "977498c9a0c594616202c236e32dbcef46d1d07bb3e6735f132b2d78547f723e"
+    "examples/scenarios/leo_tudat_variational_covariance.yaml": "977498c9a0c594616202c236e32dbcef46d1d07bb3e6735f132b2d78547f723e",
+    "examples/scenarios/leo_native_covariance_empirical.yaml": "ee1aabd43e966f9ffedf62277183215b0232ac14ff9ac18669d80ab8d330383a",
+    "examples/scenarios/leo_native_covariance_empirical_tudat.yaml": "7abb70f56014a711982f3268e75dc1fd66954491edd0a9c9e12156e61e2a9129"
   },
   "expected": {
     "requested_epochs": 11,
@@ -40,5 +51,15 @@
     "maximum_state_position_delta_km": 0.001,
     "maximum_state_velocity_delta_km_s": 2.0e-6
   },
-  "claim_boundary": "machine_scoped_comparison_evidence_not_empirical_consistency_or_certification"
+  "empirical_expected": {
+    "disposition": "criteria_satisfied",
+    "blockers": [],
+    "sample_count": 512,
+    "mean_nees_minimum": 6.15,
+    "mean_nees_maximum": 6.16,
+    "coverage_count": 480,
+    "coverage_fraction": 0.9375,
+    "coverage_lower_confidence_bound_minimum": 0.916
+  },
+  "claim_boundary": "machine_scoped_covariance_comparison_and_empirical_consistency_evidence_not_certification"
 }

@@ -271,6 +271,21 @@ evidence classes. Promotion criteria must bind raw errors, the covariance used f
 realization independence, implementation-independence review, force coverage, units, and exact input
 bytes; repeating one observation or comparing shared code cannot manufacture authority.
 
+The native covariance evidence campaign now also binds a deterministic 512-realization empirical
+truth-error population. Full initial-state covariance perturbations are sampled with PCG64 seed 817,
+Orekit supplies the native-variational zero-process-noise predictor, and independently propagated
+Tudat trajectories supply nonlinear truth at the terminal epoch. The checked campaign passes the
+preregistered criteria with mean NEES `6.152680885241317`, 480/512 samples inside the individual
+95% bounds, a one-sided 95% coverage lower bound of `0.9169573165477053`, 11/11 comparison epochs,
+and no blockers. Process noise is deliberately zero because the
+campaign does not model stochastic process-noise realizations. This is machine- and
+environment-scoped covariance comparison and consistency evidence, not flight certification,
+navigation authority, production certification, or operational authority.
+
+Project-specific steward learning: empirical consistency evidence is applicable only when its
+predictor implementation, independent truth backend, force model, initial covariance, sampling
+distribution, seed, evaluation epoch, and process-noise realization policy are explicit and bound.
+
 The supporting **AI-Native Uncertainty Campaigns and Validated Surrogates** architecture and staged
 roadmap are recorded in `docs/superpowers/specs/2026-07-12-ai-native-uncertainty-surrogate-roadmap.md`;
 the executable plan is
@@ -602,7 +617,7 @@ Post-MVP / external-campaign items:
 | mission-calibration-evidence | done | calibrate/verify | steward | typed station residuals, propulsion execution residuals, insertion covariance, inspection CLI, checked synthetic fixture | Evidence schemas and fail-closed promotion prerequisites are implemented; focused/full/public/package, independent-review, GitHub CI, and integration gates pass; PR #26 merged at `aa98d1f`. Actual mission evidence acquisition remains external work. |
 | assurance-model-form-matrix | done | productize/verify | steward | four-cell truth/estimator protocol, contrasts, public CLI, exact verifier, checked fixture | Four profiles remain separate and unpooled; local source/calibration, exact reexecution, focused/full, public, package, independent-review, GitHub CI, and integration gates pass without changing paired v1. PR #27 merged at `6c2e606`. |
 | production-covariance-criteria | done | define/verify | steward | typed covariance comparison and empirical consistency criteria, public assess/verify CLI, checked local blocker fixture | Numerical agreement, independence, force coverage, and raw NEES evidence remain separate; focused/full/public/package, independent review, GitHub CI, and integration pass without promoting screening evidence to certification. PR #29 merged at `d22fde6`. |
-| covariance-evidence-acquisition | active | acquire/verify | steward | native Orekit/Tudat comparison and raw empirical consistency evidence | The checked native Orekit/Tudat high-fidelity campaign passes 11/11 preregistered numerical epochs with drag, SRP, and third-body coverage. Independence and producer provenance gates pass. Only the separate raw empirical NEES campaign remains before the typed criteria can be satisfied. |
+| covariance-evidence-acquisition | done | acquire/verify | steward | native Orekit/Tudat comparison, aligned zero-Q predictor/reference pair, and 512-realization raw Tudat truth-error campaign | The checked high-fidelity campaign passes 11/11 comparison epochs and its empirical campaign satisfies the preregistered NEES criteria with 480/512 observed coverage, a 0.916957 one-sided lower bound, and no blockers. Applicability and raw states are provenance-bound; this remains machine-scoped validation evidence, not certification or operational authority. |
 
 ## Next Best Paths
 
@@ -610,16 +625,13 @@ Post-MVP / external-campaign items:
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
    before considering a mission-calibrated protocol claim.
-2. Define and execute a raw empirical truth-error covariance campaign with at least 30 independent
-   realizations and preregistered 95% NEES coverage criteria. Keep it separate from the now-passing
-   native Orekit/Tudat comparison. Criteria satisfaction still does not confer flight certification.
-3. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
+2. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
    needed; do not infer bundle integrity from result re-execution.
-4. Add optional evidence-bound explanations over verified finding ids only after deterministic
+3. Add optional evidence-bound explanations over verified finding ids only after deterministic
    triage is sufficient. Keep autonomous execution closed, and keep surrogate acceleration closed
    unless a measured assurance teacher or other evaluator passes the cost and fidelity gate.
-5. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+4. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-6. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+5. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.
