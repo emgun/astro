@@ -110,8 +110,26 @@ Maximum state position delta: 0.0006552344418782137 km
 Maximum state velocity delta: 9.795988339714687e-07 km/s
 
 Checked inputs are under examples/covariance_validation/live_orekit_tudat_native/. This is
-machine- and environment-scoped comparison evidence. It is not an empirical truth-error campaign,
-production certification, flight qualification, navigation authority, or operational authority.
+machine- and environment-scoped comparison evidence. By itself it is not an empirical truth-error
+campaign, production certification, flight qualification, navigation authority, or operational
+authority.
+
+2026-07-16 empirical covariance consistency campaign:
+
+The checked `leo_native_covariance_empirical.yaml` scenario removes process noise because no
+stochastic process-noise realization is modeled. PCG64 seed 817 generated 512 independent Gaussian
+initial-state perturbations from the full configured covariance. Orekit supplied the native
+variational predictor covariance and Tudat independently propagated nominal and perturbed nonlinear
+truth trajectories. Every sample records its perturbation, nominal truth state, realized truth
+state, error, and predictor covariance.
+
+`complete_protocol.yaml` passes 11/11 comparison epochs with zero blockers. Mean NEES is
+`6.152680885241317`; 480/512 samples (`0.9375`) fall within the individual 95% chi-square bounds,
+and the exact one-sided 95% binomial lower bound is `0.9169573165477053`. The campaign therefore
+satisfies the preregistered 0.90 population-coverage threshold as well as the comparison and mean
+NEES criteria.
+This remains machine- and environment-scoped validation evidence, not production certification,
+flight qualification, navigation authority, or operational authority.
 
 2026-07-15 native variational prerequisite:
 

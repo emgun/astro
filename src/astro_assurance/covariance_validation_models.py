@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field, FiniteFloat, model_validator
 
-from astro_core.models import AstroModel
+from astro_core.models import AstroModel, ForceModelConfig
 
 StateOrder = tuple[
     Literal["x"],
@@ -115,6 +115,7 @@ class CovarianceValidationProtocol(StrictCovarianceModel):
     candidate_trajectory_path: str = Field(min_length=1)
     reference_trajectory_path: str = Field(min_length=1)
     empirical_evidence_path: str | None = Field(default=None, min_length=1)
+    empirical_scenario_path: str | None = Field(default=None, min_length=1)
     independence_review_path: str | None = Field(default=None, min_length=1)
     units_policy: CovarianceUnitsPolicy
     thresholds: CovarianceValidationThresholds
@@ -131,10 +132,18 @@ class CovarianceValidationProtocol(StrictCovarianceModel):
         paths = [self.candidate_trajectory_path, self.reference_trajectory_path]
         if self.empirical_evidence_path is not None:
             paths.append(self.empirical_evidence_path)
+        if self.empirical_scenario_path is not None:
+            paths.append(self.empirical_scenario_path)
         if self.independence_review_path is not None:
             paths.append(self.independence_review_path)
         if len(paths) != len(set(paths)):
             raise ValueError("protocol input paths must be distinct")
+        if (self.empirical_evidence_path is None) != (
+            self.empirical_scenario_path is None
+        ):
+            raise ValueError(
+                "empirical evidence and empirical scenario paths must be provided together"
+            )
         if len(self.required_force_features) != len(set(self.required_force_features)):
             raise ValueError("required force features must not contain duplicates")
         return self
@@ -146,11 +155,58 @@ class EmpiricalCovarianceRawSample(StrictCovarianceModel):
     state_error: Vector6
     predicted_covariance: Matrix6
     independent_truth: bool
+    initial_state_perturbation: Vector6
+    nominal_truth_state: Vector6
+    realized_truth_state: Vector6
 
     @model_validator(mode="after")
     def epoch_is_aware(self) -> EmpiricalCovarianceRawSample:
         if self.epoch.tzinfo is None or self.epoch.utcoffset() is None:
             raise ValueError("empirical sample epoch must include timezone information")
+        return self
+
+    @model_validator(mode="after")
+    def state_error_matches_raw_truth_states(self) -> EmpiricalCovarianceRawSample:
+        expected = tuple(
+            float(realized) - float(nominal)
+            for realized, nominal in zip(
+                self.realized_truth_state, self.nominal_truth_state, strict=True
+            )
+        )
+        if any(
+            abs(float(actual) - expected_component) > 1e-12
+            for actual, expected_component in zip(self.state_error, expected, strict=True)
+        ):
+            raise ValueError("empirical state_error must equal realized minus nominal truth")
+        return self
+
+
+class EmpiricalCovarianceCampaignProvenance(StrictCovarianceModel):
+    scenario_id: str = Field(min_length=1)
+    scenario_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    predictor_trajectory_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    predictor_backend: Literal["orekit", "tudat", "local"]
+    predictor_implementation: str = Field(min_length=1)
+    truth_backend: Literal["orekit", "tudat", "local"]
+    seed: int = Field(ge=0)
+    sampling_engine: Literal["numpy.random.PCG64"] = "numpy.random.PCG64"
+    perturbation_distribution: Literal["zero_mean_gaussian_initial_state"] = (
+        "zero_mean_gaussian_initial_state"
+    )
+    process_noise_realization: Literal["none"] = "none"
+    evaluation_epoch: datetime
+    initial_covariance: Matrix6
+    sample_count: int = Field(ge=2)
+    force_model: ForceModelConfig
+
+    @model_validator(mode="after")
+    def campaign_is_independent_and_time_bounded(
+        self,
+    ) -> EmpiricalCovarianceCampaignProvenance:
+        if self.predictor_backend == self.truth_backend:
+            raise ValueError("empirical predictor and truth backends must be independent")
+        if self.evaluation_epoch.tzinfo is None or self.evaluation_epoch.utcoffset() is None:
+            raise ValueError("empirical evaluation epoch must include timezone information")
         return self
 
 
@@ -160,6 +216,7 @@ class EmpiricalCovarianceArtifact(StrictCovarianceModel):
     population_definition: str = Field(min_length=1)
     independent_realizations: bool
     independence_basis: str = Field(min_length=1)
+    campaign_provenance: EmpiricalCovarianceCampaignProvenance
     samples: tuple[EmpiricalCovarianceRawSample, ...] = Field(min_length=2)
 
     @model_validator(mode="after")
@@ -167,16 +224,16 @@ class EmpiricalCovarianceArtifact(StrictCovarianceModel):
         ids = [sample.sample_id for sample in self.samples]
         if len(ids) != len(set(ids)):
             raise ValueError("empirical sample ids must be unique")
-        observations = [
-            (
-                sample.epoch,
-                sample.state_error,
-                sample.predicted_covariance,
-            )
+        perturbations = [sample.initial_state_perturbation for sample in self.samples]
+        if len(perturbations) != len(set(perturbations)):
+            raise ValueError("empirical initial-state perturbations must not be duplicated")
+        if len(self.samples) != self.campaign_provenance.sample_count:
+            raise ValueError("empirical sample count must match campaign provenance")
+        if any(
+            sample.epoch != self.campaign_provenance.evaluation_epoch
             for sample in self.samples
-        ]
-        if len(observations) != len(set(observations)):
-            raise ValueError("empirical observations must not be duplicated")
+        ):
+            raise ValueError("empirical samples must use the campaign evaluation epoch")
         return self
 
 
@@ -290,6 +347,7 @@ class EmpiricalNEESSummary(StrictCovarianceModel):
     mean_nees: FiniteFloat = Field(ge=0.0)
     samples_within_bounds: int = Field(ge=0)
     coverage: FiniteFloat = Field(ge=0.0, le=1.0)
+    coverage_lower_confidence_bound: FiniteFloat = Field(ge=0.0, le=1.0)
     criteria_satisfied: bool
 
     @model_validator(mode="after")
@@ -303,6 +361,8 @@ class EmpiricalNEESSummary(StrictCovarianceModel):
         expected = 0.0 if self.sample_count == 0 else self.samples_within_bounds / self.sample_count
         if abs(float(self.coverage) - expected) > 1e-12:
             raise ValueError("NEES coverage must equal in-bound samples divided by sample count")
+        if self.coverage_lower_confidence_bound > self.coverage:
+            raise ValueError("NEES coverage lower confidence bound cannot exceed coverage")
         return self
 
 
@@ -312,6 +372,7 @@ class CovarianceSourceBinding(StrictCovarianceModel):
         "candidate_trajectory",
         "reference_trajectory",
         "empirical_evidence",
+        "empirical_scenario",
         "independence_review",
     ]
     path: str = Field(min_length=1)
@@ -334,7 +395,7 @@ class CovarianceValidationBlocker(StrictCovarianceModel):
 class CovarianceValidationResult(StrictCovarianceModel):
     protocol_id: str = Field(min_length=1)
     workflow: Literal["covariance_validation_v1"] = "covariance_validation_v1"
-    source_bindings: tuple[CovarianceSourceBinding, ...] = Field(min_length=3, max_length=5)
+    source_bindings: tuple[CovarianceSourceBinding, ...] = Field(min_length=3, max_length=6)
     diagnostics: tuple[CovarianceEpochComparisonDiagnostic, ...]
     comparison_summary: CovarianceComparisonSummary
     empirical_nees_summary: EmpiricalNEESSummary | None = None
@@ -354,6 +415,10 @@ class CovarianceValidationResult(StrictCovarianceModel):
         has_empirical_binding = "empirical_evidence" in roles
         if has_empirical_binding != (self.empirical_nees_summary is not None):
             raise ValueError("empirical binding and NEES summary must be present together")
+        if ("empirical_scenario" in roles) != has_empirical_binding:
+            raise ValueError(
+                "empirical scenario and evidence bindings must be present together"
+            )
         epochs = [diagnostic.epoch for diagnostic in self.diagnostics]
         if len(epochs) != len(set(epochs)):
             raise ValueError("comparison diagnostic epochs must be unique")

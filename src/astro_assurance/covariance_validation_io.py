@@ -48,6 +48,10 @@ def load_covariance_validation_protocol(path: Path | str) -> CovarianceValidatio
         updates["empirical_evidence_path"] = str(
             _resolve_reference(source, protocol.empirical_evidence_path).resolve()
         )
+    if protocol.empirical_scenario_path is not None:
+        updates["empirical_scenario_path"] = str(
+            _resolve_reference(source, protocol.empirical_scenario_path).resolve()
+        )
     if protocol.independence_review_path is not None:
         updates["independence_review_path"] = str(
             _resolve_reference(source, protocol.independence_review_path).resolve()
@@ -108,6 +112,12 @@ def run_covariance_validation(protocol: CovarianceValidationProtocol) -> Covaria
         except ValidationError as exc:
             raise InvalidScenarioError(f"empirical covariance evidence is invalid: {exc}") from exc
         bindings.append(empirical_binding)
+        if protocol.empirical_scenario_path is None:
+            raise InvalidScenarioError("empirical covariance scenario path is missing")
+        _, empirical_scenario_binding = _read_binding(
+            "empirical_scenario", protocol.empirical_scenario_path
+        )
+        bindings.append(empirical_scenario_binding)
     if protocol.independence_review_path is not None:
         review_bytes, review_binding = _read_binding(
             "independence_review", protocol.independence_review_path
