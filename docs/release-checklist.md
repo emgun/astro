@@ -18,8 +18,13 @@ Latest merged-main evidence:
   lifecycle-review and covariance-validation workflows from `/tmp`. The lifecycle review is
   `design_review_ready` with 12 findings, zero blockers, zero warnings, and zero triage actions.
   The covariance assessment passes 11/11 epochs with mean NEES `6.15268`, coverage `0.938`, zero
-  blockers, and the non-certifying claim boundary. GitHub CI, merged-commit verification, and
-  tagging remain pending.
+  blockers, and the non-certifying claim boundary.
+- 2026-07-16: GitHub CI passed in `4m55s`; PR #34 merged at
+  `f224a0629a531ff9549778e850a6163239daec98`. A fresh detached worktree at that exact merge commit
+  repeated `1055 passed, 11 skipped`, Ruff, strict MyPy across 152 source files, clean-tree review,
+  package builds, and isolated wheel-installed lifecycle-review and covariance-validation
+  workflows. Annotated tag `v0.2.0-rc.2` was published and its peeled remote target resolves exactly
+  to `f224a0629a531ff9549778e850a6163239daec98`.
 - 2026-07-14: `v0.2.0-rc.1` preparation scopes the post-`v0.1.0` reentry, mission-lifecycle,
   uncertainty-campaign, digital-twin campaign, and evidence-bound mission-assurance increment.
   Package metadata and campaign software compatibility advance to `0.2.0rc1`; artifact schema and
