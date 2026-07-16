@@ -1,11 +1,25 @@
 # Release Checklist
 
-Date: 2026-07-14
+Date: 2026-07-16
 
 Use this checklist before tagging or publishing a release candidate.
 
 Latest merged-main evidence:
 
+- 2026-07-16: `v0.2.0-rc.2` preparation scopes the 28 commits after `v0.2.0-rc.1` as a release
+  consolidation increment: deterministic assurance and lifecycle reviews, explicit digital-twin
+  margin units and v2 workflow identifiers, mission calibration evidence contracts, the four-cell
+  model-form matrix, production covariance criteria, and native plus empirical covariance
+  evidence. Package metadata and campaign software compatibility advance to `0.2.0rc2`; the
+  campaign runtime remains `1.2`.
+- 2026-07-16: candidate verification passes `1055 tests with 11 optional-backend skips`, Ruff,
+  strict MyPy across 152 source files, `git diff --check`, 10 focused package/twin compatibility
+  tests, sdist/wheel builds, metadata and content inspection, and isolated wheel-installed public
+  lifecycle-review and covariance-validation workflows from `/tmp`. The lifecycle review is
+  `design_review_ready` with 12 findings, zero blockers, zero warnings, and zero triage actions.
+  The covariance assessment passes 11/11 epochs with mean NEES `6.15268`, coverage `0.938`, zero
+  blockers, and the non-certifying claim boundary. GitHub CI, merged-commit verification, and
+  tagging remain pending.
 - 2026-07-14: `v0.2.0-rc.1` preparation scopes the post-`v0.1.0` reentry, mission-lifecycle,
   uncertainty-campaign, digital-twin campaign, and evidence-bound mission-assurance increment.
   Package metadata and campaign software compatibility advance to `0.2.0rc1`; artifact schema and
@@ -304,8 +318,8 @@ the message is actionable.
 - [x] Stored review verification re-derives findings and rejects review tampering.
 - [x] Structured continuity and margin issues produce non-executing triage; model caveats remain
   informational.
-- [x] The checked lifecycle passes while review records one `native`-unit evidence warning and one
-  bounded action.
+- [x] The initial checked lifecycle review recorded one `native`-unit evidence warning and bounded
+  action; the explicit-margin-unit follow-on resolves both and advances twin artifacts to v2.
 - [x] Focused lifecycle-review and assistant tests pass 16 tests; affected surfaces pass 183 tests.
 - [x] Full tests pass 1000 tests with 11 optional-backend skips.
 - [x] Ruff, strict MyPy across 142 source files, 9 package/import tests, `git diff --check`, and

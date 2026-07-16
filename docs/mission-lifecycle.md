@@ -88,9 +88,11 @@ continuity, typed margins, model caveats, and claim boundaries. Structured faile
 and `warn`/`fail` margins produce stable blocker or warning findings and one non-executing triage
 action per unresolved finding.
 
-The checked reference also reports one evidence-quality warning: its promoted digital-twin limiting
-margin uses the generic unit label `native`. The lifecycle itself passes, but the review requires an
-explicit physical unit before that margin is used in unit-specific design decisions.
+The checked reference passes with a `5.25 kg` promoted digital-twin limiting margin. Digital-twin
+v2 products require structured units at the source and lifecycle promotion preserves them, so the
+current review reports no unit-quality warning or triage action. Previously serialized v1 twin
+artifacts without margin units must be regenerated; review does not infer a unit from a margin name
+or numeric value.
 
 Free-text lifecycle, twin, and reentry warnings remain informational evidence-boundary findings.
 The reviewer does not infer anomaly severity or root cause from prose or rank unlike margins by raw

@@ -1,6 +1,6 @@
 # Astro Suite Current State
 
-Date: 2026-07-15 00:00 PDT
+Date: 2026-07-16 00:00 PDT
 
 ## Canonical Workspace
 
@@ -51,6 +51,25 @@ optional operational backends, and research workflows. External engines are adap
 outputs stay in Astro Suite models with explicit provenance and claim boundaries.
 
 ## Current Roadmap Decision
+
+Release consolidation is the active gate. The 28 commits after `v0.2.0-rc.1` add consequential
+public assurance-review and covariance-validation surfaces plus an intentional v2 digital-twin
+artifact contract. Prepare and verify `v0.2.0-rc.2` before expanding the product again. Optional
+external calibration and higher-fidelity campaigns remain post-release branches unless a specific
+release claim requires them.
+
+The prepared RC.2 branch advances package and campaign compatibility identity to `0.2.0rc2` while
+keeping campaign runtime `1.2`. Local release gates pass `1055 tests with 11 optional-backend
+skips`, Ruff, strict MyPy across 152 source files, builds, wheel/sdist inspection, and isolated
+wheel-installed lifecycle-review and covariance-validation workflows. The lifecycle review is
+`design_review_ready` with no warnings; the covariance assessment remains `criteria_satisfied`
+under its machine-scoped, non-certifying claim boundary. CI, merged-commit verification, and the
+annotated tag remain open.
+
+Project-specific steward learning: release compatibility review must inspect required serialized
+fields and workflow identifiers, not only package and runtime versions. When a pre-release artifact
+contract advances, document and test whether old artifacts migrate or must be regenerated; never
+infer engineering units from names or values.
 
 The broader product direction is now **evidence-bound mission assurance**: connect Astro Suite's
 existing physics, estimation, uncertainty, and digital-twin products into closed-loop decisions
@@ -618,20 +637,23 @@ Post-MVP / external-campaign items:
 | assurance-model-form-matrix | done | productize/verify | steward | four-cell truth/estimator protocol, contrasts, public CLI, exact verifier, checked fixture | Four profiles remain separate and unpooled; local source/calibration, exact reexecution, focused/full, public, package, independent-review, GitHub CI, and integration gates pass without changing paired v1. PR #27 merged at `6c2e606`. |
 | production-covariance-criteria | done | define/verify | steward | typed covariance comparison and empirical consistency criteria, public assess/verify CLI, checked local blocker fixture | Numerical agreement, independence, force coverage, and raw NEES evidence remain separate; focused/full/public/package, independent review, GitHub CI, and integration pass without promoting screening evidence to certification. PR #29 merged at `d22fde6`. |
 | covariance-evidence-acquisition | done | acquire/verify | steward | native Orekit/Tudat comparison, aligned zero-Q predictor/reference pair, and 512-realization raw Tudat truth-error campaign | The checked high-fidelity campaign passes 11/11 comparison epochs and its empirical campaign satisfies the preregistered NEES criteria with 480/512 observed coverage, a 0.916957 one-sided lower bound, and no blockers. Applicability and raw states are provenance-bound; this remains machine-scoped validation evidence, not certification or operational authority. |
+| v0.2.0-rc.2 | active | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | The 28-commit delta from RC.1 is explicitly scoped; local and wheel-installed gates pass. The candidate is complete only when CI, merged-commit, and tag evidence agree with the reviewed commit. |
 
 ## Next Best Paths
 
-1. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
+1. Complete `v0.2.0-rc.2` local, built-wheel, CI, merged-commit, and tag gates, then hold the exact
+   candidate commit for a short soak before deciding whether to promote it unchanged to `v0.2.0`.
+2. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
    before considering a mission-calibrated protocol claim.
-2. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
+3. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
    needed; do not infer bundle integrity from result re-execution.
-3. Add optional evidence-bound explanations over verified finding ids only after deterministic
+4. Add optional evidence-bound explanations over verified finding ids only after deterministic
    triage is sufficient. Keep autonomous execution closed, and keep surrogate acceleration closed
    unless a measured assurance teacher or other evaluator passes the cost and fidelity gate.
-4. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+5. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-5. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+6. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.

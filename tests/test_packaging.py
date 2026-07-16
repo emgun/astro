@@ -22,7 +22,7 @@ def test_dependency_pins_keep_optional_launch_stack_numpy_1_compatible() -> None
 def test_public_package_metadata_declares_license_and_classifiers() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.2.0rc1"
+    assert pyproject["project"]["version"] == "0.2.0rc2"
     assert pyproject["project"]["license"] == {"text": "Apache-2.0"}
     assert Path("LICENSE").exists()
     assert "License :: OSI Approved :: Apache Software License" in pyproject["project"][
