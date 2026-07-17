@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "astro-suite"
-version = "0.2.0rc2"
+version = "0.2.0"
 description = "Python flight dynamics suite for orbit determination, launch, reentry, digital twins, and verifiable mission workflows."
 readme = "README.md"
 requires-python = ">=3.12"
