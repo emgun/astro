@@ -52,20 +52,24 @@ outputs stay in Astro Suite models with explicit provenance and claim boundaries
 
 ## Current Roadmap Decision
 
-Release consolidation reached the final `v0.2.0` identity gate after explicit user approval. The
-published RC.2 package reports `0.2.0rc2`, so a final tag on the unchanged RC.2 commit would retain
-a prerelease package identity. The bounded final delta therefore changes only package and campaign
-compatibility identity to `0.2.0`, final release notes, tests, and durable state. Physics, public
-APIs, artifact schemas, checked evidence, and claim boundaries remain frozen. Optional external
-calibration and higher-fidelity campaigns remain post-release branches unless a specific release
-claim requires them.
+Release consolidation is complete at `v0.2.0`. Because the published RC.2 package reported
+`0.2.0rc2`, final promotion used a bounded release-only identity commit rather than applying a
+final tag to a prerelease wheel. Physics, public APIs, artifact schemas, dependencies, checked
+evidence, and claim boundaries remained frozen. Optional external calibration and higher-fidelity
+campaigns remain post-release branches unless a specific release claim requires them.
 
-The prepared final branch passes `1055 tests with 11 optional-backend skips`, Ruff, strict MyPy
-across 152 source files, builds, wheel/sdist inspection, and isolated wheel-installed lifecycle and
-covariance workflows. Both package metadata and campaign compatibility report `0.2.0`; campaign
-runtime remains `1.2`. The lifecycle review remains `design_review_ready` with no warnings, and the
-covariance assessment remains `criteria_satisfied` with 11/11 epochs and zero blockers. CI,
-merged-commit verification, and the annotated final tag remain open.
+PR #36 merged at `0d76d57` after GitHub CI passed in `4m46s`. Local and fresh detached-merge gates
+pass `1055 tests with 11 optional-backend skips`, Ruff, strict MyPy across 152 source files, builds,
+wheel/sdist inspection, and isolated wheel-installed lifecycle and covariance workflows. Both
+package metadata and campaign compatibility report `0.2.0`; campaign runtime remains `1.2`. The
+lifecycle review remains `design_review_ready` with no warnings, and covariance remains
+`criteria_satisfied` with 11/11 epochs and zero blockers. Annotated tag `v0.2.0` is published and
+its peeled remote target is exactly `0d76d57d74d643c9297b95359ffa3bcdaff5d99a`.
+
+Project-specific steward learning: an exact release-candidate commit can be promoted unchanged
+only when its package metadata already carries the final version, as `v0.1.0-rc.2` did. Otherwise
+use a frozen release-only identity commit and repeat the complete package and merged-commit gates;
+never let a final tag point at a wheel that still identifies itself as a prerelease.
 
 RC.2 advances package and campaign compatibility identity to `0.2.0rc2` while keeping campaign
 runtime `1.2`. PR #34 merged at `f224a06` after GitHub CI passed in `4m55s`. Local and fresh
@@ -648,12 +652,13 @@ Post-MVP / external-campaign items:
 | production-covariance-criteria | done | define/verify | steward | typed covariance comparison and empirical consistency criteria, public assess/verify CLI, checked local blocker fixture | Numerical agreement, independence, force coverage, and raw NEES evidence remain separate; focused/full/public/package, independent review, GitHub CI, and integration pass without promoting screening evidence to certification. PR #29 merged at `d22fde6`. |
 | covariance-evidence-acquisition | done | acquire/verify | steward | native Orekit/Tudat comparison, aligned zero-Q predictor/reference pair, and 512-realization raw Tudat truth-error campaign | The checked high-fidelity campaign passes 11/11 comparison epochs and its empirical campaign satisfies the preregistered NEES criteria with 480/512 observed coverage, a 0.916957 one-sided lower bound, and no blockers. Applicability and raw states are provenance-bound; this remains machine-scoped validation evidence, not certification or operational authority. |
 | v0.2.0-rc.2 | done | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Local, wheel-installed, CI, detached merged-commit, and remote annotated-tag evidence agree at `f224a06`; the candidate is ready for a short soak. |
-| v0.2.0 | active | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | The final delta is release-only; local and wheel-installed gates pass. Completion requires CI, detached merged-commit verification, and the annotated tag to agree. |
+| v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 
 ## Next Best Paths
 
-1. Complete the release-only `v0.2.0` identity gate. Any behavioral, API, schema, physics, or
-   evidence change stops final promotion and requires a new reviewed candidate.
+1. Consolidate the existing launch-to-reentry, uncertainty, assurance, and review surfaces into one
+   discoverable flagship workflow and first-run path without duplicating domain logic or adding a
+   second orchestration layer.
 2. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
