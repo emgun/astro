@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, model_validator
 
 from astro_assurance.lifecycle_review import (
     review_mission_lifecycle,
@@ -23,12 +23,14 @@ from astro_assurance.lifecycle_review_io import (
 )
 from astro_assurance.lifecycle_review_models import (
     LifecycleReviewInputReference,
+    LifecycleReviewInputRole,
     MissionLifecycleReview,
 )
 from astro_core.errors import InvalidScenarioError
 from astro_core.models import AstroModel
 from astro_mission.io import (
     format_mission_lifecycle_summary,
+    load_mission_lifecycle_result,
     load_mission_lifecycle_scenario,
     write_mission_artifact_bundle,
     write_mission_lifecycle_result,
@@ -64,10 +66,10 @@ class EvidenceArtifact(AstroModel):
 
 
 class MissionEvidenceManifest(AstroModel):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.1"
     workflow: Literal["mission_evidence_pack_v1"] = "mission_evidence_pack_v1"
     pack_id: str
-    location_bound: Literal[True] = True
+    location_bound: bool = False
     pack_root: str = Field(min_length=1)
     lifecycle_scenario_id: str
     deterministic_disposition: str
@@ -77,6 +79,13 @@ class MissionEvidenceManifest(AstroModel):
     uncertainty_requirement_fractions: dict[str, float]
     claim_boundaries: dict[str, str]
     artifacts: tuple[EvidenceArtifact, ...]
+
+    @model_validator(mode="after")
+    def location_contract_must_match_schema(self) -> MissionEvidenceManifest:
+        expected = self.schema_version == "1.0"
+        if self.location_bound != expected:
+            raise ValueError("mission evidence location binding must match schema version")
+        return self
 
 
 def load_mission_evidence_pack_spec(path: str | Path) -> MissionEvidencePackSpec:
@@ -184,12 +193,24 @@ def verify_mission_evidence_pack(output_dir: str | Path) -> MissionEvidenceManif
         raise InvalidScenarioError(
             f"mission evidence manifest is missing or invalid: {exc}"
         ) from exc
-    if Path(manifest.pack_root) != root:
+    if manifest.location_bound and Path(manifest.pack_root) != root:
         raise InvalidScenarioError("mission evidence pack moved from its bound location")
+    pack_paths = list(root.rglob("*"))
+    for path in pack_paths:
+        if path.is_symlink():
+            raise InvalidScenarioError(
+                f"mission evidence pack may not contain symbolic links: "
+                f"{path.relative_to(root).as_posix()}"
+            )
+        if path.exists() and not path.resolve().is_relative_to(root):
+            raise InvalidScenarioError(
+                f"mission evidence artifact resolves outside pack: "
+                f"{path.relative_to(root).as_posix()}"
+            )
     declared = {artifact.path for artifact in manifest.artifacts}
     actual = {
         path.relative_to(root).as_posix()
-        for path in root.rglob("*")
+        for path in pack_paths
         if path.is_file() and path.name != _MANIFEST
     }
     if actual != declared:
@@ -199,9 +220,12 @@ def verify_mission_evidence_pack(output_dir: str | Path) -> MissionEvidenceManif
             raise InvalidScenarioError(
                 f"mission evidence artifact digest mismatch: {artifact.path}"
             )
-    review = load_mission_lifecycle_review(root / "assurance/review.json")
-    if verify_mission_lifecycle_review(root / "assurance/review.json") != review:
-        raise InvalidScenarioError("mission evidence lifecycle review verification failed")
+    if manifest.schema_version == "1.0":
+        review = load_mission_lifecycle_review(root / "assurance/review.json")
+        if verify_mission_lifecycle_review(root / "assurance/review.json") != review:
+            raise InvalidScenarioError("mission evidence lifecycle review verification failed")
+    else:
+        _verify_relocated_lifecycle_review(root, manifest)
     campaign_manifest = json.loads((root / "uncertainty/campaign.json").read_text(encoding="utf-8"))
     definition = CampaignDefinition.model_validate(campaign_manifest["definition"])
     with CampaignArtifactStore(root / "uncertainty") as store:
@@ -223,6 +247,123 @@ def _resolve(owner: Path, configured: str) -> Path:
         if resolved.exists():
             return resolved.resolve()
     raise InvalidScenarioError(f"mission evidence input does not exist: {configured}")
+
+
+def _verify_relocated_lifecycle_review(
+    root: Path,
+    manifest: MissionEvidenceManifest,
+) -> None:
+    review = load_mission_lifecycle_review(root / "assurance/review.json")
+    _require_pack_path(
+        review.result_path,
+        manifest.pack_root,
+        "lifecycle/result.json",
+        label="review result",
+    )
+    lifecycle_artifact = _artifact_for_prefix(manifest, "inputs/lifecycle")
+    _require_pack_path(
+        review.scenario_path,
+        manifest.pack_root,
+        lifecycle_artifact.path,
+        label="review scenario",
+    )
+    scenario_path = root / lifecycle_artifact.path
+    scenario_bytes = scenario_path.read_bytes()
+    if sha256(scenario_bytes).hexdigest() != review.scenario_digest:
+        raise InvalidScenarioError("mission evidence review scenario digest mismatch")
+    scenario = load_mission_lifecycle_scenario(scenario_path)
+    roles: tuple[LifecycleReviewInputRole, ...] = (
+        "launch_scenario",
+        "twin_scenario",
+        "reentry_scenario",
+    )
+    role_artifacts = {
+        role: _artifact_for_prefix(manifest, f"inputs/{role}")
+        for role in roles
+    }
+    reference_by_role = {reference.role: reference for reference in review.referenced_inputs}
+    for role, artifact in role_artifacts.items():
+        reference = reference_by_role[role]
+        _require_pack_path(
+            reference.path,
+            manifest.pack_root,
+            artifact.path,
+            label=f"review {role}",
+        )
+        if sha256((root / artifact.path).read_bytes()).hexdigest() != reference.digest:
+            raise InvalidScenarioError(f"mission evidence review {role} digest mismatch")
+        _require_pack_path(
+            str(getattr(scenario, role)),
+            manifest.pack_root,
+            artifact.path,
+            label=f"captured lifecycle {role}",
+        )
+
+    rebound = scenario.model_copy(
+        update={role: str(root / artifact.path) for role, artifact in role_artifacts.items()}
+    )
+    result_path = root / "lifecycle/result.json"
+    stored_result = load_mission_lifecycle_result(result_path)
+    reproduced = run_mission_lifecycle(rebound)
+    if stored_result.model_dump(mode="json") != reproduced.model_dump(mode="json"):
+        raise InvalidScenarioError(
+            "mission evidence lifecycle result does not match relocated captured inputs"
+        )
+
+    with tempfile.TemporaryDirectory(prefix="astro-mission-evidence-review-") as directory:
+        rebound_path = Path(directory) / "lifecycle.yaml"
+        rebound_path.write_text(
+            yaml.safe_dump(rebound.model_dump(mode="json"), sort_keys=False),
+            encoding="utf-8",
+        )
+        expected = review_mission_lifecycle(result_path, rebound_path)
+    normalized_references = tuple(
+        reference.model_copy(update={"path": reference_by_role[reference.role].path})
+        for reference in expected.referenced_inputs
+    )
+    normalized = expected.model_copy(
+        update={
+            "result_path": review.result_path,
+            "scenario_path": review.scenario_path,
+            "scenario_digest": review.scenario_digest,
+            "referenced_inputs": normalized_references,
+        }
+    )
+    if normalized != review:
+        raise InvalidScenarioError("mission evidence relocated lifecycle review does not match")
+
+
+def _artifact_for_prefix(
+    manifest: MissionEvidenceManifest,
+    prefix: str,
+) -> EvidenceArtifact:
+    matches = [
+        artifact
+        for artifact in manifest.artifacts
+        if artifact.path.startswith(prefix + ".")
+    ]
+    if len(matches) != 1:
+        raise InvalidScenarioError(f"mission evidence requires exactly one {prefix} artifact")
+    return matches[0]
+
+
+def _require_pack_path(
+    configured: str,
+    creation_root: str,
+    expected_relative: str,
+    *,
+    label: str,
+) -> None:
+    configured_path = Path(configured)
+    creation_path = Path(creation_root)
+    if not configured_path.is_absolute() or not creation_path.is_absolute():
+        raise InvalidScenarioError(f"{label} must preserve an absolute creation path")
+    try:
+        relative = configured_path.relative_to(creation_path)
+    except ValueError as exc:
+        raise InvalidScenarioError(f"{label} escapes the recorded creation root") from exc
+    if relative.as_posix() != expected_relative:
+        raise InvalidScenarioError(f"{label} does not match the fixed pack layout")
 
 
 def _load_bound_campaign(path: Path) -> CampaignDefinition:

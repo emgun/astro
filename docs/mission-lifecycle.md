@@ -28,10 +28,15 @@ and records a sorted SHA-256 inventory in the top-level `manifest.json`. Verific
 exact inventory and digests, repeats the lifecycle review against captured inputs, and reopens the
 campaign through its existing integrity and completed-state checks.
 
-The v1 review contract records absolute captured-input paths, so the pack is explicitly bound to
-its publish location and verification fails after relocation. The lifecycle, assurance, and
-uncertainty claim boundaries remain separate. In particular, the checked eight-case campaign is
-deterministic design-space screening and does not estimate operational mission reliability.
+Pack manifest schema `1.1` preserves the original absolute paths as creation provenance while the
+pack verifier maps them onto the fixed captured layout. A copied or renamed pack therefore verifies
+without rewriting its manifest, review, or captured inputs. Path escape, role substitution, digest
+drift, and layout drift fail closed. Legacy schema `1.0` packs remain bound to their publish
+location, and standalone `mission_lifecycle_review_v1` files retain their existing path semantics.
+
+The lifecycle, assurance, and uncertainty claim boundaries remain separate. In particular, the
+checked eight-case campaign is deterministic design-space screening and does not estimate
+operational mission reliability.
 
 ## Run The Reference Mission
 
