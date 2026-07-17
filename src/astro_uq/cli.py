@@ -63,7 +63,7 @@ from astro_uq.runner import CampaignRuntime, run_campaign
 from astro_uq.sensitivity import analyze_campaign_sensitivity
 from astro_uq.statistics import summarize_campaign
 
-SOFTWARE_COMPATIBILITY = {"astro-suite": "0.2.0rc2", "campaign-runtime": "1.2"}
+SOFTWARE_COMPATIBILITY = {"astro-suite": "0.2.0", "campaign-runtime": "1.2"}
 _RESOLVED_DEPENDENCIES_KEY = "resolved_dependencies"
 
 

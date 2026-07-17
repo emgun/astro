@@ -6,6 +6,16 @@ Use this checklist before tagging or publishing a release candidate.
 
 Latest merged-main evidence:
 
+- 2026-07-16: final `v0.2.0` preparation is release-only. Package and campaign compatibility
+  identity advance from `0.2.0rc2` to `0.2.0`; campaign runtime remains `1.2`. Physics, public APIs,
+  artifact schemas, checked evidence, and claim boundaries are frozen.
+- 2026-07-16: final-package local verification passes `1055 tests with 11 optional-backend skips`,
+  Ruff, strict MyPy across 152 source files, `git diff --check`, 10 focused package/twin tests,
+  sdist/wheel builds, metadata/content inspection, and isolated wheel-installed lifecycle-review
+  and covariance-validation workflows. Package metadata and campaign compatibility both report
+  `0.2.0`; campaign runtime remains `1.2`. The lifecycle review remains `design_review_ready` with
+  12 findings and no warnings, and covariance remains `criteria_satisfied` at 11/11 epochs with
+  zero blockers. CI, merged-commit verification, and tagging remain pending.
 - 2026-07-16: `v0.2.0-rc.2` preparation scopes the 28 commits after `v0.2.0-rc.1` as a release
   consolidation increment: deterministic assurance and lifecycle reviews, explicit digital-twin
   margin units and v2 workflow identifiers, mission calibration evidence contracts, the four-cell
