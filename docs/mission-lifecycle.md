@@ -10,6 +10,29 @@ launch -> orbit handoff -> operations twin -> deorbit burn/coast -> reentry
 The workflow does not replace the phase models. It orchestrates them and verifies the state, epoch,
 and mass boundaries between their suite-owned products.
 
+## Flagship Evidence Pack
+
+The recommended first run packages the lifecycle result, deterministic assurance review, and the
+existing seeded lifecycle uncertainty campaign behind one fixed contract:
+
+```bash
+astro run-mission-evidence examples/workflows/leo_mission_evidence.yaml \
+  --output-dir /tmp/astro-mission-evidence
+astro verify-mission-evidence /tmp/astro-mission-evidence
+```
+
+`mission_evidence_pack_v1` is a thin publisher, not another mission engine. Its YAML only names the
+existing lifecycle scenario and uncertainty campaign. It captures those inputs and the referenced
+launch, twin, and reentry scenarios; publishes lifecycle, review, and campaign products atomically;
+and records a sorted SHA-256 inventory in the top-level `manifest.json`. Verification checks the
+exact inventory and digests, repeats the lifecycle review against captured inputs, and reopens the
+campaign through its existing integrity and completed-state checks.
+
+The v1 review contract records absolute captured-input paths, so the pack is explicitly bound to
+its publish location and verification fails after relocation. The lifecycle, assurance, and
+uncertainty claim boundaries remain separate. In particular, the checked eight-case campaign is
+deterministic design-space screening and does not estimate operational mission reliability.
+
 ## Run The Reference Mission
 
 ```bash
@@ -100,9 +123,9 @@ magnitude. Typed status and the lifecycle runner's limiting-margin identity rema
 `verify-mission-lifecycle-review` repeats the complete chain and rejects stored review tampering.
 
 This v1 proves exact output reproducibility against the captured top-level and referenced scenario
-files under the current local runtime. The existing lifecycle artifact manifest has no file
-digests, so the review does not claim
-cryptographic integrity for a separately copied artifact bundle. It does not establish probability,
+files under the current local runtime. A standalone lifecycle artifact bundle still has no file
+digests; cryptographic inventory coverage is provided only when it is published inside the mission
+evidence pack. The review does not establish probability,
 causality, flight qualification, subsystem certification, operational diagnosis, or remediation
 authority.
 

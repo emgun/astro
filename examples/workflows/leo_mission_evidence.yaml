@@ -1,0 +1,5 @@
+schema_version: "1.0"
+workflow: mission_evidence_pack_v1
+pack_id: leo-mission-evidence-v1
+lifecycle_scenario: examples/lifecycle/leo_round_trip.yaml
+uncertainty_campaign: examples/campaigns/leo_lifecycle_robustness.yaml

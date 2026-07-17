@@ -102,6 +102,10 @@ from astro_launch.reporting import (
 )
 from astro_launch.targeting import sweep_pitch_program, tune_pitch_program
 from astro_mission.errors import MissionLifecycleError
+from astro_mission.evidence import (
+    run_mission_evidence_pack,
+    verify_mission_evidence_pack,
+)
 from astro_mission.io import (
     format_mission_lifecycle_summary,
     load_mission_lifecycle_scenario,
@@ -743,6 +747,48 @@ def run_mission_lifecycle_command(
         typer.echo(f"wrote mission lifecycle summary: {summary_output}")
     if artifacts_dir is not None:
         typer.echo(f"wrote mission artifact bundle: {artifacts_dir}")
+
+
+@app.command("run-mission-evidence")
+def run_mission_evidence_command(
+    spec_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Mission evidence pack YAML path."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir", help="Publish the evidence pack to a new directory."),
+    ],
+    workers: Annotated[int, typer.Option("--workers", min=1)] = 1,
+) -> None:
+    """Run the deterministic lifecycle, review, and uncertainty evidence pack."""
+    try:
+        manifest = run_mission_evidence_pack(spec_path, output_dir, workers=workers)
+    except (InvalidScenarioError, MissionLifecycleError, ValueError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(manifest.model_dump_json())
+
+
+@app.command("verify-mission-evidence")
+def verify_mission_evidence_command(
+    output_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+) -> None:
+    """Verify pack digests, deterministic review, and campaign integrity."""
+    try:
+        manifest = verify_mission_evidence_pack(output_dir)
+    except (InvalidScenarioError, ValueError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        json.dumps(
+            {"pack_id": manifest.pack_id, "verified": True, "workflow": manifest.workflow},
+            sort_keys=True,
+        )
+    )
 
 
 @app.command("run-mission-assurance")

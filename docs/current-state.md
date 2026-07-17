@@ -656,9 +656,10 @@ Post-MVP / external-campaign items:
 
 ## Next Best Paths
 
-1. Consolidate the existing launch-to-reentry, uncertainty, assurance, and review surfaces into one
-   discoverable flagship workflow and first-run path without duplicating domain logic or adding a
-   second orchestration layer.
+1. Validate and publish `mission_evidence_pack_v1`: one fixed first-run contract now composes the
+   existing launch-to-reentry lifecycle, deterministic review, and seeded lifecycle uncertainty
+   campaign into an atomic SHA-256-inventoried directory. Keep v1 location-bound until the
+   lifecycle-review path contract can become relocatable without weakening exact reproduction.
 2. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence

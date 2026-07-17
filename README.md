@@ -52,6 +52,19 @@ Backend runtimes may also need system setup, data files, or platform-specific in
 
 ## Quick Start
 
+Run and verify the flagship mission evidence workflow. This fixed pack connects the deterministic
+launch-to-reentry lifecycle, its reproducibility review, and the seeded lifecycle uncertainty
+campaign while preserving each product's claim boundary:
+
+```bash
+astro run-mission-evidence examples/workflows/leo_mission_evidence.yaml \
+  --output-dir /tmp/astro-mission-evidence
+astro verify-mission-evidence /tmp/astro-mission-evidence
+```
+
+The output is an atomic, digest-inventoried evidence directory. The reference campaign is bounded
+design-space robustness screening; its sample frequencies are not operational probabilities.
+
 Validate and propagate a local orbit scenario:
 
 ```bash

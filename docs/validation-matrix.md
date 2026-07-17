@@ -14,6 +14,7 @@ Rows that exercise optional engines through live CLI commands belong in `Optiona
 
 | Area | Command | Expected Result |
 | --- | --- | --- |
+| Mission evidence flagship | `astro run-mission-evidence examples/workflows/leo_mission_evidence.yaml --output-dir /tmp/astro-mission-evidence`, `astro verify-mission-evidence /tmp/astro-mission-evidence`, and `python -m pytest tests/astro_mission/test_evidence.py -q` | Atomically publishes the checked lifecycle result and phase artifacts, deterministic lifecycle review, captured inputs, and seeded eight-case lifecycle robustness campaign. The top-level manifest inventories every pack file by SHA-256; verification rejects inventory or digest changes, repeats lifecycle-review reproduction, and requires campaign integrity plus completed state. V1 is explicitly publish-location-bound. Lifecycle, assurance, and uncertainty claim boundaries remain separate; campaign frequencies are design-space screening, not operational probabilities. |
 | Test suite | `python -m pytest -q` | All non-live tests pass; Orekit live tests remain skipped unless explicitly enabled. |
 | Lint | `python -m ruff check .` | No lint findings. |
 | Types | `python -m mypy` | Strict type checking passes. |
