@@ -15,7 +15,13 @@ Latest merged-main evidence:
   and covariance-validation workflows. Package metadata and campaign compatibility both report
   `0.2.0`; campaign runtime remains `1.2`. The lifecycle review remains `design_review_ready` with
   12 findings and no warnings, and covariance remains `criteria_satisfied` at 11/11 epochs with
-  zero blockers. CI, merged-commit verification, and tagging remain pending.
+  zero blockers.
+- 2026-07-16: GitHub CI passed in `4m46s`; PR #36 merged at
+  `0d76d57d74d643c9297b95359ffa3bcdaff5d99a`. A fresh detached worktree at that exact merge commit
+  repeated `1055 passed, 11 skipped`, Ruff, strict MyPy across 152 source files, clean-tree review,
+  final sdist/wheel builds, and isolated wheel-installed lifecycle-review and covariance-validation
+  workflows. Annotated tag `v0.2.0` was published and its peeled remote target resolves exactly to
+  `0d76d57d74d643c9297b95359ffa3bcdaff5d99a`.
 - 2026-07-16: `v0.2.0-rc.2` preparation scopes the 28 commits after `v0.2.0-rc.1` as a release
   consolidation increment: deterministic assurance and lifecycle reviews, explicit digital-twin
   margin units and v2 workflow identifiers, mission calibration evidence contracts, the four-cell
