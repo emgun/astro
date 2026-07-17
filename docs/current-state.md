@@ -93,6 +93,17 @@ candidate correction, estimate/truth replay, and a corrected digital twin in one
 merged the implementation to `main` at `0d73d5b`; it remains deterministic local design screening
 and does not claim RF acquisition, operational navigation, or flight-command authority.
 
+The public first-run flagship now sits one level above that domain workflow. PR #38 merged
+`mission_evidence_pack_v1` at `6d28390`: one fixed pack publishes the launch-to-reentry lifecycle,
+deterministic lifecycle review, captured inputs, and seeded lifecycle uncertainty campaign with an
+atomic SHA-256 inventory. The checked eight-case pack is `design_review_ready`, completes all eight
+samples, and keeps design-space requirement fractions separate from operational probability.
+
+Project-specific steward learning: portability belongs at the evidence-pack boundary when the
+embedded standalone artifact intentionally retains absolute path semantics. Reconstruct relocated
+evidence only through a fixed captured layout; do not silently broaden the generic verifier or
+rewrite evidence after publication.
+
 The first uncertainty layer over the deterministic assurance reference is implemented through the
 generic campaign engine. A paired assurance-validation protocol now separates independent tracking
 realizations, estimator-noise mismatch, execution timing/pointing, and force-model mismatch. AI should
@@ -653,13 +664,13 @@ Post-MVP / external-campaign items:
 | covariance-evidence-acquisition | done | acquire/verify | steward | native Orekit/Tudat comparison, aligned zero-Q predictor/reference pair, and 512-realization raw Tudat truth-error campaign | The checked high-fidelity campaign passes 11/11 comparison epochs and its empirical campaign satisfies the preregistered NEES criteria with 480/512 observed coverage, a 0.916957 one-sided lower bound, and no blockers. Applicability and raw states are provenance-bound; this remains machine-scoped validation evidence, not certification or operational authority. |
 | v0.2.0-rc.2 | done | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Local, wheel-installed, CI, detached merged-commit, and remote annotated-tag evidence agree at `f224a06`; the candidate is ready for a short soak. |
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
+| mission-evidence-flagship | active | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390` after `1058 passed, 11 skipped`, package, source-tree, isolated-wheel, and CI gates. The active follow-on replaces the explicit location binding with backward-compatible schema `1.1` pack-scoped relocation verification while leaving standalone review semantics unchanged. |
 
 ## Next Best Paths
 
-1. Validate and publish `mission_evidence_pack_v1`: one fixed first-run contract now composes the
-   existing launch-to-reentry lifecycle, deterministic review, and seeded lifecycle uncertainty
-   campaign into an atomic SHA-256-inventoried directory. Keep v1 location-bound until the
-   lifecycle-review path contract can become relocatable without weakening exact reproduction.
+1. Finish and independently verify mission-evidence manifest schema `1.1`, which makes the fixed
+   evidence pack relocatable without changing standalone lifecycle-review semantics or accepting
+   paths outside the captured layout.
 2. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
