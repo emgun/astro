@@ -1,14 +1,19 @@
 # AI-Native Assurance Operator Design
 
+> Superseded on 2026-07-17 by
+> `docs/superpowers/specs/2026-07-17-ai-native-mission-operator-design.md`. This document describes
+> the completed deterministic assurance-review product. Its prohibitions on autonomous action and
+> command authority were slice-specific constraints, not permanent AI architecture principles.
+
 ## Decision
 
-Build the operator as a typed decision-support layer over verified Astro Suite evidence. Do not add
-a second physics orchestrator, an autonomous maneuver agent, or an LLM-authored pass/fail path.
+This completed slice built a typed decision-support layer over verified Astro Suite evidence. It did
+not add a second physics orchestrator, maneuver execution, or a model-authored pass/fail path.
 
 The first product is a deterministic paired-assurance review. It verifies the source artifact,
 extracts outcome reversals, calibration limits, claim boundaries, and decision-relevant metric
 shifts, and writes a suite-owned review artifact. An optional model may later explain or prioritize
-that artifact, but the deterministic review remains the authority.
+that artifact, while deterministic derivation remains the source of findings in this artifact.
 
 ## Ownership
 
@@ -16,9 +21,9 @@ that artifact, but the deterministic review remains the authority.
   and the public review command.
 - `astro_assistant` owns allow-listed plans and policy for verify/review workflows.
 - External models may produce commentary linked to review finding ids. They may not create, delete,
-  downgrade, or change deterministic findings.
-- Existing physics, OD, UQ, calibration, and paired-validation modules remain authoritative for
-  their own products.
+  downgrade, or change findings inside this deterministic review artifact.
+- Existing physics, OD, UQ, calibration, and paired-validation modules remain the typed producers
+  for their own products.
 
 ## Review Contract
 
@@ -73,7 +78,8 @@ actions with their finding ids. They cannot execute work or promote evidence aut
 A later provider-backed explainer may consume only the typed review plus explicitly selected source
 artifacts. Its output must record provider/model identity, prompt-template digest, input digests,
 finding-id coverage, unsupported-claim diagnostics, and deterministic post-validation. Provider use
-is optional and never part of the required release gate.
+is optional and not part of this review product's required release gate. The broader mission
+operator may grant a provider progressively greater authority through a separate explicit contract.
 
 ## Exit Gate
 

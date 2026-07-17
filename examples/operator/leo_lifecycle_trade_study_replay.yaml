@@ -1,0 +1,62 @@
+- when:
+    step_count: 0
+    evidence_ids_present: [base-scenario]
+  action:
+    action_id: evaluate-baseline
+    kind: evaluate_candidate
+    rationale: Establish the base integrated lifecycle evidence before changing the design.
+    evidence_ids: [base-scenario]
+    candidate:
+      candidate_id: baseline
+      assignments: {}
+      description: Evaluate the checked lifecycle without additional overrides.
+- when:
+    last_candidate_id: baseline
+    last_evaluation_status: evaluated
+    last_candidate_passed: true
+  action:
+    action_id: evaluate-lighter
+    kind: evaluate_candidate
+    rationale: Test whether lower wet mass improves the integrated objective after observing the baseline.
+    evidence_ids: [candidate:baseline:result]
+    candidate:
+      candidate_id: lighter-spacecraft
+      assignments:
+        spacecraft_wet_mass_kg: 480.0
+      description: Reduce wet mass by 20 kg.
+- when:
+    last_candidate_id: lighter-spacecraft
+    last_evaluation_status: evaluated
+    last_candidate_passed: true
+  action:
+    action_id: finish-lighter-trade
+    kind: finish
+    rationale: The lighter candidate passed, so no recovery branch is needed.
+    evidence_ids: [candidate:lighter-spacecraft:result]
+    selected_candidate_id: lighter-spacecraft
+    conclusion: The lighter candidate passes the integrated lifecycle and is selected without evaluating the recovery branch.
+- when:
+    last_candidate_id: lighter-spacecraft
+    last_evaluation_status: evaluation_failed
+    last_candidate_passed: false
+  action:
+    action_id: evaluate-higher-reserve
+    kind: evaluate_candidate
+    rationale: The lighter case loses propellant reserve; test a bounded higher wet-mass design.
+    evidence_ids: [candidate:lighter-spacecraft:error]
+    candidate:
+      candidate_id: higher-reserve
+      assignments:
+        spacecraft_wet_mass_kg: 520.0
+      description: Increase available wet mass by 20 kg.
+- when:
+    last_candidate_id: higher-reserve
+    last_evaluation_status: evaluated
+    last_candidate_passed: true
+  action:
+    action_id: finish-higher-reserve-trade
+    kind: finish
+    rationale: Select the evaluated passing recovery design with the larger propellant reserve.
+    evidence_ids: [candidate:higher-reserve:result]
+    selected_candidate_id: higher-reserve
+    conclusion: The higher-reserve candidate passes the integrated lifecycle and improves deorbit propellant reserve within the declared design envelope.

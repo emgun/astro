@@ -1,5 +1,9 @@
 # AI-Native Assurance Operator Implementation Plan
 
+> Completed historical plan. The broader AI-native architecture continues in
+> `docs/superpowers/specs/2026-07-17-ai-native-mission-operator-design.md`. The deferred prohibition
+> on autonomous execution applied to this assurance-review slice only.
+
 **Goal:** Add deterministic evidence review and typed assistant orchestration over paired
 mission-assurance validation without granting autonomous or operational authority.
 
@@ -58,4 +62,5 @@ Gate: path/flag injection fails closed and existing OD/campaign plans remain unc
 - Cross-campaign anomaly explanation beyond deterministic review comparison.
 - Mission-assurance case and lifecycle review beyond paired validation.
 - Active evidence-acquisition recommendations tied to real station or propulsion residuals.
-- Any autonomous execution, model promotion, or operational command path.
+- Autonomous execution, model promotion, or operational commands within this assurance-review
+  workflow.

@@ -65,6 +65,21 @@ astro verify-mission-evidence /tmp/astro-mission-evidence
 The output is an atomic, digest-inventoried evidence directory. The reference campaign is bounded
 design-space robustness screening; its sample frequencies are not operational probabilities.
 
+Run the provider-neutral adaptive mission operator with its checked reasoner replay:
+
+```bash
+astro run-mission-operator examples/operator/leo_lifecycle_trade_study.yaml \
+  --reasoner-replay examples/operator/leo_lifecycle_trade_study_replay.yaml \
+  --output-dir /tmp/astro-mission-operator
+astro verify-mission-operator /tmp/astro-mission-operator
+```
+
+The conditional replay exercises the same typed reasoner boundary used by future model providers:
+it finishes on a passing lighter design or evaluates a higher-reserve recovery candidate after the
+typed failure observation. The active authority grant determines which analyses are permitted and
+stages progressively higher command authority. This checked example uses research authority and
+publishes digest-bound lifecycle observations; schema 1.0 does not commit commands.
+
 Validate and propagate a local orbit scenario:
 
 ```bash
