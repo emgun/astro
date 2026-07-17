@@ -664,24 +664,29 @@ Post-MVP / external-campaign items:
 | covariance-evidence-acquisition | done | acquire/verify | steward | native Orekit/Tudat comparison, aligned zero-Q predictor/reference pair, and 512-realization raw Tudat truth-error campaign | The checked high-fidelity campaign passes 11/11 comparison epochs and its empirical campaign satisfies the preregistered NEES criteria with 480/512 observed coverage, a 0.916957 one-sided lower bound, and no blockers. Applicability and raw states are provenance-bound; this remains machine-scoped validation evidence, not certification or operational authority. |
 | v0.2.0-rc.2 | done | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Local, wheel-installed, CI, detached merged-commit, and remote annotated-tag evidence agree at `f224a06`; the candidate is ready for a short soak. |
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
-| mission-evidence-flagship | active | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390` after `1058 passed, 11 skipped`, package, source-tree, isolated-wheel, and CI gates. The active follow-on replaces the explicit location binding with backward-compatible schema `1.1` pack-scoped relocation verification while leaving standalone review semantics unchanged. |
+| mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
+| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, progressive authority grant, provider-neutral reasoner, lifecycle candidate evaluator, replayable evidence journal, checked trade study | First slice implements bounded adaptive lifecycle evaluation and a research-authority replay while staging supervised, delegated, and mission-autonomy levels in the authority contract. Schema `1.0` refuses command commit until prepare/commit journaling and idempotency exist. Exit requires public, focused/full, typing, packaging, independent-review, CI, and integration gates. |
 
 ## Next Best Paths
 
-1. Finish and independently verify mission-evidence manifest schema `1.1`, which makes the fixed
-   evidence pack relocatable without changing standalone lifecycle-review semantics or accepting
-   paths outside the captured layout.
-2. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
+1. Finish and independently verify the first AI-native mission-operator slice: provider-neutral
+   adaptive evaluation, progressive authority enforcement, evidence-journal verification, and the
+   checked lifecycle trade study. Treat current research-only execution as a maturity state, not a
+   permanent prohibition on higher autonomy.
+2. Add a real model provider adapter with digest-bound provider/model/prompt/tool provenance, then
+   evaluate whether it improves candidate selection, evidence acquisition, or stopping decisions
+   over checked baselines.
+3. Add prepare/commit simulation command tools and exercise supervised authority before delegated
+   or mission-autonomy grants. Qualification, freshness, revocation, resource bounds, and
+   idempotency should grow in proportion to the command risk.
+4. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
    before considering a mission-calibrated protocol claim.
-3. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
+5. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
    needed; do not infer bundle integrity from result re-execution.
-4. Add optional evidence-bound explanations over verified finding ids only after deterministic
-   triage is sufficient. Keep autonomous execution closed, and keep surrogate acceleration closed
-   unless a measured assurance teacher or other evaluator passes the cost and fidelity gate.
-5. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+6. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-6. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+7. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.

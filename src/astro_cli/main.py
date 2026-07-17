@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Annotated
 
@@ -132,6 +134,17 @@ from astro_od.io import (
     resolve_measurement_format,
 )
 from astro_od.measurements import generate_synthetic_measurements
+from astro_operator.engine import run_operator
+from astro_operator.errors import OperatorError
+from astro_operator.io import (
+    capture_base_scenario_evidence,
+    load_mission_operator_spec,
+    load_operator_replay,
+    verify_operator_run,
+    write_operator_run,
+)
+from astro_operator.lifecycle import LifecycleCandidateEvaluator, resolve_lifecycle_references
+from astro_operator.reasoner import ConditionalReplayReasoner
 from astro_reentry.backends import simulate_reentry_with_backend
 from astro_reentry.handoff import trajectory_to_reentry_scenario
 from astro_reentry.io import (
@@ -768,6 +781,113 @@ def run_mission_evidence_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(manifest.model_dump_json())
+
+
+@app.command("run-mission-operator")
+def run_mission_operator_command(
+    spec_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Mission operator objective YAML path."),
+    ],
+    reasoner_replay: Annotated[
+        Path,
+        typer.Option(
+            "--reasoner-replay",
+            exists=True,
+            readable=True,
+            help="Checked typed action replay for the provider-neutral reasoner boundary.",
+        ),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir", help="Publish the operator run to a new directory."),
+    ],
+) -> None:
+    """Run an adaptive, authority-scoped mission operator replay."""
+    if output_dir.exists():
+        typer.echo("operator output directory must not already exist", err=True)
+        raise typer.Exit(code=2)
+    partial_dir: Path | None = None
+    try:
+        output_dir.parent.mkdir(parents=True, exist_ok=True)
+        if output_dir.exists():
+            raise OperatorError("operator output directory was created by another run")
+        partial_dir = Path(
+            tempfile.mkdtemp(
+                prefix=f".{output_dir.name}.partial-",
+                dir=output_dir.parent,
+            )
+        )
+        spec = load_mission_operator_spec(spec_path)
+        declared_scenario_path = Path(spec.base_scenario_path)
+        scenario_path = (
+            declared_scenario_path
+            if declared_scenario_path.is_absolute()
+            else spec_path.parent / declared_scenario_path
+        ).resolve()
+        scenario_evidence = capture_base_scenario_evidence(scenario_path, partial_dir)
+        scenario = resolve_lifecycle_references(
+            load_mission_lifecycle_scenario(partial_dir / scenario_evidence.path),
+            scenario_path,
+        )
+        objective = type(spec.objective).model_validate(
+            {
+                **spec.objective.model_dump(mode="python"),
+                "base_evidence": (
+                    *spec.objective.base_evidence,
+                    scenario_evidence,
+                ),
+            }
+        )
+        evaluator = LifecycleCandidateEvaluator(
+            base_scenario=scenario,
+            design_variables=objective.design_variables,
+            output_root=partial_dir,
+        )
+        run = run_operator(
+            objective=objective,
+            authority=spec.authority,
+            reasoner=ConditionalReplayReasoner(load_operator_replay(reasoner_replay)),
+            evaluator=evaluator,
+        )
+        write_operator_run(partial_dir / "operator-run.json", run)
+        partial_dir.replace(output_dir)
+        partial_dir = None
+    except (
+        InvalidScenarioError,
+        MissionLifecycleError,
+        OperatorError,
+        OSError,
+        ValueError,
+    ) as exc:
+        if partial_dir is not None and partial_dir.exists():
+            shutil.rmtree(partial_dir)
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"operator {run.status.value}: {len(run.steps)} steps, "
+        f"selected={run.selected_candidate_id or 'none'}"
+    )
+    typer.echo(f"wrote mission operator run: {output_dir}")
+
+
+@app.command("verify-mission-operator")
+def verify_mission_operator_command(
+    output_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+) -> None:
+    """Verify a mission operator journal and every local evidence digest."""
+    try:
+        run = verify_operator_run(output_dir)
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"verified mission operator run: {run.status.value}, "
+        f"evidence={len(run.known_evidence)}"
+    )
 
 
 @app.command("verify-mission-evidence")

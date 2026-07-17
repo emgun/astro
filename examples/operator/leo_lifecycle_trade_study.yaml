@@ -1,0 +1,33 @@
+base_scenario_path: ../lifecycle/leo_round_trip.yaml
+objective:
+  objective_id: leo-lifecycle-propellant-trade
+  summary: Find a passing lifecycle design with improved deorbit propellant reserve.
+  design_variables:
+    - variable_id: spacecraft_wet_mass_kg
+      target: spacecraft_wet_mass_kg
+      lower_bound: 470.0
+      upper_bound: 530.0
+      unit: kg
+    - variable_id: upper_stage_thrust_n
+      target: launch_upper_stage_thrust_n
+      lower_bound: 190000.0
+      upper_bound: 210000.0
+      unit: N
+  metric_goals:
+    - metric_id: margin:deorbit:propellant_reserve
+      objective: maximize while retaining a passing integrated lifecycle
+      unit: kg
+    - metric_id: margin:deorbit:entry_interface_altitude_error
+      objective: retain a nonnegative margin
+      unit: km
+  metadata:
+    example_role: provider_neutral_operator_objective
+authority:
+  grant_id: checked-leo-trade-study
+  level: research
+  mission_scope: checked LEO lifecycle design trade
+  allowed_actions: [evaluate_candidate, finish]
+  max_steps: 5
+  max_candidate_evaluations: 4
+  metadata:
+    authority_note: This checked example grants analysis authority only; the kernel supports higher grants.
