@@ -48,8 +48,36 @@ def test_checked_operator_example_runs_and_verifies(tmp_path: Path) -> None:
         "evaluation_failed",
         "evaluated",
     ]
+    assert all(step.reasoner_invocation is not None for step in run.steps)
+    providers = {
+        step.reasoner_invocation.provider
+        for step in run.steps
+        if step.reasoner_invocation
+    }
+    assert providers == {"deterministic-replay"}
 
     trace_path = output / "operator-run.json"
+    trace_payload = json.loads(trace_path.read_text(encoding="utf-8"))
+    trace_payload["steps"][0]["reasoner_invocation"]["provider"] = "forged-provider"
+    trace_path.write_text(json.dumps(trace_payload), encoding="utf-8")
+    with pytest.raises(InvalidScenarioError, match="record digest"):
+        verify_operator_run(output)
+    write_operator_run(trace_path, run)
+
+    trace_payload = json.loads(trace_path.read_text(encoding="utf-8"))
+    del trace_payload["steps"][0]["reasoner_invocation"]
+    trace_path.write_text(json.dumps(trace_payload), encoding="utf-8")
+    with pytest.raises(InvalidScenarioError, match="requires reasoner provenance"):
+        verify_operator_run(output)
+    write_operator_run(trace_path, run)
+
+    trace_payload = json.loads(trace_path.read_text(encoding="utf-8"))
+    trace_payload["schema_version"] = "1.0"
+    trace_path.write_text(json.dumps(trace_payload), encoding="utf-8")
+    with pytest.raises(InvalidScenarioError, match="does not contain reasoner provenance"):
+        verify_operator_run(output)
+    write_operator_run(trace_path, run)
+
     trace_payload = json.loads(trace_path.read_text(encoding="utf-8"))
     trace_payload["schema_version"] = "2.0"
     trace_path.write_text(json.dumps(trace_payload), encoding="utf-8")

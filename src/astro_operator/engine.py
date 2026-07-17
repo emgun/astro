@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import warnings
 from typing import Protocol
 
-from astro_operator.errors import OperatorPolicyError
+from astro_operator.errors import OperatorPolicyError, ReasonerInvalidResponseError
 from astro_operator.models import (
     AuthorityGrant,
     CandidateObservation,
@@ -17,6 +18,7 @@ from astro_operator.models import (
     OperatorRunStatus,
     OperatorState,
     OperatorStep,
+    ReasonerDecision,
 )
 from astro_operator.policy import (
     validate_action_against_grant,
@@ -24,7 +26,7 @@ from astro_operator.policy import (
     validate_observation_against_objective,
     validate_operator_run_policy,
 )
-from astro_operator.reasoner import MissionReasoner
+from astro_operator.reasoner import MissionReasoner, invocation_digest, model_digest
 
 
 class CandidateEvaluator(Protocol):
@@ -70,7 +72,38 @@ def run_operator(
                 authority.max_candidate_evaluations - evaluation_count
             ),
         )
-        action = reasoner.decide(state).model_copy(deep=True)
+        expected_input_sha256 = model_digest(state)
+        raw_decision = reasoner.decide(state)
+        if not isinstance(raw_decision, ReasonerDecision):
+            raise ReasonerInvalidResponseError(
+                "mission reasoner must return a ReasonerDecision"
+            )
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error")
+                decision = ReasonerDecision.model_validate(
+                    raw_decision.model_dump(mode="python", round_trip=True)
+                )
+        except Exception as exc:
+            raise ReasonerInvalidResponseError(
+                "mission reasoner returned an invalid ReasonerDecision"
+            ) from exc
+        action = decision.action
+        if decision.invocation.input_sha256 != expected_input_sha256:
+            raise ReasonerInvalidResponseError(
+                "reasoner invocation input digest does not match operator state"
+            )
+        if decision.invocation.output_sha256 != model_digest(action):
+            raise ReasonerInvalidResponseError(
+                "reasoner invocation output digest does not match action"
+            )
+        if (
+            decision.invocation.record_sha256 is None
+            or decision.invocation.record_sha256 != invocation_digest(decision.invocation)
+        ):
+            raise ReasonerInvalidResponseError(
+                "reasoner invocation record digest does not match provenance"
+            )
         _check_authority(authority, authority_monitor)
         _validate_action(
             action,
@@ -98,6 +131,7 @@ def run_operator(
                 OperatorStep(
                     sequence=len(steps) + 1,
                     action=action,
+                    reasoner_invocation=decision.invocation,
                     observation=observation,
                 )
             )
@@ -116,6 +150,7 @@ def run_operator(
                 OperatorStep(
                     sequence=len(steps) + 1,
                     action=action,
+                    reasoner_invocation=decision.invocation,
                     acquired_evidence=acquired,
                 )
             )
@@ -128,12 +163,18 @@ def run_operator(
                     f"command {action.command.command_id} has already been proposed"
                 )
             proposed_commands[action.command.command_id] = action.command
-            steps.append(OperatorStep(sequence=len(steps) + 1, action=action))
+            steps.append(
+                OperatorStep(
+                    sequence=len(steps) + 1,
+                    action=action,
+                    reasoner_invocation=decision.invocation,
+                )
+            )
             continue
 
         if action.kind == OperatorActionKind.EXECUTE_COMMAND:
             raise OperatorPolicyError(
-                "operator schema 1.0 stages command authority but does not support command commit; "
+                "operator command contract stages authority but does not support command commit; "
                 "add prepare/commit journaling and idempotency before enabling execution"
             )
 
@@ -143,9 +184,16 @@ def run_operator(
             and action.selected_candidate_id not in evaluated_candidates
         ):
             raise OperatorPolicyError("selected candidate must have been evaluated")
-        steps.append(OperatorStep(sequence=len(steps) + 1, action=action))
+        steps.append(
+            OperatorStep(
+                sequence=len(steps) + 1,
+                action=action,
+                reasoner_invocation=decision.invocation,
+            )
+        )
         assert action.conclusion is not None
         run = OperatorRun(
+            schema_version="1.1",
             objective=objective,
             authority=authority,
             status=OperatorRunStatus.COMPLETED,
@@ -158,6 +206,7 @@ def run_operator(
         return run
 
     run = OperatorRun(
+        schema_version="1.1",
         objective=objective,
         authority=authority,
         status=OperatorRunStatus.BUDGET_EXHAUSTED,

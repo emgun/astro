@@ -665,15 +665,15 @@ Post-MVP / external-campaign items:
 | v0.2.0-rc.2 | done | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Local, wheel-installed, CI, detached merged-commit, and remote annotated-tag evidence agree at `f224a06`; the candidate is ready for a short soak. |
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
-| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, progressive authority grant, provider-neutral reasoner, lifecycle candidate evaluator, replayable evidence journal, checked trade study | First slice implements bounded adaptive lifecycle evaluation and a research-authority replay while staging supervised, delegated, and mission-autonomy levels in the authority contract. Schema `1.0` refuses command commit until prepare/commit journaling and idempotency exist. Exit requires public, focused/full, typing, packaging, independent-review, CI, and integration gates. |
+| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, progressive authority grant, provider-neutral reasoner, lifecycle candidate evaluator, replayable evidence journal, checked trade study | The merged kernel provides bounded adaptive lifecycle evaluation and progressive authority. The active follow-on adds a strict `ReasonerDecision` envelope, engine-verified state/action digests, journaled provider-neutral invocation provenance, normalized provider failures, and API-free adversarial coverage before any real provider adapter. Command commit remains disabled until prepare/commit journaling and idempotency exist. |
 
 ## Next Best Paths
 
-1. Finish and independently verify the first AI-native mission-operator slice: provider-neutral
-   adaptive evaluation, progressive authority enforcement, evidence-journal verification, and the
-   checked lifecycle trade study. Treat current research-only execution as a maturity state, not a
-   permanent prohibition on higher autonomy.
-2. Add a real model provider adapter with digest-bound provider/model/prompt/tool provenance, then
+1. Finish and independently verify the provider-neutral decision envelope and API-free adversarial
+   corpus. Treat current research-only execution as a maturity state, not a permanent prohibition
+   on higher autonomy.
+2. Add a real model provider adapter behind the same contract with digest-bound
+   provider/model/prompt/schema/tool and attempt provenance, then
    evaluate whether it improves candidate selection, evidence acquisition, or stopping decisions
    over checked baselines.
 3. Add prepare/commit simulation command tools and exercise supervised authority before delegated

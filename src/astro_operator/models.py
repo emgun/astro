@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import Field, FiniteFloat, field_validator, model_validator
+from pydantic import Field, FiniteFloat, JsonValue, StrictInt, field_validator, model_validator
 
 from astro_core.models import AstroModel
 
@@ -296,9 +298,57 @@ class OperatorAction(AstroModel):
         return self
 
 
+class ReasonerInvocation(AstroModel):
+    """Provider-neutral provenance for one reasoner decision."""
+
+    adapter: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    input_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    output_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    record_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    request_id: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    usage: dict[str, StrictInt] = Field(default_factory=dict)
+    metadata: dict[str, JsonValue] = Field(default_factory=dict)
+
+    @field_validator("started_at", "completed_at")
+    @classmethod
+    def timestamps_must_be_aware(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("reasoner timestamps must include timezone information")
+        return value
+
+    @model_validator(mode="after")
+    def invocation_must_be_consistent(self) -> ReasonerInvocation:
+        if (
+            self.started_at is not None
+            and self.completed_at is not None
+            and self.completed_at < self.started_at
+        ):
+            raise ValueError("reasoner completion cannot precede its start")
+        if any(
+            not key or isinstance(value, bool) or value < 0
+            for key, value in self.usage.items()
+        ):
+            raise ValueError("reasoner usage values must be non-negative integers")
+        if len(json.dumps(self.metadata, separators=(",", ":")).encode("utf-8")) > 16_384:
+            raise ValueError("reasoner metadata must not exceed 16384 encoded bytes")
+        return self
+
+
+class ReasonerDecision(AstroModel):
+    """An untrusted typed action and the invocation that produced it."""
+
+    action: OperatorAction
+    invocation: ReasonerInvocation
+
+
 class OperatorStep(AstroModel):
     sequence: int = Field(ge=1)
     action: OperatorAction
+    reasoner_invocation: ReasonerInvocation | None = None
     observation: CandidateObservation | None = None
     acquired_evidence: tuple[EvidenceReference, ...] = ()
     command_result: CommandResult | None = None
@@ -342,7 +392,7 @@ class OperatorRunStatus(StrEnum):
 
 
 class OperatorRun(AstroModel):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.0"
     objective: MissionObjective
     authority: AuthorityGrant
     status: OperatorRunStatus
@@ -353,6 +403,14 @@ class OperatorRun(AstroModel):
 
     @model_validator(mode="after")
     def journal_must_be_self_consistent(self) -> OperatorRun:
+        if self.schema_version == "1.1" and any(
+            step.reasoner_invocation is None for step in self.steps
+        ):
+            raise ValueError("operator schema 1.1 requires reasoner provenance for every step")
+        if self.schema_version == "1.0" and any(
+            step.reasoner_invocation is not None for step in self.steps
+        ):
+            raise ValueError("operator schema 1.0 does not contain reasoner provenance")
         if [step.sequence for step in self.steps] != list(range(1, len(self.steps) + 1)):
             raise ValueError("operator step sequences must be contiguous and one-based")
         action_ids = [step.action.action_id for step in self.steps]

@@ -52,10 +52,19 @@ tool requirements, not reasons to prohibit command-capable architecture.
 
 ## Provider Boundary
 
-`MissionReasoner.decide(OperatorState) -> OperatorAction` is the only intelligence-provider
-contract. A provider can use a hosted model, local model, learned policy, search procedure, or a
-deterministic replay. It receives typed state and returns one typed action; it cannot submit shell
-commands, arbitrary paths, direct state mutations, or its own authority grant.
+`MissionReasoner.decide(OperatorState) -> ReasonerDecision` is the only intelligence-provider
+contract. A decision contains one typed `OperatorAction` plus a provider-neutral invocation record
+with adapter, provider, model, request, usage, metadata, and canonical input/output digests. A
+provider can use a hosted model, local model, learned policy, search procedure, or deterministic
+replay. It cannot submit shell commands, arbitrary paths, direct state mutations, or its own
+authority grant. The engine verifies the invocation digests before applying authority policy and
+journals provenance separately from the action so provider metadata cannot change action identity
+or approval binding.
+
+Adapters normalize configuration/authentication, unavailable/rate-limit, invalid-response, and
+cancellation failures into provider-neutral reasoner errors. Provider SDK response objects,
+credentials, retry settings, and exception types do not cross into the kernel. Retries, when added,
+remain adapter-owned and must retain attempt provenance.
 
 The public `ConditionalReplayReasoner` is explicitly a deterministic branching harness. Its typed
 conditions inspect current step count, evidence ids, and the last candidate observation. The
@@ -126,8 +135,8 @@ The slice exits when:
 
 ## Next Architecture Steps
 
-1. Add a real provider adapter with provider/model, prompt-template, schema, tool, and input digests;
-   do not retain hidden chain-of-thought.
+1. Add the first real provider adapter behind `MissionReasoner`, including prompt-template, schema,
+   tool, raw-response, and attempt provenance; do not retain hidden chain-of-thought.
 2. Add an evidence-acquisition tool registry and deterministic world-state reducer that preserves
    conflicting assertions rather than overwriting them.
 3. Add conclusion claims that cite typed assertions, not only artifact ids.
