@@ -350,8 +350,25 @@ def _provider_safe_state(state: OperatorState) -> dict[str, JsonValue]:
         item: dict[str, JsonValue] = {
             "sequence": step.sequence,
             "action": action_projection,
-            "acquired_evidence_ids": [evidence.evidence_id for evidence in step.acquired_evidence],
+            "acquired_evidence_ids": [
+                evidence.evidence_id for evidence in step.acquired_evidence
+            ],
         }
+        if step.acquisition_result is not None:
+            item["acquisition"] = {
+                "request_id": step.acquisition_result.request.request_id,
+                "tool_id": step.acquisition_result.tool.tool_id,
+                "tool_version": step.acquisition_result.tool.version,
+                "request_kind": step.acquisition_result.request.request_kind,
+                "status": step.acquisition_result.status.value,
+                "evidence_ids": [
+                    evidence.evidence_id for evidence in step.acquisition_result.evidence
+                ],
+                "assertion_ids": [
+                    assertion.assertion_id
+                    for assertion in step.acquisition_result.assertions
+                ],
+            }
         if step.action.candidate is not None:
             action_projection["candidate"] = {
                 "candidate_id": step.action.candidate.candidate_id,
@@ -405,17 +422,91 @@ def _provider_safe_state(state: OperatorState) -> dict[str, JsonValue]:
             "mission_scope": authority.mission_scope,
             "allowed_actions": [action.value for action in authority.allowed_actions],
             "allowed_command_types": list(authority.allowed_command_types),
+            "command_envelopes": [
+                {
+                    "command_type": envelope.command_type,
+                    "tool_version": envelope.tool_version,
+                    "tool_qualification_sha256": envelope.tool_qualification_sha256,
+                    "simulation_only": envelope.simulation_only,
+                    "allowed_asset_ids": list(envelope.allowed_asset_ids),
+                    "parameter_limits": [
+                        {
+                            "parameter": limit.parameter,
+                            "minimum": limit.minimum,
+                            "maximum": limit.maximum,
+                            "unit": limit.unit,
+                        }
+                        for limit in envelope.parameter_limits
+                    ],
+                    "max_commits": envelope.max_commits,
+                }
+                for envelope in authority.command_envelopes
+            ],
             "approval_required_for": [
                 action.value for action in authority.approval_required_for
             ],
             "revoked": authority.revoked,
             "max_steps": authority.max_steps,
             "max_candidate_evaluations": authority.max_candidate_evaluations,
+            "allowed_evidence_tools": [
+                {
+                    "tool_id": tool.tool_id,
+                    "tool_version": tool.tool_version,
+                    "request_kinds": list(tool.request_kinds),
+                }
+                for tool in authority.allowed_evidence_tools
+            ],
+            "max_evidence_acquisitions": authority.max_evidence_acquisitions,
+            "valid_from": (
+                authority.valid_from.isoformat()
+                if authority.valid_from is not None
+                else None
+            ),
+            "expires_at": (
+                authority.expires_at.isoformat()
+                if authority.expires_at is not None
+                else None
+            ),
         },
         "steps": steps,
         "known_evidence_ids": [evidence.evidence_id for evidence in state.known_evidence],
         "remaining_steps": state.remaining_steps,
         "remaining_candidate_evaluations": state.remaining_candidate_evaluations,
+        "remaining_evidence_acquisitions": state.remaining_evidence_acquisitions,
+        "world_state": (
+            {
+                "assertions": [
+                    {
+                        "assertion_id": assertion.assertion_id,
+                        "subject": assertion.subject,
+                        "predicate": assertion.predicate,
+                        "value": assertion.value,
+                        "epistemic_kind": assertion.epistemic_kind.value,
+                        "scope": assertion.scope,
+                        "source_evidence_ids": list(assertion.source_evidence_ids),
+                        "valid_at": (
+                            assertion.valid_at.isoformat()
+                            if assertion.valid_at is not None
+                            else None
+                        ),
+                    }
+                    for assertion in state.world_state.assertions
+                ],
+                "conflicts": [
+                    {
+                        "conflict_id": conflict.conflict_id,
+                        "subject": conflict.subject,
+                        "predicate": conflict.predicate,
+                        "scope": conflict.scope,
+                        "assertion_ids": list(conflict.assertion_ids),
+                    }
+                    for conflict in state.world_state.conflicts
+                ],
+                "state_sha256": state.world_state.state_sha256,
+            }
+            if state.world_state is not None
+            else None
+        ),
     }
 
 

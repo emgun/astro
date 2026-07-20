@@ -1,0 +1,49 @@
+base_scenario_path: ../lifecycle/leo_round_trip.yaml
+objective:
+  objective_id: supervised-simulated-burn
+  summary: Exercise one exactly approved simulation-only maneuver through prepare and commit.
+  design_variables:
+    - variable_id: unused_mass_context
+      target: spacecraft_wet_mass_kg
+      lower_bound: 500.0
+      upper_bound: 500.0
+      unit: kg
+  metric_goals:
+    - metric_id: simulated_command_commit
+      objective: commit one bounded simulation-only burn exactly once
+      unit: count
+  metadata:
+    example_role: ai_native_supervised_command
+authority:
+  grant_id: supervised-simulated-burn-v1
+  grant_version: 1
+  level: supervised_autonomy
+  mission_scope: simulation-only sat-1 maneuver demonstration
+  allowed_actions: [propose_command, execute_command, finish]
+  allowed_command_types: [simulated_burn]
+  command_envelopes:
+    - command_type: simulated_burn
+      tool_version: "1.0"
+      tool_qualification_sha256: c676a4477af4710155eec7a02416d6a538fa41e7c7f346282a0d2b626ffdc293
+      simulation_only: true
+      allowed_asset_ids: [sat-1]
+      parameter_limits:
+        - parameter: delta_v_m_s
+          minimum: 0.0
+          maximum: 1.0
+          unit: m/s
+        - parameter: duration_s
+          minimum: 1.0
+          maximum: 10.0
+          unit: s
+      max_commits: 1
+  approval_required_for: [execute_command]
+  approvals:
+    - approval_id: approve-simulated-burn-1
+      grant_version: 1
+      action_id: execute-simulated-burn
+      action_sha256: c4aa67bedfd451e598776ec757f1a838276164b4d786aec1238d3e6daad669ff
+  max_steps: 3
+  max_candidate_evaluations: 0
+  metadata:
+    authority_note: This grant permits only the registered simulation-only command tool.

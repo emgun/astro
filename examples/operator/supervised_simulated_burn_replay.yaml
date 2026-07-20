@@ -1,0 +1,35 @@
+- when:
+    step_count: 0
+    evidence_ids_present: [base-scenario]
+  action:
+    action_id: propose-simulated-burn
+    kind: propose_command
+    rationale: Propose a bounded simulation-only burn for supervised review.
+    evidence_ids: [base-scenario]
+    command:
+      command_id: simulated-burn-1
+      command_type: simulated_burn
+      asset_id: sat-1
+      parameters:
+        delta_v_m_s: 0.5
+        duration_s: 5.0
+        frame: TNW
+- when:
+    step_count: 1
+  action:
+    action_id: execute-simulated-burn
+    kind: execute_command
+    rationale: Execute the exact approved proposal through the durable simulation coordinator.
+    command_execution:
+      proposal_action_id: propose-simulated-burn
+      command_id: simulated-burn-1
+      idempotency_key: supervised-simulated-burn-attempt-1
+      expected_world_state_sha256: 8669d3e4284d7285e5f5884f4082c0605b3a21e67a606dbd913b0510cc9a402a
+      approval_id: approve-simulated-burn-1
+- when:
+    step_count: 2
+  action:
+    action_id: finish-supervised-simulation
+    kind: finish
+    rationale: The durable journal records one committed simulation-only execution.
+    conclusion: The supervised simulation-only burn committed exactly once within its envelope.
