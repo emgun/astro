@@ -345,6 +345,31 @@ class ReasonerDecision(AstroModel):
     invocation: ReasonerInvocation
 
 
+class ReasonerAttemptProvenance(AstroModel):
+    """Content-free provenance retained for a successful or failed provider attempt."""
+
+    adapter: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    model: str = Field(min_length=1)
+    attempt: int = Field(ge=1)
+    started_at: datetime
+    completed_at: datetime
+    request_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    prompt_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    schema_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    tool_definitions_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    raw_response_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def timestamps_must_be_aware_and_ordered(self) -> ReasonerAttemptProvenance:
+        for value in (self.started_at, self.completed_at):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError("reasoner attempt timestamps must include timezone information")
+        if self.completed_at < self.started_at:
+            raise ValueError("reasoner attempt completion cannot precede its start")
+        return self
+
+
 class OperatorStep(AstroModel):
     sequence: int = Field(ge=1)
     action: OperatorAction

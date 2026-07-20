@@ -13,6 +13,10 @@ class OperatorEvaluationError(OperatorError):
 class ReasonerError(OperatorError):
     """Base error for a reasoner invocation that produced no valid action."""
 
+    def __init__(self, message: str, *, attempt: object | None = None) -> None:
+        super().__init__(message)
+        self.attempt = attempt
+
 
 class ReasonerConfigurationError(ReasonerError):
     """Raised when reasoner configuration or credentials are invalid."""
