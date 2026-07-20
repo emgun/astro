@@ -666,6 +666,7 @@ Post-MVP / external-campaign items:
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
 | ai-native-mission-operator | active | orchestrate/learn/verify | steward | `astro_operator`, schema `1.2`, progressive authority, evidence and command registries, assertion-preserving world state, durable simulation commit, self-improving orchestrator design | PR #47 merged the reference operator architecture at `06d5da6`: provider-neutral adaptive reasoning; versioned, budgeted evidence acquisition; digest-bound assertions and explicit conflicts; exact-conclusion-bound assertion claims; and exact proposal-to-command execution through a private SQLite prepare/commit journal. A required mission/grant-scoped command ledger persists idempotency and single-use approvals across output publications. Current grant validity, expiry, revocation, exact reconstructed world state, authority-bound tool qualification, typed envelopes, terminal outcome records, and offline verification fail closed. The checked public `supervised_simulated_burn` workflow commits one simulation-only action; real-effect tools remain unregistered. The next scope is a self-improving mission orchestrator spanning design, verification, operations, a provenance-preserving knowledge graph, and qualified neural surrogates. Provider tuning is paused until those richer tasks exist. |
+| mission-design-director-v1 | active | verify/integrate | steward | typed mission intent, requirement graph, registered capability catalog, bounded analysis plan, deterministic assessments and baseline, exact-inventory bundle | The first vertical slice is implemented on `codex/self-improving-mission-orchestrator` without changing operator schemas. The checked composite capability orchestrates launch, orbit, digital-twin subsystems, deorbit, and reentry through the existing lifecycle evaluator; the adaptive journal records baseline, failed lighter, and passing recovery candidates. The outer reducer applies exact-unit hard thresholds, records reserved and consumed analysis cost, emits a baseline only for an eligible selection, and reconstructs the result offline from the verified journal. Current claim boundary remains deterministic design screening rather than qualification or operational authority. |
 
 Project-specific steward learning: once a provider-neutral boundary, provenance recorder, and bounded
 behavior gate are adequate, further model tuning is not architecture progress. Prefer the next
@@ -674,11 +675,10 @@ the richer task can distinguish models in a decision-relevant way.
 
 ## Next Best Paths
 
-1. Build the first Mission Design Director slice: a typed mission intent, requirement graph,
-   capability catalog, adaptive analysis DAG, design candidate and decision records, and a
-   multi-domain LEO design workflow. Include telemetry, estimation, and procedure evidence tools
-   plus deterministic threshold, temporal, and applicability claims so the same evidence contract
-   spans design and simulated operations.
+1. Complete the perception-to-decision bridge: add telemetry, estimation, and procedure evidence
+   tools plus deterministic threshold, temporal, and applicability claims. Then expose those claims
+   to conditional Director planning so one contract spans design, verification, and simulated
+   operations.
 2. Add the cross-run mission knowledge graph as a rebuildable read model over immutable journals,
    evidence, claims, decisions, baselines, and outcomes. Preserve provenance, applicability,
    uncertainty, and conflicts; use embeddings for retrieval without promoting extracted text into

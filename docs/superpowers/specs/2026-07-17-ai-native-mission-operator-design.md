@@ -323,12 +323,30 @@ The reference AI-native architecture is implemented through schema `1.2`: provid
 reasoning, versioned evidence acquisition, assertion-preserving world state, exact-conclusion-bound
 assertion claims, progressive grants, and durable simulation-only command prepare/commit.
 
+The first Mission Design Director vertical slice is also implemented as an outer, digest-bound
+bundle without changing the released operator journal schemas. It compiles a typed mission intent,
+acyclic requirement graph, exact capability catalog, and bounded analysis plan; reuses the adaptive
+lifecycle evaluator across launch, orbit, digital-twin subsystems, deorbit, and reentry; reduces the
+selected observation into exact-unit requirement assessments; and emits a versioned baseline only
+when every hard requirement passes. Its exact-inventory verifier reconstructs the decision from the
+verified operator journal without rerunning physics or invoking a provider.
+
+Public commands:
+
+```bash
+astro run-mission-design-director examples/design/leo_mission_design_director.yaml \
+  --reasoner-replay examples/operator/leo_lifecycle_trade_study_replay.yaml \
+  --output-dir /tmp/astro-mission-design-director
+astro verify-mission-design-director /tmp/astro-mission-design-director
+```
+
 The remaining path expands the kernel into the full north star:
 
 1. **Perception and checked claims:** add concrete local tools for telemetry, estimation, and
    procedure sources plus deterministic threshold, temporal, and applicability predicates.
-2. **Mission Design Director:** add the requirement graph, capability catalog, adaptive analysis
-   DAG, design candidates and decisions, and one multi-domain LEO design workflow.
+2. **Mission Design Director breadth:** expand the checked first slice beyond the composite
+   lifecycle screener with additional typed capabilities, conditional analysis nodes, and
+   information-value-aware fidelity escalation while preserving the golden LEO workflow.
 3. **Knowledge graph and baseline handoff:** build the replayable cross-run evidence read model and
    connect design decisions to assurance and operations through a versioned mission baseline.
 4. **Adaptive verification:** choose uncertainty, sensitivity, independent-backend, and

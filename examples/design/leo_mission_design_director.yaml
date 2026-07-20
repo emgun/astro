@@ -1,0 +1,81 @@
+schema_version: "1.0"
+base_scenario_path: ../lifecycle/leo_round_trip.yaml
+intent:
+  intent_id: leo-mission-design
+  summary: Select a feasible integrated LEO mission design with protected deorbit reserve.
+  decision_question: Which bounded spacecraft design satisfies the checked lifecycle requirements?
+  objectives:
+    - Retain a passing launch-to-reentry lifecycle.
+    - Protect deorbit propellant reserve and entry-interface continuity.
+  allowed_capability_ids: [astro.mission_lifecycle_screen]
+  authority_grant_id: checked-leo-design-director
+  max_analysis_cost_units: 4
+  claim_boundary: deterministic multi-domain mission design screening, not flight qualification
+requirement_graph:
+  graph_id: leo-mission-design-requirements
+  requirements:
+    - requirement_id: deorbit-propellant-reserve
+      statement: The selected design shall retain nonnegative deorbit propellant reserve margin.
+      metric_id: margin:deorbit:propellant_reserve
+      comparator: ge
+      threshold: 0.0
+      unit: kg
+      verification_capability_id: astro.mission_lifecycle_screen
+      hard: true
+    - requirement_id: entry-interface-continuity
+      statement: The selected design shall retain nonnegative entry-interface altitude margin.
+      parent_ids: [deorbit-propellant-reserve]
+      metric_id: margin:deorbit:entry_interface_altitude_error
+      comparator: ge
+      threshold: 0.0
+      unit: km
+      verification_capability_id: astro.mission_lifecycle_screen
+      hard: true
+capability_catalog:
+  catalog_id: checked-local-mission-design
+  capabilities:
+    - capability_id: astro.mission_lifecycle_screen
+      version: "1.0"
+      input_schema_sha256: ed679e9031b7b7ac5e366069a0fdf317ecadba78fc3441e03e279dfca70ccc02
+      output_schema_sha256: cadcc5ec4b3537fb069311a6e8ca981c56960c851c5fcd6fcc5bb1751b506ba8
+      fidelity: screening
+      deterministic: true
+      simulation_only: true
+      cost_units: 1
+      output_metric_ids:
+        - margin:deorbit:propellant_reserve
+        - margin:deorbit:entry_interface_altitude_error
+      applicability: Local integrated launch, orbit, digital-twin, deorbit, and reentry design screening for the declared lifecycle scenario.
+      qualification_sha256: 4d291360a6ad3b340a424d9229a5f6b38633c1282a9674b1e84832a7ef724938
+objective:
+  objective_id: leo-lifecycle-propellant-trade
+  summary: Find a passing lifecycle design with improved deorbit propellant reserve.
+  design_variables:
+    - variable_id: spacecraft_wet_mass_kg
+      target: spacecraft_wet_mass_kg
+      lower_bound: 470.0
+      upper_bound: 530.0
+      unit: kg
+    - variable_id: upper_stage_thrust_n
+      target: launch_upper_stage_thrust_n
+      lower_bound: 190000.0
+      upper_bound: 210000.0
+      unit: N
+  metric_goals:
+    - metric_id: margin:deorbit:propellant_reserve
+      objective: satisfy the declared hard threshold and maximize within the screened candidates
+      unit: kg
+    - metric_id: margin:deorbit:entry_interface_altitude_error
+      objective: retain a nonnegative margin
+      unit: km
+  metadata:
+    example_role: mission_design_director_v1
+authority:
+  grant_id: checked-leo-design-director
+  level: research
+  mission_scope: checked multi-domain LEO mission design screening
+  allowed_actions: [evaluate_candidate, finish]
+  max_steps: 5
+  max_candidate_evaluations: 4
+  metadata:
+    authority_note: Research authority permits candidate screening and selection only.

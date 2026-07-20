@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+from hashlib import sha256
 from pathlib import Path
 from typing import Annotated
 
@@ -145,6 +146,14 @@ from astro_operator.command_execution import (
     CommandToolRegistry,
     SimulatedBurnTool,
     SQLiteCommandExecutionStore,
+)
+from astro_operator.director import build_mission_design_run
+from astro_operator.director_io import (
+    capture_resolved_base_scenario,
+    load_mission_design_director_spec,
+    verify_mission_design_director,
+    write_mission_design_manifest,
+    write_mission_design_run,
 )
 from astro_operator.engine import run_operator
 from astro_operator.errors import OperatorError
@@ -949,6 +958,130 @@ def verify_mission_operator_command(
     typer.echo(
         f"verified mission operator run: {run.status.value}, "
         f"evidence={len(run.known_evidence)}"
+    )
+
+
+@app.command("run-mission-design-director")
+def run_mission_design_director_command(
+    spec_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Mission design director YAML path."),
+    ],
+    reasoner_replay: Annotated[
+        Path,
+        typer.Option(
+            "--reasoner-replay",
+            exists=True,
+            readable=True,
+            help="Checked adaptive candidate replay for the provider-neutral reasoner boundary.",
+        ),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir", help="Publish the design bundle to a new directory."),
+    ],
+) -> None:
+    """Run the first evidence-backed, multi-domain Mission Design Director slice."""
+    if output_dir.exists():
+        typer.echo("mission design output directory must not already exist", err=True)
+        raise typer.Exit(code=2)
+    partial_dir: Path | None = None
+    try:
+        output_dir.parent.mkdir(parents=True, exist_ok=True)
+        if output_dir.exists():
+            raise OperatorError("mission design output directory was created by another run")
+        partial_dir = Path(
+            tempfile.mkdtemp(
+                prefix=f".{output_dir.name}.partial-",
+                dir=output_dir.parent,
+            )
+        )
+        spec = load_mission_design_director_spec(spec_path)
+        captured_spec = partial_dir / "inputs" / "design-spec.yaml"
+        captured_spec.parent.mkdir(parents=True)
+        captured_spec.write_bytes(spec_path.read_bytes())
+        operator_root = partial_dir / "operator"
+        operator_root.mkdir()
+        declared_scenario_path = Path(spec.base_scenario_path)
+        scenario_path = (
+            declared_scenario_path
+            if declared_scenario_path.is_absolute()
+            else spec_path.parent / declared_scenario_path
+        ).resolve()
+        scenario_evidence = capture_base_scenario_evidence(scenario_path, operator_root)
+        scenario = resolve_lifecycle_references(
+            load_mission_lifecycle_scenario(operator_root / scenario_evidence.path),
+            scenario_path,
+        )
+        resolved_scenario_evidence = capture_resolved_base_scenario(
+            scenario, operator_root
+        )
+        objective = spec.objective.model_copy(
+            update={
+                "base_evidence": (
+                    *spec.objective.base_evidence,
+                    scenario_evidence,
+                    resolved_scenario_evidence,
+                ),
+            }
+        )
+        evaluator = LifecycleCandidateEvaluator(
+            base_scenario=scenario,
+            design_variables=objective.design_variables,
+            output_root=operator_root,
+        )
+        operator_run = run_operator(
+            objective=objective,
+            authority=spec.authority,
+            reasoner=ConditionalReplayReasoner(load_operator_replay(reasoner_replay)),
+            evaluator=evaluator,
+        )
+        operator_path = operator_root / "operator-run.json"
+        write_operator_run(operator_path, operator_run)
+        design_run = build_mission_design_run(
+            spec=spec,
+            operator_run=operator_run,
+            spec_sha256=sha256(captured_spec.read_bytes()).hexdigest(),
+            operator_run_sha256=sha256(operator_path.read_bytes()).hexdigest(),
+        )
+        write_mission_design_run(partial_dir / "mission-design-run.json", design_run)
+        write_mission_design_manifest(partial_dir)
+        partial_dir.replace(output_dir)
+        partial_dir = None
+    except (
+        InvalidScenarioError,
+        MissionLifecycleError,
+        OperatorError,
+        OSError,
+        ValueError,
+    ) as exc:
+        if partial_dir is not None and partial_dir.exists():
+            shutil.rmtree(partial_dir)
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"mission design {design_run.decision.disposition.value}: "
+        f"candidate={design_run.decision.selected_candidate_id or 'none'}"
+    )
+    typer.echo(f"wrote mission design director bundle: {output_dir}")
+
+
+@app.command("verify-mission-design-director")
+def verify_mission_design_director_command(
+    output_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+) -> None:
+    """Verify the exact design bundle and recompute its decision from operator evidence."""
+    try:
+        run = verify_mission_design_director(output_dir)
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"verified mission design director: {run.decision.disposition.value}, "
+        f"candidate={run.decision.selected_candidate_id or 'none'}"
     )
 
 
