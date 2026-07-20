@@ -665,7 +665,7 @@ Post-MVP / external-campaign items:
 | v0.2.0-rc.2 | done | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Local, wheel-installed, CI, detached merged-commit, and remote annotated-tag evidence agree at `f224a06`; the candidate is ready for a short soak. |
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
-| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, schema `1.2`, progressive authority, evidence and command registries, assertion-preserving world state, durable simulation commit | The reference architecture is implemented on the active branch: provider-neutral adaptive reasoning; versioned, budgeted evidence acquisition; digest-bound assertions and explicit conflicts; exact-conclusion-bound assertion claims; and exact proposal-to-command execution through a private SQLite prepare/commit journal. A required mission/grant-scoped command ledger persists idempotency and single-use approvals across output publications. Current grant validity, expiry, revocation, exact reconstructed world state, authority-bound tool qualification, typed envelopes, terminal outcome records, and offline verification fail closed. The checked public `supervised_simulated_burn` workflow commits one simulation-only action; real-effect tools remain unregistered. Provider tuning is paused until richer evidence and authority tasks exist. |
+| ai-native-mission-operator | active | orchestrate/learn/verify | steward | `astro_operator`, schema `1.2`, progressive authority, evidence and command registries, assertion-preserving world state, durable simulation commit, self-improving orchestrator design | PR #47 merged the reference operator architecture at `06d5da6`: provider-neutral adaptive reasoning; versioned, budgeted evidence acquisition; digest-bound assertions and explicit conflicts; exact-conclusion-bound assertion claims; and exact proposal-to-command execution through a private SQLite prepare/commit journal. A required mission/grant-scoped command ledger persists idempotency and single-use approvals across output publications. Current grant validity, expiry, revocation, exact reconstructed world state, authority-bound tool qualification, typed envelopes, terminal outcome records, and offline verification fail closed. The checked public `supervised_simulated_burn` workflow commits one simulation-only action; real-effect tools remain unregistered. The next scope is a self-improving mission orchestrator spanning design, verification, operations, a provenance-preserving knowledge graph, and qualified neural surrogates. Provider tuning is paused until those richer tasks exist. |
 
 Project-specific steward learning: once a provider-neutral boundary, provenance recorder, and bounded
 behavior gate are adequate, further model tuning is not architecture progress. Prefer the next
@@ -674,17 +674,25 @@ the richer task can distinguish models in a decision-relevant way.
 
 ## Next Best Paths
 
-1. Add concrete local evidence tools for telemetry, estimation, and procedure sources, then exercise
-   conflicting, stale, and incomplete assertions through schema `1.2` public workflows.
-2. Expand deterministic claim checkers to threshold, temporal, and applicability predicates before
-   using claim-backed state as a higher-authority command precondition.
-3. Run delegated and mission-autonomy campaigns only against registered simulation tools, including
-   concurrent idempotency, crash recovery, resource depletion, expiry, and revocation races.
-4. Define remote-effect reconciliation and qualification evidence before registering any
-   operational handler. The current tool registry deliberately rejects non-simulation tools.
-5. Resume provider evaluation against these richer tasks, then score invocation-bound recordings
-   offline. Keep transport availability separate from capability and stop if a free route becomes
-   chargeable; do not promote a default from the earlier lifecycle-only benchmark.
+1. Build the first Mission Design Director slice: a typed mission intent, requirement graph,
+   capability catalog, adaptive analysis DAG, design candidate and decision records, and a
+   multi-domain LEO design workflow. Include telemetry, estimation, and procedure evidence tools
+   plus deterministic threshold, temporal, and applicability claims so the same evidence contract
+   spans design and simulated operations.
+2. Add the cross-run mission knowledge graph as a rebuildable read model over immutable journals,
+   evidence, claims, decisions, baselines, and outcomes. Preserve provenance, applicability,
+   uncertainty, and conflicts; use embeddings for retrieval without promoting extracted text into
+   unqualified facts.
+3. Add adaptive verification planning and active learning: choose uncertainty campaigns,
+   independent backends, and high-fidelity simulations by expected decision information; feed
+   verified results into immutable surrogate datasets.
+4. Integrate the existing surrogate foundation with applicability envelopes, uncertainty and OOD
+   checks, shadow evaluation, locked promotion gates, role-specific maturity, rollback, and drift
+   triggers. Exercise the complete design-to-baseline-to-simulated-deviation learning loop.
+5. Run delegated and mission-autonomy campaigns only against registered simulation tools, including
+   concurrent idempotency, crash recovery, resource depletion, expiry, revocation, knowledge-graph
+   reconstruction, and surrogate-domain violations. Resume provider and learned-policy comparison
+   only against these richer tasks; keep transport availability, capability, and cost separate.
 6. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
