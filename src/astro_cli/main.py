@@ -136,6 +136,7 @@ from astro_od.io import (
 from astro_od.measurements import generate_synthetic_measurements
 from astro_operator.engine import run_operator
 from astro_operator.errors import OperatorError
+from astro_operator.evaluation import load_adversarial_corpus, score_adversarial_corpus
 from astro_operator.io import (
     capture_base_scenario_evidence,
     load_mission_operator_spec,
@@ -888,6 +889,32 @@ def verify_mission_operator_command(
         f"verified mission operator run: {run.status.value}, "
         f"evidence={len(run.known_evidence)}"
     )
+
+
+@app.command("score-mission-reasoner-corpus")
+def score_mission_reasoner_corpus_command(
+    corpus_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Offline adversarial corpus YAML path."),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional JSON score report path."),
+    ] = None,
+) -> None:
+    """Score recorded reasoner actions without making provider calls."""
+    try:
+        score = score_adversarial_corpus(load_adversarial_corpus(corpus_path))
+        payload = score.model_dump_json(indent=2) + "\n"
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(payload, encoding="utf-8")
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(payload, nl=False)
+    if not score.promoted:
+        raise typer.Exit(code=1)
 
 
 @app.command("verify-mission-evidence")

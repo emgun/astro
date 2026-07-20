@@ -75,6 +75,127 @@ def validate_candidate_against_objective(
             )
 
 
+def validate_action_against_state(action: OperatorAction, state: OperatorState) -> None:
+    """Validate one proposed action without executing it or calling a provider."""
+
+    if state.remaining_steps == 0:
+        raise OperatorPolicyError("operator step budget is exhausted")
+    if action.action_id in {step.action.action_id for step in state.steps}:
+        raise OperatorPolicyError(f"action ID {action.action_id} has already been used")
+    validate_action_against_grant(action, state.authority)
+    known_evidence_ids = {evidence.evidence_id for evidence in state.known_evidence}
+    unknown_evidence = set(action.evidence_ids) - known_evidence_ids
+    if unknown_evidence:
+        raise OperatorPolicyError(
+            f"action cites unknown evidence: {', '.join(sorted(unknown_evidence))}"
+        )
+    evaluated = {
+        step.observation.candidate.candidate_id
+        for step in state.steps
+        if step.observation is not None
+    }
+    if action.kind == OperatorActionKind.EVALUATE_CANDIDATE:
+        if state.remaining_candidate_evaluations == 0:
+            raise OperatorPolicyError("candidate evaluation budget exhausted")
+        assert action.candidate is not None
+        if action.candidate.candidate_id in evaluated:
+            raise OperatorPolicyError(
+                f"candidate {action.candidate.candidate_id} has already been evaluated"
+            )
+        validate_candidate_against_objective(action.candidate, state.objective)
+    elif action.kind == OperatorActionKind.PROPOSE_COMMAND:
+        assert action.command is not None
+        proposed = {
+            step.action.command.command_id
+            for step in state.steps
+            if step.action.kind == OperatorActionKind.PROPOSE_COMMAND
+            and step.action.command is not None
+        }
+        if action.command.command_id in proposed:
+            raise OperatorPolicyError(
+                f"command {action.command.command_id} has already been proposed"
+            )
+    elif action.kind == OperatorActionKind.EXECUTE_COMMAND:
+        raise OperatorPolicyError(
+            "operator command contract stages authority but does not support command commit"
+        )
+    elif (
+        action.kind == OperatorActionKind.FINISH
+        and action.selected_candidate_id is not None
+        and action.selected_candidate_id not in evaluated
+    ):
+        raise OperatorPolicyError("selected candidate must have been evaluated")
+
+
+def validate_operator_state(state: OperatorState) -> None:
+    """Reject states whose counters or evidence cannot be reconstructed from history."""
+
+    if len(state.steps) > state.authority.max_steps:
+        raise OperatorPolicyError("operator state exceeds its step budget")
+    expected_remaining_steps = state.authority.max_steps - len(state.steps)
+    if state.remaining_steps != expected_remaining_steps:
+        raise OperatorPolicyError("operator state remaining step budget is inconsistent")
+    evaluation_count = sum(
+        step.action.kind == OperatorActionKind.EVALUATE_CANDIDATE for step in state.steps
+    )
+    if evaluation_count > state.authority.max_candidate_evaluations:
+        raise OperatorPolicyError("operator state exceeds its candidate evaluation budget")
+    if (
+        state.remaining_candidate_evaluations
+        != state.authority.max_candidate_evaluations - evaluation_count
+    ):
+        raise OperatorPolicyError("operator state remaining evaluation budget is inconsistent")
+    if [step.sequence for step in state.steps] != list(range(1, len(state.steps) + 1)):
+        raise OperatorPolicyError("operator state step sequences must be contiguous and one-based")
+    known = list(state.objective.base_evidence)
+    known_ids = {evidence.evidence_id for evidence in known}
+    action_ids: set[str] = set()
+    evaluated: set[str] = set()
+    proposed_commands: set[str] = set()
+    for step in state.steps:
+        if step.action.kind == OperatorActionKind.FINISH:
+            raise OperatorPolicyError("operator state cannot continue after a finish action")
+        if step.action.action_id in action_ids:
+            raise OperatorPolicyError("operator state action IDs must be unique")
+        action_ids.add(step.action.action_id)
+        validate_action_against_grant(step.action, state.authority)
+        if not set(step.action.evidence_ids).issubset(known_ids):
+            raise OperatorPolicyError("operator state action cites unavailable evidence")
+        if step.action.kind == OperatorActionKind.EVALUATE_CANDIDATE:
+            assert step.action.candidate is not None
+            assert step.observation is not None
+            candidate_id = step.action.candidate.candidate_id
+            if candidate_id in evaluated:
+                raise OperatorPolicyError("operator state evaluates a candidate more than once")
+            if step.observation.candidate != step.action.candidate:
+                raise OperatorPolicyError("operator state observation does not match its action")
+            validate_candidate_against_objective(step.action.candidate, state.objective)
+            validate_observation_against_objective(step.observation, state.objective)
+            evaluated.add(candidate_id)
+        elif step.action.kind == OperatorActionKind.PROPOSE_COMMAND:
+            assert step.action.command is not None
+            command_id = step.action.command.command_id
+            if command_id in proposed_commands:
+                raise OperatorPolicyError("operator state proposes a command more than once")
+            proposed_commands.add(command_id)
+        elif step.action.kind == OperatorActionKind.EXECUTE_COMMAND:
+            raise OperatorPolicyError(
+                "operator command contract stages authority but does not support command commit"
+            )
+        additions = step.acquired_evidence
+        if step.observation is not None:
+            additions += step.observation.evidence
+        if step.command_result is not None:
+            additions += step.command_result.evidence
+        for evidence in additions:
+            if evidence.evidence_id in known_ids:
+                raise OperatorPolicyError("operator state evidence IDs must be unique")
+            known.append(evidence)
+            known_ids.add(evidence.evidence_id)
+    if tuple(known) != state.known_evidence:
+        raise OperatorPolicyError("operator state evidence inventory is inconsistent")
+
+
 def validate_observation_against_objective(
     observation: CandidateObservation, objective: MissionObjective
 ) -> None:

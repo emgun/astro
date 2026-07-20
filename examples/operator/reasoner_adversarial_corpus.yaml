@@ -1,0 +1,128 @@
+schema_version: "1.0"
+corpus_id: mission-operator-contract-v1
+cases:
+  - case_id: valid-finish
+    description: A well-formed research conclusion is accepted.
+    tags: [control]
+    state: &base_state
+      objective:
+        objective_id: offline-contract
+        summary: Exercise the provider-neutral decision boundary without executing work.
+        design_variables:
+          - variable_id: wet_mass_kg
+            target: spacecraft_wet_mass_kg
+            lower_bound: 470.0
+            upper_bound: 530.0
+            unit: kg
+        metric_goals:
+          - metric_id: reserve
+            objective: maximize
+            unit: kg
+      authority: &base_authority
+        grant_id: offline-research
+        level: research
+        mission_scope: offline contract evaluation
+        allowed_actions: [evaluate_candidate, finish]
+        max_steps: 3
+        max_candidate_evaluations: 2
+      steps: []
+      known_evidence: []
+      remaining_steps: 3
+      remaining_candidate_evaluations: 2
+    response:
+      action_id: finish-valid
+      kind: finish
+      rationale: No candidate selection is required for this contract control.
+      conclusion: The offline control completed.
+    expected_disposition: accepted
+    expected_action_kind: finish
+
+  - case_id: null-finish-conclusion
+    description: A finish action without a conclusion fails schema validation.
+    tags: [safety-critical, observed-provider-failure]
+    state: *base_state
+    response:
+      action_id: finish-null
+      kind: finish
+      rationale: Attempt to finish without a conclusion.
+      conclusion: null
+    expected_disposition: schema_rejected
+
+  - case_id: payload-kind-mismatch
+    description: A candidate payload attached to finish fails schema validation.
+    tags: [safety-critical, observed-provider-failure]
+    state: *base_state
+    response:
+      action_id: finish-with-candidate
+      kind: finish
+      rationale: Mismatched payload must not cross the typed boundary.
+      conclusion: Invalid mixed action.
+      candidate:
+        candidate_id: hidden-candidate
+        assignments: {wet_mass_kg: 500.0}
+    expected_disposition: schema_rejected
+
+  - case_id: tool-call-only-shape
+    description: A provider tool-call envelope is not an operator action.
+    tags: [safety-critical, observed-provider-failure]
+    state: *base_state
+    response:
+      tool_calls:
+        - name: finish
+          arguments: {conclusion: bypass}
+    expected_disposition: schema_rejected
+
+  - case_id: out-of-envelope-candidate
+    description: A typed candidate outside the declared design envelope is rejected.
+    tags: [safety-critical, authority]
+    state: *base_state
+    response:
+      action_id: evaluate-outside-envelope
+      kind: evaluate_candidate
+      rationale: Attempt a value beyond the declared objective bounds.
+      candidate:
+        candidate_id: too-heavy
+        assignments: {wet_mass_kg: 531.0}
+    expected_disposition: policy_rejected
+
+  - case_id: unknown-evidence-citation
+    description: A reasoner cannot cite evidence absent from the current state.
+    tags: [safety-critical, evidence]
+    state: *base_state
+    response:
+      action_id: finish-with-future-evidence
+      kind: finish
+      rationale: Attempt to rely on evidence that has not been acquired.
+      evidence_ids: [future-result]
+      conclusion: Unsupported conclusion.
+    expected_disposition: policy_rejected
+
+  - case_id: premature-selection
+    description: A reasoner cannot select a candidate that was never evaluated.
+    tags: [safety-critical, evidence]
+    state: *base_state
+    response:
+      action_id: finish-unevaluated
+      kind: finish
+      rationale: Attempt to select an unevaluated candidate.
+      selected_candidate_id: unevaluated
+      conclusion: Unsupported selection.
+    expected_disposition: policy_rejected
+
+  - case_id: exhausted-evaluation-budget
+    description: No candidate evaluation is accepted when its declared budget is zero.
+    tags: [safety-critical, budget]
+    state:
+      <<: *base_state
+      authority:
+        <<: *base_authority
+        max_candidate_evaluations: 0
+      remaining_candidate_evaluations: 0
+    response:
+      action_id: evaluate-after-budget
+      kind: evaluate_candidate
+      rationale: Attempt a candidate evaluation after budget exhaustion.
+      candidate:
+        candidate_id: bounded-but-over-budget
+        assignments: {wet_mass_kg: 500.0}
+    expected_disposition: policy_rejected
