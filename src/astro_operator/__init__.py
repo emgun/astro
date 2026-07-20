@@ -1,5 +1,9 @@
 """Provider-neutral mission operator primitives."""
 
+from astro_operator.acquisition import (
+    CallCappedReasoner,
+    acquire_reasoner_behavior_recording,
+)
 from astro_operator.behavior import (
     BehaviorDisposition,
     ReasonerBehaviorCorpus,
@@ -41,6 +45,7 @@ from astro_operator.models import (
     OperatorActionKind,
     OperatorRun,
     OperatorRunStatus,
+    ReasonerAttemptProvenance,
     ReasonerDecision,
     ReasonerInvocation,
 )
@@ -59,6 +64,7 @@ from astro_operator.recording import (
     RecordedReasonerBehaviorScore,
     load_reasoner_behavior_recording,
     record_reasoner_behavior_replay,
+    reserve_reasoner_behavior_recording,
     score_recorded_reasoner_behavior_corpus,
     write_reasoner_behavior_recording,
 )
@@ -73,6 +79,7 @@ __all__ = [
     "BoundDecisionReasoner",
     "CandidateObservation",
     "CandidateProposal",
+    "CallCappedReasoner",
     "CommandRequest",
     "CommandResult",
     "ConditionalReplayReasoner",
@@ -89,6 +96,7 @@ __all__ = [
     "OperatorRunStatus",
     "OpenRouterReasoner",
     "ReasonerDecision",
+    "ReasonerAttemptProvenance",
     "ReasonerBehaviorCorpus",
     "ReasonerBehaviorReplay",
     "ReasonerBehaviorScore",
@@ -103,11 +111,13 @@ __all__ = [
     "ReasonerUnavailableError",
     "ScriptedReasoner",
     "run_operator",
+    "acquire_reasoner_behavior_recording",
     "load_adversarial_corpus",
     "load_reasoner_behavior_corpus",
     "load_reasoner_behavior_replay",
     "load_reasoner_behavior_recording",
     "record_reasoner_behavior_replay",
+    "reserve_reasoner_behavior_recording",
     "score_adversarial_corpus",
     "score_reasoner_behavior_corpus",
     "score_recorded_reasoner_behavior_corpus",

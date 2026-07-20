@@ -7,6 +7,7 @@ import math
 import os
 from collections.abc import Callable
 from datetime import UTC, datetime
+from hashlib import sha256
 from http.client import HTTPResponse
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -23,6 +24,7 @@ from astro_operator.errors import (
 from astro_operator.models import (
     OperatorAction,
     OperatorState,
+    ReasonerAttemptProvenance,
     ReasonerDecision,
     ReasonerInvocation,
 )
@@ -67,9 +69,10 @@ class OpenRouterReasoner:
     def decide(self, state: OperatorState) -> ReasonerDecision:
         started_at = datetime.now(UTC)
         body = _request_body(state, self._model)
+        encoded_body = json.dumps(body, separators=(",", ":")).encode("utf-8")
         request = Request(
             OPENROUTER_ENDPOINT,
-            data=json.dumps(body, separators=(",", ":")).encode("utf-8"),
+            data=encoded_body,
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
@@ -82,31 +85,71 @@ class OpenRouterReasoner:
                 raw_response = response.read(MAX_RESPONSE_BYTES + 1)
                 if len(raw_response) > MAX_RESPONSE_BYTES:
                     raise ReasonerInvalidResponseError(
-                        "OpenRouter response exceeded the 1048576 byte limit"
+                        "OpenRouter response exceeded the 1048576 byte limit",
+                        attempt=_attempt_provenance(
+                            body, encoded_body, self._model, started_at, None
+                        ),
                     )
                 response_payload = json.loads(raw_response.decode("utf-8"))
         except HTTPError as exc:
-            diagnostic = _http_error_diagnostic(exc, self._api_key)
+            diagnostic, error_response = _http_error_diagnostic(exc, self._api_key)
+            attempt = _attempt_provenance(
+                body, encoded_body, self._model, started_at, error_response
+            )
             if exc.code in {401, 402, 403}:
                 raise ReasonerConfigurationError(
-                    f"OpenRouter rejected the credentials{diagnostic}"
+                    f"OpenRouter rejected the credentials{diagnostic}", attempt=attempt
                 ) from exc
             if exc.code in {408, 425, 429} or 500 <= exc.code < 600:
                 raise ReasonerUnavailableError(
-                    f"OpenRouter is unavailable (HTTP {exc.code}){diagnostic}"
+                    f"OpenRouter is unavailable (HTTP {exc.code}){diagnostic}",
+                    attempt=attempt,
                 ) from exc
             raise ReasonerInvalidResponseError(
-                f"OpenRouter request failed (HTTP {exc.code}){diagnostic}"
+                f"OpenRouter request failed (HTTP {exc.code}){diagnostic}", attempt=attempt
             ) from exc
         except (URLError, TimeoutError) as exc:
-            raise ReasonerUnavailableError("OpenRouter request was unavailable") from exc
+            raise ReasonerUnavailableError(
+                "OpenRouter request was unavailable",
+                attempt=_attempt_provenance(
+                    body, encoded_body, self._model, started_at, None
+                ),
+            ) from exc
         except (KeyboardInterrupt, InterruptedError) as exc:
-            raise ReasonerCancelledError("OpenRouter request was cancelled") from exc
+            raise ReasonerCancelledError(
+                "OpenRouter request was cancelled",
+                attempt=_attempt_provenance(
+                    body, encoded_body, self._model, started_at, None
+                ),
+            ) from exc
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ReasonerInvalidResponseError("OpenRouter returned invalid JSON") from exc
+            raise ReasonerInvalidResponseError(
+                "OpenRouter returned invalid JSON",
+                attempt=_attempt_provenance(
+                    body, encoded_body, self._model, started_at, raw_response
+                ),
+            ) from exc
 
         completed_at = datetime.now(UTC)
-        action, request_id, usage, metadata = _parse_response(response_payload, self._model)
+        attempt = _attempt_provenance(
+            body, encoded_body, self._model, started_at, raw_response, completed_at
+        )
+        try:
+            action, request_id, usage, metadata = _parse_response(
+                response_payload, self._model
+            )
+        except ReasonerInvalidResponseError as exc:
+            raise ReasonerInvalidResponseError(str(exc), attempt=attempt) from exc
+        metadata.update(
+            {
+                "attempt": attempt.attempt,
+                "request_sha256": attempt.request_sha256,
+                "prompt_sha256": attempt.prompt_sha256,
+                "schema_sha256": attempt.schema_sha256,
+                "tool_definitions_sha256": attempt.tool_definitions_sha256,
+                "raw_response_sha256": attempt.raw_response_sha256,
+            }
+        )
         invocation = ReasonerInvocation(
             adapter="openrouter-chat-completions",
             provider="openrouter",
@@ -160,6 +203,36 @@ def _request_body(state: OperatorState, model: str) -> dict[str, Any]:
             },
         },
     }
+
+
+def _json_digest(value: object) -> str:
+    payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return sha256(payload).hexdigest()
+
+
+def _attempt_provenance(
+    body: dict[str, Any],
+    encoded_body: bytes,
+    model: str,
+    started_at: datetime,
+    raw_response: bytes | None,
+    completed_at: datetime | None = None,
+) -> ReasonerAttemptProvenance:
+    return ReasonerAttemptProvenance(
+        adapter="openrouter-chat-completions",
+        provider="openrouter",
+        model=model,
+        attempt=1,
+        started_at=started_at,
+        completed_at=completed_at or datetime.now(UTC),
+        request_sha256=sha256(encoded_body).hexdigest(),
+        prompt_sha256=_json_digest(body["messages"]),
+        schema_sha256=_json_digest(body["response_format"]),
+        tool_definitions_sha256=_json_digest([]),
+        raw_response_sha256=(
+            sha256(raw_response).hexdigest() if raw_response is not None else None
+        ),
+    )
 
 
 def _parse_response(
@@ -236,24 +309,24 @@ def _strict_json_schema(value: Any) -> Any:
     return normalized
 
 
-def _http_error_diagnostic(exc: HTTPError, api_key: str) -> str:
+def _http_error_diagnostic(exc: HTTPError, api_key: str) -> tuple[str, bytes | None]:
     """Extract a bounded provider diagnostic while redacting the active credential."""
 
     try:
         raw = exc.read(8193)
         if len(raw) > 8192:
-            return ""
+            return "", None
         payload = json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return ""
+        return "", raw if "raw" in locals() else None
     if not isinstance(payload, dict) or not isinstance(payload.get("error"), dict):
-        return ""
+        return "", raw
     error = payload["error"]
     parts: list[str] = []
     error_type = error.get("type")
     if isinstance(error_type, str) and error_type:
         parts.append(f"type={_safe_diagnostic(error_type, api_key)}")
-    return f" ({'; '.join(parts)})" if parts else ""
+    return (f" ({'; '.join(parts)})" if parts else ""), raw
 
 
 def _safe_diagnostic(value: str, api_key: str) -> str:

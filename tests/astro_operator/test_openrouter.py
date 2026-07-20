@@ -143,12 +143,25 @@ def test_decide_sends_strict_schema_and_records_provenance() -> None:
     assert decision.invocation.output_sha256 == model_digest(_action())
     assert decision.invocation.record_sha256 == invocation_digest(decision.invocation)
     assert decision.invocation.usage == {"prompt_tokens": 12, "completion_tokens": 8}
-    assert decision.invocation.metadata == {
+    assert {
+        key: value
+        for key, value in decision.invocation.metadata.items()
+        if not key.endswith("_sha256") and key != "attempt"
+    } == {
         "response_model": DEFAULT_OPENROUTER_MODEL,
         "response_provider": "NVIDIA",
         "cost": 0.00125,
         "finish_reason": "stop",
     }
+    assert decision.invocation.metadata["attempt"] == 1
+    for key in (
+        "request_sha256",
+        "prompt_sha256",
+        "schema_sha256",
+        "tool_definitions_sha256",
+        "raw_response_sha256",
+    ):
+        assert len(str(decision.invocation.metadata[key])) == 64
 
 
 @pytest.mark.parametrize("status", [429, 500, 503])
@@ -156,8 +169,10 @@ def test_rate_limit_and_provider_failures_are_unavailable(status: int) -> None:
     def fail(request: Any, *, timeout: float) -> _Response:
         raise HTTPError(request.full_url, status, "failure", {}, io.BytesIO())
 
-    with pytest.raises(ReasonerUnavailableError):
+    with pytest.raises(ReasonerUnavailableError) as caught:
         OpenRouterReasoner("secret", _open=fail).decide(_state())
+    assert caught.value.attempt is not None
+    assert caught.value.attempt.request_sha256
 
 
 def test_auth_failure_is_configuration_error() -> None:
@@ -211,8 +226,10 @@ def test_invalid_action_is_normalized() -> None:
             {"model": DEFAULT_OPENROUTER_MODEL, "choices": [{"message": {"content": "{}"}}]}
         )
 
-    with pytest.raises(ReasonerInvalidResponseError):
+    with pytest.raises(ReasonerInvalidResponseError) as caught:
         OpenRouterReasoner("secret", _open=open_mock).decide(_state())
+    assert caught.value.attempt is not None
+    assert caught.value.attempt.raw_response_sha256 is not None
 
 
 def test_missing_credentials_fail_before_transport(monkeypatch: pytest.MonkeyPatch) -> None:

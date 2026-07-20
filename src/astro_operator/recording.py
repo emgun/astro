@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from contextlib import suppress
 from enum import StrEnum
 from hashlib import sha256
@@ -32,7 +34,12 @@ from astro_operator.errors import (
     ReasonerInvalidResponseError,
     ReasonerUnavailableError,
 )
-from astro_operator.models import OperatorActionKind, OperatorState, ReasonerDecision
+from astro_operator.models import (
+    OperatorActionKind,
+    OperatorState,
+    ReasonerAttemptProvenance,
+    ReasonerDecision,
+)
 from astro_operator.reasoner import (
     ConditionalReplayReasoner,
     InvocationRecordingReasoner,
@@ -52,12 +59,13 @@ class RecordedReasonerFailure(AstroModel):
     sequence: int = Field(ge=1)
     input_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     kind: RecordedFailureKind
+    attempt: ReasonerAttemptProvenance | None = None
     entry_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
     @model_validator(mode="after")
     def entry_digest_must_match(self) -> RecordedReasonerFailure:
         if self.entry_sha256 != recorded_failure_digest(
-            self.sequence, self.input_sha256, self.kind
+            self.sequence, self.input_sha256, self.kind, self.attempt
         ):
             raise ValueError("recorded terminal failure entry digest does not match")
         return self
@@ -111,15 +119,24 @@ class ReasonerBehaviorRecording(AstroModel):
     schema_version: str = Field(pattern=r"^1\.0$")
     recording_id: str = Field(min_length=1)
     corpus_id: str = Field(min_length=1)
-    cases: tuple[ReasonerBehaviorRecordingCase, ...] = Field(min_length=1)
+    call_cap: int | None = Field(default=None, ge=1)
+    calls_attempted: int | None = Field(default=None, ge=0)
+    complete: bool = True
+    cases: tuple[ReasonerBehaviorRecordingCase, ...] = ()
 
     @model_validator(mode="after")
     def case_ids_must_be_unique(self) -> ReasonerBehaviorRecording:
         case_ids = [case.case_id for case in self.cases]
         if len(case_ids) != len(set(case_ids)):
             raise ValueError("reasoner recording case IDs must be unique")
-        if not any(case.decisions for case in self.cases):
-            return self
+        if (self.call_cap is None) != (self.calls_attempted is None):
+            raise ValueError("recording call cap and attempted count must appear together")
+        if (
+            self.call_cap is not None
+            and self.calls_attempted is not None
+            and self.calls_attempted > self.call_cap
+        ):
+            raise ValueError("recording attempted calls exceed its call cap")
         return self
 
 
@@ -144,11 +161,56 @@ def write_reasoner_behavior_recording(
     path: Path | str, recording: ReasonerBehaviorRecording
 ) -> None:
     recording_path = Path(path)
-    recording_path.touch(mode=0o600, exist_ok=True)
-    recording_path.chmod(0o600)
-    recording_path.write_text(
-        recording.model_dump_json(indent=2) + "\n", encoding="utf-8"
+    recording_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{recording_path.name}.", suffix=".tmp", dir=recording_path.parent
     )
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(recording.model_dump_json(indent=2) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary_path.replace(recording_path)
+        recording_path.chmod(0o600)
+        _fsync_directory(recording_path.parent)
+    except BaseException:
+        temporary_path.unlink(missing_ok=True)
+        raise
+
+
+def reserve_reasoner_behavior_recording(
+    path: Path | str, recording: ReasonerBehaviorRecording
+) -> None:
+    """Exclusively reserve a mode-0600 output with an initial valid checkpoint."""
+
+    recording_path = Path(path)
+    recording_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{recording_path.name}.", suffix=".reserve", dir=recording_path.parent
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(recording.model_dump_json(indent=2) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary_path, recording_path)
+        _fsync_directory(recording_path.parent)
+    except BaseException:
+        raise
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _fsync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def recording_case_from_capture(
@@ -171,14 +233,21 @@ def recording_case_from_capture(
     if recorder.failure is not None:
         failure_state = recorder.failure_state
         assert failure_state is not None
+        attempt = (
+            recorder.failure.attempt
+            if isinstance(recorder.failure.attempt, ReasonerAttemptProvenance)
+            else None
+        )
         terminal_failure = RecordedReasonerFailure(
             sequence=len(decisions) + 1,
             input_sha256=model_digest(failure_state),
             kind=_failure_kind(recorder.failure),
+            attempt=attempt,
             entry_sha256=recorded_failure_digest(
                 len(decisions) + 1,
                 model_digest(failure_state),
                 _failure_kind(recorder.failure),
+                attempt,
             ),
         )
     return ReasonerBehaviorRecordingCase(
@@ -308,7 +377,7 @@ def score_recorded_reasoner_behavior_corpus(
         for case in corpus.cases
     )
     results = tuple(item[0] for item in scored)
-    recording_complete = all(item[1] for item in scored)
+    recording_complete = recording.complete and all(item[1] for item in scored)
     coverage_complete = (
         recording.corpus_id == corpus.corpus_id
         and behavior_coverage_complete(corpus, results, set(recording_by_id))
@@ -417,7 +486,10 @@ def recorded_decision_digest(
 
 
 def recorded_failure_digest(
-    sequence: int, input_sha256: str, kind: RecordedFailureKind
+    sequence: int,
+    input_sha256: str,
+    kind: RecordedFailureKind,
+    attempt: ReasonerAttemptProvenance | None,
 ) -> str:
     return sha256(
         _canonical_json(
@@ -425,6 +497,7 @@ def recorded_failure_digest(
                 "sequence": sequence,
                 "input_sha256": input_sha256,
                 "kind": kind.value,
+                "attempt": attempt.model_dump(mode="json") if attempt is not None else None,
             }
         )
     ).hexdigest()

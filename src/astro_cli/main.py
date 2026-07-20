@@ -134,6 +134,7 @@ from astro_od.io import (
     resolve_measurement_format,
 )
 from astro_od.measurements import generate_synthetic_measurements
+from astro_operator.acquisition import acquire_reasoner_behavior_recording
 from astro_operator.behavior import (
     load_reasoner_behavior_corpus,
     load_reasoner_behavior_replay,
@@ -150,10 +151,13 @@ from astro_operator.io import (
     write_operator_run,
 )
 from astro_operator.lifecycle import LifecycleCandidateEvaluator, resolve_lifecycle_references
+from astro_operator.openrouter import DEFAULT_OPENROUTER_MODEL, OpenRouterReasoner
 from astro_operator.reasoner import ConditionalReplayReasoner
 from astro_operator.recording import (
+    ReasonerBehaviorRecording,
     load_reasoner_behavior_recording,
     record_reasoner_behavior_replay,
+    reserve_reasoner_behavior_recording,
     score_recorded_reasoner_behavior_corpus,
     write_reasoner_behavior_recording,
 )
@@ -1016,6 +1020,63 @@ def bind_mission_reasoner_replay_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(f"wrote invocation-bound reasoner recording: {output}")
+
+
+@app.command("acquire-mission-reasoner-behavior")
+def acquire_mission_reasoner_behavior_command(
+    corpus_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Behavior corpus YAML path."),
+    ],
+    output: Annotated[Path, typer.Option("--output")],
+    recording_id: Annotated[str, typer.Option("--recording-id")],
+    provider: Annotated[str, typer.Option("--provider")] = "openrouter",
+    model: Annotated[str, typer.Option("--model")] = DEFAULT_OPENROUTER_MODEL,
+    max_calls: Annotated[int, typer.Option("--max-calls", min=1, max=32)] = 8,
+    timeout: Annotated[float, typer.Option("--timeout", min=1.0, max=300.0)] = 60.0,
+    confirm_provider_calls: Annotated[
+        bool,
+        typer.Option(
+            "--confirm-provider-calls",
+            help="Explicitly authorize the bounded external provider calls.",
+        ),
+    ] = False,
+) -> None:
+    """Acquire a capped invocation-bound recording from an authorized provider."""
+    if not confirm_provider_calls:
+        typer.echo("provider calls require --confirm-provider-calls", err=True)
+        raise typer.Exit(code=2)
+    if provider != "openrouter":
+        typer.echo(f"unsupported reasoner provider: {provider}", err=True)
+        raise typer.Exit(code=2)
+    try:
+        corpus = load_reasoner_behavior_corpus(corpus_path)
+        reserve_reasoner_behavior_recording(
+            output,
+            ReasonerBehaviorRecording(
+                schema_version="1.0",
+                recording_id=recording_id,
+                corpus_id=corpus.corpus_id,
+                call_cap=max_calls,
+                calls_attempted=0,
+                complete=False,
+                cases=(),
+            ),
+        )
+        recording = acquire_reasoner_behavior_recording(
+            corpus,
+            OpenRouterReasoner(model=model, timeout=timeout),
+            recording_id=recording_id,
+            max_calls=max_calls,
+            checkpoint=lambda value: write_reasoner_behavior_recording(output, value),
+        )
+    except (InvalidScenarioError, OperatorError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"wrote reasoner recording: {output} "
+        f"calls={recording.calls_attempted}/{recording.call_cap}"
+    )
 
 
 @app.command("verify-mission-evidence")
