@@ -8,6 +8,13 @@ from astro_operator.errors import (
     ReasonerInvalidResponseError,
     ReasonerUnavailableError,
 )
+from astro_operator.evaluation import (
+    AdversarialCorpusScore,
+    AdversarialDecisionCorpus,
+    DecisionDisposition,
+    load_adversarial_corpus,
+    score_adversarial_corpus,
+)
 from astro_operator.models import (
     ActionApproval,
     AuthorityGrant,
@@ -29,10 +36,13 @@ from astro_operator.models import (
     ReasonerInvocation,
 )
 from astro_operator.openrouter import OpenRouterReasoner
+from astro_operator.policy import validate_action_against_state, validate_operator_state
 from astro_operator.reasoner import ConditionalReplayReasoner, ScriptedReasoner
 
 __all__ = [
     "ActionApproval",
+    "AdversarialCorpusScore",
+    "AdversarialDecisionCorpus",
     "AuthorityGrant",
     "AuthorityLevel",
     "CandidateObservation",
@@ -41,6 +51,7 @@ __all__ = [
     "CommandResult",
     "ConditionalReplayReasoner",
     "DesignVariable",
+    "DecisionDisposition",
     "EpistemicKind",
     "EvidenceReference",
     "MetricGoal",
@@ -59,4 +70,8 @@ __all__ = [
     "ReasonerUnavailableError",
     "ScriptedReasoner",
     "run_operator",
+    "load_adversarial_corpus",
+    "score_adversarial_corpus",
+    "validate_action_against_state",
+    "validate_operator_state",
 ]

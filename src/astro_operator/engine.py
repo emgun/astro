@@ -12,7 +12,6 @@ from astro_operator.models import (
     EvidenceReference,
     EvidenceRequest,
     MissionObjective,
-    OperatorAction,
     OperatorActionKind,
     OperatorRun,
     OperatorRunStatus,
@@ -21,7 +20,7 @@ from astro_operator.models import (
     ReasonerDecision,
 )
 from astro_operator.policy import (
-    validate_action_against_grant,
+    validate_action_against_state,
     validate_candidate_against_objective,
     validate_observation_against_objective,
     validate_operator_run_policy,
@@ -57,7 +56,6 @@ def run_operator(
     known_evidence_ids = {item.evidence_id for item in known_evidence}
     evaluated_candidates: set[str] = set()
     proposed_commands: dict[str, CommandRequest] = {}
-    action_ids: set[str] = set()
     evaluation_count = 0
 
     while len(steps) < authority.max_steps:
@@ -105,15 +103,7 @@ def run_operator(
                 "reasoner invocation record digest does not match provenance"
             )
         _check_authority(authority, authority_monitor)
-        _validate_action(
-            action,
-            objective=objective,
-            authority=authority,
-            known_evidence_ids=known_evidence_ids,
-            action_ids=action_ids,
-        )
-        action_ids.add(action.action_id)
-
+        validate_action_against_state(action, state)
         if action.kind == OperatorActionKind.EVALUATE_CANDIDATE:
             if evaluation_count >= authority.max_candidate_evaluations:
                 raise OperatorPolicyError("candidate evaluation budget exhausted")
@@ -216,25 +206,6 @@ def run_operator(
     )
     validate_operator_run_policy(run)
     return run
-
-
-def _validate_action(
-    action: OperatorAction,
-    *,
-    objective: MissionObjective,
-    authority: AuthorityGrant,
-    known_evidence_ids: set[str],
-    action_ids: set[str],
-) -> None:
-    del objective
-    if action.action_id in action_ids:
-        raise OperatorPolicyError(f"action ID {action.action_id} has already been used")
-    validate_action_against_grant(action, authority)
-    unknown_evidence = set(action.evidence_ids) - known_evidence_ids
-    if unknown_evidence:
-        raise OperatorPolicyError(
-            f"action cites unknown evidence: {', '.join(sorted(unknown_evidence))}"
-        )
 
 
 def _add_evidence(

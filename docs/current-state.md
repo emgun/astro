@@ -665,16 +665,16 @@ Post-MVP / external-campaign items:
 | v0.2.0-rc.2 | done | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Local, wheel-installed, CI, detached merged-commit, and remote annotated-tag evidence agree at `f224a06`; the candidate is ready for a short soak. |
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
-| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, progressive authority grant, provider-neutral reasoner, lifecycle candidate evaluator, replayable evidence journal, checked trade study | The merged kernel provides bounded adaptive lifecycle evaluation and progressive authority. The provider-neutral follow-on adds a strict `ReasonerDecision` envelope, engine-verified state/action digests, journaled invocation provenance, normalized provider failures, and API-free adversarial coverage. A stacked research-only OpenRouter adapter uses strict structured output, a provider-safe state projection, no tools, exact route checks, response caps, and zero-cost free-model routes. The five-call bounded check did not promote a default: Nemotron produced one valid `finish` and one invalid null conclusion, Qwen was rate-limited, and GPT-OSS returned an invalid action. Command commit remains disabled until prepare/commit journaling and idempotency exist. |
+| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, progressive authority grant, provider-neutral reasoner, lifecycle candidate evaluator, replayable evidence journal, checked trade study | The merged kernel provides bounded adaptive lifecycle evaluation and progressive authority. The provider-neutral follow-on adds a strict `ReasonerDecision` envelope, engine-verified state/action digests, journaled invocation provenance, normalized provider failures, and an offline adversarial contract gate. The eight-case corpus passes accepted, schema-rejected, and policy-rejected controls for the observed null conclusion, payload mismatch, and tool-call-only shapes plus envelope, evidence, selection, and budget violations. This promotes only the recorded-action contract, not a live model or command authority. A stacked research-only OpenRouter adapter uses strict structured output, a provider-safe state projection, no tools, exact route checks, response caps, and zero-cost free-model routes. The five-call bounded check did not promote a default: Nemotron produced one valid `finish` and one invalid null conclusion, Qwen was rate-limited, and GPT-OSS returned an invalid action. Command commit remains disabled until prepare/commit journaling and idempotency exist. |
 
 ## Next Best Paths
 
-1. Finish and independently verify the provider-neutral decision envelope and API-free adversarial
-   corpus. Treat current research-only execution as a maturity state, not a permanent prohibition
-   on higher autonomy.
-2. Add a real model provider adapter behind the same contract with digest-bound
-   provider/model/prompt/schema/tool and attempt provenance, then
-   evaluate whether it improves candidate selection, evidence acquisition, or stopping decisions
+1. Extend the offline contract corpus into a replayed behavior benchmark with passing, recovery,
+   unmatched-branch, and budget-exhaustion traces. Keep contract enforcement and model capability
+   scores separate.
+2. Run future provider/model candidates through the same recorded-action contract and behavior
+   benchmark with digest-bound provider/model/prompt/schema/tool and attempt provenance; promote a
+   default only if it improves candidate selection, evidence acquisition, or stopping decisions
    over checked baselines.
 3. Add prepare/commit simulation command tools and exercise supervised authority before delegated
    or mission-autonomy grants. Qualification, freshness, revocation, resource bounds, and
