@@ -1,6 +1,13 @@
 """Provider-neutral mission operator primitives."""
 
 from astro_operator.engine import run_operator
+from astro_operator.errors import (
+    ReasonerCancelledError,
+    ReasonerConfigurationError,
+    ReasonerError,
+    ReasonerInvalidResponseError,
+    ReasonerUnavailableError,
+)
 from astro_operator.models import (
     ActionApproval,
     AuthorityGrant,
@@ -18,6 +25,8 @@ from astro_operator.models import (
     OperatorActionKind,
     OperatorRun,
     OperatorRunStatus,
+    ReasonerDecision,
+    ReasonerInvocation,
 )
 from astro_operator.reasoner import ConditionalReplayReasoner, ScriptedReasoner
 
@@ -39,6 +48,13 @@ __all__ = [
     "OperatorActionKind",
     "OperatorRun",
     "OperatorRunStatus",
+    "ReasonerDecision",
+    "ReasonerCancelledError",
+    "ReasonerConfigurationError",
+    "ReasonerError",
+    "ReasonerInvalidResponseError",
+    "ReasonerInvocation",
+    "ReasonerUnavailableError",
     "ScriptedReasoner",
     "run_operator",
 ]

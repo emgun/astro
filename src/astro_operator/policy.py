@@ -13,7 +13,10 @@ from astro_operator.models import (
     OperatorActionKind,
     OperatorRun,
     OperatorRunStatus,
+    OperatorState,
+    OperatorStep,
 )
+from astro_operator.reasoner import invocation_digest, model_digest
 
 
 def action_digest(action: OperatorAction) -> str:
@@ -100,8 +103,38 @@ def validate_operator_run_policy(run: OperatorRun) -> None:
     evaluated: set[str] = set()
     proposed_commands: dict[str, object] = {}
     evaluation_count = 0
-    for step in run.steps:
+    known_evidence = list(run.objective.base_evidence)
+    prior_steps: list[OperatorStep] = []
+    for step_index, step in enumerate(run.steps):
         action = step.action
+        if run.schema_version == "1.1":
+            invocation = step.reasoner_invocation
+            assert invocation is not None
+            state = OperatorState(
+                objective=run.objective,
+                authority=run.authority,
+                steps=tuple(prior_steps),
+                known_evidence=tuple(known_evidence),
+                remaining_steps=authority.max_steps - step_index,
+                remaining_candidate_evaluations=(
+                    authority.max_candidate_evaluations - evaluation_count
+                ),
+            )
+            if invocation.input_sha256 != model_digest(state):
+                raise OperatorPolicyError(
+                    "reasoner invocation input digest does not match journal state"
+                )
+            if invocation.output_sha256 != model_digest(action):
+                raise OperatorPolicyError(
+                    "reasoner invocation output digest does not match journal action"
+                )
+            if (
+                invocation.record_sha256 is None
+                or invocation.record_sha256 != invocation_digest(invocation)
+            ):
+                raise OperatorPolicyError(
+                    "reasoner invocation record digest does not match journal provenance"
+                )
         validate_action_against_grant(action, authority)
         if action.kind == OperatorActionKind.EVALUATE_CANDIDATE:
             assert action.candidate is not None
@@ -119,8 +152,15 @@ def validate_operator_run_policy(run: OperatorRun) -> None:
             proposed_commands[action.command.command_id] = action.command
         elif action.kind == OperatorActionKind.EXECUTE_COMMAND:
             raise OperatorPolicyError(
-                "operator schema 1.0 stages command authority but does not support command commit"
+                "operator command contract stages authority but does not support command commit"
             )
+        additions = step.acquired_evidence
+        if step.observation is not None:
+            additions += step.observation.evidence
+        if step.command_result is not None:
+            additions += step.command_result.evidence
+        known_evidence.extend(additions)
+        prior_steps.append(step)
 
     if evaluation_count > authority.max_candidate_evaluations:
         raise OperatorPolicyError("operator journal exceeds its candidate evaluation budget")

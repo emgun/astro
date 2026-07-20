@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 
 import pytest
 from pydantic import ValidationError
 
 from astro_operator.engine import run_operator
-from astro_operator.errors import OperatorPolicyError
+from astro_operator.errors import OperatorPolicyError, ReasonerInvalidResponseError
 from astro_operator.models import (
     ActionApproval,
     AuthorityGrant,
@@ -21,6 +22,8 @@ from astro_operator.models import (
     OperatorAction,
     OperatorActionKind,
     OperatorRunStatus,
+    ReasonerDecision,
+    ReasonerInvocation,
 )
 from astro_operator.policy import action_digest
 from astro_operator.reasoner import (
@@ -28,6 +31,8 @@ from astro_operator.reasoner import (
     ConditionalReplayReasoner,
     ReplayCondition,
     ScriptedReasoner,
+    invocation_digest,
+    model_digest,
 )
 
 
@@ -78,6 +83,23 @@ class _Evaluator:
             passed=True,
             metrics=(ObservedMetric(metric_id="reserve", value=12.0, unit="kg"),),
         )
+
+
+def _decision(action: OperatorAction, state: object) -> ReasonerDecision:
+    from astro_operator.models import OperatorState
+
+    assert isinstance(state, OperatorState)
+    invocation = ReasonerInvocation(
+        adapter="unit-test",
+        provider="deterministic",
+        model="fixture",
+        input_sha256=model_digest(state),
+        output_sha256=model_digest(action),
+    )
+    invocation = invocation.model_copy(
+        update={"record_sha256": invocation_digest(invocation)}
+    )
+    return ReasonerDecision(action=action, invocation=invocation)
 
 
 def _run_actions(actions: Sequence[OperatorAction], authority: AuthorityGrant) -> object:
@@ -372,22 +394,25 @@ def test_authority_monitor_can_revoke_between_adaptive_calls() -> None:
 
 def test_reasoner_cannot_mutate_the_policy_objective_to_escape_bounds() -> None:
     class _MutatingReasoner:
-        def decide(self, state: object) -> OperatorAction:
+        def decide(self, state: object) -> ReasonerDecision:
             from astro_operator.models import OperatorState
 
             assert isinstance(state, OperatorState)
             state.objective.design_variables[0].upper_bound = 1_000.0
-            return OperatorAction(
-                action_id="escape",
-                kind=OperatorActionKind.EVALUATE_CANDIDATE,
-                rationale="Attempt to widen the copied provider context.",
-                candidate=CandidateProposal(
-                    candidate_id="escape",
-                    assignments={"mass": 999.0},
+            return _decision(
+                OperatorAction(
+                    action_id="escape",
+                    kind=OperatorActionKind.EVALUATE_CANDIDATE,
+                    rationale="Attempt to widen the copied provider context.",
+                    candidate=CandidateProposal(
+                        candidate_id="escape",
+                        assignments={"mass": 999.0},
+                    ),
                 ),
+                state,
             )
 
-    with pytest.raises(OperatorPolicyError, match="outside"):
+    with pytest.raises(ReasonerInvalidResponseError, match="input digest"):
         run_operator(
             objective=_objective(),
             authority=_authority(),
@@ -406,18 +431,21 @@ def test_reasoner_cannot_retroactively_mutate_an_accepted_action() -> None:
                 command=CommandRequest(command_id="burn-1", command_type="burn"),
             )
 
-        def decide(self, state: object) -> OperatorAction:
+        def decide(self, state: object) -> ReasonerDecision:
             from astro_operator.models import OperatorState
 
             assert isinstance(state, OperatorState)
             if not state.steps:
-                return self.proposal
+                return _decision(self.proposal, state)
             self.proposal.rationale = "Mutated after acceptance."
-            return OperatorAction(
-                action_id="finish",
-                kind=OperatorActionKind.FINISH,
-                rationale="Finish after proposal.",
-                conclusion="Proposal recorded.",
+            return _decision(
+                OperatorAction(
+                    action_id="finish",
+                    kind=OperatorActionKind.FINISH,
+                    rationale="Finish after proposal.",
+                    conclusion="Proposal recorded.",
+                ),
+                state,
             )
 
     run = run_operator(
@@ -436,6 +464,114 @@ def test_reasoner_cannot_retroactively_mutate_an_accepted_action() -> None:
     )
 
     assert run.steps[0].action.rationale == "Original rationale."
+
+
+def test_reasoner_decision_provenance_is_digest_bound_and_journaled() -> None:
+    action = OperatorAction(
+        action_id="finish",
+        kind=OperatorActionKind.FINISH,
+        rationale="Finish deterministically.",
+        conclusion="No candidate required.",
+    )
+
+    run = _run_actions((action,), _authority(max_candidate_evaluations=0))
+
+    invocation = run.steps[0].reasoner_invocation
+    assert invocation is not None
+    assert invocation.provider == "deterministic-replay"
+    assert invocation.output_sha256 == model_digest(action)
+
+    legacy_payload = run.model_dump(mode="json")
+    legacy_payload["schema_version"] = "1.0"
+    for step in legacy_payload["steps"]:
+        step.pop("reasoner_invocation")
+    legacy = type(run).model_validate(legacy_payload)
+    assert legacy.schema_version == "1.0"
+    assert legacy.steps[0].reasoner_invocation is None
+
+
+@pytest.mark.parametrize("field", ("input_sha256", "output_sha256"))
+def test_engine_rejects_forged_reasoner_provenance(field: str) -> None:
+    class _ForgedReasoner:
+        def decide(self, state: object) -> ReasonerDecision:
+            action = OperatorAction(
+                action_id="finish",
+                kind=OperatorActionKind.FINISH,
+                rationale="Return forged provenance.",
+                conclusion="Must not be accepted.",
+            )
+            decision = _decision(action, state)
+            setattr(decision.invocation, field, "f" * 64)
+            return decision
+
+    with pytest.raises(ReasonerInvalidResponseError, match="digest"):
+        run_operator(
+            objective=_objective(),
+            authority=_authority(max_candidate_evaluations=0),
+            reasoner=_ForgedReasoner(),
+            evaluator=_Evaluator(),
+        )
+
+
+def test_engine_rejects_unenveloped_reasoner_output() -> None:
+    class _BareActionReasoner:
+        def decide(self, state: object) -> OperatorAction:
+            del state
+            return OperatorAction(
+                action_id="finish",
+                kind=OperatorActionKind.FINISH,
+                rationale="Return a bare action.",
+                conclusion="Must not be accepted.",
+            )
+
+    with pytest.raises(ReasonerInvalidResponseError, match="ReasonerDecision"):
+        run_operator(
+            objective=_objective(),
+            authority=_authority(max_candidate_evaluations=0),
+            reasoner=_BareActionReasoner(),  # type: ignore[arg-type]
+            evaluator=_Evaluator(),
+        )
+
+
+def test_engine_normalizes_mutated_decision_model() -> None:
+    class _MutatedDecisionReasoner:
+        def decide(self, state: object) -> ReasonerDecision:
+            action = OperatorAction(
+                action_id="finish",
+                kind=OperatorActionKind.FINISH,
+                rationale="Construct then corrupt a decision.",
+                conclusion="Must not be accepted.",
+            )
+            decision = _decision(action, state)
+            return decision.model_copy(update={"invocation": "not-an-invocation"})
+
+    with pytest.raises(ReasonerInvalidResponseError, match="invalid ReasonerDecision"):
+        run_operator(
+            objective=_objective(),
+            authority=_authority(max_candidate_evaluations=0),
+            reasoner=_MutatedDecisionReasoner(),
+            evaluator=_Evaluator(),
+        )
+
+
+def test_reasoner_invocation_rejects_unsafe_metadata_and_timestamps() -> None:
+    payload = {
+        "adapter": "test",
+        "provider": "test",
+        "model": "test",
+        "input_sha256": "0" * 64,
+        "output_sha256": "1" * 64,
+    }
+    with pytest.raises(ValidationError, match="timezone"):
+        ReasonerInvocation.model_validate(
+            {**payload, "started_at": datetime(2026, 7, 17, 12, 0)}
+        )
+    with pytest.raises(ValidationError):
+        ReasonerInvocation.model_validate({**payload, "metadata": {"unsafe": object()}})
+    with pytest.raises(ValidationError, match="16384"):
+        ReasonerInvocation.model_validate(
+            {**payload, "metadata": {"oversized": "x" * 16_385}}
+        )
 
 
 @pytest.mark.parametrize(

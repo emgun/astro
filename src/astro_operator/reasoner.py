@@ -1,19 +1,26 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Sequence
 from typing import Any, Protocol
 
 from pydantic import Field, StrictBool, field_validator
 
 from astro_core.models import AstroModel
-from astro_operator.errors import OperatorPolicyError
-from astro_operator.models import OperatorAction, OperatorState
+from astro_operator.errors import ReasonerInvalidResponseError
+from astro_operator.models import (
+    OperatorAction,
+    OperatorState,
+    ReasonerDecision,
+    ReasonerInvocation,
+)
 
 
 class MissionReasoner(Protocol):
     """Provider-neutral decision interface for an adaptive mission operator."""
 
-    def decide(self, state: OperatorState) -> OperatorAction: ...
+    def decide(self, state: OperatorState) -> ReasonerDecision: ...
 
 
 class ScriptedReasoner:
@@ -23,13 +30,14 @@ class ScriptedReasoner:
         self._actions = tuple(actions)
         self._cursor = 0
 
-    def decide(self, state: OperatorState) -> OperatorAction:
-        del state
+    def decide(self, state: OperatorState) -> ReasonerDecision:
         if self._cursor >= len(self._actions):
-            raise OperatorPolicyError("scripted reasoner exhausted before finishing")
+            raise ReasonerInvalidResponseError(
+                "scripted reasoner exhausted before finishing"
+            )
         action = self._actions[self._cursor]
         self._cursor += 1
-        return action
+        return _replay_decision("scripted", state, action)
 
 
 class ReplayCondition(AstroModel):
@@ -59,14 +67,52 @@ class ConditionalReplayReasoner:
         self._decisions = tuple(decisions)
         self._consumed_action_ids: set[str] = set()
 
-    def decide(self, state: OperatorState) -> OperatorAction:
+    def decide(self, state: OperatorState) -> ReasonerDecision:
         for decision in self._decisions:
             if decision.action.action_id in self._consumed_action_ids:
                 continue
             if _condition_matches(decision.when, state):
                 self._consumed_action_ids.add(decision.action.action_id)
-                return decision.action
-        raise OperatorPolicyError("conditional replay has no action matching the current state")
+                return _replay_decision("conditional-replay", state, decision.action)
+        raise ReasonerInvalidResponseError(
+            "conditional replay has no action matching the current state"
+        )
+
+
+def _replay_decision(
+    adapter: str, state: OperatorState, action: OperatorAction
+) -> ReasonerDecision:
+    invocation = ReasonerInvocation(
+        adapter=adapter,
+        provider="deterministic-replay",
+        model="checked-fixture",
+        input_sha256=model_digest(state),
+        output_sha256=model_digest(action),
+    )
+    invocation = invocation.model_copy(
+        update={"record_sha256": invocation_digest(invocation)}
+    )
+    return ReasonerDecision(action=action, invocation=invocation)
+
+
+def model_digest(model: AstroModel) -> str:
+    """Return the canonical digest used to bind reasoner inputs and outputs."""
+
+    payload = json.dumps(
+        model.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def invocation_digest(invocation: ReasonerInvocation) -> str:
+    """Bind the portable invocation metadata independently of action identity."""
+
+    payload = json.dumps(
+        invocation.model_dump(mode="json", exclude={"record_sha256"}),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _condition_matches(condition: ReplayCondition, state: OperatorState) -> bool:
