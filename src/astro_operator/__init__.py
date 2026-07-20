@@ -28,6 +28,7 @@ from astro_operator.models import (
     ReasonerDecision,
     ReasonerInvocation,
 )
+from astro_operator.openrouter import OpenRouterReasoner
 from astro_operator.reasoner import ConditionalReplayReasoner, ScriptedReasoner
 
 __all__ = [
@@ -48,6 +49,7 @@ __all__ = [
     "OperatorActionKind",
     "OperatorRun",
     "OperatorRunStatus",
+    "OpenRouterReasoner",
     "ReasonerDecision",
     "ReasonerCancelledError",
     "ReasonerConfigurationError",
