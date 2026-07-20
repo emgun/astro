@@ -151,6 +151,12 @@ from astro_operator.io import (
 )
 from astro_operator.lifecycle import LifecycleCandidateEvaluator, resolve_lifecycle_references
 from astro_operator.reasoner import ConditionalReplayReasoner
+from astro_operator.recording import (
+    load_reasoner_behavior_recording,
+    record_reasoner_behavior_replay,
+    score_recorded_reasoner_behavior_corpus,
+    write_reasoner_behavior_recording,
+)
 from astro_reentry.backends import simulate_reentry_with_backend
 from astro_reentry.handoff import trajectory_to_reentry_scenario
 from astro_reentry.io import (
@@ -929,26 +935,50 @@ def score_mission_reasoner_behavior_command(
         typer.Argument(exists=True, readable=True, help="Offline behavior corpus YAML path."),
     ],
     reasoner_replay: Annotated[
-        Path,
+        Path | None,
         typer.Option(
             "--reasoner-replay",
             exists=True,
             readable=True,
             help="Recorded provider-neutral decisions to score.",
         ),
-    ],
+    ] = None,
+    reasoner_recording: Annotated[
+        Path | None,
+        typer.Option(
+            "--reasoner-recording",
+            exists=True,
+            readable=True,
+            help="Invocation-bound decisions to verify and score.",
+        ),
+    ] = None,
     output: Annotated[
         Path | None,
         typer.Option("--output", help="Optional JSON behavior score path."),
     ] = None,
 ) -> None:
     """Score deterministic whole-run reasoner behavior without provider calls."""
-    try:
-        score = score_reasoner_behavior_corpus(
-            load_reasoner_behavior_corpus(corpus_path),
-            load_reasoner_behavior_replay(reasoner_replay),
+    if (reasoner_replay is None) == (reasoner_recording is None):
+        typer.echo(
+            "provide exactly one of --reasoner-replay or --reasoner-recording",
+            err=True,
         )
-        payload = score.model_dump_json(indent=2) + "\n"
+        raise typer.Exit(code=2)
+    try:
+        corpus = load_reasoner_behavior_corpus(corpus_path)
+        if reasoner_recording is not None:
+            score = score_recorded_reasoner_behavior_corpus(
+                corpus, load_reasoner_behavior_recording(reasoner_recording)
+            )
+            passed = score.behavior_gate_passed
+            payload = score.model_dump_json(indent=2) + "\n"
+        else:
+            assert reasoner_replay is not None
+            replay_score = score_reasoner_behavior_corpus(
+                corpus, load_reasoner_behavior_replay(reasoner_replay)
+            )
+            passed = replay_score.behavior_gate_passed
+            payload = replay_score.model_dump_json(indent=2) + "\n"
         if output is not None:
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(payload, encoding="utf-8")
@@ -956,8 +986,36 @@ def score_mission_reasoner_behavior_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(payload, nl=False)
-    if not score.behavior_gate_passed:
+    if not passed:
         raise typer.Exit(code=1)
+
+
+@app.command("bind-mission-reasoner-replay")
+def bind_mission_reasoner_replay_command(
+    corpus_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Behavior corpus YAML path."),
+    ],
+    reasoner_replay: Annotated[
+        Path,
+        typer.Option("--reasoner-replay", exists=True, readable=True),
+    ],
+    output: Annotated[Path, typer.Option("--output")],
+    recording_id: Annotated[str, typer.Option("--recording-id")] = "bound-replay",
+) -> None:
+    """Convert a synthetic replay into an invocation-bound recording."""
+    try:
+        recording = record_reasoner_behavior_replay(
+            load_reasoner_behavior_corpus(corpus_path),
+            load_reasoner_behavior_replay(reasoner_replay),
+            recording_id=recording_id,
+        )
+        output.parent.mkdir(parents=True, exist_ok=True)
+        write_reasoner_behavior_recording(output, recording)
+    except (InvalidScenarioError, OperatorError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(f"wrote invocation-bound reasoner recording: {output}")
 
 
 @app.command("verify-mission-evidence")

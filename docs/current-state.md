@@ -665,16 +665,17 @@ Post-MVP / external-campaign items:
 | v0.2.0-rc.2 | done | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Local, wheel-installed, CI, detached merged-commit, and remote annotated-tag evidence agree at `f224a06`; the candidate is ready for a short soak. |
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
-| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, progressive authority grant, provider-neutral reasoner, lifecycle candidate evaluator, replayable evidence journal, checked trade study | The merged kernel provides bounded adaptive lifecycle evaluation and progressive authority. The eight-case offline action-contract gate covers accepted, schema-rejected, and policy-rejected decisions. A separate four-case whole-run behavior scorer accepts external provider-neutral decision replays and evaluates them against digest-bound direct-success, recovery, unmatched-branch, and budget-exhaustion scenarios with exact traces. The checked conditional replay passes as a deterministic baseline; that is not evidence that a live model passed. The research-only OpenRouter adapter uses strict structured output, a provider-safe state projection, no tools, exact route checks, response caps, and zero-cost free-model routes. The five-call bounded check did not promote a default: Nemotron produced one valid `finish` and one invalid null conclusion, Qwen was rate-limited, and GPT-OSS returned an invalid action. Command commit remains disabled until prepare/commit journaling and idempotency exist. |
+| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, progressive authority grant, provider-neutral reasoner, lifecycle candidate evaluator, replayable evidence journal, checked trade study | The merged kernel provides bounded adaptive lifecycle evaluation and progressive authority. The eight-case action-contract gate covers accepted, schema-rejected, and policy-rejected decisions. The four-case whole-run scorer checks direct success, recovery, unmatched branches, and budget exhaustion. The invocation-bound recorder validates decisions before capture, stores exact states and original invocation provenance, binds terminal failures, and revalidates unchanged decisions during playback; attribution is derived rather than claimed, and mixed identity blocks passing. The checked conditional replay and its bound recording are deterministic baselines, not live-model evidence. The research-only OpenRouter adapter remains available, but the five-call free-model check promoted no default. Command commit remains disabled until prepare/commit journaling and idempotency exist. |
 
 ## Next Best Paths
 
-1. Add a provider-run recorder that converts bounded live attempts into the provider-neutral action
-   and behavior score inputs while preserving provider/model/prompt/schema/tool, attempt, usage,
-   cost, route, and raw-response digests. Keep transport availability separate from capability.
-2. Compare future provider/model candidates against the checked replay baseline. Promote a default
-   only after repeated held-out behavior runs improve candidate selection, recovery, and stopping
-   decisions without any action-contract regression.
+1. Add an explicit, bounded acquisition command around the provider-neutral recorder only when a
+   new provider evaluation is authorized. Capture attempt-level prompt/schema/tool and raw-response
+   digests without storing secrets or raw sensitive content; keep transport availability separate
+   from capability.
+2. Compare future invocation-bound provider recordings against the checked replay baseline.
+   Promote a default only after repeated held-out behavior runs improve candidate selection,
+   recovery, and stopping decisions without any action-contract regression.
 3. Add prepare/commit simulation command tools and exercise supervised authority before delegated
    or mission-autonomy grants. Qualification, freshness, revocation, resource bounds, and
    idempotency should grow in proportion to the command risk.

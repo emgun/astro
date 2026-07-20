@@ -46,7 +46,22 @@ from astro_operator.models import (
 )
 from astro_operator.openrouter import OpenRouterReasoner
 from astro_operator.policy import validate_action_against_state, validate_operator_state
-from astro_operator.reasoner import ConditionalReplayReasoner, ScriptedReasoner
+from astro_operator.reasoner import (
+    BoundDecisionReasoner,
+    ConditionalReplayReasoner,
+    InvocationRecordingReasoner,
+    ScriptedReasoner,
+    validate_reasoner_decision,
+)
+from astro_operator.recording import (
+    ReasonerAttribution,
+    ReasonerBehaviorRecording,
+    RecordedReasonerBehaviorScore,
+    load_reasoner_behavior_recording,
+    record_reasoner_behavior_replay,
+    score_recorded_reasoner_behavior_corpus,
+    write_reasoner_behavior_recording,
+)
 
 __all__ = [
     "ActionApproval",
@@ -55,6 +70,7 @@ __all__ = [
     "AuthorityGrant",
     "AuthorityLevel",
     "BehaviorDisposition",
+    "BoundDecisionReasoner",
     "CandidateObservation",
     "CandidateProposal",
     "CommandRequest",
@@ -64,6 +80,7 @@ __all__ = [
     "DecisionDisposition",
     "EpistemicKind",
     "EvidenceReference",
+    "InvocationRecordingReasoner",
     "MetricGoal",
     "MissionObjective",
     "OperatorAction",
@@ -75,19 +92,27 @@ __all__ = [
     "ReasonerBehaviorCorpus",
     "ReasonerBehaviorReplay",
     "ReasonerBehaviorScore",
+    "ReasonerBehaviorRecording",
+    "ReasonerAttribution",
     "ReasonerCancelledError",
     "ReasonerConfigurationError",
     "ReasonerError",
     "ReasonerInvalidResponseError",
     "ReasonerInvocation",
+    "RecordedReasonerBehaviorScore",
     "ReasonerUnavailableError",
     "ScriptedReasoner",
     "run_operator",
     "load_adversarial_corpus",
     "load_reasoner_behavior_corpus",
     "load_reasoner_behavior_replay",
+    "load_reasoner_behavior_recording",
+    "record_reasoner_behavior_replay",
     "score_adversarial_corpus",
     "score_reasoner_behavior_corpus",
+    "score_recorded_reasoner_behavior_corpus",
     "validate_action_against_state",
     "validate_operator_state",
+    "validate_reasoner_decision",
+    "write_reasoner_behavior_recording",
 ]

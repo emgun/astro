@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import warnings
 from typing import Protocol
 
-from astro_operator.errors import OperatorPolicyError, ReasonerInvalidResponseError
+from astro_operator.errors import OperatorPolicyError
 from astro_operator.models import (
     AuthorityGrant,
     CandidateObservation,
@@ -17,7 +16,6 @@ from astro_operator.models import (
     OperatorRunStatus,
     OperatorState,
     OperatorStep,
-    ReasonerDecision,
 )
 from astro_operator.policy import (
     validate_action_against_state,
@@ -25,7 +23,7 @@ from astro_operator.policy import (
     validate_observation_against_objective,
     validate_operator_run_policy,
 )
-from astro_operator.reasoner import MissionReasoner, invocation_digest, model_digest
+from astro_operator.reasoner import MissionReasoner, validate_reasoner_decision
 
 
 class CandidateEvaluator(Protocol):
@@ -70,40 +68,11 @@ def run_operator(
                 authority.max_candidate_evaluations - evaluation_count
             ),
         )
-        expected_input_sha256 = model_digest(state)
-        raw_decision = reasoner.decide(state)
-        if not isinstance(raw_decision, ReasonerDecision):
-            raise ReasonerInvalidResponseError(
-                "mission reasoner must return a ReasonerDecision"
-            )
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("error")
-                decision = ReasonerDecision.model_validate(
-                    raw_decision.model_dump(mode="python", round_trip=True)
-                )
-        except Exception as exc:
-            raise ReasonerInvalidResponseError(
-                "mission reasoner returned an invalid ReasonerDecision"
-            ) from exc
+        decision_state = state.model_copy(deep=True)
+        decision = validate_reasoner_decision(decision_state, reasoner.decide(state))
         action = decision.action
-        if decision.invocation.input_sha256 != expected_input_sha256:
-            raise ReasonerInvalidResponseError(
-                "reasoner invocation input digest does not match operator state"
-            )
-        if decision.invocation.output_sha256 != model_digest(action):
-            raise ReasonerInvalidResponseError(
-                "reasoner invocation output digest does not match action"
-            )
-        if (
-            decision.invocation.record_sha256 is None
-            or decision.invocation.record_sha256 != invocation_digest(decision.invocation)
-        ):
-            raise ReasonerInvalidResponseError(
-                "reasoner invocation record digest does not match provenance"
-            )
         _check_authority(authority, authority_monitor)
-        validate_action_against_state(action, state)
+        validate_action_against_state(action, decision_state)
         if action.kind == OperatorActionKind.EVALUATE_CANDIDATE:
             if evaluation_count >= authority.max_candidate_evaluations:
                 raise OperatorPolicyError("candidate evaluation budget exhausted")
