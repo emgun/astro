@@ -1,5 +1,14 @@
 """Provider-neutral mission operator primitives."""
 
+from astro_operator.behavior import (
+    BehaviorDisposition,
+    ReasonerBehaviorCorpus,
+    ReasonerBehaviorReplay,
+    ReasonerBehaviorScore,
+    load_reasoner_behavior_corpus,
+    load_reasoner_behavior_replay,
+    score_reasoner_behavior_corpus,
+)
 from astro_operator.engine import run_operator
 from astro_operator.errors import (
     ReasonerCancelledError,
@@ -45,6 +54,7 @@ __all__ = [
     "AdversarialDecisionCorpus",
     "AuthorityGrant",
     "AuthorityLevel",
+    "BehaviorDisposition",
     "CandidateObservation",
     "CandidateProposal",
     "CommandRequest",
@@ -62,6 +72,9 @@ __all__ = [
     "OperatorRunStatus",
     "OpenRouterReasoner",
     "ReasonerDecision",
+    "ReasonerBehaviorCorpus",
+    "ReasonerBehaviorReplay",
+    "ReasonerBehaviorScore",
     "ReasonerCancelledError",
     "ReasonerConfigurationError",
     "ReasonerError",
@@ -71,7 +84,10 @@ __all__ = [
     "ScriptedReasoner",
     "run_operator",
     "load_adversarial_corpus",
+    "load_reasoner_behavior_corpus",
+    "load_reasoner_behavior_replay",
     "score_adversarial_corpus",
+    "score_reasoner_behavior_corpus",
     "validate_action_against_state",
     "validate_operator_state",
 ]

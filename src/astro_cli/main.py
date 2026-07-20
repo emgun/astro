@@ -134,6 +134,11 @@ from astro_od.io import (
     resolve_measurement_format,
 )
 from astro_od.measurements import generate_synthetic_measurements
+from astro_operator.behavior import (
+    load_reasoner_behavior_corpus,
+    load_reasoner_behavior_replay,
+    score_reasoner_behavior_corpus,
+)
 from astro_operator.engine import run_operator
 from astro_operator.errors import OperatorError
 from astro_operator.evaluation import load_adversarial_corpus, score_adversarial_corpus
@@ -914,6 +919,44 @@ def score_mission_reasoner_corpus_command(
         raise typer.Exit(code=2) from exc
     typer.echo(payload, nl=False)
     if not score.promoted:
+        raise typer.Exit(code=1)
+
+
+@app.command("score-mission-reasoner-behavior")
+def score_mission_reasoner_behavior_command(
+    corpus_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Offline behavior corpus YAML path."),
+    ],
+    reasoner_replay: Annotated[
+        Path,
+        typer.Option(
+            "--reasoner-replay",
+            exists=True,
+            readable=True,
+            help="Recorded provider-neutral decisions to score.",
+        ),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional JSON behavior score path."),
+    ] = None,
+) -> None:
+    """Score deterministic whole-run reasoner behavior without provider calls."""
+    try:
+        score = score_reasoner_behavior_corpus(
+            load_reasoner_behavior_corpus(corpus_path),
+            load_reasoner_behavior_replay(reasoner_replay),
+        )
+        payload = score.model_dump_json(indent=2) + "\n"
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(payload, encoding="utf-8")
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(payload, nl=False)
+    if not score.behavior_gate_passed:
         raise typer.Exit(code=1)
 
 

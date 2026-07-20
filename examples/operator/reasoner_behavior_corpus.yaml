@@ -1,0 +1,87 @@
+schema_version: "1.0"
+corpus_id: mission-operator-behavior-v1
+cases:
+  - case_id: pass-direct
+    description: A passing first candidate is selected without entering recovery.
+    objective: &objective
+      objective_id: offline-behavior
+      summary: Exercise deterministic whole-run reasoner behavior.
+      design_variables:
+        - variable_id: mass
+          target: spacecraft_wet_mass_kg
+          lower_bound: 470.0
+          upper_bound: 530.0
+          unit: kg
+      metric_goals:
+        - metric_id: reserve
+          objective: maximize
+          unit: kg
+    authority: &authority
+      grant_id: behavior-research
+      level: research
+      mission_scope: offline behavior benchmark
+      allowed_actions: [evaluate_candidate, finish]
+      max_steps: 3
+      max_candidate_evaluations: 2
+    observations:
+      - candidate: &candidate_a
+          candidate_id: candidate-a
+          assignments: {mass: 500.0}
+        evaluation_status: evaluated
+        passed: true
+        metrics: [{metric_id: reserve, value: 12.0, unit: kg}]
+    expected_disposition: completed
+    expected_action_kinds: [evaluate_candidate, finish]
+    expected_evaluated_candidate_ids: [candidate-a]
+    expected_selected_candidate_id: candidate-a
+
+  - case_id: recover-after-failure
+    description: A failed first evaluation activates one bounded recovery candidate.
+    objective: *objective
+    authority: *authority
+    observations:
+      - candidate: *candidate_a
+        evaluation_status: evaluation_failed
+        passed: false
+        metrics: []
+        warnings: [synthetic domain failure]
+      - candidate: &candidate_b
+          candidate_id: candidate-b
+          assignments: {mass: 520.0}
+        evaluation_status: evaluated
+        passed: true
+        metrics: [{metric_id: reserve, value: 15.0, unit: kg}]
+    expected_disposition: completed
+    expected_action_kinds: [evaluate_candidate, evaluate_candidate, finish]
+    expected_evaluated_candidate_ids: [candidate-a, candidate-b]
+    expected_selected_candidate_id: candidate-b
+
+  - case_id: unmatched-branch
+    description: A missing failure branch stops with a reasoner-invalid-response result.
+    objective: *objective
+    authority: *authority
+    observations:
+      - candidate: *candidate_a
+        evaluation_status: evaluation_failed
+        passed: false
+        metrics: []
+        warnings: [synthetic domain failure]
+    expected_disposition: reasoner_invalid_response
+    expected_action_kinds: [evaluate_candidate]
+    expected_evaluated_candidate_ids: [candidate-a]
+
+  - case_id: whole-run-budget-exhaustion
+    description: A valid evaluation consumes the sole step and closes as budget exhausted.
+    objective: *objective
+    authority:
+      <<: *authority
+      max_steps: 1
+      max_candidate_evaluations: 1
+    observations:
+      - candidate: *candidate_a
+        evaluation_status: evaluated
+        passed: true
+        metrics: [{metric_id: reserve, value: 12.0, unit: kg}]
+    expected_disposition: budget_exhausted
+    expected_action_kinds: [evaluate_candidate]
+    expected_evaluated_candidate_ids: [candidate-a]
