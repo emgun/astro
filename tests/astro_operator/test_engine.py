@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -334,6 +334,26 @@ def test_delegated_grant_stages_execution_until_commit_protocol_exists() -> None
 def test_revoked_grant_stops_before_reasoner_or_tools_run() -> None:
     with pytest.raises(OperatorPolicyError, match="revoked"):
         _run_actions((), _authority(revoked=True))
+
+
+@pytest.mark.parametrize(
+    "update, message",
+    (
+        ({"expires_at": datetime.now(UTC) - timedelta(seconds=1)}, "expired"),
+        ({"valid_from": datetime.now(UTC) + timedelta(hours=1)}, "not yet valid"),
+    ),
+)
+def test_authority_validity_window_applies_to_every_operator_action(
+    update: dict[str, datetime], message: str
+) -> None:
+    finish = OperatorAction(
+        action_id="finish",
+        kind=OperatorActionKind.FINISH,
+        rationale="Must not run outside the authority window.",
+        conclusion="Blocked.",
+    )
+    with pytest.raises(OperatorPolicyError, match=message):
+        _run_actions((finish,), _authority(max_candidate_evaluations=0, **update))
 
 
 def test_run_records_budget_exhaustion_without_inventing_a_conclusion() -> None:

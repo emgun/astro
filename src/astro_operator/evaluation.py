@@ -172,9 +172,38 @@ def _score_case(case: AdversarialDecisionCase) -> AdversarialCaseResult:
 
 
 def _case_digest(case: AdversarialDecisionCase) -> str:
+    data = case.model_dump(mode="json", exclude={"description", "tags"})
+    _strip_post_v1_defaults(data)
     payload = json.dumps(
-        case.model_dump(mode="json", exclude={"description", "tags"}),
+        data,
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
     return sha256(payload).hexdigest()
+
+
+def _strip_post_v1_defaults(value: object) -> None:
+    """Keep the locked schema-1.0 corpus digest stable across additive model fields."""
+
+    if isinstance(value, dict):
+        for key, default in (
+            ("base_assertions", []),
+            ("allowed_evidence_tools", []),
+            ("command_envelopes", []),
+            ("max_evidence_acquisitions", 0),
+            ("valid_from", None),
+            ("expires_at", None),
+            ("world_state", None),
+            ("remaining_evidence_acquisitions", 0),
+            ("conclusion_claims", []),
+            ("acquisition_result", None),
+            ("command_execution", None),
+            ("command_execution_record", None),
+        ):
+            if value.get(key) == default:
+                value.pop(key, None)
+        for item in value.values():
+            _strip_post_v1_defaults(item)
+    elif isinstance(value, list):
+        for item in value:
+            _strip_post_v1_defaults(item)

@@ -40,15 +40,17 @@ budgets, grant version, and revoked state. Every adaptive action is checked at c
 during persisted-run verification. Approvals bind a stable approval id to the canonical digest of
 the exact action rather than trusting a reasoner-chosen id alone.
 
-Schema `1.0` can propose commands and represent higher authority levels, but the kernel refuses
-command commit. Supervised, delegated, and mission autonomy are staged architecture until a command
-tool adds write-ahead prepare/commit events, persistent idempotency, approval consumption,
-fresh-state revalidation, and typed parameter/resource envelopes. This is the current maturity
-gate, not a permanent prohibition on AI command authority.
+Legacy schemas `1.0` and `1.1` can propose commands but cannot commit them. Schema `1.2` implements
+the higher-authority path for explicitly registered simulation-only tools: exact proposal binding,
+private SQLite write-ahead preparation, persistent idempotency, single-use approval consumption,
+authority and world-state revalidation, typed parameter/resource envelopes, and digest-bound
+terminal records. A checked supervised-autonomy burn exercises this path end to end. Delegated and
+mission-autonomy grants use the same controls and cannot bypass envelopes, qualification, freshness,
+revocation, or idempotency. Real-effect tools remain unregistered and unqualified.
 
-Future operational handlers must add expiry, resource envelopes, idempotency keys, prepare/commit,
-fresh-state revalidation, and qualification evidence appropriate to their risk. Those are command
-tool requirements, not reasons to prohibit command-capable architecture.
+Future real-effect handlers must add expiry, remote-effect reconciliation, operational resource
+models, and qualification evidence appropriate to their risk. They inherit rather than replace the
+implemented idempotency, prepare/commit, freshness, revocation, and envelope controls.
 
 ## Provider Boundary
 
@@ -88,6 +90,28 @@ order, rejects citations to future or unknown evidence, checks contiguous steps 
 requires the final selection and conclusion to match the final action. Local artifacts are then
 checked against their recorded digests.
 
+Schema `1.2` adds a versioned evidence-tool registry and typed acquisition results. Assertions bind
+subject, predicate, JSON value, epistemic kind, scope, source evidence, producer identity, optional
+valid time, and canonical digest. The pure reducer retains every assertion and emits explicit
+conflict sets for incompatible values; it never silently overwrites an assertion with a newer one.
+Conclusion claims cite assertion IDs. A categorical supported claim fails closed when it cites an
+unresolved conflict, while qualified or disputed claims must state their qualification.
+
+The provider projection exposes only allow-listed assertion and conflict fields. Artifact paths,
+arbitrary evidence metadata, credentials, and provider internals remain outside the reasoner input.
+
+## Simulation Command Commit
+
+The first executable tool is `simulated_burn` version `1.0`. It has no external or physical side
+effects. A command-capable CLI run requires a mission/grant-scoped `--command-store` reused across
+publication attempts. The coordinator durably reserves an idempotency key, approval, and
+grant-envelope capacity before dispatch; rechecks the current grant and exact world-state digest
+before dispatch and before commit; and records committed, failed, or indeterminate terminal
+outcomes. A prepared or
+indeterminate execution is never automatically re-executed. Offline verification reconstructs the
+proposal, execution, authority receipt, world-state receipt, record digests, and result digest
+without invoking the tool.
+
 ## First Working Slice
 
 The first slice is an adaptive mission lifecycle trade study:
@@ -116,6 +140,12 @@ astro run-mission-operator examples/operator/leo_lifecycle_trade_study.yaml \
   --reasoner-replay examples/operator/leo_lifecycle_trade_study_replay.yaml \
   --output-dir /tmp/astro-mission-operator
 astro verify-mission-operator /tmp/astro-mission-operator
+
+astro run-mission-operator examples/operator/supervised_simulated_burn.yaml \
+  --reasoner-replay examples/operator/supervised_simulated_burn_replay.yaml \
+  --command-store /tmp/astro-supervised-command-ledger.sqlite3 \
+  --output-dir /tmp/astro-supervised-simulated-burn
+astro verify-mission-operator /tmp/astro-supervised-simulated-burn
 ```
 
 Publication uses an invocation-owned unique partial sibling directory and renames it only after the
@@ -127,18 +157,28 @@ output contains the operator journal plus per-candidate scenario, result, or fai
 The slice exits when:
 
 - adaptive success and domain-failure paths are checked end to end;
-- research, revoked, approval, envelope, and budget policies fail closed, while higher command
-  grants remain valid but command commit is explicitly rejected by schema `1.0`;
+- research, revoked, approval, envelope, and budget policies fail closed, while legacy command
+  shapes remain non-executable and schema `1.2` permits only the checked simulation transaction;
 - persisted journal structure and local evidence digests verify and tampering fails;
 - the checked public example runs from the source tree and installed wheel;
 - focused, full, lint, strict typing, packaging, and independent-review gates pass.
 
-## Next Architecture Steps
+## Architecture Status And Next Maturity Steps
 
-1. Add the first real provider adapter behind `MissionReasoner`, including prompt-template, schema,
-   tool, raw-response, and attempt provenance; do not retain hidden chain-of-thought.
-2. Add an evidence-acquisition tool registry and deterministic world-state reducer that preserves
-   conflicting assertions rather than overwriting them.
-3. Add conclusion claims that cite typed assertions, not only artifact ids.
-4. Add prepare/commit command tools and exercise supervised execution in simulation before moving
-   through delegated or mission autonomy.
+The reference AI-native architecture is implemented through schema `1.2`: provider-neutral
+reasoning, versioned evidence acquisition, assertion-preserving world state, exact-conclusion-bound
+assertion claims, progressive grants, and durable simulation-only command prepare/commit.
+
+The remaining work is qualification and breadth, not another missing kernel layer:
+
+1. Add concrete local evidence tools for mission telemetry, estimation, and procedure sources, then
+   exercise conflicting and stale evidence through public workflows.
+2. Expand checked claim kinds beyond conflict-aware citation to deterministic threshold, temporal,
+   and applicability predicates.
+3. Exercise delegated and mission-autonomy grants only in simulation, with longer crash/recovery,
+   concurrency, resource-depletion, expiry, and revocation campaigns.
+4. Define reconciliation and qualification evidence for a real-effect handler before registering
+   any such tool. External or flight-adjacent execution remains out of scope until that separate
+   gate passes.
+5. Resume provider comparison only against these richer tasks; do not optimize models against the
+   earlier lifecycle-only benchmark.

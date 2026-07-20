@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from enum import StrEnum
+from hashlib import sha256
 from typing import Any, Literal
 
 from pydantic import Field, FiniteFloat, JsonValue, StrictInt, field_validator, model_validator
@@ -32,6 +33,17 @@ class EpistemicKind(StrEnum):
     ESTIMATED = "estimated"
     SIMULATED = "simulated"
     INFERRED = "inferred"
+
+
+class AcquisitionStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+
+
+class ClaimDisposition(StrEnum):
+    SUPPORTED = "supported"
+    QUALIFIED = "qualified"
+    DISPUTED = "disputed"
 
 
 _MINIMUM_AUTHORITY = {
@@ -65,6 +77,64 @@ class ActionApproval(AstroModel):
         return value
 
 
+class AllowedEvidenceTool(AstroModel):
+    tool_id: str = Field(min_length=1)
+    tool_version: str = Field(min_length=1)
+    request_kinds: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def request_kinds_must_be_unique(self) -> AllowedEvidenceTool:
+        if len(set(self.request_kinds)) != len(self.request_kinds):
+            raise ValueError("allowed evidence request kinds must be unique")
+        return self
+
+
+class CommandParameterLimit(AstroModel):
+    parameter: str = Field(min_length=1)
+    minimum: FiniteFloat
+    maximum: FiniteFloat
+    unit: str = Field(min_length=1)
+
+    @field_validator("minimum", "maximum", mode="before")
+    @classmethod
+    def limits_must_be_numeric(cls, value: Any) -> Any:
+        if isinstance(value, bool | str):
+            raise ValueError("command parameter limits must be numeric scalars")
+        return value
+
+    @model_validator(mode="after")
+    def limits_must_be_ordered(self) -> CommandParameterLimit:
+        if self.minimum > self.maximum:
+            raise ValueError("command parameter minimum must not exceed maximum")
+        return self
+
+
+class CommandEnvelope(AstroModel):
+    command_type: str = Field(min_length=1)
+    tool_version: str = Field(min_length=1)
+    tool_qualification_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    simulation_only: Literal[True] = True
+    allowed_asset_ids: tuple[str, ...] = Field(min_length=1)
+    parameter_limits: tuple[CommandParameterLimit, ...] = Field(min_length=1)
+    max_commits: int = Field(ge=1, le=10_000)
+
+    @field_validator("max_commits", mode="before")
+    @classmethod
+    def max_commits_must_be_strict(cls, value: Any) -> Any:
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError("command envelope max_commits must be an integer")
+        return value
+
+    @model_validator(mode="after")
+    def envelope_entries_must_be_unique(self) -> CommandEnvelope:
+        if len(set(self.allowed_asset_ids)) != len(self.allowed_asset_ids):
+            raise ValueError("command envelope asset IDs must be unique")
+        parameters = [item.parameter for item in self.parameter_limits]
+        if len(set(parameters)) != len(parameters):
+            raise ValueError("command envelope parameter limits must be unique")
+        return self
+
+
 class AuthorityGrant(AstroModel):
     grant_id: str = Field(min_length=1)
     grant_version: int = Field(default=1, ge=1)
@@ -72,19 +142,43 @@ class AuthorityGrant(AstroModel):
     mission_scope: str = Field(min_length=1)
     allowed_actions: tuple[OperatorActionKind, ...] = Field(min_length=1)
     allowed_command_types: tuple[str, ...] = ()
+    command_envelopes: tuple[CommandEnvelope, ...] = ()
     approval_required_for: tuple[OperatorActionKind, ...] = ()
     approvals: tuple[ActionApproval, ...] = ()
+    allowed_evidence_tools: tuple[AllowedEvidenceTool, ...] = ()
     max_steps: int = Field(ge=1, le=10_000)
     max_candidate_evaluations: int = Field(ge=0, le=10_000)
+    max_evidence_acquisitions: int = Field(default=0, ge=0, le=10_000)
+    valid_from: datetime | None = None
+    expires_at: datetime | None = None
     revoked: bool = False
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_authority_contract(self) -> AuthorityGrant:
+        for value in (self.valid_from, self.expires_at):
+            if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+                raise ValueError("authority validity timestamps must include timezone information")
+        if (
+            self.valid_from is not None
+            and self.expires_at is not None
+            and self.expires_at <= self.valid_from
+        ):
+            raise ValueError("authority expiry must follow its validity start")
         if len(set(self.allowed_actions)) != len(self.allowed_actions):
             raise ValueError("allowed actions must be unique")
         if len(set(self.allowed_command_types)) != len(self.allowed_command_types):
             raise ValueError("allowed command types must be unique")
+        envelope_types = [item.command_type for item in self.command_envelopes]
+        if len(set(envelope_types)) != len(envelope_types):
+            raise ValueError("command envelopes must be unique by command type")
+        if not set(envelope_types).issubset(self.allowed_command_types):
+            raise ValueError("command envelopes must cover only allowed command types")
+        tool_keys = [
+            (item.tool_id, item.tool_version) for item in self.allowed_evidence_tools
+        ]
+        if len(set(tool_keys)) != len(tool_keys):
+            raise ValueError("allowed evidence tools must be unique by ID and version")
         if len(set(self.approval_required_for)) != len(self.approval_required_for):
             raise ValueError("approval requirements must be unique")
         if not set(self.approval_required_for).issubset(self.allowed_actions):
@@ -116,9 +210,20 @@ class AuthorityGrant(AstroModel):
             and OperatorActionKind.PROPOSE_COMMAND not in self.allowed_actions
         ):
             raise ValueError("command execution requires command proposal authority")
+        if OperatorActionKind.REQUEST_EVIDENCE in self.allowed_actions:
+            if not self.allowed_evidence_tools:
+                raise ValueError("evidence requests require at least one allowed evidence tool")
+            if self.max_evidence_acquisitions == 0:
+                raise ValueError("evidence requests require a positive acquisition budget")
         return self
 
-    @field_validator("grant_version", "max_steps", "max_candidate_evaluations", mode="before")
+    @field_validator(
+        "grant_version",
+        "max_steps",
+        "max_candidate_evaluations",
+        "max_evidence_acquisitions",
+        mode="before",
+    )
     @classmethod
     def integer_fields_must_be_strict(cls, value: Any) -> Any:
         if isinstance(value, bool) or not isinstance(value, int):
@@ -163,12 +268,69 @@ class EvidenceReference(AstroModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class EvidenceToolSpec(AstroModel):
+    tool_id: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+    request_kind: str = Field(min_length=1)
+    parameter_schema_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    output_assertion_kinds: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def assertion_kinds_must_be_unique(self) -> EvidenceToolSpec:
+        if len(set(self.output_assertion_kinds)) != len(self.output_assertion_kinds):
+            raise ValueError("output assertion kinds must be unique")
+        return self
+
+
+class EvidenceAssertion(AstroModel):
+    assertion_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    subject: str = Field(min_length=1)
+    predicate: str = Field(min_length=1)
+    value: JsonValue
+    epistemic_kind: EpistemicKind
+    scope: str = Field(min_length=1)
+    source_evidence_ids: tuple[str, ...] = Field(min_length=1)
+    producer_tool_id: str = Field(min_length=1)
+    producer_tool_version: str = Field(min_length=1)
+    valid_at: datetime | None = None
+    assertion_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator("valid_at")
+    @classmethod
+    def valid_at_must_be_aware(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("assertion valid_at must include timezone information")
+        return value
+
+    @model_validator(mode="after")
+    def source_ids_must_be_unique(self) -> EvidenceAssertion:
+        if len(set(self.source_evidence_ids)) != len(self.source_evidence_ids):
+            raise ValueError("assertion source evidence IDs must be unique")
+        return self
+
+
+class AssertionConflict(AstroModel):
+    conflict_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    subject: str = Field(min_length=1)
+    predicate: str = Field(min_length=1)
+    scope: str = Field(min_length=1)
+    valid_at: datetime | None = None
+    assertion_ids: tuple[str, ...] = Field(min_length=2)
+
+
+class WorldState(AstroModel):
+    assertions: tuple[EvidenceAssertion, ...] = ()
+    conflicts: tuple[AssertionConflict, ...] = ()
+    state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class MissionObjective(AstroModel):
     objective_id: str = Field(min_length=1)
     summary: str = Field(min_length=1)
     design_variables: tuple[DesignVariable, ...] = Field(min_length=1)
     metric_goals: tuple[MetricGoal, ...] = Field(min_length=1)
     base_evidence: tuple[EvidenceReference, ...] = ()
+    base_assertions: tuple[EvidenceAssertion, ...] = ()
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -177,6 +339,7 @@ class MissionObjective(AstroModel):
         targets = [item.target for item in self.design_variables]
         metric_ids = [item.metric_id for item in self.metric_goals]
         evidence_ids = [item.evidence_id for item in self.base_evidence]
+        assertion_ids = [item.assertion_id for item in self.base_assertions]
         if len(set(variable_ids)) != len(variable_ids):
             raise ValueError("design variable IDs must be unique")
         if len(set(targets)) != len(targets):
@@ -185,6 +348,14 @@ class MissionObjective(AstroModel):
             raise ValueError("metric goal IDs must be unique")
         if len(set(evidence_ids)) != len(evidence_ids):
             raise ValueError("base evidence IDs must be unique")
+        if len(set(assertion_ids)) != len(assertion_ids):
+            raise ValueError("base assertion IDs must be unique")
+        known_evidence = set(evidence_ids)
+        if any(
+            not set(assertion.source_evidence_ids).issubset(known_evidence)
+            for assertion in self.base_assertions
+        ):
+            raise ValueError("base assertions must cite base evidence")
         return self
 
 
@@ -239,21 +410,164 @@ class CandidateObservation(AstroModel):
 
 class EvidenceRequest(AstroModel):
     request_id: str = Field(min_length=1)
-    evidence_kind: str = Field(min_length=1)
-    query: str = Field(min_length=1)
+    tool_id: str = Field(min_length=1)
+    tool_version: str = Field(min_length=1)
+    request_kind: str = Field(min_length=1)
+    parameters: dict[str, JsonValue] = Field(default_factory=dict)
+
+
+class EvidenceAcquisitionResult(AstroModel):
+    request: EvidenceRequest
+    tool: EvidenceToolSpec
+    status: AcquisitionStatus
+    evidence: tuple[EvidenceReference, ...] = ()
+    assertions: tuple[EvidenceAssertion, ...] = ()
+    message: str = ""
+
+    @model_validator(mode="after")
+    def result_must_match_request_and_bind_assertions(self) -> EvidenceAcquisitionResult:
+        if (
+            self.tool.tool_id != self.request.tool_id
+            or self.tool.version != self.request.tool_version
+            or self.tool.request_kind != self.request.request_kind
+        ):
+            raise ValueError("acquisition tool identity must match its request")
+        evidence_ids = [item.evidence_id for item in self.evidence]
+        assertion_ids = [item.assertion_id for item in self.assertions]
+        if len(set(evidence_ids)) != len(evidence_ids):
+            raise ValueError("acquisition evidence IDs must be unique")
+        if len(set(assertion_ids)) != len(assertion_ids):
+            raise ValueError("acquisition assertion IDs must be unique")
+        for assertion in self.assertions:
+            if (
+                assertion.producer_tool_id != self.tool.tool_id
+                or assertion.producer_tool_version != self.tool.version
+            ):
+                raise ValueError("assertion producer must match acquisition tool")
+            if assertion.predicate not in self.tool.output_assertion_kinds:
+                raise ValueError("assertion predicate is outside the tool output contract")
+        if self.status == AcquisitionStatus.SUCCEEDED and not (
+            self.evidence or self.assertions
+        ):
+            raise ValueError("successful acquisition must produce evidence or assertions")
+        if self.status == AcquisitionStatus.FAILED and self.assertions:
+            raise ValueError("failed acquisition cannot produce assertions")
+        return self
+
+
+class ConclusionClaim(AstroModel):
+    claim_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    statement: str = Field(min_length=1)
+    conclusion_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    disposition: ClaimDisposition
+    assertion_ids: tuple[str, ...] = Field(min_length=1)
+    qualification: str | None = None
+
+    @model_validator(mode="after")
+    def claim_must_be_consistent(self) -> ConclusionClaim:
+        if len(set(self.assertion_ids)) != len(self.assertion_ids):
+            raise ValueError("claim assertion IDs must be unique")
+        if self.disposition != ClaimDisposition.SUPPORTED and not self.qualification:
+            raise ValueError("qualified and disputed claims require a qualification")
+        return self
 
 
 class CommandRequest(AstroModel):
     command_id: str = Field(min_length=1)
     command_type: str = Field(min_length=1)
-    parameters: dict[str, Any] = Field(default_factory=dict)
+    asset_id: str | None = None
+    parameters: dict[str, JsonValue] = Field(default_factory=dict)
+
+
+class CommandExecutionRequest(AstroModel):
+    proposal_action_id: str = Field(min_length=1)
+    command_id: str = Field(min_length=1)
+    idempotency_key: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    expected_world_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    approval_id: str | None = None
 
 
 class CommandResult(AstroModel):
     command: CommandRequest
     status: str = Field(min_length=1)
     evidence: tuple[EvidenceReference, ...] = ()
+    assertions: tuple[EvidenceAssertion, ...] = ()
     message: str = ""
+
+    @model_validator(mode="after")
+    def command_result_ids_must_be_unique(self) -> CommandResult:
+        if len({item.evidence_id for item in self.evidence}) != len(self.evidence):
+            raise ValueError("command result evidence IDs must be unique")
+        if len({item.assertion_id for item in self.assertions}) != len(self.assertions):
+            raise ValueError("command result assertion IDs must be unique")
+        return self
+
+
+class CommandTerminalStatus(StrEnum):
+    COMMITTED = "committed"
+    FAILED = "failed"
+    INDETERMINATE = "indeterminate"
+
+
+class CommandPreparedRecord(AstroModel):
+    execution_id: str = Field(min_length=1)
+    idempotency_key: str = Field(min_length=1)
+    proposal_action_id: str = Field(min_length=1)
+    proposal_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    execution_action_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    command_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    tool_version: str = Field(min_length=1)
+    tool_qualification_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    simulation_only: bool
+    grant_id: str = Field(min_length=1)
+    grant_version: int = Field(ge=1)
+    authority_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    world_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    approval_id: str | None = None
+    prepared_at: datetime
+    record_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator("prepared_at")
+    @classmethod
+    def prepared_at_must_be_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("command preparation timestamp must include timezone information")
+        return value
+
+
+class CommandTerminalRecord(AstroModel):
+    execution_id: str = Field(min_length=1)
+    status: CommandTerminalStatus
+    result_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    completed_at: datetime
+    message: str = ""
+    record_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @field_validator("completed_at")
+    @classmethod
+    def completed_at_must_be_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("command completion timestamp must include timezone information")
+        return value
+
+    @model_validator(mode="after")
+    def committed_terminal_requires_result(self) -> CommandTerminalRecord:
+        if self.status == CommandTerminalStatus.COMMITTED and self.result_sha256 is None:
+            raise ValueError("committed command terminal record requires a result digest")
+        return self
+
+
+class CommandExecutionRecord(AstroModel):
+    prepared: CommandPreparedRecord
+    terminal: CommandTerminalRecord
+
+    @model_validator(mode="after")
+    def execution_ids_must_match(self) -> CommandExecutionRecord:
+        if self.prepared.execution_id != self.terminal.execution_id:
+            raise ValueError("command preparation and terminal execution IDs must match")
+        if self.terminal.completed_at < self.prepared.prepared_at:
+            raise ValueError("command terminal event cannot precede preparation")
+        return self
 
 
 class OperatorAction(AstroModel):
@@ -264,8 +578,10 @@ class OperatorAction(AstroModel):
     candidate: CandidateProposal | None = None
     evidence_request: EvidenceRequest | None = None
     command: CommandRequest | None = None
+    command_execution: CommandExecutionRequest | None = None
     selected_candidate_id: str | None = None
     conclusion: str | None = None
+    conclusion_claims: tuple[ConclusionClaim, ...] = ()
 
     @model_validator(mode="after")
     def payload_must_match_action(self) -> OperatorAction:
@@ -273,11 +589,18 @@ class OperatorAction(AstroModel):
             OperatorActionKind.EVALUATE_CANDIDATE: self.candidate,
             OperatorActionKind.REQUEST_EVIDENCE: self.evidence_request,
             OperatorActionKind.PROPOSE_COMMAND: self.command,
-            OperatorActionKind.EXECUTE_COMMAND: self.command,
         }
         for kind, payload in required.items():
             if self.kind == kind and payload is None:
                 raise ValueError(f"{kind.value} requires its typed payload")
+        if self.kind == OperatorActionKind.EXECUTE_COMMAND and (
+            self.command is None and self.command_execution is None
+        ):
+            raise ValueError("execute_command requires a command execution request")
+        if self.kind == OperatorActionKind.EXECUTE_COMMAND and (
+            self.command is not None and self.command_execution is not None
+        ):
+            raise ValueError("execute_command cannot contain two command payloads")
         if self.kind == OperatorActionKind.FINISH and not self.conclusion:
             raise ValueError("finish requires a conclusion")
         if self.kind != OperatorActionKind.EVALUATE_CANDIDATE and self.candidate is not None:
@@ -289,10 +612,25 @@ class OperatorAction(AstroModel):
             OperatorActionKind.EXECUTE_COMMAND,
         } and self.command is not None:
             raise ValueError("command payload is only valid for command actions")
+        if self.kind != OperatorActionKind.EXECUTE_COMMAND and self.command_execution is not None:
+            raise ValueError("command execution payload is only valid for execute_command")
         if self.kind != OperatorActionKind.FINISH and (
-            self.selected_candidate_id is not None or self.conclusion is not None
+            self.selected_candidate_id is not None
+            or self.conclusion is not None
+            or self.conclusion_claims
         ):
             raise ValueError("selection and conclusion are only valid for finish")
+        claim_ids = [item.claim_id for item in self.conclusion_claims]
+        if len(set(claim_ids)) != len(claim_ids):
+            raise ValueError("conclusion claim IDs must be unique")
+        if self.kind == OperatorActionKind.FINISH and self.conclusion_claims:
+            assert self.conclusion is not None
+            conclusion_sha256 = sha256(self.conclusion.encode("utf-8")).hexdigest()
+            if any(
+                item.conclusion_sha256 != conclusion_sha256
+                for item in self.conclusion_claims
+            ):
+                raise ValueError("conclusion claims must bind the exact conclusion text")
         if len(set(self.evidence_ids)) != len(self.evidence_ids):
             raise ValueError("action evidence IDs must be unique")
         return self
@@ -376,7 +714,9 @@ class OperatorStep(AstroModel):
     reasoner_invocation: ReasonerInvocation | None = None
     observation: CandidateObservation | None = None
     acquired_evidence: tuple[EvidenceReference, ...] = ()
+    acquisition_result: EvidenceAcquisitionResult | None = None
     command_result: CommandResult | None = None
+    command_execution_record: CommandExecutionRecord | None = None
 
     @model_validator(mode="after")
     def outputs_must_match_action(self) -> OperatorStep:
@@ -388,15 +728,26 @@ class OperatorStep(AstroModel):
         elif self.action.kind == OperatorActionKind.REQUEST_EVIDENCE:
             if self.observation is not None or self.command_result is not None:
                 raise ValueError("request_evidence step has invalid outputs")
+            if self.acquisition_result is not None:
+                if self.acquired_evidence:
+                    raise ValueError("typed acquisition cannot duplicate acquired evidence")
+                if self.action.evidence_request != self.acquisition_result.request:
+                    raise ValueError("acquisition result does not match its action")
         elif self.action.kind == OperatorActionKind.EXECUTE_COMMAND:
             if self.command_result is None:
                 raise ValueError("execute_command step requires a command result")
+            if (
+                self.action.command_execution is not None
+                and self.command_execution_record is None
+            ):
+                raise ValueError("execute_command step requires a command execution record")
             if self.observation is not None or self.acquired_evidence:
                 raise ValueError("execute_command step has invalid outputs")
         elif (
             self.observation is not None
             or self.acquired_evidence
             or self.command_result is not None
+            or self.command_execution_record is not None
         ):
             raise ValueError("action step has outputs that do not match its kind")
         return self
@@ -407,8 +758,10 @@ class OperatorState(AstroModel):
     authority: AuthorityGrant
     steps: tuple[OperatorStep, ...]
     known_evidence: tuple[EvidenceReference, ...]
+    world_state: WorldState | None = None
     remaining_steps: int = Field(ge=0)
     remaining_candidate_evaluations: int = Field(ge=0)
+    remaining_evidence_acquisitions: int = Field(default=0, ge=0)
 
 
 class OperatorRunStatus(StrEnum):
@@ -417,12 +770,13 @@ class OperatorRunStatus(StrEnum):
 
 
 class OperatorRun(AstroModel):
-    schema_version: Literal["1.0", "1.1"] = "1.0"
+    schema_version: Literal["1.0", "1.1", "1.2"] = "1.0"
     objective: MissionObjective
     authority: AuthorityGrant
     status: OperatorRunStatus
     steps: tuple[OperatorStep, ...]
     known_evidence: tuple[EvidenceReference, ...]
+    world_state: WorldState | None = None
     selected_candidate_id: str | None = None
     conclusion: str
 
@@ -432,10 +786,29 @@ class OperatorRun(AstroModel):
             step.reasoner_invocation is None for step in self.steps
         ):
             raise ValueError("operator schema 1.1 requires reasoner provenance for every step")
+        if self.schema_version == "1.2" and any(
+            step.reasoner_invocation is None for step in self.steps
+        ):
+            raise ValueError("operator schema 1.2 requires reasoner provenance for every step")
         if self.schema_version == "1.0" and any(
             step.reasoner_invocation is not None for step in self.steps
         ):
             raise ValueError("operator schema 1.0 does not contain reasoner provenance")
+        if self.schema_version != "1.2":
+            if self.world_state is not None or self.objective.base_assertions:
+                raise ValueError("legacy operator schemas do not contain typed world state")
+            if any(
+                step.acquisition_result is not None
+                or step.action.command_execution is not None
+                or step.command_execution_record is not None
+                or step.action.conclusion_claims
+                or (
+                    step.command_result is not None
+                    and bool(step.command_result.assertions)
+                )
+                for step in self.steps
+            ):
+                raise ValueError("legacy operator schemas do not contain schema 1.2 events")
         if [step.sequence for step in self.steps] != list(range(1, len(self.steps) + 1)):
             raise ValueError("operator step sequences must be contiguous and one-based")
         action_ids = [step.action.action_id for step in self.steps]
@@ -455,6 +828,8 @@ class OperatorRun(AstroModel):
                 additions += step.observation.evidence
             if step.command_result is not None:
                 additions += step.command_result.evidence
+            if step.acquisition_result is not None:
+                additions += step.acquisition_result.evidence
             for evidence in additions:
                 if evidence.evidence_id in known_ids:
                     raise ValueError("operator evidence IDs must be unique")
@@ -472,6 +847,8 @@ class OperatorRun(AstroModel):
                 raise ValueError("run selection must match the finish action")
             if final.conclusion != self.conclusion:
                 raise ValueError("run conclusion must match the finish action")
+            if self.schema_version == "1.2" and self.world_state is None:
+                raise ValueError("operator schema 1.2 requires a world state")
         elif any(step.action.kind == OperatorActionKind.FINISH for step in self.steps):
             raise ValueError("budget-exhausted operator run cannot contain finish")
         if any(

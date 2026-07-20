@@ -140,6 +140,12 @@ from astro_operator.behavior import (
     load_reasoner_behavior_replay,
     score_reasoner_behavior_corpus,
 )
+from astro_operator.command_execution import (
+    CommandExecutionCoordinator,
+    CommandToolRegistry,
+    SimulatedBurnTool,
+    SQLiteCommandExecutionStore,
+)
 from astro_operator.engine import run_operator
 from astro_operator.errors import OperatorError
 from astro_operator.evaluation import load_adversarial_corpus, score_adversarial_corpus
@@ -151,6 +157,7 @@ from astro_operator.io import (
     write_operator_run,
 )
 from astro_operator.lifecycle import LifecycleCandidateEvaluator, resolve_lifecycle_references
+from astro_operator.models import OperatorActionKind
 from astro_operator.openrouter import DEFAULT_OPENROUTER_MODEL, OpenRouterReasoner
 from astro_operator.reasoner import ConditionalReplayReasoner
 from astro_operator.recording import (
@@ -161,6 +168,7 @@ from astro_operator.recording import (
     score_recorded_reasoner_behavior_corpus,
     write_reasoner_behavior_recording,
 )
+from astro_operator.world_state import reduce_world_state
 from astro_reentry.backends import simulate_reentry_with_backend
 from astro_reentry.handoff import trajectory_to_reentry_scenario
 from astro_reentry.io import (
@@ -818,12 +826,23 @@ def run_mission_operator_command(
         Path,
         typer.Option("--output-dir", help="Publish the operator run to a new directory."),
     ],
+    command_store_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--command-store",
+            help=(
+                "Mission/grant-scoped durable SQLite command ledger. Required when the "
+                "authority permits command execution; reuse it across output publications."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Run an adaptive, authority-scoped mission operator replay."""
     if output_dir.exists():
         typer.echo("operator output directory must not already exist", err=True)
         raise typer.Exit(code=2)
     partial_dir: Path | None = None
+    retain_partial = False
     try:
         output_dir.parent.mkdir(parents=True, exist_ok=True)
         if output_dir.exists():
@@ -860,12 +879,33 @@ def run_mission_operator_command(
             design_variables=objective.design_variables,
             output_root=partial_dir,
         )
-        run = run_operator(
-            objective=objective,
-            authority=spec.authority,
-            reasoner=ConditionalReplayReasoner(load_operator_replay(reasoner_replay)),
-            evaluator=evaluator,
-        )
+        command_store: SQLiteCommandExecutionStore | None = None
+        command_executor: CommandExecutionCoordinator | None = None
+        if OperatorActionKind.EXECUTE_COMMAND in spec.authority.allowed_actions:
+            if command_store_path is None:
+                raise OperatorError(
+                    "command-capable operator runs require a durable --command-store path"
+                )
+            retain_partial = True
+            command_store = SQLiteCommandExecutionStore(command_store_path)
+            initial_world_state = reduce_world_state(objective.base_assertions)
+            command_executor = CommandExecutionCoordinator(
+                CommandToolRegistry((SimulatedBurnTool(),)),
+                command_store,
+                authority_resolver=lambda _grant_id: spec.authority.model_copy(deep=True),
+                world_state_resolver=lambda: initial_world_state.model_copy(deep=True),
+            )
+        try:
+            run = run_operator(
+                objective=objective,
+                authority=spec.authority,
+                reasoner=ConditionalReplayReasoner(load_operator_replay(reasoner_replay)),
+                evaluator=evaluator,
+                command_executor=command_executor,
+            )
+        finally:
+            if command_store is not None:
+                command_store.close()
         write_operator_run(partial_dir / "operator-run.json", run)
         partial_dir.replace(output_dir)
         partial_dir = None
@@ -877,7 +917,13 @@ def run_mission_operator_command(
         ValueError,
     ) as exc:
         if partial_dir is not None and partial_dir.exists():
-            shutil.rmtree(partial_dir)
+            if retain_partial:
+                typer.echo(
+                    f"retained interrupted command journal for recovery: {partial_dir}",
+                    err=True,
+                )
+            else:
+                shutil.rmtree(partial_dir)
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(

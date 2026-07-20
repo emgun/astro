@@ -665,27 +665,34 @@ Post-MVP / external-campaign items:
 | v0.2.0-rc.2 | done | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Local, wheel-installed, CI, detached merged-commit, and remote annotated-tag evidence agree at `f224a06`; the candidate is ready for a short soak. |
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
-| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, progressive authority grant, provider-neutral reasoner, lifecycle candidate evaluator, replayable evidence journal, checked trade study | The merged kernel provides bounded adaptive lifecycle evaluation and progressive authority. Separate action-contract and whole-run behavior gates cover typed decisions and adaptive traces. Invocation-bound recordings validate before capture, persist state digests rather than state content, bind terminal failures, derive attribution, and revalidate unchanged decisions. The optional acquisition command requires explicit provider-call confirmation, enforces one global call cap, exclusively reserves its output, and atomically checkpoints an explicit incomplete artifact after each case. Successful and failed OpenRouter attempts retain available content-free request/prompt/schema/tool/raw-response provenance. The command has not been run in this slice. The checked replay remains the only passing baseline; the earlier five-call free-model check promoted no default. Command commit remains disabled until prepare/commit journaling and idempotency exist. |
+| ai-native-mission-operator | active | adapt/authorize/verify | steward | `astro_operator`, schema `1.2`, progressive authority, evidence and command registries, assertion-preserving world state, durable simulation commit | The reference architecture is implemented on the active branch: provider-neutral adaptive reasoning; versioned, budgeted evidence acquisition; digest-bound assertions and explicit conflicts; exact-conclusion-bound assertion claims; and exact proposal-to-command execution through a private SQLite prepare/commit journal. A required mission/grant-scoped command ledger persists idempotency and single-use approvals across output publications. Current grant validity, expiry, revocation, exact reconstructed world state, authority-bound tool qualification, typed envelopes, terminal outcome records, and offline verification fail closed. The checked public `supervised_simulated_burn` workflow commits one simulation-only action; real-effect tools remain unregistered. Provider tuning is paused until richer evidence and authority tasks exist. |
+
+Project-specific steward learning: once a provider-neutral boundary, provenance recorder, and bounded
+behavior gate are adequate, further model tuning is not architecture progress. Prefer the next
+missing perception, state, claim, or authority capability; return to provider comparison only when
+the richer task can distinguish models in a decision-relevant way.
 
 ## Next Best Paths
 
-1. When a new provider evaluation is explicitly authorized, choose the model and call cap, run the
-   acquisition command once, then score its invocation-bound recording offline. Keep transport
-   availability separate from capability and stop if a supposedly free route becomes chargeable.
-2. Compare the resulting provider recording against the checked replay baseline.
-   Promote a default only after repeated held-out behavior runs improve candidate selection,
-   recovery, and stopping decisions without any action-contract regression.
-3. Add prepare/commit simulation command tools and exercise supervised authority before delegated
-   or mission-autonomy grants. Qualification, freshness, revocation, resource bounds, and
-   idempotency should grow in proportion to the command risk.
-4. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
+1. Add concrete local evidence tools for telemetry, estimation, and procedure sources, then exercise
+   conflicting, stale, and incomplete assertions through schema `1.2` public workflows.
+2. Expand deterministic claim checkers to threshold, temporal, and applicability predicates before
+   using claim-backed state as a higher-authority command precondition.
+3. Run delegated and mission-autonomy campaigns only against registered simulation tools, including
+   concurrent idempotency, crash recovery, resource depletion, expiry, and revocation races.
+4. Define remote-effect reconciliation and qualification evidence before registering any
+   operational handler. The current tool registry deliberately rejects non-simulation tools.
+5. Resume provider evaluation against these richer tasks, then score invocation-bound recordings
+   offline. Keep transport availability separate from capability and stop if a free route becomes
+   chargeable; do not promote a default from the earlier lifecycle-only benchmark.
+6. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
    before considering a mission-calibrated protocol claim.
-5. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
+7. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
    needed; do not infer bundle integrity from result re-execution.
-6. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+8. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-7. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+9. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.
