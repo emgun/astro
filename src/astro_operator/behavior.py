@@ -31,6 +31,9 @@ class BehaviorDisposition(StrEnum):
     COMPLETED = "completed"
     BUDGET_EXHAUSTED = "budget_exhausted"
     REASONER_INVALID_RESPONSE = "reasoner_invalid_response"
+    REASONER_UNAVAILABLE = "reasoner_unavailable"
+    REASONER_CONFIGURATION = "reasoner_configuration"
+    REASONER_CANCELLED = "reasoner_cancelled"
     POLICY_REJECTED = "policy_rejected"
 
 
@@ -155,14 +158,8 @@ def score_reasoner_behavior_corpus(
     results = tuple(
         _score_case(case, replay_by_id.get(case.case_id)) for case in corpus.cases
     )
-    cases_by_id = {case.case_id: case for case in corpus.cases}
-    results_by_id = {result.case_id: result for result in results}
-    coverage_complete = set(cases_by_id) == set(replay_by_id) and all(
-        (result := results_by_id.get(case_id)) is not None
-        and result.matched
-        and (case := cases_by_id.get(case_id)) is not None
-        and _case_digest(case) == expected_digest
-        for case_id, expected_digest in _REQUIRED_CASE_DIGESTS.items()
+    coverage_complete = behavior_coverage_complete(
+        corpus, results, set(replay_by_id)
     )
     matched = sum(result.matched for result in results)
     return ReasonerBehaviorScore(
@@ -177,7 +174,7 @@ def score_reasoner_behavior_corpus(
     )
 
 
-class _FixtureEvaluator:
+class BehaviorFixtureEvaluator:
     def __init__(self, observations: tuple[CandidateObservation, ...]) -> None:
         self._observations = {item.candidate.candidate_id: item for item in observations}
         self.evaluated_candidate_ids: list[str] = []
@@ -208,7 +205,7 @@ def _score_case(
 ) -> ReasonerBehaviorResult:
     decisions = replay.decisions if replay is not None else ()
     reasoner = _RecordingReasoner(decisions)
-    evaluator = _FixtureEvaluator(case.observations)
+    evaluator = BehaviorFixtureEvaluator(case.observations)
     selected_candidate_id: str | None = None
     diagnostic: str | None = None
     try:
@@ -257,3 +254,19 @@ def _case_digest(case: ReasonerBehaviorCase) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return sha256(payload).hexdigest()
+
+
+def behavior_coverage_complete(
+    corpus: ReasonerBehaviorCorpus,
+    results: tuple[ReasonerBehaviorResult, ...],
+    provided_case_ids: set[str],
+) -> bool:
+    cases_by_id = {case.case_id: case for case in corpus.cases}
+    results_by_id = {result.case_id: result for result in results}
+    return set(cases_by_id) == provided_case_ids and all(
+        (result := results_by_id.get(case_id)) is not None
+        and result.matched
+        and (case := cases_by_id.get(case_id)) is not None
+        and _case_digest(case) == expected_digest
+        for case_id, expected_digest in _REQUIRED_CASE_DIGESTS.items()
+    )

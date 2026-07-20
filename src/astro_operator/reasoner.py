@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import warnings
 from collections.abc import Sequence
 from typing import Any, Protocol
 
 from pydantic import Field, StrictBool, field_validator
 
 from astro_core.models import AstroModel
-from astro_operator.errors import ReasonerInvalidResponseError
+from astro_operator.errors import ReasonerError, ReasonerInvalidResponseError
 from astro_operator.models import (
     OperatorAction,
     OperatorState,
@@ -21,6 +22,69 @@ class MissionReasoner(Protocol):
     """Provider-neutral decision interface for an adaptive mission operator."""
 
     def decide(self, state: OperatorState) -> ReasonerDecision: ...
+
+
+class InvocationRecordingReasoner:
+    """Capture successful provider-neutral decisions from another reasoner."""
+
+    def __init__(self, reasoner: MissionReasoner) -> None:
+        self._reasoner = reasoner
+        self._decisions: list[ReasonerDecision] = []
+        self._states: list[OperatorState] = []
+        self._failure_state: OperatorState | None = None
+        self._failure: ReasonerError | None = None
+
+    @property
+    def decisions(self) -> tuple[ReasonerDecision, ...]:
+        return tuple(decision.model_copy(deep=True) for decision in self._decisions)
+
+    @property
+    def states(self) -> tuple[OperatorState, ...]:
+        return tuple(state.model_copy(deep=True) for state in self._states)
+
+    @property
+    def failure_state(self) -> OperatorState | None:
+        return (
+            self._failure_state.model_copy(deep=True)
+            if self._failure_state is not None
+            else None
+        )
+
+    @property
+    def failure(self) -> ReasonerError | None:
+        return self._failure
+
+    def decide(self, state: OperatorState) -> ReasonerDecision:
+        recorded_state = state.model_copy(deep=True)
+        try:
+            decision = validate_reasoner_decision(
+                recorded_state, self._reasoner.decide(state)
+            )
+        except ReasonerError as exc:
+            self._failure_state = recorded_state
+            self._failure = exc
+            raise
+        self._states.append(recorded_state)
+        self._decisions.append(decision.model_copy(deep=True))
+        return decision
+
+
+class BoundDecisionReasoner:
+    """Replay exact invocation-bound decisions for engine verification."""
+
+    def __init__(self, decisions: Sequence[ReasonerDecision]) -> None:
+        self._decisions = tuple(decision.model_copy(deep=True) for decision in decisions)
+        self._cursor = 0
+
+    def decide(self, state: OperatorState) -> ReasonerDecision:
+        del state
+        if self._cursor >= len(self._decisions):
+            raise ReasonerInvalidResponseError(
+                "invocation-bound recording exhausted before finishing"
+            )
+        decision = self._decisions[self._cursor].model_copy(deep=True)
+        self._cursor += 1
+        return decision
 
 
 class ScriptedReasoner:
@@ -113,6 +177,43 @@ def invocation_digest(invocation: ReasonerInvocation) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def validate_reasoner_decision(
+    state: OperatorState, raw_decision: object
+) -> ReasonerDecision:
+    """Normalize and verify one untrusted decision against its exact input state."""
+
+    if not isinstance(raw_decision, ReasonerDecision):
+        raise ReasonerInvalidResponseError(
+            "mission reasoner must return a ReasonerDecision"
+        )
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            decision = ReasonerDecision.model_validate(
+                raw_decision.model_dump(mode="python", round_trip=True)
+            )
+    except Exception as exc:
+        raise ReasonerInvalidResponseError(
+            "mission reasoner returned an invalid ReasonerDecision"
+        ) from exc
+    if decision.invocation.input_sha256 != model_digest(state):
+        raise ReasonerInvalidResponseError(
+            "reasoner invocation input digest does not match operator state"
+        )
+    if decision.invocation.output_sha256 != model_digest(decision.action):
+        raise ReasonerInvalidResponseError(
+            "reasoner invocation output digest does not match action"
+        )
+    if (
+        decision.invocation.record_sha256 is None
+        or decision.invocation.record_sha256 != invocation_digest(decision.invocation)
+    ):
+        raise ReasonerInvalidResponseError(
+            "reasoner invocation record digest does not match provenance"
+        )
+    return decision
 
 
 def _condition_matches(condition: ReplayCondition, state: OperatorState) -> bool:
