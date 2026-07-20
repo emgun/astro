@@ -1,0 +1,57 @@
+schema_version: "1.0"
+replay_id: checked-conditional-replay-v1
+cases:
+  - case_id: pass-direct
+    decisions:
+      - when: {step_count: 0}
+        action: &evaluate_a
+          action_id: evaluate-a
+          kind: evaluate_candidate
+          rationale: Evaluate the first bounded candidate.
+          candidate: &candidate_a
+            candidate_id: candidate-a
+            assignments: {mass: 500.0}
+      - when: {last_candidate_id: candidate-a, last_evaluation_status: evaluated, last_candidate_passed: true}
+        action:
+          action_id: finish-a
+          kind: finish
+          rationale: Select the passing first candidate.
+          selected_candidate_id: candidate-a
+          conclusion: Candidate A passed.
+
+  - case_id: recover-after-failure
+    decisions:
+      - when: {step_count: 0}
+        action: *evaluate_a
+      - when: {last_candidate_id: candidate-a, last_evaluation_status: evaluation_failed, last_candidate_passed: false}
+        action:
+          action_id: evaluate-b
+          kind: evaluate_candidate
+          rationale: Evaluate the bounded recovery candidate.
+          candidate: &candidate_b
+            candidate_id: candidate-b
+            assignments: {mass: 520.0}
+      - when: {last_candidate_id: candidate-b, last_evaluation_status: evaluated, last_candidate_passed: true}
+        action:
+          action_id: finish-b
+          kind: finish
+          rationale: Select the passing recovery candidate.
+          selected_candidate_id: candidate-b
+          conclusion: Candidate B recovered after candidate A failed.
+
+  - case_id: unmatched-branch
+    decisions:
+      - when: {step_count: 0}
+        action: *evaluate_a
+      - when: {last_candidate_id: candidate-a, last_evaluation_status: evaluated, last_candidate_passed: true}
+        action:
+          action_id: unreachable-finish
+          kind: finish
+          rationale: This branch must not match the failed observation.
+          selected_candidate_id: candidate-a
+          conclusion: Unreachable.
+
+  - case_id: whole-run-budget-exhaustion
+    decisions:
+      - when: {step_count: 0}
+        action: *evaluate_a
