@@ -163,22 +163,202 @@ The slice exits when:
 - the checked public example runs from the source tree and installed wheel;
 - focused, full, lint, strict typing, packaging, and independent-review gates pass.
 
+## Long-Term North Star: Self-Improving Mission Orchestrator
+
+The mission operator is one mode of a broader AI-native mission engineering system. The long-term
+product should orchestrate the full mission lifecycle: translate intent into requirements, explore
+mission and spacecraft designs, commission analyses at appropriate fidelity, select and verify a
+baseline, operate against that baseline, learn from outcomes, and safely replan when evidence
+changes.
+
+The target loop is:
+
+```text
+mission intent -> requirements and design variables -> adaptive analysis plan
+      -> physics, estimation, test, and procedure tools -> evidence world state
+      -> trade decision and versioned baseline -> verification and operations
+      -> observed outcomes and residuals -> knowledge graph and learning datasets
+      -> improved orchestration policies and qualified surrogates -> next mission decision
+```
+
+This is not a claim that one model should absorb every responsibility. The system assigns planning,
+analysis, approval, and execution authority through explicit grants and tool contracts. Learned
+components may own meaningful planning or control decisions when the applicable grant and
+qualification evidence permit them. All components retain enough provenance, evaluation evidence,
+and version identity for their outputs and effects to be inspected, reproduced where possible, and
+rolled back.
+
+### Mission Design Orchestration
+
+A mission-design run begins from a typed `MissionIntent`: objectives, hard constraints,
+preferences, budgets, initial assumptions, and allowed decisions. The orchestrator converts that
+intent into a dependency-aware engineering plan instead of invoking every tool in a fixed sequence.
+
+The design layer should add these provider-neutral contracts:
+
+- `MissionIntent`: mission objectives, constraints, preferences, analysis budgets, and authority.
+- `RequirementGraph`: requirements, parents, verification methods, margins, evidence status, and
+  applicability.
+- `CapabilityCatalog`: versioned tools with typed inputs and outputs, fidelity, cost, latency,
+  applicability, qualification, and dependency metadata.
+- `DesignCandidate`: an immutable assignment of architecture and design variables with lineage.
+- `AnalysisPlan`: a dependency DAG with expected information gain, acceptance conditions, budgets,
+  and stop rules.
+- `DesignDecision`: a selected candidate, rejected alternatives, cited evidence, unresolved
+  uncertainty, sensitivity, and rationale.
+- `MissionBaseline`: a versioned configuration that assurance and operations can reference.
+- `VerificationPlan`: required simulations, campaigns, tests, measurements, reviews, and promotion
+  gates for the selected baseline.
+
+The first integrated design director should compose existing Astro capabilities for launch and
+insertion, orbit and trajectory design, coverage and communications, mass, power, thermal, ADCS,
+propellant, disposal, uncertainty, assurance, and reentry. External engines remain typed
+capabilities in the same catalog rather than special provider-specific paths.
+
+The planner should use adaptive fidelity. It can screen many candidates with inexpensive local
+models, eliminate infeasible regions, run uncertainty and sensitivity analysis on survivors, and
+escalate only decision-relevant cases to higher-cost or independently implemented tools. It should
+stop when additional analysis is unlikely to change the decision under the declared budgets and
+acceptance criteria.
+
+### Mission Knowledge Graph
+
+The knowledge layer is an evidence graph, not an unqualified fact store. It connects:
+
+```text
+mission -> requirement -> design variable -> candidate -> analysis -> evidence
+evidence -> assertion -> claim -> decision -> baseline -> observed outcome
+tool/version -> produced evidence -> applicability domain -> qualification evidence
+```
+
+Nodes and edges retain source identity, version, valid time, applicability, uncertainty, and
+digest-bound provenance. Conflicting assertions coexist until a deterministic rule or qualified
+decision resolves their relevance. Documents, papers, procedures, and reports may be indexed with
+embeddings for retrieval, but extracted claims enter the graph with their source and scope rather
+than becoming global facts.
+
+The graph should support decision-oriented questions such as:
+
+- Which assumptions or requirements eliminated earlier designs?
+- Which evidence and tool versions justified this baseline?
+- Where did predicted and observed mission behavior diverge?
+- Which models are qualified in the current design regime?
+- Which unresolved uncertainty is most likely to change the selected design?
+- Which prior mission episodes are applicable to the current objective?
+
+The append-only operator journal remains the event source for a run. The graph is a versioned,
+rebuildable read model across runs and missions; graph mutations do not replace the evidence bytes
+or silently rewrite historical decisions.
+
+### Learning Loops
+
+The system should improve at three separate levels, with independent datasets and promotion gates:
+
+1. **Knowledge learning** extracts reusable, scoped relationships from evidence, decisions, and
+   outcomes while preserving provenance and contradiction.
+2. **Orchestration-policy learning** improves candidate generation, tool selection, fidelity
+   escalation, information-value ranking, and stop decisions from recorded mission episodes.
+3. **Physics-surrogate learning** approximates expensive domain tools inside explicit applicability
+   and uncertainty envelopes.
+
+Learned planner or routing policies start as challengers in offline replay, then shadow checked
+workflows before they can influence live decisions. Promotion depends on independently checked
+decision outcomes, constraint violations, abstention behavior, cost, and robustness rather than
+persuasive explanations alone. Each promoted policy is versioned and reversible.
+
+Operational observations close the loop. For example, propulsion execution residuals, OD
+residuals, atmospheric-density mismatch, power degradation, thermal discrepancies, and link-budget
+errors can update scoped models and identify affected baseline claims. New evidence creates a new
+state and a new decision; it does not retroactively change the evidence available to an older
+decision.
+
+### Neural Surrogate Lifecycle
+
+A neural surrogate is a registered capability with more than a model file. Its contract binds:
+
+- target quantities, units, input schema, and source solver or experiment;
+- training dataset, selection policy, split, and digest;
+- architecture, weights, code, runtime, and random-seed provenance;
+- applicability domain and out-of-distribution detector;
+- predictive uncertainty or calibration method;
+- held-out and challenger evaluation artifacts;
+- allowed decision roles and maturity status;
+- expiry, supersession, rollback, and retraining triggers.
+
+The maturity ladder is `experimental -> shadow -> screening -> decision_support ->
+qualified_for_declared_use`. Promotion is specific to the exact surrogate version, dataset,
+metrics, domain, and decision role. A model promoted for design-space screening is not thereby
+qualified for final verification or operational control.
+
+Active learning connects design orchestration to surrogate improvement:
+
+1. Evaluate broad candidate regions with the current surrogate.
+2. Identify high uncertainty, out-of-domain cases, and requirement or Pareto boundaries.
+3. Select high-fidelity runs by expected decision information rather than uniform coverage alone.
+4. Add verified results to a new immutable dataset version.
+5. Train a challenger surrogate and evaluate it on locked held-out and stress campaigns.
+6. Promote, retain in shadow, or reject the challenger under preregistered gates.
+7. Resume the mission trade using only the role and domain actually earned.
+
+This produces compounding value: mission studies generate targeted training evidence, while better
+surrogates make future studies faster and enable larger uncertainty campaigns. Periodic independent
+high-fidelity checks remain necessary to detect drift and blind spots.
+
+### Unifying Flagship
+
+The eventual flagship should demonstrate one continuous evidence chain:
+
+> Design a feasible LEO mission, identify its limiting uncertainty, commission targeted
+> high-fidelity simulations, improve and qualify a screening surrogate, select and verify a
+> mission baseline, encounter a simulated post-launch deviation, update the evidence graph, and
+> safely replan or abstain under the active authority grant.
+
+The flagship should be scored on requirement satisfaction, evidence traceability, decision quality,
+uncertainty reduction, tool cost, surrogate calibration and domain compliance, safe abstention,
+recovery behavior, and exact replayability. Provider fluency is secondary to these outcomes.
+
 ## Architecture Status And Next Maturity Steps
 
 The reference AI-native architecture is implemented through schema `1.2`: provider-neutral
 reasoning, versioned evidence acquisition, assertion-preserving world state, exact-conclusion-bound
 assertion claims, progressive grants, and durable simulation-only command prepare/commit.
 
-The remaining work is qualification and breadth, not another missing kernel layer:
+The first Mission Design Director vertical slice is also implemented as an outer, digest-bound
+bundle without changing the released operator journal schemas. It compiles a typed mission intent,
+acyclic requirement graph, exact capability catalog, and bounded analysis plan; reuses the adaptive
+lifecycle evaluator across launch, orbit, digital-twin subsystems, deorbit, and reentry; reduces the
+selected observation into exact-unit requirement assessments; and emits a versioned baseline only
+when every hard requirement passes. Its exact-inventory verifier reconstructs the decision from the
+verified operator journal without rerunning physics or invoking a provider.
 
-1. Add concrete local evidence tools for mission telemetry, estimation, and procedure sources, then
-   exercise conflicting and stale evidence through public workflows.
-2. Expand checked claim kinds beyond conflict-aware citation to deterministic threshold, temporal,
-   and applicability predicates.
-3. Exercise delegated and mission-autonomy grants only in simulation, with longer crash/recovery,
-   concurrency, resource-depletion, expiry, and revocation campaigns.
-4. Define reconciliation and qualification evidence for a real-effect handler before registering
-   any such tool. External or flight-adjacent execution remains out of scope until that separate
-   gate passes.
-5. Resume provider comparison only against these richer tasks; do not optimize models against the
-   earlier lifecycle-only benchmark.
+Public commands:
+
+```bash
+astro run-mission-design-director examples/design/leo_mission_design_director.yaml \
+  --reasoner-replay examples/operator/leo_lifecycle_trade_study_replay.yaml \
+  --output-dir /tmp/astro-mission-design-director
+astro verify-mission-design-director /tmp/astro-mission-design-director
+```
+
+The remaining path expands the kernel into the full north star:
+
+1. **Perception and checked claims:** add concrete local tools for telemetry, estimation, and
+   procedure sources plus deterministic threshold, temporal, and applicability predicates.
+2. **Mission Design Director breadth:** expand the checked first slice beyond the composite
+   lifecycle screener with additional typed capabilities, conditional analysis nodes, and
+   information-value-aware fidelity escalation while preserving the golden LEO workflow.
+3. **Knowledge graph and baseline handoff:** build the replayable cross-run evidence read model and
+   connect design decisions to assurance and operations through a versioned mission baseline.
+4. **Adaptive verification:** choose uncertainty, sensitivity, independent-backend, and
+   high-fidelity work according to decision relevance and information value.
+5. **Surrogate lifecycle and active learning:** integrate the existing surrogate and campaign
+   foundations with dataset lineage, applicability, uncertainty, shadow evaluation, promotion,
+   rollback, and targeted high-fidelity acquisition.
+6. **Closed-loop mission orchestration:** exercise simulated design-to-operations replanning,
+   including conflict, staleness, crash recovery, concurrency, resource depletion, expiry, and
+   revocation campaigns at progressively broader grants.
+7. **Operational qualification:** define remote-effect reconciliation, qualification evidence, and
+   operational resource models before registering any real-effect handler.
+8. **Learned orchestration and provider comparison:** evaluate learned planners and providers only
+   against the richer mission-design and closed-loop tasks, with transport availability separated
+   from capability and cost.

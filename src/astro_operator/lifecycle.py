@@ -109,6 +109,14 @@ class LifecycleCandidateEvaluator:
                         "candidate_id": candidate.candidate_id,
                         "error_type": type(exc).__name__,
                         "message": str(exc),
+                        "operator_scenario_sha256": sha256(
+                            scenario_path.read_bytes()
+                        ).hexdigest(),
+                        "resolved_input_overrides": overrides.model_dump(
+                            mode="json",
+                            exclude_none=True,
+                            exclude_defaults=True,
+                        ),
                     },
                     indent=2,
                     sort_keys=True,
@@ -141,6 +149,14 @@ class LifecycleCandidateEvaluator:
                 },
             )
         result_path = candidate_directory / "result.json"
+        result = result.model_copy(
+            update={
+                "metadata": {
+                    **result.metadata,
+                    "operator_scenario_sha256": sha256(scenario_path.read_bytes()).hexdigest(),
+                }
+            }
+        )
         write_mission_lifecycle_result(result_path, result)
 
         metrics = tuple(
