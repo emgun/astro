@@ -46,6 +46,14 @@ class ClaimDisposition(StrEnum):
     DISPUTED = "disputed"
 
 
+class NumericComparisonOperator(StrEnum):
+    LESS_THAN = "lt"
+    LESS_THAN_OR_EQUAL = "le"
+    GREATER_THAN = "gt"
+    GREATER_THAN_OR_EQUAL = "ge"
+    EQUAL = "eq"
+
+
 _MINIMUM_AUTHORITY = {
     OperatorActionKind.EVALUATE_CANDIDATE: AuthorityLevel.RESEARCH,
     OperatorActionKind.REQUEST_EVIDENCE: AuthorityLevel.RESEARCH,
@@ -455,18 +463,139 @@ class EvidenceAcquisitionResult(AstroModel):
         return self
 
 
+class NumericThresholdPredicate(AstroModel):
+    kind: Literal["numeric_threshold"] = "numeric_threshold"
+    predicate_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    assertion_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    assertion_predicate: str = Field(min_length=1)
+    operator: NumericComparisonOperator
+    threshold_value: FiniteFloat | None = None
+    threshold_assertion_id: str | None = Field(
+        default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    )
+    threshold_assertion_predicate: str | None = Field(default=None, min_length=1)
+
+    @field_validator("threshold_value", mode="before")
+    @classmethod
+    def threshold_must_be_numeric(cls, value: Any) -> Any:
+        if isinstance(value, bool | str):
+            raise ValueError("numeric threshold must be a numeric scalar")
+        return value
+
+    @model_validator(mode="after")
+    def threshold_source_must_be_unambiguous(self) -> NumericThresholdPredicate:
+        if (self.threshold_value is None) == (self.threshold_assertion_id is None):
+            raise ValueError(
+                "numeric predicate requires exactly one literal or assertion threshold"
+            )
+        if (self.threshold_assertion_id is None) != (
+            self.threshold_assertion_predicate is None
+        ):
+            raise ValueError(
+                "assertion threshold requires its exact expected assertion predicate"
+            )
+        return self
+
+
+class FreshnessPredicate(AstroModel):
+    kind: Literal["freshness"] = "freshness"
+    predicate_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    assertion_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    assertion_predicate: str = Field(min_length=1)
+    reference_assertion_id: str = Field(
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    )
+    reference_assertion_predicate: str = Field(min_length=1)
+    max_age_s: FiniteFloat | None = Field(default=None, ge=0.0)
+    max_age_assertion_id: str | None = Field(
+        default=None, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    )
+    max_age_assertion_predicate: str = Field(default="maximum_age_s", min_length=1)
+
+    @field_validator("max_age_s", mode="before")
+    @classmethod
+    def max_age_must_be_numeric(cls, value: Any) -> Any:
+        if isinstance(value, bool | str):
+            raise ValueError("freshness maximum age must be a numeric scalar")
+        return value
+
+    @model_validator(mode="after")
+    def age_source_must_be_unambiguous(self) -> FreshnessPredicate:
+        if (self.max_age_s is None) == (self.max_age_assertion_id is None):
+            raise ValueError(
+                "freshness predicate requires exactly one literal or assertion maximum age"
+            )
+        return self
+
+
+class ApplicabilityPredicate(AstroModel):
+    kind: Literal["applicability"] = "applicability"
+    predicate_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    actual_assertion_id: str = Field(
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    )
+    actual_assertion_predicate: str = Field(min_length=1)
+    required_assertion_id: str = Field(
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    )
+    required_assertion_predicate: str = Field(min_length=1)
+    expected_subject: str = Field(min_length=1)
+    expected_scope: str = Field(min_length=1)
+
+
+class ExactValuePredicate(AstroModel):
+    kind: Literal["exact_value"] = "exact_value"
+    predicate_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    assertion_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    assertion_predicate: str = Field(min_length=1)
+    expected_value: JsonValue
+
+
+ClaimPredicate = (
+    NumericThresholdPredicate
+    | FreshnessPredicate
+    | ApplicabilityPredicate
+    | ExactValuePredicate
+)
+
+
 class ConclusionClaim(AstroModel):
     claim_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
     statement: str = Field(min_length=1)
     conclusion_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     disposition: ClaimDisposition
     assertion_ids: tuple[str, ...] = Field(min_length=1)
+    predicates: tuple[ClaimPredicate, ...] = ()
     qualification: str | None = None
 
     @model_validator(mode="after")
     def claim_must_be_consistent(self) -> ConclusionClaim:
         if len(set(self.assertion_ids)) != len(self.assertion_ids):
             raise ValueError("claim assertion IDs must be unique")
+        predicate_assertion_ids: set[str] = set()
+        predicate_ids: list[str] = []
+        for predicate in self.predicates:
+            predicate_ids.append(predicate.predicate_id)
+            if isinstance(predicate, NumericThresholdPredicate):
+                predicate_assertion_ids.add(predicate.assertion_id)
+                if predicate.threshold_assertion_id is not None:
+                    predicate_assertion_ids.add(predicate.threshold_assertion_id)
+            elif isinstance(predicate, FreshnessPredicate):
+                predicate_assertion_ids.update(
+                    (predicate.assertion_id, predicate.reference_assertion_id)
+                )
+                if predicate.max_age_assertion_id is not None:
+                    predicate_assertion_ids.add(predicate.max_age_assertion_id)
+            elif isinstance(predicate, ApplicabilityPredicate):
+                predicate_assertion_ids.update(
+                    (predicate.actual_assertion_id, predicate.required_assertion_id)
+                )
+            else:
+                predicate_assertion_ids.add(predicate.assertion_id)
+        if len(set(predicate_ids)) != len(predicate_ids):
+            raise ValueError("claim predicate IDs must be unique")
+        if not predicate_assertion_ids.issubset(self.assertion_ids):
+            raise ValueError("claim predicates must reference cited assertion IDs")
         if self.disposition != ClaimDisposition.SUPPORTED and not self.qualification:
             raise ValueError("qualified and disputed claims require a qualification")
         return self
@@ -770,7 +899,7 @@ class OperatorRunStatus(StrEnum):
 
 
 class OperatorRun(AstroModel):
-    schema_version: Literal["1.0", "1.1", "1.2"] = "1.0"
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3"] = "1.0"
     objective: MissionObjective
     authority: AuthorityGrant
     status: OperatorRunStatus
@@ -786,15 +915,18 @@ class OperatorRun(AstroModel):
             step.reasoner_invocation is None for step in self.steps
         ):
             raise ValueError("operator schema 1.1 requires reasoner provenance for every step")
-        if self.schema_version == "1.2" and any(
+        if self.schema_version in {"1.2", "1.3"} and any(
             step.reasoner_invocation is None for step in self.steps
         ):
-            raise ValueError("operator schema 1.2 requires reasoner provenance for every step")
+            raise ValueError(
+                f"operator schema {self.schema_version} requires reasoner provenance "
+                "for every step"
+            )
         if self.schema_version == "1.0" and any(
             step.reasoner_invocation is not None for step in self.steps
         ):
             raise ValueError("operator schema 1.0 does not contain reasoner provenance")
-        if self.schema_version != "1.2":
+        if self.schema_version not in {"1.2", "1.3"}:
             if self.world_state is not None or self.objective.base_assertions:
                 raise ValueError("legacy operator schemas do not contain typed world state")
             if any(
@@ -809,6 +941,26 @@ class OperatorRun(AstroModel):
                 for step in self.steps
             ):
                 raise ValueError("legacy operator schemas do not contain schema 1.2 events")
+        if self.schema_version != "1.3" and any(
+            claim.predicates
+            for step in self.steps
+            for claim in step.action.conclusion_claims
+        ):
+            raise ValueError("claim predicates require operator schema 1.3")
+        if self.schema_version == "1.3":
+            claims = tuple(
+                claim
+                for step in self.steps
+                for claim in step.action.conclusion_claims
+            )
+            if not claims or any(
+                claim.disposition == ClaimDisposition.SUPPORTED
+                and not claim.predicates
+                for claim in claims
+            ):
+                raise ValueError(
+                    "operator schema 1.3 requires predicates on every supported claim"
+                )
         if [step.sequence for step in self.steps] != list(range(1, len(self.steps) + 1)):
             raise ValueError("operator step sequences must be contiguous and one-based")
         action_ids = [step.action.action_id for step in self.steps]
@@ -847,8 +999,10 @@ class OperatorRun(AstroModel):
                 raise ValueError("run selection must match the finish action")
             if final.conclusion != self.conclusion:
                 raise ValueError("run conclusion must match the finish action")
-            if self.schema_version == "1.2" and self.world_state is None:
-                raise ValueError("operator schema 1.2 requires a world state")
+            if self.schema_version in {"1.2", "1.3"} and self.world_state is None:
+                raise ValueError(
+                    f"operator schema {self.schema_version} requires a world state"
+                )
         elif any(step.action.kind == OperatorActionKind.FINISH for step in self.steps):
             raise ValueError("budget-exhausted operator run cannot contain finish")
         if any(

@@ -254,7 +254,9 @@ def run_operator(
         assert action.conclusion is not None
         run = OperatorRun(
             schema_version=(
-                "1.2" if schema_1_2_enabled or action.conclusion_claims else "1.1"
+                "1.3"
+                if any(claim.predicates for claim in action.conclusion_claims)
+                else ("1.2" if schema_1_2_enabled or action.conclusion_claims else "1.1")
             ),
             objective=objective,
             authority=authority,

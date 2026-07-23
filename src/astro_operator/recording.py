@@ -25,6 +25,7 @@ from astro_operator.behavior import (
     ReasonerBehaviorResult,
     behavior_coverage_complete,
 )
+from astro_operator.digest import model_dump_for_digest
 from astro_operator.engine import run_operator
 from astro_operator.errors import (
     OperatorPolicyError,
@@ -466,7 +467,8 @@ def _score_recorded_case(
 
 
 def reasoner_behavior_recording_digest(recording: ReasonerBehaviorRecording) -> str:
-    return sha256(_canonical_json(recording.model_dump(mode="json"))).hexdigest()
+    payload = model_dump_for_digest(recording)
+    return sha256(_canonical_json(payload)).hexdigest()
 
 
 def recorded_decision_digest(

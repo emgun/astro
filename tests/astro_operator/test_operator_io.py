@@ -91,6 +91,53 @@ def test_checked_operator_example_runs_and_verifies(tmp_path: Path) -> None:
         verify_operator_run(output)
 
 
+def test_perception_to_decision_example_runs_as_schema_1_3_and_fails_tampering(
+    tmp_path: Path,
+) -> None:
+    from astro_cli.main import app
+    from tests.astro_cli.helpers import make_cli_runner
+
+    output = tmp_path / "post-launch-review"
+    result = make_cli_runner().invoke(
+        app,
+        [
+            "run-mission-operator",
+            "examples/operator/post_launch_recovery_review.yaml",
+            "--reasoner-replay",
+            "examples/operator/post_launch_recovery_review_replay.yaml",
+            "--output-dir",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    run = verify_operator_run(output)
+    assert run.schema_version == "1.3"
+    assert len(run.steps) == 4
+    assert run.world_state is not None
+    assert len(run.world_state.assertions) == 16
+    claim = run.steps[-1].action.conclusion_claims[0]
+    assert len(claim.predicates) == 10
+    assert {item.epistemic_kind.value for item in run.known_evidence[1:]} == {
+        "simulated",
+        "estimated",
+        "declared",
+    }
+
+    trace = output / "operator-run.json"
+    payload = json.loads(trace.read_text(encoding="utf-8"))
+    payload["schema_version"] = "1.2"
+    trace.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(InvalidScenarioError, match="claim predicates require"):
+        verify_operator_run(output)
+    write_operator_run(trace, run)
+
+    procedure = output / "evidence" / "procedure-post-launch-procedure.yaml"
+    procedure.write_text("maximum_position_sigma_km: 99\n", encoding="utf-8")
+    with pytest.raises(InvalidScenarioError, match="digest mismatch"):
+        verify_operator_run(output)
+
+
 def test_verifier_rejects_forged_out_of_grant_command_history(tmp_path: Path) -> None:
     command = CommandRequest(command_id="forged", command_type="burn")
     execute = OperatorAction(

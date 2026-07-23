@@ -13,6 +13,7 @@ from pydantic import Field, ValidationError, model_validator
 
 from astro_core.errors import InvalidScenarioError
 from astro_core.models import AstroModel
+from astro_operator.digest import model_dump_for_digest
 from astro_operator.errors import OperatorPolicyError
 from astro_operator.models import (
     OperatorAction,
@@ -172,7 +173,9 @@ def _score_case(case: AdversarialDecisionCase) -> AdversarialCaseResult:
 
 
 def _case_digest(case: AdversarialDecisionCase) -> str:
-    data = case.model_dump(mode="json", exclude={"description", "tags"})
+    data = model_dump_for_digest(case)
+    data.pop("description", None)
+    data.pop("tags", None)
     _strip_post_v1_defaults(data)
     payload = json.dumps(
         data,

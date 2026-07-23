@@ -1,0 +1,7 @@
+snapshot_id: post-launch-telemetry-0030
+asset_id: lifecycle-observer
+configuration_id: post-launch-recovery-baseline-v1
+observed_at: "2026-01-01T00:30:00Z"
+decision_time: "2026-01-01T00:30:30Z"
+operating_mode: orbit_acquisition
+source_simulation: post-launch-orbit-acquisition

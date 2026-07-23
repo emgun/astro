@@ -665,24 +665,38 @@ Post-MVP / external-campaign items:
 | v0.2.0-rc.2 | done | release/verify | steward | package metadata, compatibility review, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Local, wheel-installed, CI, detached merged-commit, and remote annotated-tag evidence agree at `f224a06`; the candidate is ready for a short soak. |
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
-| ai-native-mission-operator | active | orchestrate/learn/verify | steward | `astro_operator`, schema `1.2`, progressive authority, evidence and command registries, assertion-preserving world state, durable simulation commit, self-improving orchestrator design | PR #47 merged the reference operator architecture at `06d5da6`: provider-neutral adaptive reasoning; versioned, budgeted evidence acquisition; digest-bound assertions and explicit conflicts; exact-conclusion-bound assertion claims; and exact proposal-to-command execution through a private SQLite prepare/commit journal. A required mission/grant-scoped command ledger persists idempotency and single-use approvals across output publications. Current grant validity, expiry, revocation, exact reconstructed world state, authority-bound tool qualification, typed envelopes, terminal outcome records, and offline verification fail closed. The checked public `supervised_simulated_burn` workflow commits one simulation-only action; real-effect tools remain unregistered. The next scope is a self-improving mission orchestrator spanning design, verification, operations, a provenance-preserving knowledge graph, and qualified neural surrogates. Provider tuning is paused until those richer tasks exist. |
-| mission-design-director-v1 | active | verify/integrate | steward | typed mission intent, requirement graph, registered capability catalog, bounded analysis plan, deterministic assessments and baseline, exact-inventory bundle | The first vertical slice is implemented on `codex/self-improving-mission-orchestrator` without changing operator schemas. The checked composite capability orchestrates launch, orbit, digital-twin subsystems, deorbit, and reentry through the existing lifecycle evaluator; the adaptive journal records baseline, failed lighter, and passing recovery candidates. The outer reducer applies exact-unit hard thresholds, records reserved and consumed analysis cost, emits a baseline only for an eligible selection, and reconstructs the result offline from the verified journal. Current claim boundary remains deterministic design screening rather than qualification or operational authority. |
+| ai-native-mission-operator | active | orchestrate/learn/verify | steward | `astro_operator`, schemas `1.2` and `1.3`, progressive authority, evidence and command registries, assertion-preserving world state, checked claims, durable simulation commit | PR #47 merged the reference operator architecture at `06d5da6`. Schema `1.3` now adds kernel-evaluated numeric-threshold, exact-value, freshness, and applicability predicates while retaining verification compatibility for older journals. Provider tuning remains paused until richer mission tasks can distinguish models in a decision-relevant way. |
+| mission-design-director-v1 | done | verify/integrate | steward | typed mission intent, requirement graph, registered capability catalog, bounded analysis plan, deterministic assessments and baseline, exact-inventory bundle | PR #48 merged the first Director vertical slice at `d99754b`. The checked composite capability orchestrates launch, orbit, digital-twin subsystems, deorbit, and reentry through the existing lifecycle evaluator; the outer reducer applies exact-unit hard thresholds and emits a baseline only for an eligible selection. |
+| operator-perception-claims | active | orchestrate/verify | steward | concrete simulated-telemetry, orbit-estimate, and declared-procedure tools; schema `1.3` checked claims; post-launch manual-review gate | The checked workflow acquires three catalog-root-confined, source-ID-addressed artifacts without allowing reasoner-chosen paths; preserves simulated, estimated, and declared epistemic kinds; binds the estimate to the exact telemetry digest; and recomputes assertions from captured bytes plus uncertainty, simulated-time freshness, procedure validity, configuration and mode applicability, estimate convergence, and manual-review predicates during offline verification. The conclusion is explicitly as-of the captured simulated decision time and indicates readiness for manual review, not maneuver authorization. |
+
+The perception-to-decision branch passes 126 focused operator tests, 1,191 full-suite tests with
+11 optional-backend skips, seven packaging tests, Ruff, strict MyPy across 173 source files,
+`git diff --check`, both distribution builds, the source-tree public run/verifier, and the
+installed-wheel public run/verifier. Three independent read-only review passes drove captured-byte
+assertion reconstruction, telemetry-to-estimate digest lineage, catalog-root confinement,
+captured simulated decision time, model-aware legacy digest compatibility, and authentic failed
+acquisition replay; the final review found no remaining P1/P2 issues.
 
 Project-specific steward learning: once a provider-neutral boundary, provenance recorder, and bounded
 behavior gate are adequate, further model tuning is not architecture progress. Prefer the next
 missing perception, state, claim, or authority capability; return to provider comparison only when
 the richer task can distinguish models in a decision-relevant way.
 
+Project-specific steward learning: a source digest binds bytes but does not bind derived assertions.
+Concrete evidence tools must support offline assertion re-derivation from captured bytes, and
+downstream estimates must carry explicit input lineage before a checked claim can connect perception
+to a decision. Compatibility shims must operate on typed model fields rather than recursively
+rewriting same-named user metadata.
+
 ## Next Best Paths
 
-1. Complete the perception-to-decision bridge: add telemetry, estimation, and procedure evidence
-   tools plus deterministic threshold, temporal, and applicability claims. Then expose those claims
-   to conditional Director planning so one contract spans design, verification, and simulated
-   operations.
-2. Add the cross-run mission knowledge graph as a rebuildable read model over immutable journals,
+1. Add the cross-run mission knowledge graph as a rebuildable read model over immutable journals,
    evidence, claims, decisions, baselines, and outcomes. Preserve provenance, applicability,
    uncertainty, and conflicts; use embeddings for retrieval without promoting extracted text into
    unqualified facts.
+2. Expose checked claim outcomes to conditional Director planning so design, verification, and
+   simulated operations share one evidence contract and can select `continue`, `hold`, or
+   `abstain` branches without parsing prose.
 3. Add adaptive verification planning and active learning: choose uncertainty campaigns,
    independent backends, and high-fidelity simulations by expected decision information; feed
    verified results into immutable surrogate datasets.

@@ -168,6 +168,7 @@ from astro_operator.io import (
 from astro_operator.lifecycle import LifecycleCandidateEvaluator, resolve_lifecycle_references
 from astro_operator.models import OperatorActionKind
 from astro_operator.openrouter import DEFAULT_OPENROUTER_MODEL, OpenRouterReasoner
+from astro_operator.operational_evidence import build_operational_evidence_registry
 from astro_operator.reasoner import ConditionalReplayReasoner
 from astro_operator.recording import (
     ReasonerBehaviorRecording,
@@ -910,6 +911,11 @@ def run_mission_operator_command(
                 authority=spec.authority,
                 reasoner=ConditionalReplayReasoner(load_operator_replay(reasoner_replay)),
                 evaluator=evaluator,
+                evidence_provider=build_operational_evidence_registry(
+                    spec.evidence_sources,
+                    source_root=spec_path.parent,
+                    output_root=partial_dir,
+                ),
                 command_executor=command_executor,
             )
         finally:
