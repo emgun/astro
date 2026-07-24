@@ -1,0 +1,145 @@
+- when:
+    step_count: 0
+    evidence_ids_present: [base-scenario]
+  action:
+    action_id: acquire-telemetry
+    kind: request_evidence
+    rationale: Acquire the causal simulated telemetry snapshot.
+    evidence_request:
+      request_id: telemetry
+      tool_id: astro.simulated_telemetry_snapshot
+      tool_version: "1.0"
+      request_kind: read_simulated_telemetry
+      parameters:
+        source_id: post-launch-telemetry
+- when:
+    step_count: 1
+    evidence_ids_present: [telemetry.source]
+  action:
+    action_id: acquire-estimate
+    kind: request_evidence
+    rationale: Acquire the orbit estimate that will be checked against the procedure.
+    evidence_ids: [telemetry.source]
+    evidence_request:
+      request_id: estimate
+      tool_id: astro.orbit_estimate
+      tool_version: "1.0"
+      request_kind: read_orbit_estimate
+      parameters:
+        source_id: post-launch-estimate
+- when:
+    step_count: 2
+    evidence_ids_present: [estimate.source]
+  action:
+    action_id: acquire-procedure
+    kind: request_evidence
+    rationale: Acquire the declared, versioned review procedure.
+    evidence_ids: [telemetry.source, estimate.source]
+    evidence_request:
+      request_id: procedure
+      tool_id: astro.procedure_snapshot
+      tool_version: "1.0"
+      request_kind: read_procedure
+      parameters:
+        source_id: post-launch-procedure
+- when:
+    step_count: 3
+    evidence_ids_present: [procedure.source]
+  action:
+    action_id: finish-review
+    kind: finish
+    rationale: Finish only after the kernel checks threshold, freshness, and applicability.
+    evidence_ids: [telemetry.source, estimate.source, procedure.source]
+    conclusion: As of simulated time 2026-01-01T00:30:30Z, the post-launch orbit estimate satisfies the declared procedure and is ready for manual review.
+    conclusion_claims:
+      - claim_id: post-launch-review-ready
+        statement: The simulated evidence satisfies the declared review prerequisites.
+        conclusion_sha256: 2bc00f1a1eecb0ca5f6770113a5966de9c0620fcfe61be46abaeb863712c015e
+        disposition: supported
+        assertion_ids:
+          - telemetry.configuration
+          - telemetry.mode
+          - telemetry.source-sha256
+          - telemetry.decision-time
+          - estimate.configuration
+          - estimate.telemetry-source-sha256
+          - estimate.converged
+          - estimate.position-sigma
+          - procedure.configuration
+          - procedure.position-sigma-limit
+          - procedure.maximum-age
+          - procedure.validity
+          - procedure.required-mode
+          - procedure.manual-review
+        predicates:
+          - kind: numeric_threshold
+            predicate_id: position-uncertainty-within-procedure
+            assertion_id: estimate.position-sigma
+            assertion_predicate: position_sigma_km
+            operator: le
+            threshold_assertion_id: procedure.position-sigma-limit
+            threshold_assertion_predicate: maximum_position_sigma_km
+          - kind: freshness
+            predicate_id: telemetry-fresh-at-decision
+            assertion_id: telemetry.configuration
+            assertion_predicate: asset_configuration_id
+            reference_assertion_id: telemetry.decision-time
+            reference_assertion_predicate: simulated_decision_time
+            max_age_assertion_id: procedure.maximum-age
+          - kind: freshness
+            predicate_id: estimate-fresh-at-decision
+            assertion_id: estimate.configuration
+            assertion_predicate: estimate_configuration_id
+            reference_assertion_id: telemetry.decision-time
+            reference_assertion_predicate: simulated_decision_time
+            max_age_assertion_id: procedure.maximum-age
+          - kind: freshness
+            predicate_id: procedure-effective-at-decision
+            assertion_id: procedure.configuration
+            assertion_predicate: applicable_configuration_id
+            reference_assertion_id: telemetry.decision-time
+            reference_assertion_predicate: simulated_decision_time
+            max_age_assertion_id: procedure.validity
+            max_age_assertion_predicate: procedure_validity_s
+          - kind: applicability
+            predicate_id: estimate-bound-to-telemetry
+            actual_assertion_id: estimate.telemetry-source-sha256
+            actual_assertion_predicate: telemetry_source_sha256
+            required_assertion_id: telemetry.source-sha256
+            required_assertion_predicate: telemetry_source_sha256
+            expected_subject: lifecycle-observer
+            expected_scope: simulated telemetry post-launch-telemetry-0030 for lifecycle-observer
+          - kind: applicability
+            predicate_id: telemetry-configuration-applicable
+            actual_assertion_id: telemetry.configuration
+            actual_assertion_predicate: asset_configuration_id
+            required_assertion_id: procedure.configuration
+            required_assertion_predicate: applicable_configuration_id
+            expected_subject: lifecycle-observer
+            expected_scope: post-launch orbit-recovery review for baseline v1
+          - kind: applicability
+            predicate_id: estimate-configuration-applicable
+            actual_assertion_id: estimate.configuration
+            actual_assertion_predicate: estimate_configuration_id
+            required_assertion_id: procedure.configuration
+            required_assertion_predicate: applicable_configuration_id
+            expected_subject: lifecycle-observer
+            expected_scope: post-launch orbit-recovery review for baseline v1
+          - kind: applicability
+            predicate_id: operating-mode-applicable
+            actual_assertion_id: telemetry.mode
+            actual_assertion_predicate: operating_mode
+            required_assertion_id: procedure.required-mode
+            required_assertion_predicate: required_operating_mode
+            expected_subject: lifecycle-observer
+            expected_scope: post-launch orbit-recovery review for baseline v1
+          - kind: exact_value
+            predicate_id: estimate-converged
+            assertion_id: estimate.converged
+            assertion_predicate: estimate_converged
+            expected_value: true
+          - kind: exact_value
+            predicate_id: manual-review-required
+            assertion_id: procedure.manual-review
+            assertion_predicate: manual_review_required
+            expected_value: true

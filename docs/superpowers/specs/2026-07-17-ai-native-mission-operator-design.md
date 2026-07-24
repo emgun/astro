@@ -97,6 +97,13 @@ conflict sets for incompatible values; it never silently overwrites an assertion
 Conclusion claims cite assertion IDs. A categorical supported claim fails closed when it cites an
 unresolved conflict, while qualified or disputed claims must state their qualification.
 
+Schema `1.3` adds deterministic claim predicates. Supported claims may bind exact scalar
+comparisons, exact values, freshness relative to a cited digest-bound time assertion, and
+applicability through exact subject, scope, predicate, and value matching. Live completion and
+offline verification call the same pure evaluator; the reasoner cannot turn a failed predicate
+into a supported claim by changing prose. Empty predicate fields are omitted from legacy action
+digests so existing schema `1.2` journals retain their prior identities.
+
 The provider projection exposes only allow-listed assertion and conflict fields. Artifact paths,
 arbitrary evidence metadata, credentials, and provider internals remain outside the reasoner input.
 
@@ -319,9 +326,10 @@ recovery behavior, and exact replayability. Provider fluency is secondary to the
 
 ## Architecture Status And Next Maturity Steps
 
-The reference AI-native architecture is implemented through schema `1.2`: provider-neutral
-reasoning, versioned evidence acquisition, assertion-preserving world state, exact-conclusion-bound
-assertion claims, progressive grants, and durable simulation-only command prepare/commit.
+The reference AI-native architecture is implemented through schema `1.3`: provider-neutral
+reasoning, versioned evidence acquisition, assertion-preserving world state, deterministic checked
+claims, progressive grants, and durable simulation-only command prepare/commit. Schemas `1.0`
+through `1.2` remain verifiable.
 
 The first Mission Design Director vertical slice is also implemented as an outer, digest-bound
 bundle without changing the released operator journal schemas. It compiles a typed mission intent,
@@ -338,27 +346,43 @@ astro run-mission-design-director examples/design/leo_mission_design_director.ya
   --reasoner-replay examples/operator/leo_lifecycle_trade_study_replay.yaml \
   --output-dir /tmp/astro-mission-design-director
 astro verify-mission-design-director /tmp/astro-mission-design-director
+
+astro run-mission-operator examples/operator/post_launch_recovery_review.yaml \
+  --reasoner-replay examples/operator/post_launch_recovery_review_replay.yaml \
+  --output-dir /tmp/astro-post-launch-recovery-review
+astro verify-mission-operator /tmp/astro-post-launch-recovery-review
 ```
+
+The perception-to-decision slice now registers concrete, source-ID-addressed tools for simulated
+telemetry, orbit-estimate snapshots, and declared procedures. The checked post-launch workflow
+captures all three sources into the run, preserves their simulated, estimated, and declared
+epistemic kinds, binds the estimate to the exact telemetry-source digest, and recomputes every
+tool assertion from captured bytes during offline verification before checking uncertainty,
+convergence, simulated-time freshness, procedure-validity, configuration, mode, and manual-review
+gates. Its conclusion is explicitly as-of the captured simulated decision time and indicates
+readiness for manual review, not maneuver authorization. Catalog entries cannot be absolute,
+traverse their source root, or pass through symlinks. The tools consume typed snapshots in this
+first slice; future live
+telemetry and estimator adapters can produce the same contracts without changing the kernel.
 
 The remaining path expands the kernel into the full north star:
 
-1. **Perception and checked claims:** add concrete local tools for telemetry, estimation, and
-   procedure sources plus deterministic threshold, temporal, and applicability predicates.
-2. **Mission Design Director breadth:** expand the checked first slice beyond the composite
+1. **Mission Design Director breadth:** expose checked predicate outcomes to conditional planning,
+   expand beyond the composite
    lifecycle screener with additional typed capabilities, conditional analysis nodes, and
    information-value-aware fidelity escalation while preserving the golden LEO workflow.
-3. **Knowledge graph and baseline handoff:** build the replayable cross-run evidence read model and
+2. **Knowledge graph and baseline handoff:** build the replayable cross-run evidence read model and
    connect design decisions to assurance and operations through a versioned mission baseline.
-4. **Adaptive verification:** choose uncertainty, sensitivity, independent-backend, and
+3. **Adaptive verification:** choose uncertainty, sensitivity, independent-backend, and
    high-fidelity work according to decision relevance and information value.
-5. **Surrogate lifecycle and active learning:** integrate the existing surrogate and campaign
+4. **Surrogate lifecycle and active learning:** integrate the existing surrogate and campaign
    foundations with dataset lineage, applicability, uncertainty, shadow evaluation, promotion,
    rollback, and targeted high-fidelity acquisition.
-6. **Closed-loop mission orchestration:** exercise simulated design-to-operations replanning,
+5. **Closed-loop mission orchestration:** exercise simulated design-to-operations replanning,
    including conflict, staleness, crash recovery, concurrency, resource depletion, expiry, and
    revocation campaigns at progressively broader grants.
-7. **Operational qualification:** define remote-effect reconciliation, qualification evidence, and
+6. **Operational qualification:** define remote-effect reconciliation, qualification evidence, and
    operational resource models before registering any real-effect handler.
-8. **Learned orchestration and provider comparison:** evaluate learned planners and providers only
+7. **Learned orchestration and provider comparison:** evaluate learned planners and providers only
    against the richer mission-design and closed-loop tasks, with transport availability separated
    from capability and cost.

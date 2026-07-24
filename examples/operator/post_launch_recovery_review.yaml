@@ -1,0 +1,45 @@
+base_scenario_path: ../lifecycle/leo_round_trip.yaml
+objective:
+  objective_id: post-launch-recovery-review
+  summary: Determine whether simulated post-launch evidence is ready for manual recovery review.
+  design_variables:
+    - variable_id: fixed_reference_mass
+      target: spacecraft_wet_mass_kg
+      lower_bound: 500.0
+      upper_bound: 500.0
+      unit: kg
+  metric_goals:
+    - metric_id: review_readiness
+      objective: satisfy the declared procedure without executing a maneuver
+      unit: disposition
+  metadata:
+    example_role: perception_to_decision_review
+    claim_boundary: simulated evidence and declared procedure; no maneuver authorization
+authority:
+  grant_id: post-launch-recovery-review-v1
+  level: research
+  mission_scope: simulated post-launch recovery evidence review
+  allowed_actions: [request_evidence, finish]
+  allowed_evidence_tools:
+    - tool_id: astro.simulated_telemetry_snapshot
+      tool_version: "1.0"
+      request_kinds: [read_simulated_telemetry]
+    - tool_id: astro.orbit_estimate
+      tool_version: "1.0"
+      request_kinds: [read_orbit_estimate]
+    - tool_id: astro.procedure_snapshot
+      tool_version: "1.0"
+      request_kinds: [read_procedure]
+  max_steps: 4
+  max_candidate_evaluations: 0
+  max_evidence_acquisitions: 3
+evidence_sources:
+  - source_id: post-launch-telemetry
+    kind: simulated_telemetry
+    path: evidence/post_launch_telemetry.yaml
+  - source_id: post-launch-estimate
+    kind: orbit_estimate
+    path: evidence/post_launch_estimate.yaml
+  - source_id: post-launch-procedure
+    kind: procedure
+    path: evidence/post_launch_recovery_procedure.yaml

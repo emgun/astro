@@ -1,0 +1,11 @@
+procedure_id: post-launch-orbit-recovery
+version: "1.0"
+asset_id: lifecycle-observer
+applicability_scope: post-launch orbit-recovery review for baseline v1
+applicable_configuration_id: post-launch-recovery-baseline-v1
+effective_from: "2025-12-01T00:00:00Z"
+expires_at: "2026-12-01T00:00:00Z"
+maximum_position_sigma_km: 0.1
+maximum_age_s: 60.0
+required_operating_mode: orbit_acquisition
+manual_review_required: true

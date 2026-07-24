@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -9,6 +10,7 @@ from pydantic import JsonValue
 from astro_operator.evidence_tools import EvidenceToolRegistry
 from astro_operator.models import (
     AcquisitionStatus,
+    ApplicabilityPredicate,
     ClaimDisposition,
     ConclusionClaim,
     EpistemicKind,
@@ -17,6 +19,10 @@ from astro_operator.models import (
     EvidenceReference,
     EvidenceRequest,
     EvidenceToolSpec,
+    ExactValuePredicate,
+    FreshnessPredicate,
+    NumericComparisonOperator,
+    NumericThresholdPredicate,
 )
 from astro_operator.world_state import (
     assertion_digest,
@@ -179,3 +185,152 @@ def test_supported_claim_accepts_non_conflicting_assertion() -> None:
     )
 
     validate_conclusion_claims((claim,), state)
+
+
+def test_supported_claim_recomputes_threshold_freshness_and_applicability() -> None:
+    as_of = datetime(2026, 1, 1, 0, 30, 30, tzinfo=UTC)
+    assertions = (
+        _assertion("sigma", 0.042).model_copy(
+            update={"predicate": "position_sigma_km", "valid_at": as_of}
+        ),
+        _assertion("limit", 0.1).model_copy(
+            update={
+                "predicate": "maximum_position_sigma_km",
+                "subject": "spacecraft-a",
+                "scope": "procedure-v1",
+            }
+        ),
+        _assertion("age", 60.0).model_copy(
+            update={"predicate": "maximum_age_s"}
+        ),
+        _assertion("actual-config", "baseline-v1").model_copy(
+            update={
+                "predicate": "asset_configuration_id",
+                "valid_at": as_of - timedelta(seconds=30),
+            }
+        ),
+        _assertion("required-config", "baseline-v1").model_copy(
+            update={
+                "predicate": "applicable_configuration_id",
+                "subject": "spacecraft-a",
+                "scope": "procedure-v1",
+            }
+        ),
+        _assertion("manual", True).model_copy(
+            update={"predicate": "manual_review_required"}
+        ),
+        _assertion("decision", as_of.isoformat()).model_copy(
+            update={"predicate": "simulated_decision_time", "valid_at": as_of}
+        ),
+    )
+    state = reduce_world_state(assertions)
+    claim = ConclusionClaim(
+        claim_id="checked",
+        statement="The evidence satisfies the procedure.",
+        conclusion_sha256=SHA,
+        disposition=ClaimDisposition.SUPPORTED,
+        assertion_ids=tuple(item.assertion_id for item in assertions),
+        predicates=(
+            NumericThresholdPredicate(
+                predicate_id="threshold",
+                assertion_id="sigma",
+                assertion_predicate="position_sigma_km",
+                operator=NumericComparisonOperator.LESS_THAN_OR_EQUAL,
+                threshold_assertion_id="limit",
+                threshold_assertion_predicate="maximum_position_sigma_km",
+            ),
+            FreshnessPredicate(
+                predicate_id="fresh",
+                assertion_id="actual-config",
+                assertion_predicate="asset_configuration_id",
+                reference_assertion_id="decision",
+                reference_assertion_predicate="simulated_decision_time",
+                max_age_assertion_id="age",
+            ),
+            ApplicabilityPredicate(
+                predicate_id="applicable",
+                actual_assertion_id="actual-config",
+                actual_assertion_predicate="asset_configuration_id",
+                required_assertion_id="required-config",
+                required_assertion_predicate="applicable_configuration_id",
+                expected_subject="spacecraft-a",
+                expected_scope="procedure-v1",
+            ),
+            ExactValuePredicate(
+                predicate_id="manual",
+                assertion_id="manual",
+                assertion_predicate="manual_review_required",
+                expected_value=True,
+            ),
+        ),
+    )
+
+    validate_conclusion_claims((claim,), state)
+
+    stale_state = reduce_world_state(
+        tuple(
+            item.model_copy(
+                update={"value": (as_of + timedelta(seconds=31)).isoformat()}
+            )
+            if item.assertion_id == "decision"
+            else item
+            for item in assertions
+        )
+    )
+    with pytest.raises(ValueError, match="unsatisfied freshness"):
+        validate_conclusion_claims((claim,), stale_state)
+
+    mismatched = reduce_world_state(
+        tuple(
+            item.model_copy(update={"value": "other-baseline"})
+            if item.assertion_id == "actual-config"
+            else item
+            for item in assertions
+        )
+    )
+    with pytest.raises(ValueError, match="unsatisfied applicability"):
+        validate_conclusion_claims((claim,), mismatched)
+
+
+def test_numeric_and_exact_predicates_reject_bool_number_equivalence() -> None:
+    state = reduce_world_state(
+        (
+            _assertion("bool", True).model_copy(
+                update={"predicate": "manual_review_required"}
+            ),
+        )
+    )
+    numeric = ConclusionClaim(
+        claim_id="numeric",
+        statement="Boolean is not a number.",
+        conclusion_sha256=SHA,
+        disposition=ClaimDisposition.SUPPORTED,
+        assertion_ids=("bool",),
+        predicates=(
+            NumericThresholdPredicate(
+                predicate_id="numeric",
+                assertion_id="bool",
+                assertion_predicate="manual_review_required",
+                operator=NumericComparisonOperator.EQUAL,
+                threshold_value=1.0,
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="not numeric"):
+        validate_conclusion_claims((numeric,), state)
+
+    exact = numeric.model_copy(
+        update={
+            "claim_id": "exact",
+            "predicates": (
+                ExactValuePredicate(
+                    predicate_id="exact",
+                    assertion_id="bool",
+                    assertion_predicate="manual_review_required",
+                    expected_value=1,
+                ),
+            ),
+        }
+    )
+    with pytest.raises(ValueError, match="unsatisfied exact_value"):
+        validate_conclusion_claims((exact,), state)

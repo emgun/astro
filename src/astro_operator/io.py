@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import ValidationError
+from pydantic import ValidationError, model_validator
 
 from astro_core.errors import InvalidScenarioError
 from astro_core.models import AstroModel
@@ -18,6 +18,10 @@ from astro_operator.models import (
     MissionObjective,
     OperatorRun,
 )
+from astro_operator.operational_evidence import (
+    OperationalEvidenceSource,
+    verify_operational_acquisition,
+)
 from astro_operator.policy import validate_operator_run_policy
 from astro_operator.reasoner import ConditionalReplayDecision
 
@@ -26,6 +30,14 @@ class MissionOperatorSpec(AstroModel):
     base_scenario_path: str
     objective: MissionObjective
     authority: AuthorityGrant
+    evidence_sources: tuple[OperationalEvidenceSource, ...] = ()
+
+    @model_validator(mode="after")
+    def evidence_source_ids_must_be_unique(self) -> MissionOperatorSpec:
+        source_ids = [source.source_id for source in self.evidence_sources]
+        if len(set(source_ids)) != len(source_ids):
+            raise ValueError("mission operator evidence source IDs must be unique")
+        return self
 
 
 def load_mission_operator_spec(path: Path | str) -> MissionOperatorSpec:
@@ -97,6 +109,19 @@ def verify_operator_run(root: Path | str) -> OperatorRun:
             raise InvalidScenarioError(f"Operator evidence artifact is missing: {evidence.path}")
         if sha256(candidate.read_bytes()).hexdigest() != evidence.sha256:
             raise InvalidScenarioError(f"Operator evidence digest mismatch: {evidence.path}")
+    try:
+        for step in run.steps:
+            if step.acquisition_result is not None:
+                artifact_path = run_root
+                if len(step.acquisition_result.evidence) == 1:
+                    artifact_path = run_root / step.acquisition_result.evidence[0].path
+                verify_operational_acquisition(
+                    step.acquisition_result, artifact_path
+                )
+    except ValueError as exc:
+        raise InvalidScenarioError(
+            f"Operator evidence derivation verification failed: {exc}"
+        ) from exc
     return run
 
 

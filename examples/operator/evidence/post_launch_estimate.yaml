@@ -1,0 +1,10 @@
+estimate_id: post-launch-local-od-0030
+asset_id: lifecycle-observer
+configuration_id: post-launch-recovery-baseline-v1
+telemetry_source_sha256: 61ceaf7d31d37f8f20a15e5d7989f884b951d4bf68b4cbed16fb7c681552a3df
+estimated_at: "2026-01-01T00:30:00Z"
+estimator: astro.local_batch_od.reference
+converged: true
+measurement_count: 64
+position_sigma_km: 0.042
+normalized_residual_rms: 0.91

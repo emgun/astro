@@ -9,10 +9,15 @@ from datetime import datetime
 from hashlib import sha256
 
 from astro_operator.models import (
+    ApplicabilityPredicate,
     AssertionConflict,
     ClaimDisposition,
     ConclusionClaim,
     EvidenceAssertion,
+    ExactValuePredicate,
+    FreshnessPredicate,
+    NumericComparisonOperator,
+    NumericThresholdPredicate,
     WorldState,
 )
 
@@ -147,6 +152,126 @@ def validate_conclusion_claims(
                 f"supported claim {claim.claim_id!r} cites unresolved conflicting assertions: "
                 + ", ".join(sorted(unresolved))
             )
+        if claim.disposition == ClaimDisposition.SUPPORTED:
+            for predicate in claim.predicates:
+                if not _evaluate_claim_predicate(predicate, assertions):
+                    raise ValueError(
+                        f"supported claim {claim.claim_id!r} has an unsatisfied "
+                        f"{predicate.kind} predicate"
+                    )
+
+
+def _numeric_assertion(
+    assertion_id: str,
+    assertions: dict[str, EvidenceAssertion],
+    *,
+    expected_predicate: str,
+) -> float:
+    assertion = assertions[assertion_id]
+    if assertion.predicate != expected_predicate:
+        raise ValueError(
+            f"assertion {assertion_id!r} predicate {assertion.predicate!r} does not "
+            f"match {expected_predicate!r}"
+        )
+    value = assertion.value
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"assertion {assertion_id!r} is not numeric")
+    return float(value)
+
+
+def _evaluate_claim_predicate(
+    predicate: (
+        NumericThresholdPredicate
+        | FreshnessPredicate
+        | ApplicabilityPredicate
+        | ExactValuePredicate
+    ),
+    assertions: dict[str, EvidenceAssertion],
+) -> bool:
+    if isinstance(predicate, NumericThresholdPredicate):
+        value = _numeric_assertion(
+            predicate.assertion_id,
+            assertions,
+            expected_predicate=predicate.assertion_predicate,
+        )
+        threshold = (
+            float(predicate.threshold_value)
+            if predicate.threshold_value is not None
+            else _numeric_assertion(
+                predicate.threshold_assertion_id or "",
+                assertions,
+                expected_predicate=predicate.threshold_assertion_predicate or "",
+            )
+        )
+        comparisons = {
+            NumericComparisonOperator.LESS_THAN: value < threshold,
+            NumericComparisonOperator.LESS_THAN_OR_EQUAL: value <= threshold,
+            NumericComparisonOperator.GREATER_THAN: value > threshold,
+            NumericComparisonOperator.GREATER_THAN_OR_EQUAL: value >= threshold,
+            NumericComparisonOperator.EQUAL: value == threshold,
+        }
+        return comparisons[predicate.operator]
+    if isinstance(predicate, FreshnessPredicate):
+        assertion = assertions[predicate.assertion_id]
+        if assertion.predicate != predicate.assertion_predicate:
+            raise ValueError(
+                f"assertion {predicate.assertion_id!r} predicate does not match "
+                f"{predicate.assertion_predicate!r}"
+            )
+        if assertion.valid_at is None:
+            raise ValueError(
+                f"assertion {predicate.assertion_id!r} has no valid_at for freshness"
+            )
+        reference_assertion = assertions[predicate.reference_assertion_id]
+        if reference_assertion.predicate != predicate.reference_assertion_predicate:
+            raise ValueError(
+                f"assertion {predicate.reference_assertion_id!r} predicate does not match "
+                f"{predicate.reference_assertion_predicate!r}"
+            )
+        reference_value = reference_assertion.value
+        if not isinstance(reference_value, str):
+            raise ValueError(
+                f"assertion {predicate.reference_assertion_id!r} is not an ISO datetime"
+            )
+        try:
+            reference_time = datetime.fromisoformat(reference_value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError(
+                f"assertion {predicate.reference_assertion_id!r} is not an ISO datetime"
+            ) from exc
+        if reference_time.tzinfo is None or reference_time.utcoffset() is None:
+            raise ValueError(
+                f"assertion {predicate.reference_assertion_id!r} datetime is not aware"
+            )
+        max_age_s = (
+            float(predicate.max_age_s)
+            if predicate.max_age_s is not None
+            else _numeric_assertion(
+                predicate.max_age_assertion_id or "",
+                assertions,
+                expected_predicate=predicate.max_age_assertion_predicate,
+            )
+        )
+        age_s = (reference_time - assertion.valid_at).total_seconds()
+        return 0.0 <= age_s <= max_age_s
+    if isinstance(predicate, ApplicabilityPredicate):
+        actual = assertions[predicate.actual_assertion_id]
+        required = assertions[predicate.required_assertion_id]
+        return (
+            actual.predicate == predicate.actual_assertion_predicate
+            and required.predicate == predicate.required_assertion_predicate
+            and actual.subject == predicate.expected_subject
+            and required.subject == predicate.expected_subject
+            and required.scope == predicate.expected_scope
+            and type(actual.value) is type(required.value)
+            and actual.value == required.value
+        )
+    assertion = assertions[predicate.assertion_id]
+    return (
+        assertion.predicate == predicate.assertion_predicate
+        and type(assertion.value) is type(predicate.expected_value)
+        and assertion.value == predicate.expected_value
+    )
 
 
 def _validate_state_integrity(state: WorldState) -> None:

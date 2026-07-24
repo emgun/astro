@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from pydantic import Field, StrictBool, field_validator
 
 from astro_core.models import AstroModel
+from astro_operator.digest import model_dump_for_digest
 from astro_operator.errors import ReasonerError, ReasonerInvalidResponseError
 from astro_operator.models import (
     OperatorAction,
@@ -162,8 +163,9 @@ def _replay_decision(
 def model_digest(model: AstroModel) -> str:
     """Return the canonical digest used to bind reasoner inputs and outputs."""
 
+    data = model_dump_for_digest(model)
     payload = json.dumps(
-        model.model_dump(mode="json"), sort_keys=True, separators=(",", ":")
+        data, sort_keys=True, separators=(",", ":")
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
