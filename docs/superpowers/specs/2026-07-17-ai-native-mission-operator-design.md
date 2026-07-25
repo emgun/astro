@@ -365,14 +365,24 @@ traverse their source root, or pass through symlinks. The tools consume typed sn
 first slice; future live
 telemetry and estimator adapters can produce the same contracts without changing the kernel.
 
+The first mission knowledge graph slice is implemented as a versioned, rebuildable read model over
+complete captured Director and operator bundles. Its exact-inventory verifier invokes each native
+source verifier and reconstructs the graph before accepting the stored convenience artifact.
+Typed nodes and edges retain the complete source records for requirements, candidates,
+assessments, evidence, assertions, conflicts, claims, decisions, baselines, and tool versions. A
+bounded public query traces the exact justification chain behind a baseline. Cross-run membership
+is explicitly declared; the reducer does not infer a design-baseline-to-operations edge from
+similar names or prose because the current operator contract lacks a typed baseline identity.
+
 The remaining path expands the kernel into the full north star:
 
-1. **Mission Design Director breadth:** expose checked predicate outcomes to conditional planning,
-   expand beyond the composite
+1. **Baseline handoff and conditional planning:** add a typed mission/baseline context to operator
+   inputs, resolve it against one verified baseline, expose checked predicate outcomes as
+   `continue`, `hold`, or `abstain`, and expand beyond the composite
    lifecycle screener with additional typed capabilities, conditional analysis nodes, and
    information-value-aware fidelity escalation while preserving the golden LEO workflow.
-2. **Knowledge graph and baseline handoff:** build the replayable cross-run evidence read model and
-   connect design decisions to assurance and operations through a versioned mission baseline.
+2. **Knowledge and outcomes:** add verified operational outcome and residual contracts, then extend
+   the graph and learning datasets without rewriting historical decisions.
 3. **Adaptive verification:** choose uncertainty, sensitivity, independent-backend, and
    high-fidelity work according to decision relevance and information value.
 4. **Surrogate lifecycle and active learning:** integrate the existing surrogate and campaign

@@ -80,6 +80,21 @@ typed failure observation. The active authority grant determines which analyses 
 stages progressively higher command authority. This checked example uses research authority and
 publishes digest-bound lifecycle observations; schema 1.0 does not commit commands.
 
+Build the first cross-run mission knowledge graph after running its Director and post-launch source
+bundles:
+
+```bash
+astro build-mission-knowledge-graph \
+  examples/knowledge/leo_mission_knowledge_graph.yaml \
+  --output-dir build/mission-knowledge-graph
+astro verify-mission-knowledge-graph build/mission-knowledge-graph
+astro trace-mission-baseline build/mission-knowledge-graph \
+  --baseline-id leo-mission-design:baseline
+```
+
+See [Mission Knowledge Graph](docs/mission-knowledge-graph.md) for the complete source workflow and
+the explicit no-inferred-baseline-handoff boundary.
+
 Validate and propagate a local orbit scenario:
 
 ```bash

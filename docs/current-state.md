@@ -667,7 +667,8 @@ Post-MVP / external-campaign items:
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
 | ai-native-mission-operator | active | orchestrate/learn/verify | steward | `astro_operator`, schemas `1.2` and `1.3`, progressive authority, evidence and command registries, assertion-preserving world state, checked claims, durable simulation commit | PR #47 merged the reference operator architecture at `06d5da6`. Schema `1.3` now adds kernel-evaluated numeric-threshold, exact-value, freshness, and applicability predicates while retaining verification compatibility for older journals. Provider tuning remains paused until richer mission tasks can distinguish models in a decision-relevant way. |
 | mission-design-director-v1 | done | verify/integrate | steward | typed mission intent, requirement graph, registered capability catalog, bounded analysis plan, deterministic assessments and baseline, exact-inventory bundle | PR #48 merged the first Director vertical slice at `d99754b`. The checked composite capability orchestrates launch, orbit, digital-twin subsystems, deorbit, and reentry through the existing lifecycle evaluator; the outer reducer applies exact-unit hard thresholds and emits a baseline only for an eligible selection. |
-| operator-perception-claims | active | orchestrate/verify | steward | concrete simulated-telemetry, orbit-estimate, and declared-procedure tools; schema `1.3` checked claims; post-launch manual-review gate | The checked workflow acquires three catalog-root-confined, source-ID-addressed artifacts without allowing reasoner-chosen paths; preserves simulated, estimated, and declared epistemic kinds; binds the estimate to the exact telemetry digest; and recomputes assertions from captured bytes plus uncertainty, simulated-time freshness, procedure validity, configuration and mode applicability, estimate convergence, and manual-review predicates during offline verification. The conclusion is explicitly as-of the captured simulated decision time and indicates readiness for manual review, not maneuver authorization. |
+| operator-perception-claims | done | orchestrate/verify | steward | concrete simulated-telemetry, orbit-estimate, and declared-procedure tools; schema `1.3` checked claims; post-launch manual-review gate | PR #49 merged the checked workflow at `ce301ec`. It acquires three catalog-root-confined, source-ID-addressed artifacts without allowing reasoner-chosen paths; preserves simulated, estimated, and declared epistemic kinds; binds the estimate to the exact telemetry digest; and recomputes assertions from captured bytes plus uncertainty, simulated-time freshness, procedure validity, configuration and mode applicability, estimate convergence, and manual-review predicates during offline verification. The conclusion is explicitly as-of the captured simulated decision time and indicates readiness for manual review, not maneuver authorization. |
+| mission-knowledge-graph-v1 | active | orchestrate/learn/verify | steward | versioned typed graph, complete captured Director/operator sources, exact inventory, native source verification, deterministic reconstruction, baseline justification trace | The first cross-run read model groups verified design and post-launch episodes under an explicitly declared mission identity, preserves typed provenance and conflicts, and traces a baseline back to its decision, selected candidate, requirements, assessments, evidence, capability version, and claim boundary. It deliberately does not infer a design-baseline-to-operations handoff from prose; that edge requires a typed baseline identity in the operator contract. |
 
 The perception-to-decision branch passes 126 focused operator tests, 1,191 full-suite tests with
 11 optional-backend skips, seven packaging tests, Ruff, strict MyPy across 173 source files,
@@ -676,6 +677,13 @@ installed-wheel public run/verifier. Three independent read-only review passes d
 assertion reconstruction, telemetry-to-estimate digest lineage, catalog-root confinement,
 captured simulated decision time, model-aware legacy digest compatibility, and authentic failed
 acquisition replay; the final review found no remaining P1/P2 issues.
+
+The mission-knowledge-graph branch passes five focused graph tests, 1,196 full-suite tests with 11
+optional-backend skips, Ruff, strict MyPy across 175 source files, package/import checks,
+`git diff --check`, both distribution builds, and matching source-tree and isolated
+installed-wheel graph build/verify/trace workflows. Independent review corrected claim-disposition
+edge semantics, special-filesystem-entry rejection, exact capability-version trace output, and
+node-completeness wording; a fresh final review found no remaining P1/P2 issues.
 
 Project-specific steward learning: once a provider-neutral boundary, provenance recorder, and bounded
 behavior gate are adequate, further model tuning is not architecture progress. Prefer the next
@@ -690,13 +698,14 @@ rewriting same-named user metadata.
 
 ## Next Best Paths
 
-1. Add the cross-run mission knowledge graph as a rebuildable read model over immutable journals,
-   evidence, claims, decisions, baselines, and outcomes. Preserve provenance, applicability,
-   uncertainty, and conflicts; use embeddings for retrieval without promoting extracted text into
-   unqualified facts.
-2. Expose checked claim outcomes to conditional Director planning so design, verification, and
+1. Add a typed mission/baseline context to operator inputs and resolve it against exactly one
+   verified Director baseline, then expose checked claim outcomes to conditional Director planning
+   so design, verification, and
    simulated operations share one evidence contract and can select `continue`, `hold`, or
    `abstain` branches without parsing prose.
+2. Extend the graph with verified operational outcomes and residuals once their typed contracts
+   exist. Add retrieval indexes only as disposable aids; extracted text must retain source and
+   scope rather than becoming an unqualified graph fact.
 3. Add adaptive verification planning and active learning: choose uncertainty campaigns,
    independent backends, and high-fidelity simulations by expected decision information; feed
    verified results into immutable surrogate datasets.

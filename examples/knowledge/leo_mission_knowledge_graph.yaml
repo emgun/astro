@@ -1,0 +1,10 @@
+schema_version: "1.0"
+graph_id: leo-reference-mission-episodes
+mission_id: leo-reference-mission
+sources:
+  - source_id: design
+    kind: mission_design_director
+    path: ../../build/mission-knowledge-director
+  - source_id: post-launch
+    kind: operator_run
+    path: ../../build/mission-knowledge-post-launch

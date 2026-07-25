@@ -165,6 +165,11 @@ from astro_operator.io import (
     verify_operator_run,
     write_operator_run,
 )
+from astro_operator.knowledge import trace_baseline_justification
+from astro_operator.knowledge_io import (
+    publish_mission_knowledge_graph,
+    verify_mission_knowledge_graph,
+)
 from astro_operator.lifecycle import LifecycleCandidateEvaluator, resolve_lifecycle_references
 from astro_operator.models import OperatorActionKind
 from astro_operator.openrouter import DEFAULT_OPENROUTER_MODEL, OpenRouterReasoner
@@ -1089,6 +1094,77 @@ def verify_mission_design_director_command(
         f"verified mission design director: {run.decision.disposition.value}, "
         f"candidate={run.decision.selected_candidate_id or 'none'}"
     )
+
+
+@app.command("build-mission-knowledge-graph")
+def build_mission_knowledge_graph_command(
+    spec_path: Annotated[
+        Path,
+        typer.Argument(
+            exists=True,
+            readable=True,
+            help="Cross-run mission knowledge graph YAML path.",
+        ),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir", help="Publish the self-contained graph bundle."),
+    ],
+) -> None:
+    """Capture verified mission runs and build their deterministic evidence graph."""
+    try:
+        graph = publish_mission_knowledge_graph(spec_path, output_dir)
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"mission knowledge graph built: sources={len(graph.sources)}, "
+        f"nodes={len(graph.nodes)}, edges={len(graph.edges)}"
+    )
+    typer.echo(f"wrote mission knowledge graph bundle: {output_dir}")
+
+
+@app.command("verify-mission-knowledge-graph")
+def verify_mission_knowledge_graph_command(
+    output_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+) -> None:
+    """Verify source bundles and reconstruct their mission knowledge graph."""
+    try:
+        graph = verify_mission_knowledge_graph(output_dir)
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"verified mission knowledge graph: sources={len(graph.sources)}, "
+        f"nodes={len(graph.nodes)}, edges={len(graph.edges)}"
+    )
+
+
+@app.command("trace-mission-baseline")
+def trace_mission_baseline_command(
+    output_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+    baseline_id: Annotated[
+        str,
+        typer.Option(
+            "--baseline-id",
+            help="Baseline record ID or fully namespaced graph node ID.",
+        ),
+    ],
+) -> None:
+    """Trace the requirements, evidence, and tool version behind a baseline."""
+    try:
+        graph = verify_mission_knowledge_graph(output_dir)
+        trace = trace_baseline_justification(graph, baseline_id)
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(trace.model_dump_json(indent=2))
 
 
 @app.command("score-mission-reasoner-corpus")
