@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
 from typing import Any, Literal
@@ -10,6 +11,7 @@ from typing import Any, Literal
 from pydantic import Field, JsonValue, model_validator
 
 from astro_core.models import AstroModel
+from astro_operator.conditional_campaign import ConditionalCampaignOutcome
 from astro_operator.director import MissionDesignRun
 from astro_operator.models import (
     ClaimDisposition,
@@ -28,6 +30,7 @@ def _canonical_digest(value: object) -> str:
 class KnowledgeSourceKind(StrEnum):
     MISSION_DESIGN_DIRECTOR = "mission_design_director"
     OPERATOR_RUN = "operator_run"
+    CONDITIONAL_CAMPAIGN = "conditional_campaign"
 
 
 class KnowledgeSourceSpec(AstroModel):
@@ -65,6 +68,7 @@ class KnowledgeNodeKind(StrEnum):
     DECISION = "decision"
     BASELINE = "baseline"
     TOOL = "tool"
+    VERIFICATION_EPISODE = "verification_episode"
 
 
 class KnowledgeNode(AstroModel):
@@ -95,10 +99,11 @@ class KnowledgeSource(AstroModel):
 
 
 class MissionKnowledgeGraph(AstroModel):
-    schema_version: Literal["1.0", "1.1"] = "1.0"
+    schema_version: Literal["1.0", "1.1", "1.2"] = "1.0"
     extractor_version: Literal[
         "astro.mission_knowledge_graph/1.0",
         "astro.mission_knowledge_graph/1.1",
+        "astro.mission_knowledge_graph/1.2",
     ] = "astro.mission_knowledge_graph/1.0"
     graph_id: str = Field(min_length=1)
     mission_id: str = Field(min_length=1)
@@ -158,11 +163,11 @@ class BaselineJustificationTrace(AstroModel):
     claim_boundary: str = Field(min_length=1)
 
 
-VerifiedSourcePayload = tuple[
-    MissionDesignRun | OperatorRun,
-    OperatorRun | None,
-    str,
-]
+@dataclass(frozen=True)
+class VerifiedKnowledgeSource:
+    primary: MissionDesignRun | OperatorRun | ConditionalCampaignOutcome
+    nested_operator: OperatorRun | None
+    source_tree_sha256: str
 
 
 class _GraphCollector:
@@ -237,39 +242,50 @@ class _GraphCollector:
 
 def build_mission_knowledge_graph(
     spec: MissionKnowledgeGraphSpec,
-    verified_sources: dict[str, VerifiedSourcePayload],
+    verified_sources: dict[str, VerifiedKnowledgeSource],
     *,
-    schema_version: Literal["1.0", "1.1"] = "1.1",
+    schema_version: Literal["1.0", "1.1", "1.2"] = "1.2",
 ) -> MissionKnowledgeGraph:
     """Build the canonical graph from already verified, captured source bundles."""
 
     if set(verified_sources) != {item.source_id for item in spec.sources}:
         raise ValueError("verified knowledge sources do not match the graph specification")
     if schema_version == "1.0" and any(
-        isinstance(primary, OperatorRun) and primary.mission_context is not None
-        for primary, _nested, _digest in verified_sources.values()
+        isinstance(source.primary, OperatorRun) and source.primary.mission_context is not None
+        for source in verified_sources.values()
     ):
         raise ValueError("knowledge graph schema 1.0 cannot contain baseline-bound runs")
+    if schema_version != "1.2" and any(
+        isinstance(source.primary, ConditionalCampaignOutcome)
+        for source in verified_sources.values()
+    ):
+        raise ValueError("conditional campaign knowledge sources require graph schema 1.2")
     collector = _GraphCollector(spec.mission_id)
     graph_sources: list[KnowledgeSource] = []
     for source_spec in sorted(spec.sources, key=lambda item: item.source_id):
-        primary, nested_operator, tree_sha256 = verified_sources[source_spec.source_id]
-        expected_kind = (
-            KnowledgeSourceKind.MISSION_DESIGN_DIRECTOR
-            if isinstance(primary, MissionDesignRun)
-            else KnowledgeSourceKind.OPERATOR_RUN
-        )
+        verified_source = verified_sources[source_spec.source_id]
+        primary = verified_source.primary
+        nested_operator = verified_source.nested_operator
+        workflow: str
+        if isinstance(primary, MissionDesignRun):
+            expected_kind = KnowledgeSourceKind.MISSION_DESIGN_DIRECTOR
+            workflow = primary.workflow
+        elif isinstance(primary, OperatorRun):
+            expected_kind = KnowledgeSourceKind.OPERATOR_RUN
+            workflow = "mission_operator"
+        else:
+            expected_kind = KnowledgeSourceKind.CONDITIONAL_CAMPAIGN
+            workflow = "conditional_mission_design_campaign_v1"
         if source_spec.kind != expected_kind:
             raise ValueError(
                 f"knowledge source {source_spec.source_id!r} has the wrong verified type"
             )
-        workflow = primary.workflow if isinstance(primary, MissionDesignRun) else "mission_operator"
         graph_sources.append(
             KnowledgeSource(
                 source_id=source_spec.source_id,
                 kind=source_spec.kind,
                 captured_path=f"sources/{source_spec.source_id}",
-                source_tree_sha256=tree_sha256,
+                source_tree_sha256=verified_source.source_tree_sha256,
                 workflow=workflow,
                 schema_version=primary.schema_version,
             )
@@ -278,7 +294,7 @@ def build_mission_knowledge_graph(
             if nested_operator is None:
                 raise ValueError("Director knowledge source lacks its verified operator journal")
             _add_director_source(collector, source_spec.source_id, primary, nested_operator)
-        else:
+        elif isinstance(primary, OperatorRun):
             if nested_operator is not None:
                 raise ValueError("operator knowledge source contains an unexpected nested journal")
             _add_operator_source(
@@ -287,8 +303,16 @@ def build_mission_knowledge_graph(
                 primary,
                 run_record_id="operator",
             )
-    if schema_version == "1.1":
+        else:
+            if nested_operator is not None:
+                raise ValueError(
+                    "conditional campaign source contains an unexpected nested journal"
+                )
+            _add_conditional_campaign_source(collector, source_spec.source_id, primary)
+    if schema_version in {"1.1", "1.2"}:
         _add_baseline_context_edges(collector, spec, verified_sources)
+    if schema_version == "1.2":
+        _add_campaign_context_edges(collector, verified_sources)
     payload: dict[str, Any] = {
         "schema_version": schema_version,
         "extractor_version": f"astro.mission_knowledge_graph/{schema_version}",
@@ -323,7 +347,14 @@ def _add_director_source(
         {
             "workflow": run.workflow,
             "schema_version": run.schema_version,
+            "spec_sha256": run.spec_sha256,
             "run_sha256": run.run_sha256,
+            "intent_sha256": run.analysis_plan.intent_sha256,
+            "requirement_graph_sha256": run.analysis_plan.requirement_graph_sha256,
+            "capability_catalog_sha256": run.analysis_plan.capability_catalog_sha256,
+            "analysis_plan_sha256": run.analysis_plan.plan_sha256,
+            "max_analysis_cost_units": run.analysis_plan.max_cost_units,
+            "consumed_analysis_cost_units": run.consumed_analysis_cost_units,
             "claim_boundary": run.claim_boundary,
         },
     )
@@ -390,6 +421,15 @@ def _add_director_source(
         run.decision.model_dump(mode="json"),
     )
     collector.edge(run_node, "produced", decision_node, source_id)
+    for conditional in run.verification_plan.conditional_analyses:
+        conditional_node = collector.node(
+            source_id,
+            KnowledgeNodeKind.DECISION,
+            conditional.decision_sha256,
+            f"conditional analysis: {conditional.disposition.value}",
+            conditional.model_dump(mode="json"),
+        )
+        collector.edge(run_node, "produced", conditional_node, source_id)
     candidate_ids = {
         step.observation.candidate.candidate_id
         for step in operator_run.steps
@@ -616,17 +656,83 @@ def _add_operator_source(
     return run_node
 
 
+def _add_conditional_campaign_source(
+    collector: _GraphCollector,
+    source_id: str,
+    outcome: ConditionalCampaignOutcome,
+) -> None:
+    episode_node = collector.node(
+        source_id,
+        KnowledgeNodeKind.VERIFICATION_EPISODE,
+        outcome.execution_id,
+        f"conditional verification: {outcome.disposition.value}",
+        outcome.model_dump(mode="json"),
+    )
+    collector.edge(collector.mission_node_id, "contains", episode_node, source_id)
+    evidence_nodes = []
+    for record_id, label, digest in (
+        (
+            "campaign-definition",
+            "campaign definition",
+            outcome.campaign_definition_digest,
+        ),
+        ("campaign-samples", "campaign samples", outcome.campaign_samples_sha256),
+        ("campaign-cases", "campaign cases", outcome.campaign_cases_sha256),
+        (
+            "campaign-statistics",
+            "campaign statistics",
+            outcome.campaign_statistics_sha256,
+        ),
+    ):
+        evidence_node = collector.node(
+            source_id,
+            KnowledgeNodeKind.EVIDENCE,
+            record_id,
+            label,
+            {"sha256": digest, "execution_id": outcome.execution_id},
+        )
+        evidence_nodes.append(evidence_node)
+        collector.edge(episode_node, "contains", evidence_node, source_id)
+    decision_node = collector.node(
+        source_id,
+        KnowledgeNodeKind.DECISION,
+        outcome.outcome_sha256,
+        f"baseline verification: {outcome.disposition.value}",
+        {
+            "disposition": outcome.disposition.value,
+            "reason": outcome.reason.value,
+            "outcome_sha256": outcome.outcome_sha256,
+            "claim_boundary": outcome.claim_boundary,
+        },
+    )
+    collector.edge(episode_node, "produced", decision_node, source_id)
+    for gate in outcome.gate_assessments:
+        assessment_node = collector.node(
+            source_id,
+            KnowledgeNodeKind.ASSESSMENT,
+            gate.assessment_sha256,
+            gate.director_requirement_id,
+            gate.model_dump(mode="json"),
+        )
+        collector.edge(episode_node, "measured", assessment_node, source_id)
+        collector.edge(assessment_node, "informed", decision_node, source_id)
+        for evidence_node in evidence_nodes:
+            collector.edge(evidence_node, "supports", assessment_node, source_id)
+
+
 def _add_baseline_context_edges(
     collector: _GraphCollector,
     spec: MissionKnowledgeGraphSpec,
-    verified_sources: dict[str, VerifiedSourcePayload],
+    verified_sources: dict[str, VerifiedKnowledgeSource],
 ) -> None:
     directors = [
-        (source_id, primary)
-        for source_id, (primary, _nested, _digest) in verified_sources.items()
-        if isinstance(primary, MissionDesignRun)
+        (source_id, source.primary)
+        for source_id, source in verified_sources.items()
+        if isinstance(source.primary, MissionDesignRun)
     ]
-    for source_id, (primary, nested, _digest) in verified_sources.items():
+    for source_id, source in verified_sources.items():
+        primary = source.primary
+        nested = source.nested_operator
         if not isinstance(primary, OperatorRun) or nested is not None:
             continue
         context = primary.mission_context
@@ -642,9 +748,7 @@ def _add_baseline_context_edges(
             if director.run_sha256 == context.mission_design_run_sha256
         ]
         if len(matches) != 1:
-            raise ValueError(
-                f"operator source {source_id!r} must match exactly one Director run"
-            )
+            raise ValueError(f"operator source {source_id!r} must match exactly one Director run")
         director_source_id, director = matches[0]
         baseline = director.baseline
         if (
@@ -668,6 +772,104 @@ def _add_baseline_context_edges(
             source_id,
             properties=context.model_dump(mode="json"),
         )
+
+
+def _add_campaign_context_edges(
+    collector: _GraphCollector,
+    verified_sources: dict[str, VerifiedKnowledgeSource],
+) -> None:
+    directors = [
+        (source_id, source.primary)
+        for source_id, source in verified_sources.items()
+        if isinstance(source.primary, MissionDesignRun)
+    ]
+    for source_id, source in verified_sources.items():
+        primary = source.primary
+        nested = source.nested_operator
+        if not isinstance(primary, ConditionalCampaignOutcome):
+            continue
+        if nested is not None:
+            raise ValueError(
+                f"conditional campaign source {source_id!r} has an unexpected nested run"
+            )
+        matches = [
+            (director_source_id, director)
+            for director_source_id, director in directors
+            if director.run_sha256 == primary.director_run_sha256
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"conditional campaign source {source_id!r} must match exactly one Director run"
+            )
+        director_source_id, director = matches[0]
+        baseline = director.baseline
+        conditional_matches = [
+            decision
+            for decision in director.verification_plan.conditional_analyses
+            if decision.decision_sha256 == primary.conditional_decision_sha256
+        ]
+        if (
+            baseline is None
+            or baseline.baseline_id != primary.baseline_id
+            or baseline.baseline_sha256 != primary.baseline_sha256
+            or baseline.candidate_id != primary.candidate_id
+            or len(conditional_matches) != 1
+            or conditional_matches[0].baseline_id != baseline.baseline_id
+            or conditional_matches[0].candidate_id != baseline.candidate_id
+            or conditional_matches[0].disposition.value != "recommended"
+        ):
+            raise ValueError(
+                f"conditional campaign source {source_id!r} does not bind an eligible "
+                "Director baseline and recommendation"
+            )
+        episode_node = f"{source_id}:verification_episode:{primary.execution_id}"
+        decision_node = f"{source_id}:decision:{primary.outcome_sha256}"
+        baseline_node = f"{director_source_id}:baseline:{baseline.baseline_id}"
+        director_run_node = f"{director_source_id}:run:director"
+        collector.edge(
+            episode_node,
+            "verifies",
+            baseline_node,
+            source_id,
+            properties={
+                "director_run_sha256": primary.director_run_sha256,
+                "baseline_sha256": primary.baseline_sha256,
+                "candidate_id": primary.candidate_id,
+                "conditional_decision_sha256": primary.conditional_decision_sha256,
+                "campaign_definition_digest": primary.campaign_definition_digest,
+            },
+        )
+        collector.edge(
+            episode_node,
+            "derived_from",
+            director_run_node,
+            source_id,
+        )
+        collector.edge(
+            episode_node,
+            "triggered_by",
+            (f"{director_source_id}:decision:{primary.conditional_decision_sha256}"),
+            source_id,
+        )
+        collector.edge(
+            f"{director_source_id}:tool:{conditional_matches[0].capability_id}",
+            "produced",
+            episode_node,
+            source_id,
+        )
+        collector.edge(
+            episode_node,
+            "evaluates",
+            f"{director_source_id}:candidate:{primary.candidate_id}",
+            source_id,
+            properties={"candidate_id": primary.candidate_id},
+        )
+        relation = {
+            "retain": "supports_retention_of",
+            "revise": "requests_revision_of",
+            "abstain": "leaves_unresolved",
+        }[primary.disposition.value]
+        collector.edge(decision_node, relation, baseline_node, source_id)
 
 
 def _add_evidence_nodes(
@@ -812,6 +1014,7 @@ __all__ = [
     "KnowledgeSourceSpec",
     "MissionKnowledgeGraph",
     "MissionKnowledgeGraphSpec",
+    "VerifiedKnowledgeSource",
     "build_mission_knowledge_graph",
     "trace_baseline_justification",
 ]

@@ -411,11 +411,20 @@ the declared design space, `revise` requests a new Director decision without sel
 replacement, and `abstain` covers incomplete or failed campaign evidence. The relocatable
 exact-inventory verifier does not rerun physics or invoke a provider.
 
+The verification episode now enters the mission knowledge graph through schema `1.2`. The graph
+invokes the campaign's native verifier, preserves its definition/sample/case/statistics digests and
+gate assessments, and resolves the episode against exactly one Director run, conditional decision,
+candidate, capability, and historical baseline. A pure route maps the checked relationship to
+`support_retention_within_declared_scope`, `open_new_director_decision`, or `abstain`. The revision route carries
+failed requirements and prior capability, analysis-cost, and authority envelopes, but it does not
+select a replacement, mutate history, execute a second Director, or assume that the old grant and
+budget can be reused.
+
 The remaining path expands the kernel into the full north star:
 
-1. **Verification episodes in knowledge:** add the conditional campaign and its disposition as
-   typed graph evidence, then route `revise` into a new bounded Director decision without rewriting
-   the historical baseline.
+1. **Versioned redesign lineage:** consume a revision handoff with fresh design inputs and
+   authority, run a new bounded Director decision, and link any successor baseline to its parent
+   decision without rewriting history.
 2. **Knowledge and outcomes:** add verified operational outcome and residual contracts, then extend
    the graph and learning datasets without rewriting historical decisions.
 3. **Adaptive verification:** add calibrated decision-change probabilities where evidence supports

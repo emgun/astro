@@ -96,6 +96,7 @@ from astro_operator.knowledge import (
     KnowledgeSourceSpec,
     MissionKnowledgeGraph,
     MissionKnowledgeGraphSpec,
+    VerifiedKnowledgeSource,
     build_mission_knowledge_graph,
     trace_baseline_justification,
 )
@@ -189,6 +190,14 @@ from astro_operator.recording import (
     score_recorded_reasoner_behavior_corpus,
     write_reasoner_behavior_recording,
 )
+from astro_operator.revision import (
+    DirectorRevisionRequest,
+    MissionDesignRevisionAction,
+    MissionDesignRevisionQuery,
+    MissionDesignRevisionReason,
+    MissionDesignRevisionRoute,
+    evaluate_mission_design_verification,
+)
 from astro_operator.world_state import (
     assertion_digest,
     evaluate_claim_predicate,
@@ -249,6 +258,7 @@ __all__ = [
     "DesignVariable",
     "DesignDecision",
     "DesignDecisionDisposition",
+    "DirectorRevisionRequest",
     "DecisionDisposition",
     "EpistemicKind",
     "EvidenceAcquisitionResult",
@@ -278,6 +288,10 @@ __all__ = [
     "MissionDesignDirectorSpec",
     "MissionDesignManifest",
     "MissionDesignRun",
+    "MissionDesignRevisionAction",
+    "MissionDesignRevisionQuery",
+    "MissionDesignRevisionReason",
+    "MissionDesignRevisionRoute",
     "MissionIntent",
     "MissionKnowledgeGraph",
     "MissionKnowledgeGraphSpec",
@@ -324,9 +338,11 @@ __all__ = [
     "WorldState",
     "VerificationCheck",
     "VerificationPlan",
+    "VerifiedKnowledgeSource",
     "assertion_digest",
     "evaluate_claim_predicate",
     "evaluate_mission_orchestration",
+    "evaluate_mission_design_verification",
     "run_operator",
     "acquire_reasoner_behavior_recording",
     "build_analysis_plan",

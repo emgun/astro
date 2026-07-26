@@ -1,14 +1,15 @@
 # Mission Knowledge Graph
 
 Astro's mission knowledge graph is a deterministic, rebuildable read model over verified mission
-run artifacts. It is not a graph database, an embedding index, or a global fact store. The
-captured Director and operator bundles remain authoritative.
+artifacts. It is not a graph database, an embedding index, or a global fact store. The captured
+Director, operator, and conditional-campaign bundles remain authoritative.
 
 The first slice connects an explicitly declared mission grouping to typed run, intent, objective,
-requirement, candidate, assessment, evidence, assertion, conflict, claim, decision, baseline, and
-tool/version records. Record nodes retain the typed fields needed for the relationship and query;
-the captured source bundle remains the complete authoritative record. Edges are emitted only from
-explicit IDs and typed relationships; the reducer does not extract relationships from prose.
+requirement, candidate, assessment, evidence, assertion, conflict, claim, decision, baseline,
+verification-episode, and tool/version records. Record nodes retain the typed fields needed for the
+relationship and query; the captured source bundle remains the complete authoritative record.
+Edges are emitted only from explicit IDs and typed relationships; the reducer does not extract
+relationships from prose.
 
 ## Checked Cross-Run Workflow
 
@@ -26,6 +27,11 @@ astro run-mission-operator \
   --mission-design-context build/mission-knowledge-director \
   --output-dir build/mission-knowledge-post-launch
 
+astro run-mission-design-conditional-campaign \
+  build/mission-knowledge-director \
+  examples/design/leo_mission_design_conditional_campaign.yaml \
+  --output-dir build/mission-knowledge-verification
+
 astro build-mission-knowledge-graph \
   examples/knowledge/leo_mission_knowledge_graph.yaml \
   --output-dir build/mission-knowledge-graph
@@ -40,6 +46,10 @@ astro evaluate-mission-orchestration build/mission-knowledge-graph \
   --operator-objective-id post-launch-recovery-review \
   --claim-id post-launch-review-ready \
   --manual-review-gate-predicate-id manual-review-required
+
+astro evaluate-mission-design-verification build/mission-knowledge-graph \
+  --episode-id leo-mission-design-conditional-verification \
+  --baseline-id leo-mission-design:baseline
 ```
 
 The trace answers a bounded decision question: which selected candidate, requirements,
@@ -51,7 +61,8 @@ The graph bundle is self-contained. It captures both complete source directories
 derived graph separately. Offline verification:
 
 1. rejects extra, missing, altered, escaping, or symbolic-link artifacts;
-2. invokes the native Director and operator verifiers on the captured sources;
+2. invokes the native Director, operator, and conditional-campaign verifiers on the captured
+   sources;
 3. re-derives operational assertions and the Director decision through those verifiers;
 4. reconstructs the canonical graph from the verified typed records; and
 5. compares the reconstruction to the stored graph.
@@ -89,3 +100,23 @@ named exact-value manual-review gate. Its dispositions are deliberately asymmetr
 This first disposition scope is exactly `manual_review_readiness`. `continue` routes the verified
 evidence package into manual review; it does not approve a maneuver, execute a command, or confer
 operational authority. The decision is digest-bound to the verified graph and typed query.
+
+Graph schema `1.2` also ingests a natively verified conditional-campaign bundle as a typed
+verification episode. It binds the episode to exactly one Director run, conditional decision,
+candidate, capability, and historical baseline by digest. Definition, sample, case, and statistics
+digests support each gate assessment. The resulting baseline relation is
+`supports_retention_of`, `requests_revision_of`, or `leaves_unresolved`; none mutates baseline
+state.
+
+The mission-design verification reducer routes one exact episode:
+
+- `support_retention_within_declared_scope` records the campaign definition digest and claim
+  boundary alongside its scoped support for retention;
+- `open_new_director_decision` emits a digest-bound handoff containing the prior run, decision,
+  baseline, failed requirements, capability allow-list envelope, prior analysis-cost ceiling,
+  consumed design and completed verification costs, and prior authority identity;
+- `abstain` covers inconclusive evidence and missing, ambiguous, or invalid bindings.
+
+The revision handoff is not a new design decision, does not select a replacement, and exposes the
+old cost and authority values only as provenance. A later Director invocation must supply fresh
+inputs, authority, and budget and prove they remain inside the recorded envelope.
