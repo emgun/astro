@@ -39,7 +39,7 @@ from astro_uq.models import (
     ScenarioRealization,
 )
 from astro_uq.parameters import ParameterBindingError, ParameterRegistry, model_digest
-from astro_uq.samplers import generate_samples
+from astro_uq.samplers import SampleBatch, generate_samples
 from astro_uq.statistics import effective_sample_size, summarize_campaign
 from astro_uq.stopping import (
     ConfidenceIntervalRule,
@@ -85,17 +85,7 @@ def run_campaign(
         )
     store = CampaignArtifactStore(output_dir)
     definition_digest = canonical_hash(definition)
-    sample_plan = SamplePlan(
-        sampler=definition.sampler,
-        campaign_digest=definition_digest,
-    )
-    parameter_ids = tuple(parameter.parameter_id for parameter in definition.uncertainty.parameters)
-    batch = generate_samples(
-        sample_plan,
-        parameter_ids=parameter_ids,
-        model_variants=definition.uncertainty.model_variants,
-    )
-    realized_samples = tuple(_physical_realization(raw, definition) for raw in batch.samples)
+    batch, realized_samples = plan_campaign_samples(definition)
     if isinstance(definition.stopping, ConfidenceIntervalStopping):
         sample_weights = np.asarray(
             [float(sample.weight) for sample in realized_samples], dtype=np.float64
@@ -176,6 +166,48 @@ def run_campaign(
             batch_size = _stopping_batch_size(definition)
             for batch_start in range(0, len(pending_samples), batch_size):
                 sample_batch = pending_samples[batch_start : batch_start + batch_size]
+                if isinstance(definition.stopping, FixedCountStopping):
+
+                    def record_fixed_observation(observation: CaseObservation) -> None:
+                        observations.append(observation)
+                        store.append_case(observation)
+                        completed.add(observation.sample_id)
+                        _decision, record = _stopping_decision(
+                            definition,
+                            tuple(observations),
+                            realized_samples,
+                            convergence_history,
+                        )
+                        convergence_history.append(record)
+                        checkpoint_weights = {
+                            item.sample_id: weights[item.sample_id] for item in observations
+                        }
+                        store.write_statistics(
+                            summarize_campaign(
+                                requested_samples=definition.sampler.samples,
+                                observations=tuple(observations),
+                                weights=checkpoint_weights,
+                                requirement_ids=tuple(
+                                    requirement.requirement_id
+                                    for requirement in definition.requirements
+                                ),
+                                convergence_history=tuple(convergence_history),
+                            )
+                        )
+
+                    if workers == 1:
+                        for sample in sample_batch:
+                            record_fixed_observation(_evaluate_sample(definition, runtime, sample))
+                    else:
+                        assert runtime_factory is not None
+                        _parallel_observations(
+                            definition,
+                            sample_batch,
+                            workers=workers,
+                            runtime_factory=runtime_factory,
+                            on_observation=record_fixed_observation,
+                        )
+                    continue
                 if workers == 1:
                     new_observations = tuple(
                         _evaluate_sample(definition, runtime, sample) for sample in sample_batch
@@ -251,6 +283,24 @@ def run_campaign(
     )
 
 
+def plan_campaign_samples(
+    definition: CampaignDefinition,
+) -> tuple[SampleBatch, tuple[ParameterRealization, ...]]:
+    """Return the deterministic sampler batch and physical realizations."""
+
+    sample_plan = SamplePlan(
+        sampler=definition.sampler,
+        campaign_digest=canonical_hash(definition),
+    )
+    parameter_ids = tuple(parameter.parameter_id for parameter in definition.uncertainty.parameters)
+    batch = generate_samples(
+        sample_plan,
+        parameter_ids=parameter_ids,
+        model_variants=definition.uncertainty.model_variants,
+    )
+    return batch, tuple(_physical_realization(raw, definition) for raw in batch.samples)
+
+
 def _evaluate_sample(
     definition: CampaignDefinition,
     runtime: CampaignRuntime,
@@ -300,9 +350,7 @@ def _evaluate_sample(
             field="serialization_s",
             elapsed_s=max(0.0, perf_counter() - started),
         )
-        return _case_failure_from_observation(
-            definition, observation, exc, phase="serialization"
-        )
+        return _case_failure_from_observation(definition, observation, exc, phase="serialization")
     elapsed = max(0.0, perf_counter() - started)
     observation = _add_timing_phase(observation, field="serialization_s", elapsed_s=elapsed)
     return observation.model_copy(update={"artifact_refs": artifact_refs})
@@ -397,6 +445,7 @@ def _parallel_observations(
     *,
     workers: int,
     runtime_factory: Callable[[], CampaignRuntime],
+    on_observation: Callable[[CaseObservation], None] | None = None,
 ) -> tuple[CaseObservation, ...]:
     """Evaluate with bounded in-flight work and deterministic sample ordering."""
     if not samples:
@@ -413,7 +462,10 @@ def _parallel_observations(
             pending.append(executor.submit(_evaluate_in_worker, next(iterator)))
         while pending:
             future = pending.pop(0)
-            observations.append(future.result())
+            observation = future.result()
+            observations.append(observation)
+            if on_observation is not None:
+                on_observation(observation)
             try:
                 sample = next(iterator)
             except StopIteration:

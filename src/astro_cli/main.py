@@ -147,6 +147,10 @@ from astro_operator.command_execution import (
     SimulatedBurnTool,
     SQLiteCommandExecutionStore,
 )
+from astro_operator.conditional_campaign_io import (
+    run_conditional_campaign,
+    verify_conditional_campaign,
+)
 from astro_operator.director import MissionDesignRun, build_mission_design_run
 from astro_operator.director_io import (
     capture_resolved_base_scenario,
@@ -211,6 +215,7 @@ from astro_uq.cli import (
     summarize_campaign_command,
     validate_campaign,
 )
+from astro_uq.io import CampaignIOError
 
 app = typer.Typer(help="Astro Suite flight dynamics workflows.")
 app.command("validate-campaign")(validate_campaign)
@@ -222,9 +227,7 @@ app.command("validate-assurance-validation")(validate_assurance_validation_comma
 app.command("validate-covariance-validation")(validate_covariance_validation_command)
 app.command("assess-covariance-validation")(assess_covariance_validation_command)
 app.command("verify-covariance-validation")(verify_covariance_validation_command)
-app.command("run-empirical-covariance-campaign")(
-    run_empirical_covariance_campaign_command
-)
+app.command("run-empirical-covariance-campaign")(run_empirical_covariance_campaign_command)
 app.command("inspect-assurance-calibration")(inspect_assurance_calibration_command)
 app.command("run-assurance-validation")(run_assurance_validation_command)
 app.command("verify-assurance-validation")(verify_assurance_validation_command)
@@ -233,9 +236,7 @@ app.command("run-model-form-matrix")(run_model_form_matrix_command)
 app.command("verify-model-form-matrix")(verify_model_form_matrix_command)
 app.command("review-assurance-validation")(review_assurance_validation_command)
 app.command("compare-assurance-reviews")(compare_assurance_reviews_command)
-app.command("verify-assurance-review-comparison")(
-    verify_assurance_review_comparison_command
-)
+app.command("verify-assurance-review-comparison")(verify_assurance_review_comparison_command)
 app.command("verify-mission-lifecycle-result")(verify_mission_lifecycle_result_command)
 app.command("review-mission-lifecycle")(review_mission_lifecycle_command)
 app.command("verify-mission-lifecycle-review")(verify_mission_lifecycle_review_command)
@@ -889,9 +890,7 @@ def run_mission_operator_command(
         mission_context = spec.mission_context
         if mission_design_context is not None:
             if mission_context is None:
-                raise OperatorError(
-                    "--mission-design-context requires a declared mission_context"
-                )
+                raise OperatorError("--mission-design-context requires a declared mission_context")
             mission_context = _resolve_operator_mission_context(
                 mission_context,
                 verify_mission_design_director(mission_design_context),
@@ -993,10 +992,7 @@ def _resolve_operator_mission_context(
         or baseline.version != declared.baseline_version
         or director_run.verification_plan.baseline_id != baseline.baseline_id
         or director_run.verification_plan.remaining_hard_requirement_ids
-        or any(
-            check.status != "passed"
-            for check in director_run.verification_plan.checks
-        )
+        or any(check.status != "passed" for check in director_run.verification_plan.checks)
     ):
         raise OperatorError(
             "mission design context does not resolve to the declared eligible baseline"
@@ -1023,8 +1019,7 @@ def verify_mission_operator_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(
-        f"verified mission operator run: {run.status.value}, "
-        f"evidence={len(run.known_evidence)}"
+        f"verified mission operator run: {run.status.value}, evidence={len(run.known_evidence)}"
     )
 
 
@@ -1080,9 +1075,7 @@ def run_mission_design_director_command(
             load_mission_lifecycle_scenario(operator_root / scenario_evidence.path),
             scenario_path,
         )
-        resolved_scenario_evidence = capture_resolved_base_scenario(
-            scenario, operator_root
-        )
+        resolved_scenario_evidence = capture_resolved_base_scenario(scenario, operator_root)
         objective = spec.objective.model_copy(
             update={
                 "base_evidence": (
@@ -1159,6 +1152,74 @@ def verify_mission_design_director_command(
         f"verified mission design director: {run.decision.disposition.value}, "
         f"candidate={run.decision.selected_candidate_id or 'none'}, "
         f"conditional_analyses_recommended={recommended_count}"
+    )
+
+
+@app.command("run-mission-design-conditional-campaign")
+def run_mission_design_conditional_campaign_command(
+    director_root: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+    spec_path: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir"),
+    ],
+    resume: Annotated[bool, typer.Option("--resume")] = False,
+    workers: Annotated[int, typer.Option("--workers", min=1)] = 1,
+) -> None:
+    """Execute a recommended Director campaign and reduce its checked evidence."""
+    try:
+        outcome = run_conditional_campaign(
+            director_root=director_root,
+            spec_path=spec_path,
+            output_dir=output_dir,
+            resume=resume,
+            workers=workers,
+        )
+    except (
+        CampaignIOError,
+        InvalidScenarioError,
+        MissionLifecycleError,
+        OSError,
+        ValueError,
+    ) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"conditional mission-design campaign: {outcome.disposition.value}, "
+        f"baseline={outcome.baseline_id}, "
+        f"completed={outcome.completed_samples}/{outcome.requested_samples}"
+    )
+    typer.echo(f"wrote conditional campaign bundle: {output_dir}")
+
+
+@app.command("verify-mission-design-conditional-campaign")
+def verify_mission_design_conditional_campaign_command(
+    output_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+) -> None:
+    """Verify a conditional campaign without rerunning physics or a provider."""
+    try:
+        outcome = verify_conditional_campaign(output_dir)
+    except (
+        CampaignIOError,
+        InvalidScenarioError,
+        OSError,
+        ValueError,
+    ) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(
+        f"verified conditional mission-design campaign: "
+        f"{outcome.disposition.value}, baseline={outcome.baseline_id}, "
+        f"completed={outcome.completed_samples}/{outcome.requested_samples}"
     )
 
 
@@ -1433,8 +1494,7 @@ def acquire_mission_reasoner_behavior_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(
-        f"wrote reasoner recording: {output} "
-        f"calls={recording.calls_attempted}/{recording.call_cap}"
+        f"wrote reasoner recording: {output} calls={recording.calls_attempted}/{recording.call_cap}"
     )
 
 

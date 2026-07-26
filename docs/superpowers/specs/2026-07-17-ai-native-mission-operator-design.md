@@ -359,6 +359,13 @@ astro run-mission-design-director examples/design/leo_mission_design_director.ya
   --output-dir /tmp/astro-mission-design-director
 astro verify-mission-design-director /tmp/astro-mission-design-director
 
+astro run-mission-design-conditional-campaign \
+  /tmp/astro-mission-design-director \
+  examples/design/leo_mission_design_conditional_campaign.yaml \
+  --output-dir /tmp/astro-mission-design-conditional-campaign
+astro verify-mission-design-conditional-campaign \
+  /tmp/astro-mission-design-conditional-campaign
+
 astro run-mission-operator examples/operator/post_launch_recovery_review.yaml \
   --reasoner-replay examples/operator/post_launch_recovery_review_replay.yaml \
   --mission-design-context /tmp/astro-mission-design-director \
@@ -394,11 +401,21 @@ claim, exact predicate outcomes, applicability, conflicts, and named manual-revi
 `continue`, `hold`, or `abstain`. The implemented scope is manual-review readiness only:
 `continue` advances an evidence package into review and does not approve or execute operations.
 
+The first conditional campaign execution slice is also implemented. It copies and natively verifies
+the complete Director source bundle, captures the exact selected candidate plus launch, twin,
+orbit, and reentry inputs, executes the registered fixed-count lifecycle campaign with resumable
+case evidence, and independently reconstructs its deterministic samples and statistics. The
+checked campaign completes 8/8 successful cases; both hard-requirement configured-design-space
+fractions are `1.0`, so the reducer returns `retain` for the bound baseline. `Retain` is limited to
+the declared design space, `revise` requests a new Director decision without selecting a
+replacement, and `abstain` covers incomplete or failed campaign evidence. The relocatable
+exact-inventory verifier does not rerun physics or invoke a provider.
+
 The remaining path expands the kernel into the full north star:
 
-1. **Execute conditional verification:** turn the recommended lifecycle uncertainty node into a
-   captured, resumable campaign; bind its result to the selected baseline; and deterministically
-   retain, revise, or abstain without weakening the existing screening claim boundary.
+1. **Verification episodes in knowledge:** add the conditional campaign and its disposition as
+   typed graph evidence, then route `revise` into a new bounded Director decision without rewriting
+   the historical baseline.
 2. **Knowledge and outcomes:** add verified operational outcome and residual contracts, then extend
    the graph and learning datasets without rewriting historical decisions.
 3. **Adaptive verification:** add calibrated decision-change probabilities where evidence supports

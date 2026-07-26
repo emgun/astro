@@ -1,0 +1,16 @@
+schema_version: "1.0"
+workflow: conditional_mission_design_campaign_v1
+execution_id: leo-mission-design-conditional-verification
+rule_id: entry-interface-margin-near-boundary
+capability_id: astro.mission_lifecycle_uncertainty
+campaign_template_path: ../campaigns/leo_mission_design_verification.yaml
+acceptance_gates:
+  - director_requirement_id: deorbit-propellant-reserve
+    campaign_requirement_id: deorbit_propellant_reserve
+    campaign_metric_id: propellant_reserve_margin
+    minimum_pass_fraction: 1.0
+  - director_requirement_id: entry-interface-continuity
+    campaign_requirement_id: entry_interface_continuity
+    campaign_metric_id: entry_interface_margin
+    minimum_pass_fraction: 1.0
+claim_boundary: configured_design_space_verification_not_operational_probability_qualification_or_authority

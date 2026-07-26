@@ -666,7 +666,7 @@ Post-MVP / external-campaign items:
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
 | ai-native-mission-operator | active | orchestrate/learn/verify | steward | `astro_operator`, schemas `1.2` through `1.4`, progressive authority, evidence and command registries, assertion-preserving world state, checked claims, baseline context, durable simulation commit | PR #47 merged the reference operator architecture at `06d5da6`. Schema `1.3` adds kernel-evaluated predicates; schema `1.4` binds a run to an exact Director baseline and operational configuration while preserving verification compatibility for older journals. Provider tuning remains paused until richer mission tasks can distinguish models in a decision-relevant way. |
-| mission-design-director-v1 | active | orchestrate/verify | steward | typed mission intent, requirement graph, registered screening and uncertainty capabilities, conditional analysis DAG, deterministic assessments and baseline, exact-inventory bundle | PR #48 merged the first Director slice at `d99754b`. Schema `1.1` now reserves a decision-relevant lifecycle uncertainty node after screening and recommends it only when an eligible baseline's exact-unit requirement margin falls inside its declared decision-change band. The checked entry-interface margin is `0.908437 km`, so the `1.0 km` rule recommends analysis; a `0.5 km` rule defers it. An unresolved hard requirement removes baseline eligibility and deterministically defers the handoff. Each decision binds its candidate and optional baseline. This is a transparent proximity score, not calibrated expected information value. |
+| mission-design-director-v1 | active | orchestrate/verify | steward | typed mission intent, requirement graph, registered screening and uncertainty capabilities, conditional analysis DAG, executed conditional campaign, deterministic assessments and baseline, exact-inventory bundles | PR #48 merged the first Director slice at `d99754b`; schema `1.1` then added baseline-bound conditional planning. The execution layer now captures the exact selected candidate and its dependencies, runs the recommended fixed-count lifecycle campaign resumably, verifies its deterministic sample plan/cases/statistics offline, and reduces all hard-requirement gates to `retain`, `revise`, or `abstain`. The checked campaign completed 8/8 successful cases with both configured-design-space pass fractions at `1.0`, so it retains `leo-mission-design:baseline` within the declared design space. This is neither operational probability nor qualification, and `revise` never selects a replacement baseline. |
 | operator-perception-claims | done | orchestrate/verify | steward | concrete simulated-telemetry, orbit-estimate, and declared-procedure tools; schema `1.3` checked claims; post-launch manual-review gate | PR #49 merged the checked workflow at `ce301ec`. It acquires three catalog-root-confined, source-ID-addressed artifacts without allowing reasoner-chosen paths; preserves simulated, estimated, and declared epistemic kinds; binds the estimate to the exact telemetry digest; and recomputes assertions from captured bytes plus uncertainty, simulated-time freshness, procedure validity, configuration and mode applicability, estimate convergence, and manual-review predicates during offline verification. The conclusion is explicitly as-of the captured simulated decision time and indicates readiness for manual review, not maneuver authorization. |
 | mission-knowledge-graph-v1 | active | orchestrate/learn/verify | steward | versioned typed graph, complete captured Director/operator sources, exact inventory, native source verification, deterministic reconstruction, baseline justification and orchestration queries | The read model groups verified episodes, preserves typed provenance and conflicts, and traces a baseline to its decision evidence. Graph schema `1.1` resolves operator schema `1.4` context against exactly one eligible baseline and emits `operates_against`. The pure reducer routes a fully checked package to manual review with `continue`, holds readiness failures, and abstains on binding, applicability, authority, or check errors; it cannot approve or execute operations. |
 
@@ -695,6 +695,11 @@ Until campaign evidence supplies calibrated uncertainty over a decision-changing
 explicit unit-bearing decision-change band and expose its deterministic relevance score. The next
 gate is executing and checking the recommended analysis, not tuning the score.
 
+Project-specific steward learning: a conditional campaign outcome must bind the exact candidate and
+baseline, rederive its deterministic sample plan and statistics from captured cases, and keep
+`retain` scoped to the declared design space. A `revise` result withdraws confidence in the retained
+baseline but does not authorize an AI-selected replacement; that requires a new Director decision.
+
 Project-specific steward learning: a source digest binds bytes but does not bind derived assertions.
 Concrete evidence tools must support offline assertion re-derivation from captured bytes, and
 downstream estimates must carry explicit input lineage before a checked claim can connect perception
@@ -703,8 +708,9 @@ rewriting same-named user metadata.
 
 ## Next Best Paths
 
-1. Execute the Director's recommended lifecycle uncertainty node as a captured, resumable campaign;
-   bind its result to the selected baseline and deterministically retain, revise, or abstain.
+1. Add the verified conditional-campaign episode and its `retain`/`revise`/`abstain` relationship to
+   the mission knowledge graph, then make a `revise` result open a new bounded Director decision
+   rather than mutating the historical baseline.
 2. Extend the graph with verified operational outcomes and residuals once their typed contracts
    exist. Add retrieval indexes only as disposable aids; extracted text must retain source and
    scope rather than becoming an unqualified graph fact.
