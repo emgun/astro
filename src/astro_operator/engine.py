@@ -14,6 +14,7 @@ from astro_operator.models import (
     EvidenceAssertion,
     EvidenceReference,
     EvidenceRequest,
+    MissionBaselineContext,
     MissionObjective,
     OperatorAction,
     OperatorActionKind,
@@ -62,6 +63,7 @@ def run_operator(
     *,
     objective: MissionObjective,
     authority: AuthorityGrant,
+    mission_context: MissionBaselineContext | None = None,
     reasoner: MissionReasoner,
     evaluator: CandidateEvaluator,
     evidence_provider: EvidenceProvider | None = None,
@@ -85,6 +87,7 @@ def run_operator(
     acquisition_count = 0
     schema_1_2_enabled = bool(
         assertions
+        or mission_context is not None
         or authority.max_evidence_acquisitions
         or authority.allowed_evidence_tools
         or OperatorActionKind.EXECUTE_COMMAND in authority.allowed_actions
@@ -95,6 +98,11 @@ def run_operator(
         state = OperatorState(
             objective=objective.model_copy(deep=True),
             authority=authority.model_copy(deep=True),
+            mission_context=(
+                mission_context.model_copy(deep=True)
+                if mission_context is not None
+                else None
+            ),
             steps=tuple(step.model_copy(deep=True) for step in steps),
             known_evidence=tuple(item.model_copy(deep=True) for item in known_evidence),
             world_state=(
@@ -254,12 +262,21 @@ def run_operator(
         assert action.conclusion is not None
         run = OperatorRun(
             schema_version=(
-                "1.3"
-                if any(claim.predicates for claim in action.conclusion_claims)
-                else ("1.2" if schema_1_2_enabled or action.conclusion_claims else "1.1")
+                "1.4"
+                if mission_context is not None
+                else (
+                    "1.3"
+                    if any(claim.predicates for claim in action.conclusion_claims)
+                    else (
+                        "1.2"
+                        if schema_1_2_enabled or action.conclusion_claims
+                        else "1.1"
+                    )
+                )
             ),
             objective=objective,
             authority=authority,
+            mission_context=mission_context,
             status=OperatorRunStatus.COMPLETED,
             steps=tuple(steps),
             known_evidence=tuple(known_evidence),
@@ -271,9 +288,14 @@ def run_operator(
         return run
 
     run = OperatorRun(
-        schema_version="1.2" if schema_1_2_enabled else "1.1",
+        schema_version=(
+            "1.4"
+            if mission_context is not None
+            else ("1.2" if schema_1_2_enabled else "1.1")
+        ),
         objective=objective,
         authority=authority,
+        mission_context=mission_context,
         status=OperatorRunStatus.BUDGET_EXHAUSTED,
         steps=tuple(steps),
         known_evidence=tuple(known_evidence),

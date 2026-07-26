@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from astro_operator.models import ConclusionClaim
+from astro_operator.models import ConclusionClaim, OperatorState
 
 
 def model_dump_for_digest(model: BaseModel) -> dict[str, Any]:
@@ -22,6 +22,12 @@ def _strip_model_defaults(model: object, data: object) -> None:
         if not model.predicates and isinstance(data, dict):
             data.pop("predicates", None)
         return
+    if (
+        isinstance(model, OperatorState)
+        and model.mission_context is None
+        and isinstance(data, dict)
+    ):
+        data.pop("mission_context", None)
     if isinstance(model, BaseModel) and isinstance(data, dict):
         for field_name in type(model).model_fields:
             if field_name in data:

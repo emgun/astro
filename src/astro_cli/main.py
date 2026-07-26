@@ -147,7 +147,7 @@ from astro_operator.command_execution import (
     SimulatedBurnTool,
     SQLiteCommandExecutionStore,
 )
-from astro_operator.director import build_mission_design_run
+from astro_operator.director import MissionDesignRun, build_mission_design_run
 from astro_operator.director_io import (
     capture_resolved_base_scenario,
     load_mission_design_director_spec,
@@ -171,9 +171,13 @@ from astro_operator.knowledge_io import (
     verify_mission_knowledge_graph,
 )
 from astro_operator.lifecycle import LifecycleCandidateEvaluator, resolve_lifecycle_references
-from astro_operator.models import OperatorActionKind
+from astro_operator.models import MissionBaselineContext, OperatorActionKind
 from astro_operator.openrouter import DEFAULT_OPENROUTER_MODEL, OpenRouterReasoner
 from astro_operator.operational_evidence import build_operational_evidence_registry
+from astro_operator.orchestration import (
+    MissionOrchestrationQuery,
+    evaluate_mission_orchestration,
+)
 from astro_operator.reasoner import ConditionalReplayReasoner
 from astro_operator.recording import (
     ReasonerBehaviorRecording,
@@ -851,6 +855,19 @@ def run_mission_operator_command(
             ),
         ),
     ] = None,
+    mission_design_context: Annotated[
+        Path | None,
+        typer.Option(
+            "--mission-design-context",
+            exists=True,
+            file_okay=False,
+            readable=True,
+            help=(
+                "Verified Director bundle used to resolve the exact run and baseline "
+                "digests declared by the operator mission context."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Run an adaptive, authority-scoped mission operator replay."""
     if output_dir.exists():
@@ -869,6 +886,16 @@ def run_mission_operator_command(
             )
         )
         spec = load_mission_operator_spec(spec_path)
+        mission_context = spec.mission_context
+        if mission_design_context is not None:
+            if mission_context is None:
+                raise OperatorError(
+                    "--mission-design-context requires a declared mission_context"
+                )
+            mission_context = _resolve_operator_mission_context(
+                mission_context,
+                verify_mission_design_director(mission_design_context),
+            )
         declared_scenario_path = Path(spec.base_scenario_path)
         scenario_path = (
             declared_scenario_path
@@ -914,6 +941,7 @@ def run_mission_operator_command(
             run = run_operator(
                 objective=objective,
                 authority=spec.authority,
+                mission_context=mission_context,
                 reasoner=ConditionalReplayReasoner(load_operator_replay(reasoner_replay)),
                 evaluator=evaluator,
                 evidence_provider=build_operational_evidence_registry(
@@ -951,6 +979,34 @@ def run_mission_operator_command(
         f"selected={run.selected_candidate_id or 'none'}"
     )
     typer.echo(f"wrote mission operator run: {output_dir}")
+
+
+def _resolve_operator_mission_context(
+    declared: MissionBaselineContext,
+    director_run: MissionDesignRun,
+) -> MissionBaselineContext:
+    baseline = director_run.baseline
+    if (
+        baseline is None
+        or director_run.decision.disposition.value != "selected"
+        or baseline.baseline_id != declared.baseline_id
+        or baseline.version != declared.baseline_version
+        or director_run.verification_plan.baseline_id != baseline.baseline_id
+        or director_run.verification_plan.remaining_hard_requirement_ids
+        or any(
+            check.status != "passed"
+            for check in director_run.verification_plan.checks
+        )
+    ):
+        raise OperatorError(
+            "mission design context does not resolve to the declared eligible baseline"
+        )
+    return declared.model_copy(
+        update={
+            "mission_design_run_sha256": director_run.run_sha256,
+            "baseline_sha256": baseline.baseline_sha256,
+        }
+    )
 
 
 @app.command("verify-mission-operator")
@@ -1165,6 +1221,38 @@ def trace_mission_baseline_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(trace.model_dump_json(indent=2))
+
+
+@app.command("evaluate-mission-orchestration")
+def evaluate_mission_orchestration_command(
+    output_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+    baseline_id: Annotated[str, typer.Option("--baseline-id")],
+    operator_objective_id: Annotated[str, typer.Option("--operator-objective-id")],
+    disposition_claim_id: Annotated[str, typer.Option("--claim-id")],
+    manual_review_gate_predicate_id: Annotated[
+        str,
+        typer.Option("--manual-review-gate-predicate-id"),
+    ],
+) -> None:
+    """Route a verified baseline-bound evidence package into manual review."""
+    try:
+        graph = verify_mission_knowledge_graph(output_dir)
+        decision = evaluate_mission_orchestration(
+            graph,
+            MissionOrchestrationQuery(
+                baseline_id=baseline_id,
+                operator_objective_id=operator_objective_id,
+                disposition_claim_id=disposition_claim_id,
+                manual_review_gate_predicate_id=manual_review_gate_predicate_id,
+            ),
+        )
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(decision.model_dump_json(indent=2))
 
 
 @app.command("score-mission-reasoner-corpus")

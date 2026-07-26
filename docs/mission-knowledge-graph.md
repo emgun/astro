@@ -23,6 +23,7 @@ astro run-mission-design-director \
 astro run-mission-operator \
   examples/operator/post_launch_recovery_review.yaml \
   --reasoner-replay examples/operator/post_launch_recovery_review_replay.yaml \
+  --mission-design-context build/mission-knowledge-director \
   --output-dir build/mission-knowledge-post-launch
 
 astro build-mission-knowledge-graph \
@@ -33,6 +34,12 @@ astro verify-mission-knowledge-graph build/mission-knowledge-graph
 
 astro trace-mission-baseline build/mission-knowledge-graph \
   --baseline-id leo-mission-design:baseline
+
+astro evaluate-mission-orchestration build/mission-knowledge-graph \
+  --baseline-id leo-mission-design:baseline \
+  --operator-objective-id post-launch-recovery-review \
+  --claim-id post-launch-review-ready \
+  --manual-review-gate-predicate-id manual-review-required
 ```
 
 The trace answers a bounded decision question: which selected candidate, requirements,
@@ -61,9 +68,24 @@ simulation-screening observations are not labeled as operational outcomes. Capab
 `qualification_sha256` values remain identities because the current Director contract does not
 carry the qualification evidence bytes.
 
-The post-launch review and design baseline intentionally remain separate episodes under the
-declared mission node. The current operator contract has no typed baseline ID or digest, so the
-graph does not infer a handoff from phrases such as “baseline v1.” The next architecture slice
-should add a versioned mission/baseline context to operator inputs, resolve it against exactly one
-verified baseline, and then reduce checked claim predicates into typed `continue`, `hold`, or
-`abstain` planning branches.
+Operator schema `1.4` adds an explicit mission/baseline context: mission identity, exact Director
+run digest, baseline identity/version/digest, and operational configuration. Graph schema `1.1`
+emits `operates_against` only when that context resolves to exactly one selected, fully checked
+Director baseline. Names or prose never create the edge, and mismatched context fails graph
+construction. `--mission-design-context` verifies the freshly generated Director bundle and
+resolves its exact run and baseline digests into the operator journal. This avoids treating a
+platform-specific example digest as the identity of a newly generated run while retaining the
+declared baseline ID, version, mission, and operational configuration.
+
+The orchestration reducer then checks the linked operator run, its non-command authority, the
+target claim, every cited assertion and predicate, configuration applicability, conflicts, and a
+named exact-value manual-review gate. Its dispositions are deliberately asymmetric:
+
+- `abstain` for missing or ambiguous bindings, operational authority, invalid checks, or failed
+  applicability;
+- `hold` for qualified/disputed claims, readiness conflicts, or failed readiness predicates;
+- `continue` only when every check passes.
+
+This first disposition scope is exactly `manual_review_readiness`. `continue` routes the verified
+evidence package into manual review; it does not approve a maneuver, execute a command, or confer
+operational authority. The decision is digest-bound to the verified graph and typed query.

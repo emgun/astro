@@ -326,10 +326,10 @@ recovery behavior, and exact replayability. Provider fluency is secondary to the
 
 ## Architecture Status And Next Maturity Steps
 
-The reference AI-native architecture is implemented through schema `1.3`: provider-neutral
+The reference AI-native architecture is implemented through schema `1.4`: provider-neutral
 reasoning, versioned evidence acquisition, assertion-preserving world state, deterministic checked
-claims, progressive grants, and durable simulation-only command prepare/commit. Schemas `1.0`
-through `1.2` remain verifiable.
+claims, progressive grants, typed baseline context, and durable simulation-only command
+prepare/commit. Schemas `1.0` through `1.3` remain verifiable.
 
 The first Mission Design Director vertical slice is also implemented as an outer, digest-bound
 bundle without changing the released operator journal schemas. It compiles a typed mission intent,
@@ -349,6 +349,7 @@ astro verify-mission-design-director /tmp/astro-mission-design-director
 
 astro run-mission-operator examples/operator/post_launch_recovery_review.yaml \
   --reasoner-replay examples/operator/post_launch_recovery_review_replay.yaml \
+  --mission-design-context /tmp/astro-mission-design-director \
   --output-dir /tmp/astro-post-launch-recovery-review
 astro verify-mission-operator /tmp/astro-post-launch-recovery-review
 ```
@@ -370,17 +371,23 @@ complete captured Director and operator bundles. Its exact-inventory verifier in
 source verifier and reconstructs the graph before accepting the stored convenience artifact.
 Typed nodes and edges retain the complete source records for requirements, candidates,
 assessments, evidence, assertions, conflicts, claims, decisions, baselines, and tool versions. A
-bounded public query traces the exact justification chain behind a baseline. Cross-run membership
-is explicitly declared; the reducer does not infer a design-baseline-to-operations edge from
-similar names or prose because the current operator contract lacks a typed baseline identity.
+bounded public query traces the exact justification chain behind a baseline.
+
+The baseline handoff and first conditional-planning reducer are now implemented. Operator schema
+`1.4` carries the mission, Director run digest, baseline identity/version/digest, and operational
+configuration. Graph schema `1.1` resolves that context against exactly one eligible Director
+baseline and emits an explicit `operates_against` edge; it never infers the relationship from
+similar names or prose. A provider-neutral query reduces the verified edge, run authority, target
+claim, exact predicate outcomes, applicability, conflicts, and named manual-review gate into
+`continue`, `hold`, or `abstain`. The implemented scope is manual-review readiness only:
+`continue` advances an evidence package into review and does not approve or execute operations.
 
 The remaining path expands the kernel into the full north star:
 
-1. **Baseline handoff and conditional planning:** add a typed mission/baseline context to operator
-   inputs, resolve it against one verified baseline, expose checked predicate outcomes as
-   `continue`, `hold`, or `abstain`, and expand beyond the composite
-   lifecycle screener with additional typed capabilities, conditional analysis nodes, and
-   information-value-aware fidelity escalation while preserving the golden LEO workflow.
+1. **Conditional design and verification planning:** expand beyond the completed baseline handoff
+   with additional typed capabilities, conditional analysis nodes, explicit information-value
+   estimates, and fidelity escalation while preserving the golden LEO workflow and its fail-closed
+   disposition reducer.
 2. **Knowledge and outcomes:** add verified operational outcome and residual contracts, then extend
    the graph and learning datasets without rewriting historical decisions.
 3. **Adaptive verification:** choose uncertainty, sensitivity, independent-backend, and

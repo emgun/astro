@@ -455,7 +455,7 @@ def validate_operator_run_policy(run: OperatorRun) -> None:
     acquisition_count = 0
     known_evidence = list(run.objective.base_evidence)
     assertions = list(run.objective.base_assertions)
-    if run.schema_version in {"1.2", "1.3"} and any(
+    if run.schema_version in {"1.2", "1.3", "1.4"} and any(
         item.assertion_sha256 != assertion_digest(item) for item in assertions
     ):
         raise OperatorPolicyError("operator journal base assertions are not digest-bound")
@@ -464,16 +464,19 @@ def validate_operator_run_policy(run: OperatorRun) -> None:
     request_ids: set[str] = set()
     for step_index, step in enumerate(run.steps):
         action = step.action
-        if run.schema_version in {"1.1", "1.2", "1.3"}:
+        if run.schema_version in {"1.1", "1.2", "1.3", "1.4"}:
             invocation = step.reasoner_invocation
             assert invocation is not None
             state = OperatorState(
                 objective=run.objective,
                 authority=run.authority,
+                mission_context=run.mission_context,
                 steps=tuple(prior_steps),
                 known_evidence=tuple(known_evidence),
                 world_state=(
-                    world_state if run.schema_version in {"1.2", "1.3"} else None
+                    world_state
+                    if run.schema_version in {"1.2", "1.3", "1.4"}
+                    else None
                 ),
                 remaining_steps=authority.max_steps - step_index,
                 remaining_candidate_evaluations=(
@@ -525,7 +528,7 @@ def validate_operator_run_policy(run: OperatorRun) -> None:
                 raise OperatorPolicyError("operator journal lacks a typed acquisition result")
             acquisition_count += 1
         elif action.kind == OperatorActionKind.EXECUTE_COMMAND:
-            if run.schema_version not in {"1.2", "1.3"}:
+            if run.schema_version not in {"1.2", "1.3", "1.4"}:
                 raise OperatorPolicyError("legacy operator schemas cannot commit commands")
             execution = action.command_execution
             if execution is None or step.command_execution_record is None:
@@ -547,7 +550,7 @@ def validate_operator_run_policy(run: OperatorRun) -> None:
         if step.observation is not None:
             additions += step.observation.evidence
         if step.command_result is not None:
-            if run.schema_version in {"1.2", "1.3"} and any(
+            if run.schema_version in {"1.2", "1.3", "1.4"} and any(
                 item.assertion_sha256 != assertion_digest(item)
                 for item in step.command_result.assertions
             ):
@@ -556,7 +559,7 @@ def validate_operator_run_policy(run: OperatorRun) -> None:
                 )
             additions += step.command_result.evidence
         if step.acquisition_result is not None:
-            if run.schema_version in {"1.2", "1.3"} and any(
+            if run.schema_version in {"1.2", "1.3", "1.4"} and any(
                 item.assertion_sha256 != assertion_digest(item)
                 for item in step.acquisition_result.assertions
             ):
@@ -597,7 +600,7 @@ def validate_operator_run_policy(run: OperatorRun) -> None:
         raise OperatorPolicyError("operator journal exceeds its candidate evaluation budget")
     if acquisition_count > authority.max_evidence_acquisitions:
         raise OperatorPolicyError("operator journal exceeds its evidence acquisition budget")
-    if run.schema_version in {"1.2", "1.3"}:
+    if run.schema_version in {"1.2", "1.3", "1.4"}:
         if run.world_state != world_state:
             raise OperatorPolicyError("operator journal world state does not match replay")
         if run.status == OperatorRunStatus.COMPLETED:

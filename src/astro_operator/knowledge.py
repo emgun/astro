@@ -95,10 +95,11 @@ class KnowledgeSource(AstroModel):
 
 
 class MissionKnowledgeGraph(AstroModel):
-    schema_version: Literal["1.0"] = "1.0"
-    extractor_version: Literal["astro.mission_knowledge_graph/1.0"] = (
-        "astro.mission_knowledge_graph/1.0"
-    )
+    schema_version: Literal["1.0", "1.1"] = "1.0"
+    extractor_version: Literal[
+        "astro.mission_knowledge_graph/1.0",
+        "astro.mission_knowledge_graph/1.1",
+    ] = "astro.mission_knowledge_graph/1.0"
     graph_id: str = Field(min_length=1)
     mission_id: str = Field(min_length=1)
     sources: tuple[KnowledgeSource, ...] = Field(min_length=2)
@@ -108,6 +109,8 @@ class MissionKnowledgeGraph(AstroModel):
 
     @model_validator(mode="after")
     def graph_must_be_canonical_and_closed(self) -> MissionKnowledgeGraph:
+        if self.extractor_version != f"astro.mission_knowledge_graph/{self.schema_version}":
+            raise ValueError("knowledge graph schema and extractor versions must match")
         source_ids = [item.source_id for item in self.sources]
         node_ids = [item.node_id for item in self.nodes]
         edge_ids = [item.edge_id for item in self.edges]
@@ -235,11 +238,18 @@ class _GraphCollector:
 def build_mission_knowledge_graph(
     spec: MissionKnowledgeGraphSpec,
     verified_sources: dict[str, VerifiedSourcePayload],
+    *,
+    schema_version: Literal["1.0", "1.1"] = "1.1",
 ) -> MissionKnowledgeGraph:
     """Build the canonical graph from already verified, captured source bundles."""
 
     if set(verified_sources) != {item.source_id for item in spec.sources}:
         raise ValueError("verified knowledge sources do not match the graph specification")
+    if schema_version == "1.0" and any(
+        isinstance(primary, OperatorRun) and primary.mission_context is not None
+        for primary, _nested, _digest in verified_sources.values()
+    ):
+        raise ValueError("knowledge graph schema 1.0 cannot contain baseline-bound runs")
     collector = _GraphCollector(spec.mission_id)
     graph_sources: list[KnowledgeSource] = []
     for source_spec in sorted(spec.sources, key=lambda item: item.source_id):
@@ -277,9 +287,11 @@ def build_mission_knowledge_graph(
                 primary,
                 run_record_id="operator",
             )
+    if schema_version == "1.1":
+        _add_baseline_context_edges(collector, spec, verified_sources)
     payload: dict[str, Any] = {
-        "schema_version": "1.0",
-        "extractor_version": "astro.mission_knowledge_graph/1.0",
+        "schema_version": schema_version,
+        "extractor_version": f"astro.mission_knowledge_graph/{schema_version}",
         "graph_id": spec.graph_id,
         "mission_id": spec.mission_id,
         "sources": [item.model_dump(mode="json") for item in graph_sources],
@@ -468,6 +480,11 @@ def _add_operator_source(
             "selected_candidate_id": run.selected_candidate_id,
             "conclusion": run.conclusion,
             "authority": run.authority.model_dump(mode="json"),
+            **(
+                {"mission_context": run.mission_context.model_dump(mode="json")}
+                if run.mission_context is not None
+                else {}
+            ),
         },
     )
     collector.edge(collector.mission_node_id, "contains", run_node, source_id)
@@ -597,6 +614,60 @@ def _add_operator_source(
                     source_id,
                 )
     return run_node
+
+
+def _add_baseline_context_edges(
+    collector: _GraphCollector,
+    spec: MissionKnowledgeGraphSpec,
+    verified_sources: dict[str, VerifiedSourcePayload],
+) -> None:
+    directors = [
+        (source_id, primary)
+        for source_id, (primary, _nested, _digest) in verified_sources.items()
+        if isinstance(primary, MissionDesignRun)
+    ]
+    for source_id, (primary, nested, _digest) in verified_sources.items():
+        if not isinstance(primary, OperatorRun) or nested is not None:
+            continue
+        context = primary.mission_context
+        if context is None:
+            continue
+        if context.mission_id != spec.mission_id:
+            raise ValueError(
+                f"operator source {source_id!r} mission context does not match the graph"
+            )
+        matches = [
+            (director_source_id, director)
+            for director_source_id, director in directors
+            if director.run_sha256 == context.mission_design_run_sha256
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"operator source {source_id!r} must match exactly one Director run"
+            )
+        director_source_id, director = matches[0]
+        baseline = director.baseline
+        if (
+            baseline is None
+            or baseline.baseline_id != context.baseline_id
+            or baseline.version != context.baseline_version
+            or baseline.baseline_sha256 != context.baseline_sha256
+            or director.decision.disposition.value != "selected"
+            or director.verification_plan.baseline_id != baseline.baseline_id
+            or director.verification_plan.remaining_hard_requirement_ids
+            or any(check.status != "passed" for check in director.verification_plan.checks)
+        ):
+            raise ValueError(
+                f"operator source {source_id!r} baseline context does not match "
+                "an eligible Director baseline"
+            )
+        collector.edge(
+            f"{source_id}:run:operator",
+            "operates_against",
+            f"{director_source_id}:baseline:{baseline.baseline_id}",
+            source_id,
+            properties=context.model_dump(mode="json"),
+        )
 
 
 def _add_evidence_nodes(

@@ -394,6 +394,13 @@ def _provider_safe_state(state: OperatorState) -> dict[str, JsonValue]:
             }
         steps.append(item)
     return {
+        **(
+            {
+                "mission_context": state.mission_context.model_dump(mode="json")
+            }
+            if state.mission_context is not None
+            else {}
+        ),
         "objective": {
             "summary": objective.summary,
             "design_variables": [

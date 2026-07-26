@@ -50,9 +50,7 @@ def test_checked_operator_example_runs_and_verifies(tmp_path: Path) -> None:
     ]
     assert all(step.reasoner_invocation is not None for step in run.steps)
     providers = {
-        step.reasoner_invocation.provider
-        for step in run.steps
-        if step.reasoner_invocation
+        step.reasoner_invocation.provider for step in run.steps if step.reasoner_invocation
     }
     assert providers == {"deterministic-replay"}
 
@@ -91,7 +89,7 @@ def test_checked_operator_example_runs_and_verifies(tmp_path: Path) -> None:
         verify_operator_run(output)
 
 
-def test_perception_to_decision_example_runs_as_schema_1_3_and_fails_tampering(
+def test_perception_to_decision_example_binds_baseline_context_and_fails_tampering(
     tmp_path: Path,
 ) -> None:
     from astro_cli.main import app
@@ -112,7 +110,11 @@ def test_perception_to_decision_example_runs_as_schema_1_3_and_fails_tampering(
 
     assert result.exit_code == 0, result.output
     run = verify_operator_run(output)
-    assert run.schema_version == "1.3"
+    assert run.schema_version == "1.4"
+    assert run.mission_context is not None
+    assert run.mission_context.mission_id == "leo-reference-mission"
+    assert run.mission_context.baseline_id == "leo-mission-design:baseline"
+    assert run.mission_context.operational_configuration_id == ("post-launch-recovery-baseline-v1")
     assert len(run.steps) == 4
     assert run.world_state is not None
     assert len(run.world_state.assertions) == 16
@@ -126,9 +128,9 @@ def test_perception_to_decision_example_runs_as_schema_1_3_and_fails_tampering(
 
     trace = output / "operator-run.json"
     payload = json.loads(trace.read_text(encoding="utf-8"))
-    payload["schema_version"] = "1.2"
+    payload["schema_version"] = "1.3"
     trace.write_text(json.dumps(payload), encoding="utf-8")
-    with pytest.raises(InvalidScenarioError, match="claim predicates require"):
+    with pytest.raises(InvalidScenarioError, match="older schemas forbid"):
         verify_operator_run(output)
     write_operator_run(trace, run)
 

@@ -182,9 +182,7 @@ class AuthorityGrant(AstroModel):
             raise ValueError("command envelopes must be unique by command type")
         if not set(envelope_types).issubset(self.allowed_command_types):
             raise ValueError("command envelopes must cover only allowed command types")
-        tool_keys = [
-            (item.tool_id, item.tool_version) for item in self.allowed_evidence_tools
-        ]
+        tool_keys = [(item.tool_id, item.tool_version) for item in self.allowed_evidence_tools]
         if len(set(tool_keys)) != len(tool_keys):
             raise ValueError("allowed evidence tools must be unique by ID and version")
         if len(set(self.approval_required_for)) != len(self.approval_required_for):
@@ -332,6 +330,16 @@ class WorldState(AstroModel):
     state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class MissionBaselineContext(AstroModel):
+    schema_version: Literal["1.0"] = "1.0"
+    mission_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    mission_design_run_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    baseline_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
+    baseline_version: StrictInt = Field(ge=1)
+    baseline_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    operational_configuration_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
 class MissionObjective(AstroModel):
     objective_id: str = Field(min_length=1)
     summary: str = Field(min_length=1)
@@ -454,9 +462,7 @@ class EvidenceAcquisitionResult(AstroModel):
                 raise ValueError("assertion producer must match acquisition tool")
             if assertion.predicate not in self.tool.output_assertion_kinds:
                 raise ValueError("assertion predicate is outside the tool output contract")
-        if self.status == AcquisitionStatus.SUCCEEDED and not (
-            self.evidence or self.assertions
-        ):
+        if self.status == AcquisitionStatus.SUCCEEDED and not (self.evidence or self.assertions):
             raise ValueError("successful acquisition must produce evidence or assertions")
         if self.status == AcquisitionStatus.FAILED and self.assertions:
             raise ValueError("failed acquisition cannot produce assertions")
@@ -488,12 +494,8 @@ class NumericThresholdPredicate(AstroModel):
             raise ValueError(
                 "numeric predicate requires exactly one literal or assertion threshold"
             )
-        if (self.threshold_assertion_id is None) != (
-            self.threshold_assertion_predicate is None
-        ):
-            raise ValueError(
-                "assertion threshold requires its exact expected assertion predicate"
-            )
+        if (self.threshold_assertion_id is None) != (self.threshold_assertion_predicate is None):
+            raise ValueError("assertion threshold requires its exact expected assertion predicate")
         return self
 
 
@@ -502,9 +504,7 @@ class FreshnessPredicate(AstroModel):
     predicate_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
     assertion_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
     assertion_predicate: str = Field(min_length=1)
-    reference_assertion_id: str = Field(
-        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-    )
+    reference_assertion_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
     reference_assertion_predicate: str = Field(min_length=1)
     max_age_s: FiniteFloat | None = Field(default=None, ge=0.0)
     max_age_assertion_id: str | None = Field(
@@ -531,13 +531,9 @@ class FreshnessPredicate(AstroModel):
 class ApplicabilityPredicate(AstroModel):
     kind: Literal["applicability"] = "applicability"
     predicate_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
-    actual_assertion_id: str = Field(
-        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-    )
+    actual_assertion_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
     actual_assertion_predicate: str = Field(min_length=1)
-    required_assertion_id: str = Field(
-        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
-    )
+    required_assertion_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
     required_assertion_predicate: str = Field(min_length=1)
     expected_subject: str = Field(min_length=1)
     expected_scope: str = Field(min_length=1)
@@ -552,10 +548,7 @@ class ExactValuePredicate(AstroModel):
 
 
 ClaimPredicate = (
-    NumericThresholdPredicate
-    | FreshnessPredicate
-    | ApplicabilityPredicate
-    | ExactValuePredicate
+    NumericThresholdPredicate | FreshnessPredicate | ApplicabilityPredicate | ExactValuePredicate
 )
 
 
@@ -736,10 +729,14 @@ class OperatorAction(AstroModel):
             raise ValueError("candidate payload is only valid for evaluate_candidate")
         if self.kind != OperatorActionKind.REQUEST_EVIDENCE and self.evidence_request is not None:
             raise ValueError("evidence request payload is only valid for request_evidence")
-        if self.kind not in {
-            OperatorActionKind.PROPOSE_COMMAND,
-            OperatorActionKind.EXECUTE_COMMAND,
-        } and self.command is not None:
+        if (
+            self.kind
+            not in {
+                OperatorActionKind.PROPOSE_COMMAND,
+                OperatorActionKind.EXECUTE_COMMAND,
+            }
+            and self.command is not None
+        ):
             raise ValueError("command payload is only valid for command actions")
         if self.kind != OperatorActionKind.EXECUTE_COMMAND and self.command_execution is not None:
             raise ValueError("command execution payload is only valid for execute_command")
@@ -755,10 +752,7 @@ class OperatorAction(AstroModel):
         if self.kind == OperatorActionKind.FINISH and self.conclusion_claims:
             assert self.conclusion is not None
             conclusion_sha256 = sha256(self.conclusion.encode("utf-8")).hexdigest()
-            if any(
-                item.conclusion_sha256 != conclusion_sha256
-                for item in self.conclusion_claims
-            ):
+            if any(item.conclusion_sha256 != conclusion_sha256 for item in self.conclusion_claims):
                 raise ValueError("conclusion claims must bind the exact conclusion text")
         if len(set(self.evidence_ids)) != len(self.evidence_ids):
             raise ValueError("action evidence IDs must be unique")
@@ -796,8 +790,7 @@ class ReasonerInvocation(AstroModel):
         ):
             raise ValueError("reasoner completion cannot precede its start")
         if any(
-            not key or isinstance(value, bool) or value < 0
-            for key, value in self.usage.items()
+            not key or isinstance(value, bool) or value < 0 for key, value in self.usage.items()
         ):
             raise ValueError("reasoner usage values must be non-negative integers")
         if len(json.dumps(self.metadata, separators=(",", ":")).encode("utf-8")) > 16_384:
@@ -865,10 +858,7 @@ class OperatorStep(AstroModel):
         elif self.action.kind == OperatorActionKind.EXECUTE_COMMAND:
             if self.command_result is None:
                 raise ValueError("execute_command step requires a command result")
-            if (
-                self.action.command_execution is not None
-                and self.command_execution_record is None
-            ):
+            if self.action.command_execution is not None and self.command_execution_record is None:
                 raise ValueError("execute_command step requires a command execution record")
             if self.observation is not None or self.acquired_evidence:
                 raise ValueError("execute_command step has invalid outputs")
@@ -885,6 +875,7 @@ class OperatorStep(AstroModel):
 class OperatorState(AstroModel):
     objective: MissionObjective
     authority: AuthorityGrant
+    mission_context: MissionBaselineContext | None = None
     steps: tuple[OperatorStep, ...]
     known_evidence: tuple[EvidenceReference, ...]
     world_state: WorldState | None = None
@@ -899,9 +890,10 @@ class OperatorRunStatus(StrEnum):
 
 
 class OperatorRun(AstroModel):
-    schema_version: Literal["1.0", "1.1", "1.2", "1.3"] = "1.0"
+    schema_version: Literal["1.0", "1.1", "1.2", "1.3", "1.4"] = "1.0"
     objective: MissionObjective
     authority: AuthorityGrant
+    mission_context: MissionBaselineContext | None = None
     status: OperatorRunStatus
     steps: tuple[OperatorStep, ...]
     known_evidence: tuple[EvidenceReference, ...]
@@ -915,18 +907,17 @@ class OperatorRun(AstroModel):
             step.reasoner_invocation is None for step in self.steps
         ):
             raise ValueError("operator schema 1.1 requires reasoner provenance for every step")
-        if self.schema_version in {"1.2", "1.3"} and any(
+        if self.schema_version in {"1.2", "1.3", "1.4"} and any(
             step.reasoner_invocation is None for step in self.steps
         ):
             raise ValueError(
-                f"operator schema {self.schema_version} requires reasoner provenance "
-                "for every step"
+                f"operator schema {self.schema_version} requires reasoner provenance for every step"
             )
         if self.schema_version == "1.0" and any(
             step.reasoner_invocation is not None for step in self.steps
         ):
             raise ValueError("operator schema 1.0 does not contain reasoner provenance")
-        if self.schema_version not in {"1.2", "1.3"}:
+        if self.schema_version not in {"1.2", "1.3", "1.4"}:
             if self.world_state is not None or self.objective.base_assertions:
                 raise ValueError("legacy operator schemas do not contain typed world state")
             if any(
@@ -934,33 +925,28 @@ class OperatorRun(AstroModel):
                 or step.action.command_execution is not None
                 or step.command_execution_record is not None
                 or step.action.conclusion_claims
-                or (
-                    step.command_result is not None
-                    and bool(step.command_result.assertions)
-                )
+                or (step.command_result is not None and bool(step.command_result.assertions))
                 for step in self.steps
             ):
                 raise ValueError("legacy operator schemas do not contain schema 1.2 events")
-        if self.schema_version != "1.3" and any(
-            claim.predicates
-            for step in self.steps
-            for claim in step.action.conclusion_claims
+        if self.schema_version not in {"1.3", "1.4"} and any(
+            claim.predicates for step in self.steps for claim in step.action.conclusion_claims
         ):
             raise ValueError("claim predicates require operator schema 1.3")
-        if self.schema_version == "1.3":
-            claims = tuple(
-                claim
-                for step in self.steps
-                for claim in step.action.conclusion_claims
-            )
-            if not claims or any(
-                claim.disposition == ClaimDisposition.SUPPORTED
-                and not claim.predicates
+        if self.schema_version in {"1.3", "1.4"}:
+            claims = tuple(claim for step in self.steps for claim in step.action.conclusion_claims)
+            if (self.status == OperatorRunStatus.COMPLETED and not claims) or any(
+                claim.disposition == ClaimDisposition.SUPPORTED and not claim.predicates
                 for claim in claims
             ):
                 raise ValueError(
-                    "operator schema 1.3 requires predicates on every supported claim"
+                    f"operator schema {self.schema_version} requires a completed "
+                    "claim set and predicates on every supported claim"
                 )
+        if (self.schema_version == "1.4") != (self.mission_context is not None):
+            raise ValueError(
+                "operator schema 1.4 requires mission context and older schemas forbid it"
+            )
         if [step.sequence for step in self.steps] != list(range(1, len(self.steps) + 1)):
             raise ValueError("operator step sequences must be contiguous and one-based")
         action_ids = [step.action.action_id for step in self.steps]
@@ -999,14 +985,10 @@ class OperatorRun(AstroModel):
                 raise ValueError("run selection must match the finish action")
             if final.conclusion != self.conclusion:
                 raise ValueError("run conclusion must match the finish action")
-            if self.schema_version in {"1.2", "1.3"} and self.world_state is None:
-                raise ValueError(
-                    f"operator schema {self.schema_version} requires a world state"
-                )
+            if self.schema_version in {"1.2", "1.3", "1.4"} and self.world_state is None:
+                raise ValueError(f"operator schema {self.schema_version} requires a world state")
         elif any(step.action.kind == OperatorActionKind.FINISH for step in self.steps):
             raise ValueError("budget-exhausted operator run cannot contain finish")
-        if any(
-            step.action.kind == OperatorActionKind.FINISH for step in self.steps[:-1]
-        ):
+        if any(step.action.kind == OperatorActionKind.FINISH for step in self.steps[:-1]):
             raise ValueError("finish can appear only as the final operator step")
         return self
