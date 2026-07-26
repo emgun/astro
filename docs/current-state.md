@@ -706,6 +706,14 @@ carry the old capability, cost, and authority identities as ceilings and provena
 Director must receive fresh inputs and authority instead of silently spending or mutating the prior
 run.
 
+Project-specific steward learning: evaluate and benchmark the architecture continuously rather than
+waiting for provider selection. Evals define preregistered promotion thresholds and hard failures;
+benchmarks provide stable comparison tasks. Reuse the existing adversarial contract and whole-run
+behavior corpora as components, but add typed eval specifications/results and a versioned
+mission-specific end-to-end benchmark once redesign lineage exists. Keep contract, provenance,
+authority, and safety failures as hard gates; do not let an aggregate quality score hide them.
+Report provider transport, capability, latency, and cost separately.
+
 Project-specific steward learning: a source digest binds bytes but does not bind derived assertions.
 Concrete evidence tools must support offline assertion re-derivation from captured bytes, and
 downstream estimates must carry explicit input lineage before a checked claim can connect perception
@@ -717,28 +725,35 @@ rewriting same-named user metadata.
 1. Add versioned redesign lineage: consume the bounded revision handoff with a fresh Director spec
    and authority grant, produce a new decision, and link any successor baseline to its parent
    decision without mutating the historical run.
-2. Extend the graph with verified operational outcomes and residuals once their typed contracts
+2. Establish a typed eval registry and Mission Engineering Benchmark v1 over the existing
+   contract/behavior corpora plus redesign-lineage cases. Bind eval specifications, result
+   artifacts, thresholds, benchmark manifests, scoring code, seeds, provenance, locked holdouts,
+   and challenger cases; keep hard contract gates separate from quality, calibration,
+   evidence-efficiency, latency, and cost metrics. Run fast evals in CI and expensive
+   solver/provider/closed-loop evals as capped scheduled or promotion gates. Evaluate external
+   benchmark adapters where their semantics and licenses fit.
+3. Extend the graph with verified operational outcomes and residuals once their typed contracts
    exist. Add retrieval indexes only as disposable aids; extracted text must retain source and
    scope rather than becoming an unqualified graph fact.
-3. Extend adaptive verification beyond the first declared margin band. Add calibrated
+4. Extend adaptive verification beyond the first declared margin band. Add calibrated
    decision-change probabilities where evidence supports them, then choose uncertainty campaigns,
    independent backends, and high-fidelity simulations by expected information value; feed verified
    results into immutable surrogate datasets.
-4. Integrate the existing surrogate foundation with applicability envelopes, uncertainty and OOD
+5. Integrate the existing surrogate foundation with applicability envelopes, uncertainty and OOD
    checks, shadow evaluation, locked promotion gates, role-specific maturity, rollback, and drift
    triggers. Exercise the complete design-to-baseline-to-simulated-deviation learning loop.
-5. Run delegated and mission-autonomy campaigns only against registered simulation tools, including
+6. Run delegated and mission-autonomy campaigns only against registered simulation tools, including
    concurrent idempotency, crash recovery, resource depletion, expiry, revocation, knowledge-graph
    reconstruction, and surrogate-domain violations. Resume provider and learned-policy comparison
    only against these richer tasks; keep transport availability, capability, and cost separate.
-6. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
+7. Ingest reviewed mission-specific station residuals, propulsion execution residuals including
    timing, and insertion covariance into the typed evidence contract; replace illustrative bounds
    only where applicability and derivation review support promotion. Add subsystem test evidence
    before considering a mission-calibrated protocol claim.
-7. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
+8. Add a digest-bearing lifecycle artifact manifest only if separately copied bundle provenance is
    needed; do not infer bundle integrity from result re-execution.
-8. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
+9. Recreate an isolated TudatPy environment only if a future claim specifically needs a fresh
    Tudat-vs-local comparison or native variational covariance refresh.
-9. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
+10. Choose any higher-authority reentry campaign deliberately and keep it separate from the local
    screening product: atmosphere uncertainty, 6-DOF/GNC, aerothermal/material response, or external
    Dymos/Tudat/Orekit correlation.
