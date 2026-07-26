@@ -116,6 +116,7 @@ from astro_operator.models import (
     ExactValuePredicate,
     FreshnessPredicate,
     MetricGoal,
+    MissionBaselineContext,
     MissionObjective,
     NumericComparisonOperator,
     NumericThresholdPredicate,
@@ -141,6 +142,14 @@ from astro_operator.operational_evidence import (
     build_operational_evidence_registry,
     verify_operational_acquisition,
 )
+from astro_operator.orchestration import (
+    MissionOrchestrationDecision,
+    MissionOrchestrationQuery,
+    OrchestrationDisposition,
+    OrchestrationReason,
+    PredicateCheck,
+    evaluate_mission_orchestration,
+)
 from astro_operator.policy import validate_action_against_state, validate_operator_state
 from astro_operator.reasoner import (
     BoundDecisionReasoner,
@@ -161,6 +170,7 @@ from astro_operator.recording import (
 )
 from astro_operator.world_state import (
     assertion_digest,
+    evaluate_claim_predicate,
     reduce_world_state,
     validate_conclusion_claims,
     world_state_digest,
@@ -226,6 +236,7 @@ __all__ = [
     "KnowledgeSourceKind",
     "KnowledgeSourceSpec",
     "MetricGoal",
+    "MissionBaselineContext",
     "MissionObjective",
     "NumericComparisonOperator",
     "NumericThresholdPredicate",
@@ -237,10 +248,14 @@ __all__ = [
     "MissionKnowledgeGraph",
     "MissionKnowledgeGraphSpec",
     "MissionKnowledgeManifest",
+    "MissionOrchestrationDecision",
+    "MissionOrchestrationQuery",
     "OperatorAction",
     "OperatorActionKind",
     "OperatorRun",
     "OperatorRunStatus",
+    "OrchestrationDisposition",
+    "OrchestrationReason",
     "OperationalEvidenceKind",
     "OperationalEvidenceSource",
     "OpenRouterReasoner",
@@ -248,6 +263,7 @@ __all__ = [
     "OrbitEstimateTool",
     "ProcedureSnapshot",
     "ProcedureTool",
+    "PredicateCheck",
     "ReasonerDecision",
     "ReasonerAttemptProvenance",
     "ReasonerBehaviorCorpus",
@@ -275,6 +291,8 @@ __all__ = [
     "VerificationCheck",
     "VerificationPlan",
     "assertion_digest",
+    "evaluate_claim_predicate",
+    "evaluate_mission_orchestration",
     "run_operator",
     "acquire_reasoner_behavior_recording",
     "build_analysis_plan",

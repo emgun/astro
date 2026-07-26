@@ -1,4 +1,12 @@
 base_scenario_path: ../lifecycle/leo_round_trip.yaml
+mission_context:
+  schema_version: "1.0"
+  mission_id: leo-reference-mission
+  mission_design_run_sha256: 16ef403b660280b22a52079862711f6c69e709ee5b7081decc7c3fb4898308f7
+  baseline_id: leo-mission-design:baseline
+  baseline_version: 1
+  baseline_sha256: 0b64fb62d6030ce5338a4c496d147fbfabf1e13d57fa56ae8f7199f41c42dc52
+  operational_configuration_id: post-launch-recovery-baseline-v1
 objective:
   objective_id: post-launch-recovery-review
   summary: Determine whether simulated post-launch evidence is ready for manual recovery review.

@@ -197,7 +197,6 @@ def verify_mission_knowledge_graph(
             )
     spec = load_mission_knowledge_graph_spec(spec_path)
     verified = _verify_captured_sources(bundle_root, spec)
-    expected = build_mission_knowledge_graph(spec, verified)
     try:
         stored = MissionKnowledgeGraph.model_validate_json(graph_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValidationError) as exc:
@@ -207,6 +206,11 @@ def verify_mission_knowledge_graph(
     graph_payload = stored.model_dump(mode="json", exclude={"graph_sha256"})
     if stored.graph_sha256 != _canonical_digest(graph_payload):
         raise InvalidScenarioError("Mission knowledge graph digest mismatch")
+    expected = build_mission_knowledge_graph(
+        spec,
+        verified,
+        schema_version=stored.schema_version,
+    )
     if stored != expected:
         raise InvalidScenarioError(
             "Mission knowledge graph does not match its verified source bundles"

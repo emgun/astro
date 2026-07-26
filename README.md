@@ -90,10 +90,15 @@ astro build-mission-knowledge-graph \
 astro verify-mission-knowledge-graph build/mission-knowledge-graph
 astro trace-mission-baseline build/mission-knowledge-graph \
   --baseline-id leo-mission-design:baseline
+astro evaluate-mission-orchestration build/mission-knowledge-graph \
+  --baseline-id leo-mission-design:baseline \
+  --operator-objective-id post-launch-recovery-review \
+  --claim-id post-launch-review-ready \
+  --manual-review-gate-predicate-id manual-review-required
 ```
 
 See [Mission Knowledge Graph](docs/mission-knowledge-graph.md) for the complete source workflow and
-the explicit no-inferred-baseline-handoff boundary.
+the exact baseline handoff and manual-review-only disposition boundary.
 
 Validate and propagate a local orbit scenario:
 

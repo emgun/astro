@@ -10,6 +10,7 @@ import pytest
 from astro_core.errors import InvalidScenarioError
 from astro_operator.knowledge import (
     KnowledgeNodeKind,
+    MissionKnowledgeGraph,
     _claim_decision_relation,
     trace_baseline_justification,
 )
@@ -19,6 +20,13 @@ from astro_operator.knowledge_io import (
     write_mission_knowledge_manifest,
 )
 from astro_operator.models import ClaimDisposition
+from astro_operator.orchestration import (
+    MissionOrchestrationDecision,
+    MissionOrchestrationQuery,
+    OrchestrationDisposition,
+    OrchestrationReason,
+    evaluate_mission_orchestration,
+)
 
 
 def _canonical_digest(value: object) -> str:
@@ -180,6 +188,143 @@ def test_cross_run_graph_rebuilds_and_traces_baseline(tmp_path: Path) -> None:
         not (edge.target_node_id == claim_node and edge.relation == "supports")
         for edge in graph.edges
     )
+    handoffs = [edge for edge in graph.edges if edge.relation == "operates_against"]
+    assert len(handoffs) == 1
+    assert handoffs[0].source_node_id == "post-launch:run:operator"
+    assert handoffs[0].target_node_id == ("design:baseline:leo-mission-design:baseline")
+    assert handoffs[0].properties["operational_configuration_id"] == (
+        "post-launch-recovery-baseline-v1"
+    )
+
+    query = MissionOrchestrationQuery(
+        baseline_id="leo-mission-design:baseline",
+        operator_objective_id="post-launch-recovery-review",
+        disposition_claim_id="post-launch-review-ready",
+        manual_review_gate_predicate_id="manual-review-required",
+    )
+    decision = evaluate_mission_orchestration(graph, query)
+    assert decision.disposition == OrchestrationDisposition.CONTINUE
+    assert decision.reason_codes == (OrchestrationReason.ALL_MANUAL_REVIEW_GATES_SATISFIED,)
+    assert all(item.passed for item in decision.predicate_checks)
+    assert "no_command_approval_execution" in decision.authority_boundary
+
+    result = make_cli_runner().invoke(
+        app,
+        [
+            "evaluate-mission-orchestration",
+            str(output),
+            "--baseline-id",
+            query.baseline_id,
+            "--operator-objective-id",
+            query.operator_objective_id,
+            "--claim-id",
+            query.disposition_claim_id,
+            "--manual-review-gate-predicate-id",
+            query.manual_review_gate_predicate_id,
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["decision_sha256"] == decision.decision_sha256
+
+
+def test_orchestration_reducer_fails_closed_and_holds_readiness(
+    tmp_path: Path,
+) -> None:
+    director, operator = _run_source_bundles(tmp_path)
+    spec = tmp_path / "graph.yaml"
+    _write_spec(spec, director, operator)
+    output = tmp_path / "knowledge"
+    _build_graph(spec, output)
+    graph = verify_mission_knowledge_graph(output)
+    query = MissionOrchestrationQuery(
+        baseline_id="leo-mission-design:baseline",
+        operator_objective_id="post-launch-recovery-review",
+        disposition_claim_id="post-launch-review-ready",
+        manual_review_gate_predicate_id="manual-review-required",
+    )
+
+    unbound = graph.model_copy(
+        update={"edges": tuple(edge for edge in graph.edges if edge.relation != "operates_against")}
+    )
+    with pytest.raises(ValueError, match="graph digest mismatch"):
+        evaluate_mission_orchestration(unbound, query)
+    unbound = _redigest_graph(unbound)
+    unbound_decision = evaluate_mission_orchestration(unbound, query)
+    assert unbound_decision.disposition == OrchestrationDisposition.ABSTAIN
+    assert unbound_decision.reason_codes == (
+        OrchestrationReason.TARGET_OPERATOR_MISSING_OR_AMBIGUOUS,
+    )
+
+    command_capable = _replace_graph_node_property(
+        graph,
+        "post-launch:run:operator",
+        ("authority", "allowed_actions"),
+        ["request_evidence", "finish", "propose_command"],
+    )
+    authority_decision = evaluate_mission_orchestration(command_capable, query)
+    assert authority_decision.disposition == OrchestrationDisposition.ABSTAIN
+    assert authority_decision.reason_codes == (OrchestrationReason.OPERATIONAL_AUTHORITY_PRESENT,)
+
+    inapplicable = _replace_graph_node_property(
+        graph,
+        "post-launch:assertion:telemetry.mode",
+        ("value",),
+        "safe_mode",
+    )
+    applicability_decision = evaluate_mission_orchestration(inapplicable, query)
+    assert applicability_decision.disposition == OrchestrationDisposition.ABSTAIN
+    assert applicability_decision.reason_codes == (
+        OrchestrationReason.APPLICABILITY_PREDICATE_FAILED,
+    )
+
+    not_ready = _replace_graph_node_property(
+        graph,
+        "post-launch:assertion:estimate.converged",
+        ("value",),
+        False,
+    )
+    readiness_decision = evaluate_mission_orchestration(not_ready, query)
+    assert readiness_decision.disposition == OrchestrationDisposition.HOLD
+    assert readiness_decision.reason_codes == (OrchestrationReason.READINESS_PREDICATE_FAILED,)
+
+    missing_gate = evaluate_mission_orchestration(
+        graph,
+        query.model_copy(update={"manual_review_gate_predicate_id": "missing-manual-review-gate"}),
+    )
+    assert missing_gate.disposition == OrchestrationDisposition.ABSTAIN
+    assert missing_gate.reason_codes == (OrchestrationReason.MANUAL_REVIEW_GATE_MISSING_OR_INVALID,)
+
+    decision_payload = evaluate_mission_orchestration(graph, query).model_dump(
+        mode="json"
+    )
+    decision_payload["disposition"] = "hold"
+    with pytest.raises(ValueError, match="decision digest mismatch"):
+        MissionOrchestrationDecision.model_validate(decision_payload)
+
+
+def _replace_graph_node_property(
+    graph: MissionKnowledgeGraph,
+    node_id: str,
+    path: tuple[str, ...],
+    value: object,
+) -> MissionKnowledgeGraph:
+    nodes = []
+    for node in graph.nodes:
+        if node.node_id != node_id:
+            nodes.append(node)
+            continue
+        properties = json.loads(json.dumps(node.properties))
+        target = properties
+        for part in path[:-1]:
+            target = target[part]
+        target[path[-1]] = value
+        nodes.append(node.model_copy(update={"properties": properties}))
+    return _redigest_graph(graph.model_copy(update={"nodes": tuple(nodes)}))
+
+
+def _redigest_graph(graph: MissionKnowledgeGraph) -> MissionKnowledgeGraph:
+    payload = graph.model_dump(mode="json", exclude={"graph_sha256"})
+    return graph.model_copy(update={"graph_sha256": _canonical_digest(payload)})
 
 
 def test_graph_is_input_order_invariant_and_relocatable(tmp_path: Path) -> None:

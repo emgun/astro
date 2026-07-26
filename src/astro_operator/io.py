@@ -15,6 +15,7 @@ from astro_operator.models import (
     AuthorityGrant,
     EpistemicKind,
     EvidenceReference,
+    MissionBaselineContext,
     MissionObjective,
     OperatorRun,
 )
@@ -30,6 +31,7 @@ class MissionOperatorSpec(AstroModel):
     base_scenario_path: str
     objective: MissionObjective
     authority: AuthorityGrant
+    mission_context: MissionBaselineContext | None = None
     evidence_sources: tuple[OperationalEvidenceSource, ...] = ()
 
     @model_validator(mode="after")
@@ -73,7 +75,10 @@ def capture_base_scenario_evidence(path: Path, run_root: Path) -> EvidenceRefere
 
 
 def write_operator_run(path: Path, run: OperatorRun) -> None:
-    path.write_text(run.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    exclude = {"mission_context"} if run.mission_context is None else None
+    path.write_text(
+        run.model_dump_json(indent=2, exclude=exclude) + "\n", encoding="utf-8"
+    )
 
 
 def verify_operator_run(root: Path | str) -> OperatorRun:

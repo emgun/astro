@@ -154,7 +154,7 @@ def validate_conclusion_claims(
             )
         if claim.disposition == ClaimDisposition.SUPPORTED:
             for predicate in claim.predicates:
-                if not _evaluate_claim_predicate(predicate, assertions):
+                if not evaluate_claim_predicate(predicate, assertions):
                     raise ValueError(
                         f"supported claim {claim.claim_id!r} has an unsatisfied "
                         f"{predicate.kind} predicate"
@@ -179,7 +179,7 @@ def _numeric_assertion(
     return float(value)
 
 
-def _evaluate_claim_predicate(
+def evaluate_claim_predicate(
     predicate: (
         NumericThresholdPredicate
         | FreshnessPredicate

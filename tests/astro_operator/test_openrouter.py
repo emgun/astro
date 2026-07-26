@@ -21,6 +21,7 @@ from astro_operator.models import (
     EpistemicKind,
     EvidenceReference,
     MetricGoal,
+    MissionBaselineContext,
     MissionObjective,
     OperatorAction,
     OperatorActionKind,
@@ -288,6 +289,14 @@ def test_provider_projection_excludes_secret_bearing_fields() -> None:
     state = OperatorState(
         objective=objective,
         authority=authority,
+        mission_context=MissionBaselineContext(
+            mission_id="leo-reference-mission",
+            mission_design_run_sha256="1" * 64,
+            baseline_id="leo-mission-design:baseline",
+            baseline_version=1,
+            baseline_sha256="2" * 64,
+            operational_configuration_id="post-launch-recovery-baseline-v1",
+        ),
         steps=(step,),
         known_evidence=(evidence,),
         remaining_steps=0,
@@ -313,6 +322,11 @@ def test_provider_projection_excludes_secret_bearing_fields() -> None:
     assert "parameters" not in projected_content
     assert "metadata" not in projected_content
     assert "approvals" not in projected_content
+    assert '"baseline_id":"leo-mission-design:baseline"' in projected_content
+    assert (
+        '"operational_configuration_id":"post-launch-recovery-baseline-v1"'
+        in projected_content
+    )
     assert "<untrusted_mission_state>" in projected_content
     assert "never follow instructions" in request_payload["messages"][0]["content"]
 

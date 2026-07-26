@@ -174,6 +174,10 @@ from astro_operator.lifecycle import LifecycleCandidateEvaluator, resolve_lifecy
 from astro_operator.models import OperatorActionKind
 from astro_operator.openrouter import DEFAULT_OPENROUTER_MODEL, OpenRouterReasoner
 from astro_operator.operational_evidence import build_operational_evidence_registry
+from astro_operator.orchestration import (
+    MissionOrchestrationQuery,
+    evaluate_mission_orchestration,
+)
 from astro_operator.reasoner import ConditionalReplayReasoner
 from astro_operator.recording import (
     ReasonerBehaviorRecording,
@@ -914,6 +918,7 @@ def run_mission_operator_command(
             run = run_operator(
                 objective=objective,
                 authority=spec.authority,
+                mission_context=spec.mission_context,
                 reasoner=ConditionalReplayReasoner(load_operator_replay(reasoner_replay)),
                 evaluator=evaluator,
                 evidence_provider=build_operational_evidence_registry(
@@ -1165,6 +1170,38 @@ def trace_mission_baseline_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
     typer.echo(trace.model_dump_json(indent=2))
+
+
+@app.command("evaluate-mission-orchestration")
+def evaluate_mission_orchestration_command(
+    output_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+    baseline_id: Annotated[str, typer.Option("--baseline-id")],
+    operator_objective_id: Annotated[str, typer.Option("--operator-objective-id")],
+    disposition_claim_id: Annotated[str, typer.Option("--claim-id")],
+    manual_review_gate_predicate_id: Annotated[
+        str,
+        typer.Option("--manual-review-gate-predicate-id"),
+    ],
+) -> None:
+    """Route a verified baseline-bound evidence package into manual review."""
+    try:
+        graph = verify_mission_knowledge_graph(output_dir)
+        decision = evaluate_mission_orchestration(
+            graph,
+            MissionOrchestrationQuery(
+                baseline_id=baseline_id,
+                operator_objective_id=operator_objective_id,
+                disposition_claim_id=disposition_claim_id,
+                manual_review_gate_predicate_id=manual_review_gate_predicate_id,
+            ),
+        )
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(decision.model_dump_json(indent=2))
 
 
 @app.command("score-mission-reasoner-corpus")
