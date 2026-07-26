@@ -23,6 +23,7 @@ astro run-mission-design-director \
 astro run-mission-operator \
   examples/operator/post_launch_recovery_review.yaml \
   --reasoner-replay examples/operator/post_launch_recovery_review_replay.yaml \
+  --mission-design-context build/mission-knowledge-director \
   --output-dir build/mission-knowledge-post-launch
 
 astro build-mission-knowledge-graph \
@@ -71,7 +72,10 @@ Operator schema `1.4` adds an explicit mission/baseline context: mission identit
 run digest, baseline identity/version/digest, and operational configuration. Graph schema `1.1`
 emits `operates_against` only when that context resolves to exactly one selected, fully checked
 Director baseline. Names or prose never create the edge, and mismatched context fails graph
-construction.
+construction. `--mission-design-context` verifies the freshly generated Director bundle and
+resolves its exact run and baseline digests into the operator journal. This avoids treating a
+platform-specific example digest as the identity of a newly generated run while retaining the
+declared baseline ID, version, mission, and operational configuration.
 
 The orchestration reducer then checks the linked operator run, its non-command authority, the
 target claim, every cited assertion and predicate, configuration applicability, conflicts, and a

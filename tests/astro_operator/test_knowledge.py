@@ -63,6 +63,8 @@ def _run_source_bundles(tmp_path: Path) -> tuple[Path, Path]:
             str(repository / "examples/operator/post_launch_recovery_review_replay.yaml"),
             "--output-dir",
             str(operator),
+            "--mission-design-context",
+            str(director),
         ],
     )
     assert result.exit_code == 0, result.output

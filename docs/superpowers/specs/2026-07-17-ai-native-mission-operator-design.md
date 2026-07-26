@@ -349,6 +349,7 @@ astro verify-mission-design-director /tmp/astro-mission-design-director
 
 astro run-mission-operator examples/operator/post_launch_recovery_review.yaml \
   --reasoner-replay examples/operator/post_launch_recovery_review_replay.yaml \
+  --mission-design-context /tmp/astro-mission-design-director \
   --output-dir /tmp/astro-post-launch-recovery-review
 astro verify-mission-operator /tmp/astro-post-launch-recovery-review
 ```
