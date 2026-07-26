@@ -666,7 +666,7 @@ Post-MVP / external-campaign items:
 | v0.2.0 | done | release/verify | steward | final package identity, release notes, full local and built-wheel gates, CI, merged-commit verification, tag | Package metadata, wheel identity, local, CI, detached merged-commit, and remote annotated-tag evidence agree at `0d76d57`. |
 | mission-evidence-flagship | done | productize/verify | steward | fixed lifecycle, review, and uncertainty pack; atomic publisher; SHA-256 inventory; relocation verifier | PR #38 merged the first public pack at `6d28390`; PR #39 merged backward-compatible schema `1.1` relocation verification at `5c1c427` while preserving standalone review semantics. |
 | ai-native-mission-operator | active | orchestrate/learn/verify | steward | `astro_operator`, schemas `1.2` through `1.4`, progressive authority, evidence and command registries, assertion-preserving world state, checked claims, baseline context, durable simulation commit | PR #47 merged the reference operator architecture at `06d5da6`. Schema `1.3` adds kernel-evaluated predicates; schema `1.4` binds a run to an exact Director baseline and operational configuration while preserving verification compatibility for older journals. Provider tuning remains paused until richer mission tasks can distinguish models in a decision-relevant way. |
-| mission-design-director-v1 | done | verify/integrate | steward | typed mission intent, requirement graph, registered capability catalog, bounded analysis plan, deterministic assessments and baseline, exact-inventory bundle | PR #48 merged the first Director vertical slice at `d99754b`. The checked composite capability orchestrates launch, orbit, digital-twin subsystems, deorbit, and reentry through the existing lifecycle evaluator; the outer reducer applies exact-unit hard thresholds and emits a baseline only for an eligible selection. |
+| mission-design-director-v1 | active | orchestrate/verify | steward | typed mission intent, requirement graph, registered screening and uncertainty capabilities, conditional analysis DAG, deterministic assessments and baseline, exact-inventory bundle | PR #48 merged the first Director slice at `d99754b`. Schema `1.1` now reserves a decision-relevant lifecycle uncertainty node after screening and recommends it only when an eligible baseline's exact-unit requirement margin falls inside its declared decision-change band. The checked entry-interface margin is `0.908437 km`, so the `1.0 km` rule recommends analysis; a `0.5 km` rule defers it. An unresolved hard requirement removes baseline eligibility and deterministically defers the handoff. Each decision binds its candidate and optional baseline. This is a transparent proximity score, not calibrated expected information value. |
 | operator-perception-claims | done | orchestrate/verify | steward | concrete simulated-telemetry, orbit-estimate, and declared-procedure tools; schema `1.3` checked claims; post-launch manual-review gate | PR #49 merged the checked workflow at `ce301ec`. It acquires three catalog-root-confined, source-ID-addressed artifacts without allowing reasoner-chosen paths; preserves simulated, estimated, and declared epistemic kinds; binds the estimate to the exact telemetry digest; and recomputes assertions from captured bytes plus uncertainty, simulated-time freshness, procedure validity, configuration and mode applicability, estimate convergence, and manual-review predicates during offline verification. The conclusion is explicitly as-of the captured simulated decision time and indicates readiness for manual review, not maneuver authorization. |
 | mission-knowledge-graph-v1 | active | orchestrate/learn/verify | steward | versioned typed graph, complete captured Director/operator sources, exact inventory, native source verification, deterministic reconstruction, baseline justification and orchestration queries | The read model groups verified episodes, preserves typed provenance and conflicts, and traces a baseline to its decision evidence. Graph schema `1.1` resolves operator schema `1.4` context against exactly one eligible baseline and emits `operates_against`. The pure reducer routes a fully checked package to manual review with `continue`, holds readiness failures, and abstains on binding, applicability, authority, or check errors; it cannot approve or execute operations. |
 
@@ -690,6 +690,11 @@ behavior gate are adequate, further model tuning is not architecture progress. P
 missing perception, state, claim, or authority capability; return to provider comparison only when
 the richer task can distinguish models in a decision-relevant way.
 
+Project-specific steward learning: do not label boundary proximity as expected information value.
+Until campaign evidence supplies calibrated uncertainty over a decision-changing outcome, use an
+explicit unit-bearing decision-change band and expose its deterministic relevance score. The next
+gate is executing and checking the recommended analysis, not tuning the score.
+
 Project-specific steward learning: a source digest binds bytes but does not bind derived assertions.
 Concrete evidence tools must support offline assertion re-derivation from captured bytes, and
 downstream estimates must carry explicit input lineage before a checked claim can connect perception
@@ -698,17 +703,15 @@ rewriting same-named user metadata.
 
 ## Next Best Paths
 
-1. Add a typed mission/baseline context to operator inputs and resolve it against exactly one
-   verified Director baseline, then expose checked claim outcomes to conditional Director planning
-   so design, verification, and
-   simulated operations share one evidence contract and can select `continue`, `hold`, or
-   `abstain` branches without parsing prose.
+1. Execute the Director's recommended lifecycle uncertainty node as a captured, resumable campaign;
+   bind its result to the selected baseline and deterministically retain, revise, or abstain.
 2. Extend the graph with verified operational outcomes and residuals once their typed contracts
    exist. Add retrieval indexes only as disposable aids; extracted text must retain source and
    scope rather than becoming an unqualified graph fact.
-3. Add adaptive verification planning and active learning: choose uncertainty campaigns,
-   independent backends, and high-fidelity simulations by expected decision information; feed
-   verified results into immutable surrogate datasets.
+3. Extend adaptive verification beyond the first declared margin band. Add calibrated
+   decision-change probabilities where evidence supports them, then choose uncertainty campaigns,
+   independent backends, and high-fidelity simulations by expected information value; feed verified
+   results into immutable surrogate datasets.
 4. Integrate the existing surrogate foundation with applicability envelopes, uncertainty and OOD
    checks, shadow evaluation, locked promotion gates, role-specific maturity, rollback, and drift
    triggers. Exercise the complete design-to-baseline-to-simulated-deviation learning loop.

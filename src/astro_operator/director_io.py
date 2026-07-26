@@ -18,6 +18,7 @@ from astro_operator.director import (
     MissionDesignDirectorSpec,
     MissionDesignRun,
     build_mission_design_run,
+    mission_design_run_payload,
 )
 from astro_operator.io import verify_operator_run
 from astro_operator.models import (
@@ -65,7 +66,10 @@ def load_mission_design_director_spec(
 
 
 def write_mission_design_run(path: Path, run: MissionDesignRun) -> None:
-    path.write_text(run.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(mission_design_run_payload(run), indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def capture_resolved_base_scenario(
@@ -149,22 +153,16 @@ def verify_mission_design_director(root: Path | str) -> MissionDesignRun:
             raise InvalidScenarioError("Mission design artifact path escapes the bundle")
         path = run_root / relative
         if artifact.role != _artifact_role(artifact.path):
-            raise InvalidScenarioError(
-                f"Mission design artifact role mismatch: {artifact.path}"
-            )
+            raise InvalidScenarioError(f"Mission design artifact role mismatch: {artifact.path}")
         if path.stat().st_size != artifact.size_bytes:
-            raise InvalidScenarioError(
-                f"Mission design artifact size mismatch: {artifact.path}"
-            )
+            raise InvalidScenarioError(f"Mission design artifact size mismatch: {artifact.path}")
         if sha256(path.read_bytes()).hexdigest() != artifact.sha256:
-            raise InvalidScenarioError(
-                f"Mission design artifact digest mismatch: {artifact.path}"
-            )
+            raise InvalidScenarioError(f"Mission design artifact digest mismatch: {artifact.path}")
     try:
         stored = MissionDesignRun.model_validate_json(run_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, ValidationError) as exc:
         raise InvalidScenarioError(f"Could not load mission design run {run_path}: {exc}") from exc
-    run_payload = stored.model_dump(mode="json", exclude={"run_sha256"})
+    run_payload = mission_design_run_payload(stored, include_run_sha256=False)
     if stored.run_sha256 != _canonical_digest(run_payload):
         raise InvalidScenarioError("Mission design run digest mismatch")
     spec = load_mission_design_director_spec(spec_path)
@@ -174,9 +172,7 @@ def verify_mission_design_director(root: Path | str) -> MissionDesignRun:
         spec=spec,
         operator_run=operator_run,
         spec_sha256=sha256(spec_path.read_bytes()).hexdigest(),
-        operator_run_sha256=sha256(
-            (run_root / stored.operator_run_path).read_bytes()
-        ).hexdigest(),
+        operator_run_sha256=sha256((run_root / stored.operator_run_path).read_bytes()).hexdigest(),
     )
     if stored != expected:
         raise InvalidScenarioError(
@@ -245,9 +241,7 @@ def _verify_lifecycle_observations(operator_root: Path, run: OperatorRun) -> Non
         expected_scenario = resolved_base.model_copy(
             update={
                 "scenario_id": f"{resolved_base.scenario_id}--{candidate.candidate_id}",
-                "input_overrides": MissionLifecycleInputOverrides.model_validate(
-                    override_payload
-                ),
+                "input_overrides": MissionLifecycleInputOverrides.model_validate(override_payload),
                 "metadata": {
                     **resolved_base.metadata,
                     "operator_candidate_id": candidate.candidate_id,
@@ -275,8 +269,7 @@ def _verify_lifecycle_observations(operator_root: Path, run: OperatorRun) -> Non
                 raise InvalidScenarioError("Candidate result does not match its scenario artifact")
             if (
                 result.metadata.get("resolved_input_overrides") != resolved_overrides
-                or result.metadata.get("operator_scenario_sha256")
-                != scenario_reference.sha256
+                or result.metadata.get("operator_scenario_sha256") != scenario_reference.sha256
             ):
                 raise InvalidScenarioError(
                     "Candidate result provenance does not bind its exact scenario inputs"
@@ -323,8 +316,7 @@ def _verify_lifecycle_observations(operator_root: Path, run: OperatorRun) -> Non
         if (
             not isinstance(error_payload, dict)
             or error_payload.get("candidate_id") != candidate.candidate_id
-            or error_payload.get("operator_scenario_sha256")
-            != scenario_reference.sha256
+            or error_payload.get("operator_scenario_sha256") != scenario_reference.sha256
             or error_payload.get("resolved_input_overrides") != resolved_overrides
             or observation.passed
             or observation.metrics

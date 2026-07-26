@@ -20,6 +20,7 @@ from astro_operator.models import (
     OperatorRunStatus,
 )
 from astro_operator.reasoner import model_digest
+from astro_uq.models import CampaignDefinition, CampaignResult
 
 
 def _canonical_digest(value: object) -> str:
@@ -36,6 +37,17 @@ class RequirementComparator(StrEnum):
 
 class FidelityClass(StrEnum):
     SCREENING = "screening"
+    UNCERTAINTY = "uncertainty"
+
+
+class AnalysisActivation(StrEnum):
+    ALWAYS = "always"
+    DECISION_RELEVANT = "decision_relevant"
+
+
+class ConditionalAnalysisDisposition(StrEnum):
+    RECOMMENDED = "recommended"
+    DEFERRED = "deferred"
 
 
 class DesignDecisionDisposition(StrEnum):
@@ -139,20 +151,35 @@ class CapabilityCatalog(AstroModel):
         return self
 
 
+class ConditionalAnalysisRule(AstroModel):
+    rule_id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+    requirement_id: str = Field(min_length=1)
+    capability_id: str = Field(min_length=1)
+    maximum_absolute_margin: FiniteFloat = Field(gt=0.0)
+    unit: str = Field(min_length=1)
+    rationale: str = Field(min_length=1)
+
+    @field_validator("maximum_absolute_margin", mode="before")
+    @classmethod
+    def margin_must_be_numeric(cls, value: Any) -> Any:
+        if isinstance(value, bool | str):
+            raise ValueError("conditional analysis margin must be numeric")
+        return value
+
+
 class MissionDesignDirectorSpec(AstroModel):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.0"
     base_scenario_path: str = Field(min_length=1)
     intent: MissionIntent
     requirement_graph: RequirementGraph
     capability_catalog: CapabilityCatalog
     objective: MissionObjective
     authority: AuthorityGrant
+    conditional_analysis_rules: tuple[ConditionalAnalysisRule, ...] = ()
 
     @model_validator(mode="after")
     def contracts_must_align(self) -> MissionDesignDirectorSpec:
-        capabilities = {
-            item.capability_id: item for item in self.capability_catalog.capabilities
-        }
+        capabilities = {item.capability_id: item for item in self.capability_catalog.capabilities}
         if set(capabilities) != set(self.intent.allowed_capability_ids):
             raise ValueError("mission intent capability allow-list must match the catalog")
         if self.intent.authority_grant_id != self.authority.grant_id:
@@ -175,6 +202,50 @@ class MissionDesignDirectorSpec(AstroModel):
                 )
         if set(goals) != {item.metric_id for item in self.requirement_graph.requirements}:
             raise ValueError("objective goals must map exactly to first-slice requirements")
+        if self.schema_version == "1.0" and self.conditional_analysis_rules:
+            raise ValueError(
+                "mission design schema 1.0 does not contain conditional analysis rules"
+            )
+        requirement_by_id = {
+            item.requirement_id: item for item in self.requirement_graph.requirements
+        }
+        rule_ids = [item.rule_id for item in self.conditional_analysis_rules]
+        if len(set(rule_ids)) != len(rule_ids):
+            raise ValueError("conditional analysis rule IDs must be unique")
+        rule_targets = [
+            (item.requirement_id, item.capability_id) for item in self.conditional_analysis_rules
+        ]
+        if len(set(rule_targets)) != len(rule_targets):
+            raise ValueError(
+                "conditional analysis rules must be unique by requirement and capability"
+            )
+        for rule in self.conditional_analysis_rules:
+            target_requirement = requirement_by_id.get(rule.requirement_id)
+            capability = capabilities.get(rule.capability_id)
+            if target_requirement is None:
+                raise ValueError("conditional analysis requirement must exist")
+            if capability is None:
+                raise ValueError("conditional analysis capability must exist")
+            if rule.unit != target_requirement.unit:
+                raise ValueError("conditional analysis band must use requirement units")
+            if target_requirement.metric_id not in capability.output_metric_ids:
+                raise ValueError(
+                    "conditional analysis capability must produce the requirement metric"
+                )
+            if target_requirement.verification_capability_id not in capability.depends_on:
+                raise ValueError(
+                    "conditional analysis capability must depend on screening verification"
+                )
+        screening_capability_ids = {
+            item.verification_capability_id for item in self.requirement_graph.requirements
+        }
+        conditional_capability_ids = {
+            item.capability_id for item in self.conditional_analysis_rules
+        }
+        if set(capabilities) - screening_capability_ids != conditional_capability_ids:
+            raise ValueError(
+                "every non-screening capability must be activated by a conditional rule"
+            )
         if self.authority.level.value not in {"research", "decision_support"}:
             raise ValueError("first-slice design direction permits research authority only")
         if set(self.authority.allowed_actions) != {
@@ -192,6 +263,18 @@ class AnalysisNode(AstroModel):
     depends_on: tuple[str, ...] = ()
     requirement_ids: tuple[str, ...] = ()
     cost_units: StrictInt = Field(ge=1)
+    activation: AnalysisActivation = AnalysisActivation.ALWAYS
+    trigger_rule_ids: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def activation_must_match_triggers(self) -> AnalysisNode:
+        if self.activation == AnalysisActivation.ALWAYS and self.trigger_rule_ids:
+            raise ValueError("always analysis nodes cannot have trigger rules")
+        if self.activation == AnalysisActivation.DECISION_RELEVANT and not self.trigger_rule_ids:
+            raise ValueError("decision-relevant analysis nodes require trigger rules")
+        if len(set(self.trigger_rule_ids)) != len(self.trigger_rule_ids):
+            raise ValueError("analysis trigger rule IDs must be unique")
+        return self
 
 
 class AnalysisPlan(AstroModel):
@@ -251,15 +334,63 @@ class VerificationCheck(AstroModel):
     status: Literal["passed", "failed"]
 
 
+class ConditionalAnalysisDecision(AstroModel):
+    rule_id: str = Field(min_length=1)
+    requirement_id: str = Field(min_length=1)
+    capability_id: str = Field(min_length=1)
+    candidate_id: str = Field(min_length=1)
+    baseline_id: str | None = None
+    observed_margin: FiniteFloat
+    maximum_absolute_margin: FiniteFloat = Field(gt=0.0)
+    unit: str = Field(min_length=1)
+    decision_relevance_score: FiniteFloat = Field(ge=0.0, le=1.0)
+    disposition: ConditionalAnalysisDisposition
+    reason: Literal[
+        "within_declared_decision_change_band",
+        "outside_declared_decision_change_band",
+        "baseline_not_eligible",
+    ]
+    decision_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def decision_must_be_canonical(self) -> ConditionalAnalysisDecision:
+        within_band = abs(self.observed_margin) <= self.maximum_absolute_margin
+        expected_relevance = (
+            max(
+                0.0,
+                1.0 - abs(self.observed_margin) / self.maximum_absolute_margin,
+            )
+            if within_band
+            else 0.0
+        )
+        expected_disposition = ConditionalAnalysisDisposition.DEFERRED
+        if self.baseline_id is None:
+            expected_reason = "baseline_not_eligible"
+        elif within_band:
+            expected_disposition = ConditionalAnalysisDisposition.RECOMMENDED
+            expected_reason = "within_declared_decision_change_band"
+        else:
+            expected_reason = "outside_declared_decision_change_band"
+        if self.decision_relevance_score != expected_relevance:
+            raise ValueError("conditional analysis relevance score is not canonical")
+        if self.disposition != expected_disposition or self.reason != expected_reason:
+            raise ValueError("conditional analysis disposition is not canonical")
+        payload = self.model_dump(mode="json", exclude={"decision_sha256"})
+        if self.decision_sha256 != _canonical_digest(payload):
+            raise ValueError("conditional analysis decision digest mismatch")
+        return self
+
+
 class VerificationPlan(AstroModel):
     baseline_id: str | None = None
     checks: tuple[VerificationCheck, ...] = Field(min_length=1)
+    conditional_analyses: tuple[ConditionalAnalysisDecision, ...] = ()
     remaining_hard_requirement_ids: tuple[str, ...] = ()
     plan_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class MissionDesignRun(AstroModel):
-    schema_version: Literal["1.0"] = "1.0"
+    schema_version: Literal["1.0", "1.1"] = "1.0"
     workflow: Literal["mission_design_director_v1"] = "mission_design_director_v1"
     spec_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     operator_run_path: Literal["operator/operator-run.json"] = "operator/operator-run.json"
@@ -302,41 +433,97 @@ def lifecycle_screen_capability() -> CapabilitySpec:
     )
 
 
+def lifecycle_uncertainty_capability() -> CapabilitySpec:
+    """Return the registered lifecycle uncertainty-campaign planning contract."""
+
+    return CapabilitySpec(
+        capability_id="astro.mission_lifecycle_uncertainty",
+        version="1.0",
+        input_schema_sha256=_canonical_digest(CampaignDefinition.model_json_schema()),
+        output_schema_sha256=_canonical_digest(CampaignResult.model_json_schema()),
+        fidelity=FidelityClass.UNCERTAINTY,
+        deterministic=True,
+        cost_units=3,
+        output_metric_ids=(
+            "margin:deorbit:propellant_reserve",
+            "margin:deorbit:entry_interface_altitude_error",
+        ),
+        applicability=(
+            "Deterministic configured-design-space uncertainty campaign over the "
+            "integrated mission lifecycle; frequencies are not operational probabilities."
+        ),
+        qualification_sha256=sha256(
+            b"astro.mission_lifecycle_uncertainty@1.0:checked-campaign-contract-planning-only"
+        ).hexdigest(),
+        depends_on=("astro.mission_lifecycle_screen",),
+    )
+
+
 def build_analysis_plan(spec: MissionDesignDirectorSpec) -> AnalysisPlan:
     """Compile a deterministic, budgeted capability DAG from the design contracts."""
 
-    expected = lifecycle_screen_capability()
-    if spec.capability_catalog.capabilities != (expected,):
-        raise ValueError(
-            "first-slice capability catalog must contain only the registered lifecycle capability"
+    expected = (
+        (lifecycle_screen_capability(),)
+        if spec.schema_version == "1.0"
+        else (
+            lifecycle_screen_capability(),
+            lifecycle_uncertainty_capability(),
         )
+    )
+    if spec.capability_catalog.capabilities != expected:
+        raise ValueError("capability catalog does not match the registered capabilities")
     catalog_by_id = {item.capability_id: item for item in spec.capability_catalog.capabilities}
-    registered = catalog_by_id.get(expected.capability_id)
-    if registered != expected:
-        raise ValueError("capability catalog does not match the registered lifecycle capability")
     order = _topological_order(
         {item.capability_id: item.depends_on for item in spec.capability_catalog.capabilities}
     )
     requirements_by_capability: dict[str, list[str]] = {}
     for requirement in spec.requirement_graph.requirements:
-        requirements_by_capability.setdefault(
-            requirement.verification_capability_id, []
-        ).append(requirement.requirement_id)
+        requirements_by_capability.setdefault(requirement.verification_capability_id, []).append(
+            requirement.requirement_id
+        )
+    rules_by_capability: dict[str, list[ConditionalAnalysisRule]] = {}
+    for rule in spec.conditional_analysis_rules:
+        rules_by_capability.setdefault(rule.capability_id, []).append(rule)
     nodes = tuple(
         AnalysisNode(
             node_id=f"analyze:{capability_id}",
             capability_id=capability_id,
             capability_version=catalog_by_id[capability_id].version,
             depends_on=tuple(
-                f"analyze:{dependency}"
-                for dependency in catalog_by_id[capability_id].depends_on
+                f"analyze:{dependency}" for dependency in catalog_by_id[capability_id].depends_on
             ),
-            requirement_ids=tuple(sorted(requirements_by_capability.get(capability_id, []))),
+            requirement_ids=tuple(
+                sorted(
+                    {
+                        *requirements_by_capability.get(capability_id, []),
+                        *(
+                            rule.requirement_id
+                            for rule in rules_by_capability.get(capability_id, [])
+                        ),
+                    }
+                )
+            ),
             cost_units=catalog_by_id[capability_id].cost_units,
+            activation=(
+                AnalysisActivation.DECISION_RELEVANT
+                if rules_by_capability.get(capability_id)
+                else AnalysisActivation.ALWAYS
+            ),
+            trigger_rule_ids=tuple(
+                sorted(rule.rule_id for rule in rules_by_capability.get(capability_id, []))
+            ),
         )
         for capability_id in order
     )
-    total = sum(node.cost_units for node in nodes) * spec.authority.max_candidate_evaluations
+    total = sum(
+        node.cost_units
+        * (
+            spec.authority.max_candidate_evaluations
+            if node.activation == AnalysisActivation.ALWAYS
+            else 1
+        )
+        for node in nodes
+    )
     if total > spec.intent.max_analysis_cost_units:
         raise ValueError("analysis plan exceeds the mission intent cost budget")
     payload = {
@@ -344,13 +531,13 @@ def build_analysis_plan(spec: MissionDesignDirectorSpec) -> AnalysisPlan:
         "intent_sha256": model_digest(spec.intent),
         "requirement_graph_sha256": model_digest(spec.requirement_graph),
         "capability_catalog_sha256": model_digest(spec.capability_catalog),
-        "nodes": [node.model_dump(mode="json") for node in nodes],
+        "nodes": [
+            _analysis_node_payload(node, schema_version=spec.schema_version) for node in nodes
+        ],
         "total_cost_units": total,
         "max_cost_units": spec.intent.max_analysis_cost_units,
     }
-    return AnalysisPlan.model_validate(
-        {**payload, "plan_sha256": _canonical_digest(payload)}
-    )
+    return AnalysisPlan.model_validate({**payload, "plan_sha256": _canonical_digest(payload)})
 
 
 def build_mission_design_run(
@@ -423,9 +610,7 @@ def build_mission_design_run(
                 }
             )
         )
-    unresolved = tuple(
-        item.requirement_id for item in assessments if item.hard and not item.passed
-    )
+    unresolved = tuple(item.requirement_id for item in assessments if item.hard and not item.passed)
     disposition = (
         DesignDecisionDisposition.ABSTAINED
         if unresolved or not selected_observation.passed
@@ -471,22 +656,78 @@ def build_mission_design_run(
         )
         for assessment in assessments
     )
-    verification_payload = {
+    assessment_by_requirement = {item.requirement_id: item for item in assessments}
+    conditional_analyses: list[ConditionalAnalysisDecision] = []
+    for rule in spec.conditional_analysis_rules:
+        assessment = assessment_by_requirement[rule.requirement_id]
+        observed_margin = (
+            assessment.observed_value - assessment.threshold
+            if assessment.comparator == RequirementComparator.GREATER_THAN_OR_EQUAL
+            else assessment.threshold - assessment.observed_value
+        )
+        absolute_margin = abs(observed_margin)
+        within_band = absolute_margin <= rule.maximum_absolute_margin
+        relevance = (
+            max(
+                0.0,
+                1.0 - absolute_margin / rule.maximum_absolute_margin,
+            )
+            if within_band
+            else 0.0
+        )
+        conditional_payload = {
+            "rule_id": rule.rule_id,
+            "requirement_id": rule.requirement_id,
+            "capability_id": rule.capability_id,
+            "candidate_id": selected_id,
+            "baseline_id": baseline.baseline_id if baseline is not None else None,
+            "observed_margin": observed_margin,
+            "maximum_absolute_margin": rule.maximum_absolute_margin,
+            "unit": rule.unit,
+            "decision_relevance_score": relevance,
+            "disposition": (
+                ConditionalAnalysisDisposition.RECOMMENDED
+                if within_band and baseline is not None
+                else ConditionalAnalysisDisposition.DEFERRED
+            ),
+            "reason": (
+                "baseline_not_eligible"
+                if baseline is None
+                else (
+                    "within_declared_decision_change_band"
+                    if within_band
+                    else "outside_declared_decision_change_band"
+                )
+            ),
+        }
+        conditional_analyses.append(
+            ConditionalAnalysisDecision.model_validate(
+                {
+                    **conditional_payload,
+                    "decision_sha256": _canonical_digest(conditional_payload),
+                }
+            )
+        )
+    verification_payload: dict[str, object] = {
         "baseline_id": baseline.baseline_id if baseline is not None else None,
         "checks": [item.model_dump(mode="json") for item in checks],
         "remaining_hard_requirement_ids": unresolved,
     }
+    if spec.schema_version == "1.1":
+        verification_payload["conditional_analyses"] = [
+            item.model_dump(mode="json") for item in conditional_analyses
+        ]
     verification_plan = VerificationPlan.model_validate(
         {**verification_payload, "plan_sha256": _canonical_digest(verification_payload)}
     )
     plan = build_analysis_plan(spec)
-    consumed_cost = sum(
-        1 for step in operator_run.steps if step.observation is not None
-    ) * sum(node.cost_units for node in plan.nodes)
+    consumed_cost = sum(1 for step in operator_run.steps if step.observation is not None) * sum(
+        node.cost_units for node in plan.nodes if node.activation == AnalysisActivation.ALWAYS
+    )
     if consumed_cost > plan.total_cost_units:
         raise ValueError("operator run consumed more analysis cost than the reserved plan")
     run_payload = {
-        "schema_version": "1.0",
+        "schema_version": spec.schema_version,
         "workflow": "mission_design_director_v1",
         "spec_sha256": spec_sha256,
         "operator_run_path": "operator/operator-run.json",
@@ -494,17 +735,79 @@ def build_mission_design_run(
         "intent": spec.intent.model_dump(mode="json"),
         "requirement_graph": spec.requirement_graph.model_dump(mode="json"),
         "capability_catalog": spec.capability_catalog.model_dump(mode="json"),
-        "analysis_plan": plan.model_dump(mode="json"),
+        "analysis_plan": _analysis_plan_payload(
+            plan,
+            schema_version=spec.schema_version,
+        ),
         "consumed_analysis_cost_units": consumed_cost,
         "assessments": [item.model_dump(mode="json") for item in assessments],
         "decision": decision.model_dump(mode="json"),
         "baseline": baseline.model_dump(mode="json") if baseline is not None else None,
-        "verification_plan": verification_plan.model_dump(mode="json"),
+        "verification_plan": _verification_plan_payload(
+            verification_plan,
+            schema_version=spec.schema_version,
+        ),
         "claim_boundary": spec.intent.claim_boundary,
     }
     return MissionDesignRun.model_validate(
         {**run_payload, "run_sha256": _canonical_digest(run_payload)}
     )
+
+
+def mission_design_run_payload(
+    run: MissionDesignRun,
+    *,
+    include_run_sha256: bool = True,
+) -> dict[str, object]:
+    """Return the canonical version-aware Director wire payload."""
+
+    payload = run.model_dump(mode="json")
+    if not include_run_sha256:
+        payload.pop("run_sha256")
+    payload["analysis_plan"] = _analysis_plan_payload(
+        run.analysis_plan,
+        schema_version=run.schema_version,
+    )
+    payload["verification_plan"] = _verification_plan_payload(
+        run.verification_plan,
+        schema_version=run.schema_version,
+    )
+    return payload
+
+
+def _analysis_node_payload(
+    node: AnalysisNode,
+    *,
+    schema_version: Literal["1.0", "1.1"],
+) -> dict[str, object]:
+    payload = node.model_dump(mode="json")
+    if schema_version == "1.0":
+        payload.pop("activation")
+        payload.pop("trigger_rule_ids")
+    return payload
+
+
+def _analysis_plan_payload(
+    plan: AnalysisPlan,
+    *,
+    schema_version: Literal["1.0", "1.1"],
+) -> dict[str, object]:
+    payload = plan.model_dump(mode="json")
+    payload["nodes"] = [
+        _analysis_node_payload(node, schema_version=schema_version) for node in plan.nodes
+    ]
+    return payload
+
+
+def _verification_plan_payload(
+    plan: VerificationPlan,
+    *,
+    schema_version: Literal["1.0", "1.1"],
+) -> dict[str, object]:
+    payload = plan.model_dump(mode="json")
+    if schema_version == "1.0":
+        payload.pop("conditional_analyses")
+    return payload
 
 
 def _topological_order(dependencies: dict[str, tuple[str, ...]]) -> tuple[str, ...]:
@@ -530,10 +833,14 @@ def _topological_order(dependencies: dict[str, tuple[str, ...]]) -> tuple[str, .
 
 
 __all__ = [
+    "AnalysisActivation",
     "AnalysisNode",
     "AnalysisPlan",
     "CapabilityCatalog",
     "CapabilitySpec",
+    "ConditionalAnalysisDecision",
+    "ConditionalAnalysisDisposition",
+    "ConditionalAnalysisRule",
     "DesignDecision",
     "DesignDecisionDisposition",
     "FidelityClass",
@@ -550,4 +857,6 @@ __all__ = [
     "build_analysis_plan",
     "build_mission_design_run",
     "lifecycle_screen_capability",
+    "lifecycle_uncertainty_capability",
+    "mission_design_run_payload",
 ]
