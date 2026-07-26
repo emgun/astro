@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import astro_uq.runner as runner_module
 from astro_core.models import AstroModel
 from astro_uq.io import CampaignArtifactStore, CampaignIOError
 from astro_uq.metrics import MetricExtractor, MetricRegistry
@@ -19,6 +20,7 @@ from astro_uq.models import (
     MetricStabilityStopping,
     MetricValueKind,
     ModelVariant,
+    ParameterRealization,
     RequirementOperator,
     RequirementSpec,
     RetentionPolicy,
@@ -248,6 +250,54 @@ def test_parallel_runner_matches_serial_evidence(tmp_path: Path) -> None:
     assert _case_scientific_evidence(
         tmp_path / "parallel" / "cases.jsonl"
     ) == _case_scientific_evidence(tmp_path / "serial" / "cases.jsonl")
+
+
+def test_fixed_campaign_uses_one_parallel_pool_and_checkpoints_each_case(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[int, int]] = []
+
+    def evaluate_without_processes(
+        definition: CampaignDefinition,
+        samples: tuple[object, ...],
+        *,
+        workers: int,
+        runtime_factory: object,
+        on_observation: object = None,
+    ) -> tuple[CaseObservation, ...]:
+        del runtime_factory
+        typed_samples = tuple(ParameterRealization.model_validate(sample) for sample in samples)
+        observations = tuple(
+            runner_module._evaluate_sample(definition, _runtime(), sample)
+            for sample in typed_samples
+        )
+        calls.append((len(samples), workers))
+        assert callable(on_observation)
+        for observation in observations:
+            on_observation(observation)
+        return observations
+
+    monkeypatch.setattr(runner_module, "_parallel_observations", evaluate_without_processes)
+
+    result = run_campaign(
+        _definition(),
+        _runtime(),
+        output_dir=tmp_path / "parallel",
+        software_compatibility={"astro": "test"},
+        workers=4,
+        runtime_factory=_runtime,
+    )
+
+    assert calls == [(4, 4)]
+    assert result.statistics.completed_samples == 4
+    assert len(result.statistics.convergence_history) == 4
+    assert [record["completed_samples"] for record in result.statistics.convergence_history] == [
+        1,
+        2,
+        3,
+        4,
+    ]
 
 
 def test_parallel_runner_requires_runtime_factory_before_writing_evidence(

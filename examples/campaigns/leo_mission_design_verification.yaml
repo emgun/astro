@@ -1,0 +1,66 @@
+schema_version: "1.0"
+campaign_id: leo-mission-design-verification-template
+workflow:
+  kind: mission_lifecycle
+  scenario: ../lifecycle/leo_round_trip.yaml
+uncertainty:
+  parameters:
+    - parameter_id: reentry_density_scale
+      target: lifecycle.reentry.atmosphere.density_scale_factor
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution: {kind: uniform, low: 0.98, high: 1.02}
+    - parameter_id: reentry_drag_coefficient
+      target: lifecycle.reentry.vehicle.drag_coefficient
+      unit: "1"
+      uncertainty_kind: epistemic
+      distribution: {kind: uniform, low: 1.47, high: 1.53}
+    - parameter_id: deorbit_delta_v
+      target: lifecycle.deorbit.delta_v_km_s
+      unit: km/s
+      uncertainty_kind: epistemic
+      distribution: {kind: triangular, low: 0.19, mode: 0.20, high: 0.21}
+    - parameter_id: deorbit_specific_impulse
+      target: lifecycle.deorbit.specific_impulse_s
+      unit: s
+      uncertainty_kind: epistemic
+      distribution: {kind: uniform, low: 290.0, high: 310.0}
+  correlations: []
+  model_variants: []
+sampler:
+  kind: latin_hypercube
+  samples: 8
+  seed: 7262026
+  scramble: true
+evaluator:
+  evaluator_id: local-lifecycle-conditional-verification
+  kind: authoritative
+  workflow: mission_lifecycle
+  implementation_version: mission_lifecycle_v1
+  backend: local
+  claim_boundary: configured_design_space_verification_not_operational_probability_qualification_or_authority
+metrics:
+  - metric_id: propellant_reserve_margin
+    extractor: lifecycle.propellant_reserve_margin_kg
+    value_kind: numeric
+    unit: kg
+  - metric_id: entry_interface_margin
+    extractor: lifecycle.entry_interface_margin_km
+    value_kind: numeric
+    unit: km
+requirements:
+  - requirement_id: deorbit_propellant_reserve
+    metric_id: propellant_reserve_margin
+    operator: ge
+    value: 0.0
+  - requirement_id: entry_interface_continuity
+    metric_id: entry_interface_margin
+    operator: ge
+    value: 0.0
+stopping:
+  kind: fixed_count
+retention:
+  policy: failures
+metadata:
+  uncertainty_scope: selected_baseline_cross_phase_epistemic_design_inputs
+  interpretation: configured_design_space_fraction_not_operational_probability
