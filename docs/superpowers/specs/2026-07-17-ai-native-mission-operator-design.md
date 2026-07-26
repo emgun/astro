@@ -420,24 +420,79 @@ failed requirements and prior capability, analysis-cost, and authority envelopes
 select a replacement, mutate history, execute a second Director, or assume that the old grant and
 budget can be reused.
 
+Evaluation and benchmarking are cross-cutting programs, not a final provider leaderboard. An eval
+answers whether a particular component, policy, model, or release satisfies a preregistered
+contract; a benchmark supplies a stable task collection for comparison and progress measurement.
+The same cases may participate in both, but only an eval contract defines promotion blockers,
+thresholds, and the authority scope of a pass.
+
+Each eval run should bind a typed eval specification, case and scorer versions, inputs, expected
+invariants, environment, seeds, provider/model or implementation identity, source provenance,
+artifacts, metrics, thresholds, and pass/fail disposition. Eval families should cover:
+
+- schema, provenance, digest, authority, budget, and exact-reconstruction contracts;
+- Director decision quality, evidence selection, justified abstention, and redesign lineage;
+- reasoner action traces, tool selection, evidence grounding, recovery behavior, and calibration;
+- uncertainty-campaign relevance, statistical validity, and information gained per cost unit;
+- surrogate error, calibration, out-of-distribution detection, decision-change impact, shadow
+  performance, rollback, and drift;
+- closed-loop mission outcome, conflict handling, staleness, resource use, crash recovery, expiry,
+  and revocation; and
+- operational-effect preparation, reconciliation, idempotency, and safe handling of indeterminate
+  outcomes before any higher-authority promotion.
+
+Fast deterministic evals run in CI. More expensive solver, provider, surrogate, and closed-loop
+evals run as scheduled or promotion gates, with provider cost caps and immutable result artifacts.
+Deployment monitoring reuses the same typed metrics and thresholds where applicable, but does not
+retroactively rewrite the eval evidence that promoted a version.
+
+The existing adversarial contract corpus, whole-run reasoner behavior corpus, deterministic
+campaign fixtures, and solver/assurance comparisons are the initial eval and benchmark components.
+After versioned redesign lineage exists, they should be wrapped by a digest-bound Mission
+Engineering Benchmark manifest with separate tracks for:
+
+- kernel and contract correctness;
+- Director planning, evidence selection, abstention, and redesign quality;
+- uncertainty-campaign selection and information gained per analysis-cost unit;
+- surrogate accuracy, calibration, out-of-distribution detection, decision impact, and speedup;
+- closed-loop recovery under conflict, staleness, resource loss, crash/restart, expiry, and
+  revocation; and
+- end-to-end mission outcome quality, evidence completeness, latency, and cost.
+
+Hard contract, provenance, authority, and safety failures remain eval blockers rather than being
+averaged into a single score. Every benchmark release binds task/environment versions, inputs,
+seeds, expected invariants, scoring code, source rights and provenance, and result artifacts. It
+keeps locked holdouts and challenger cases separate from development cases, and reports uncertainty
+over aggregate results rather than treating a small case set as a definitive ranking. Existing
+external aerospace, trajectory-optimization, autonomy, scientific-agent, or general agent
+benchmarks may be adapted when their licenses, task semantics, and evidence provenance fit; they
+supplement rather than replace Astro's mission-specific end-to-end benchmark. Provider runs use the
+same benchmark manifests while reporting transport availability, capability, latency, and cost
+separately.
+
 The remaining path expands the kernel into the full north star:
 
 1. **Versioned redesign lineage:** consume a revision handoff with fresh design inputs and
    authority, run a new bounded Director decision, and link any successor baseline to its parent
    decision without rewriting history.
-2. **Knowledge and outcomes:** add verified operational outcome and residual contracts, then extend
+2. **Eval registry and Mission Engineering Benchmark v1:** define typed, digest-bound eval
+   specifications and result artifacts; version the existing contract and behavior corpora; add
+   redesign-lineage cases and locked challengers; define non-averagable hard gates plus
+   task-quality, calibration, evidence-efficiency, latency, and cost metrics; and evaluate useful
+   external benchmark adapters.
+3. **Knowledge and outcomes:** add verified operational outcome and residual contracts, then extend
    the graph and learning datasets without rewriting historical decisions.
-3. **Adaptive verification:** add calibrated decision-change probabilities where evidence supports
+4. **Adaptive verification:** add calibrated decision-change probabilities where evidence supports
    them, then choose uncertainty, sensitivity, independent-backend, and high-fidelity work by
    expected information value rather than boundary proximity alone.
-4. **Surrogate lifecycle and active learning:** integrate the existing surrogate and campaign
+5. **Surrogate lifecycle and active learning:** integrate the existing surrogate and campaign
    foundations with dataset lineage, applicability, uncertainty, shadow evaluation, promotion,
    rollback, and targeted high-fidelity acquisition.
-5. **Closed-loop mission orchestration:** exercise simulated design-to-operations replanning,
+6. **Closed-loop mission orchestration:** exercise simulated design-to-operations replanning,
    including conflict, staleness, crash recovery, concurrency, resource depletion, expiry, and
    revocation campaigns at progressively broader grants.
-6. **Operational qualification:** define remote-effect reconciliation, qualification evidence, and
+7. **Operational qualification:** define remote-effect reconciliation, qualification evidence, and
    operational resource models before registering any real-effect handler.
-7. **Learned orchestration and provider comparison:** evaluate learned planners and providers only
-   against the richer mission-design and closed-loop tasks, with transport availability separated
-   from capability and cost.
+8. **Learned orchestration and provider comparison:** evaluate learned planners and providers on
+   the versioned mission benchmark only after its richer mission-design and closed-loop tracks
+   exist, with transport availability separated from capability, latency, and cost.
