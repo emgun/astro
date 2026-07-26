@@ -8,3 +8,6 @@ sources:
   - source_id: post-launch
     kind: operator_run
     path: ../../build/mission-knowledge-post-launch
+  - source_id: verification
+    kind: conditional_campaign
+    path: ../../build/mission-knowledge-verification

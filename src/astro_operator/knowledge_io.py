@@ -14,6 +14,8 @@ from pydantic import Field, ValidationError, model_validator
 
 from astro_core.errors import InvalidScenarioError
 from astro_core.models import AstroModel
+from astro_operator.conditional_campaign import ConditionalCampaignOutcome
+from astro_operator.conditional_campaign_io import verify_conditional_campaign
 from astro_operator.director import MissionDesignRun
 from astro_operator.director_io import verify_mission_design_director
 from astro_operator.io import verify_operator_run
@@ -21,7 +23,7 @@ from astro_operator.knowledge import (
     KnowledgeSourceKind,
     MissionKnowledgeGraph,
     MissionKnowledgeGraphSpec,
-    VerifiedSourcePayload,
+    VerifiedKnowledgeSource,
     build_mission_knowledge_graph,
 )
 from astro_operator.models import OperatorRun
@@ -221,26 +223,33 @@ def verify_mission_knowledge_graph(
 def _verify_captured_sources(
     root: Path,
     spec: MissionKnowledgeGraphSpec,
-) -> dict[str, VerifiedSourcePayload]:
-    verified: dict[str, VerifiedSourcePayload] = {}
+) -> dict[str, VerifiedKnowledgeSource]:
+    verified: dict[str, VerifiedKnowledgeSource] = {}
     for source in spec.sources:
         source_root = root / "sources" / source.source_id
         _validate_source_tree(source_root)
         tree_sha256 = _source_tree_digest(source_root)
         try:
             if source.kind == KnowledgeSourceKind.MISSION_DESIGN_DIRECTOR:
-                director: MissionDesignRun | OperatorRun = verify_mission_design_director(
-                    source_root
+                primary: MissionDesignRun | OperatorRun | ConditionalCampaignOutcome = (
+                    verify_mission_design_director(source_root)
                 )
                 operator = verify_operator_run(source_root / "operator")
+            elif source.kind == KnowledgeSourceKind.OPERATOR_RUN:
+                primary = verify_operator_run(source_root)
+                operator = None
             else:
-                director = verify_operator_run(source_root)
+                primary = verify_conditional_campaign(source_root)
                 operator = None
         except (InvalidScenarioError, OSError, ValueError) as exc:
             raise InvalidScenarioError(
                 f"Mission knowledge source {source.source_id!r} failed verification: {exc}"
             ) from exc
-        verified[source.source_id] = (director, operator, tree_sha256)
+        verified[source.source_id] = VerifiedKnowledgeSource(
+            primary=primary,
+            nested_operator=operator,
+            source_tree_sha256=tree_sha256,
+        )
     return verified
 
 

@@ -9,6 +9,7 @@ import pytest
 
 from astro_core.errors import InvalidScenarioError
 from astro_operator.knowledge import (
+    KnowledgeEdge,
     KnowledgeNodeKind,
     MissionKnowledgeGraph,
     _claim_decision_relation,
@@ -26,6 +27,14 @@ from astro_operator.orchestration import (
     OrchestrationDisposition,
     OrchestrationReason,
     evaluate_mission_orchestration,
+)
+from astro_operator.revision import (
+    DirectorRevisionRequest,
+    MissionDesignRevisionAction,
+    MissionDesignRevisionQuery,
+    MissionDesignRevisionReason,
+    MissionDesignRevisionRoute,
+    evaluate_mission_design_verification,
 )
 
 
@@ -71,7 +80,14 @@ def _run_source_bundles(tmp_path: Path) -> tuple[Path, Path]:
     return director, operator
 
 
-def _write_spec(path: Path, director: Path, operator: Path, *, reverse: bool = False) -> None:
+def _write_spec(
+    path: Path,
+    director: Path,
+    operator: Path,
+    *,
+    campaign: Path | None = None,
+    reverse: bool = False,
+) -> None:
     sources = [
         (
             "design",
@@ -84,6 +100,14 @@ def _write_spec(path: Path, director: Path, operator: Path, *, reverse: bool = F
             operator.as_posix(),
         ),
     ]
+    if campaign is not None:
+        sources.append(
+            (
+                "verification",
+                "conditional_campaign",
+                campaign.as_posix(),
+            )
+        )
     if reverse:
         sources.reverse()
     source_yaml = "\n".join(
@@ -98,6 +122,26 @@ def _write_spec(path: Path, director: Path, operator: Path, *, reverse: bool = F
         f"{source_yaml}\n",
         encoding="utf-8",
     )
+
+
+def _run_conditional_campaign_source(tmp_path: Path, director: Path) -> Path:
+    from astro_cli.main import app
+    from tests.astro_cli.helpers import make_cli_runner
+
+    repository = Path(__file__).resolve().parents[2]
+    campaign = tmp_path / "verification"
+    result = make_cli_runner().invoke(
+        app,
+        [
+            "run-mission-design-conditional-campaign",
+            str(director),
+            str(repository / "examples/design/leo_mission_design_conditional_campaign.yaml"),
+            "--output-dir",
+            str(campaign),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    return campaign
 
 
 def _build_graph(spec: Path, output: Path) -> None:
@@ -229,6 +273,146 @@ def test_cross_run_graph_rebuilds_and_traces_baseline(tmp_path: Path) -> None:
     assert json.loads(result.output)["decision_sha256"] == decision.decision_sha256
 
 
+def test_verified_campaign_episode_routes_retention_and_relocates(
+    tmp_path: Path,
+) -> None:
+    director, operator = _run_source_bundles(tmp_path)
+    campaign = _run_conditional_campaign_source(tmp_path, director)
+    spec = tmp_path / "graph.yaml"
+    _write_spec(spec, director, operator, campaign=campaign)
+    output = tmp_path / "knowledge"
+    _build_graph(spec, output)
+
+    graph = verify_mission_knowledge_graph(output)
+    assert graph.schema_version == "1.2"
+    episode = next(
+        node for node in graph.nodes if node.kind is KnowledgeNodeKind.VERIFICATION_EPISODE
+    )
+    assert episode.source_record_id == "leo-mission-design-conditional-verification"
+    assert episode.properties["disposition"] == "retain"
+    assert any(
+        edge.source_node_id == episode.node_id
+        and edge.relation == "verifies"
+        and edge.target_node_id == "design:baseline:leo-mission-design:baseline"
+        for edge in graph.edges
+    )
+    assert any(
+        edge.relation == "supports_retention_of"
+        and edge.target_node_id == "design:baseline:leo-mission-design:baseline"
+        for edge in graph.edges
+    )
+    route = evaluate_mission_design_verification(
+        graph,
+        MissionDesignRevisionQuery(
+            episode_id=episode.source_record_id,
+            baseline_id="leo-mission-design:baseline",
+        ),
+    )
+    assert route.action is MissionDesignRevisionAction.SUPPORT_RETENTION_WITHIN_DECLARED_SCOPE
+    assert route.reason is MissionDesignRevisionReason.VERIFIED_CAMPAIGN_SUPPORTS_RETENTION
+    assert route.revision_request is None
+    assert route.campaign_definition_digest == episode.properties["campaign_definition_digest"]
+    assert route.campaign_claim_boundary == (
+        "configured_design_space_verification_not_operational_probability_"
+        "qualification_or_authority"
+    )
+
+    from astro_cli.main import app
+    from tests.astro_cli.helpers import make_cli_runner
+
+    result = make_cli_runner().invoke(
+        app,
+        [
+            "evaluate-mission-design-verification",
+            str(output),
+            "--episode-id",
+            episode.source_record_id,
+            "--baseline-id",
+            "leo-mission-design:baseline",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["route_sha256"] == route.route_sha256
+
+    relocated = tmp_path / "relocated-knowledge"
+    output.rename(relocated)
+    assert verify_mission_knowledge_graph(relocated).graph_sha256 == graph.graph_sha256
+
+
+def test_revise_episode_opens_bounded_director_request_without_mutating_baseline(
+    tmp_path: Path,
+) -> None:
+    director, operator = _run_source_bundles(tmp_path)
+    campaign = _run_conditional_campaign_source(tmp_path, director)
+    spec = tmp_path / "graph.yaml"
+    _write_spec(spec, director, operator, campaign=campaign)
+    output = tmp_path / "knowledge"
+    _build_graph(spec, output)
+    graph = verify_mission_knowledge_graph(output)
+    revised = _synthetic_revise_graph(graph)
+    query = MissionDesignRevisionQuery(
+        episode_id="leo-mission-design-conditional-verification",
+        baseline_id="leo-mission-design:baseline",
+    )
+
+    route = evaluate_mission_design_verification(revised, query)
+
+    assert route.action is MissionDesignRevisionAction.OPEN_NEW_DIRECTOR_DECISION
+    assert route.reason is MissionDesignRevisionReason.VERIFIED_CAMPAIGN_REQUESTS_REVISION
+    request = route.revision_request
+    assert request is not None
+    assert request.prior_baseline_id == "leo-mission-design:baseline"
+    assert request.prior_baseline_version == 1
+    assert request.failed_requirement_ids == ("deorbit-propellant-reserve",)
+    assert request.prior_analysis_cost_ceiling_units == 7
+    assert request.prior_consumed_analysis_cost_units == 3
+    assert request.completed_verification_cost_units == 3
+    assert request.prior_recorded_cost_units == 6
+    assert request.capability_allowlist_envelope == (
+        "astro.mission_lifecycle_screen",
+        "astro.mission_lifecycle_uncertainty",
+    )
+    assert request.authority_boundary == (
+        "requests_new_bounded_director_decision_does_not_select_or_mutate_baseline_"
+        "and_requires_fresh_authority_and_budget"
+    )
+    assert request.campaign_definition_digest == route.campaign_definition_digest
+    assert request.campaign_claim_boundary == route.campaign_claim_boundary
+    baseline = next(node for node in revised.nodes if node.node_id == route.baseline_node_id)
+    assert baseline.properties["version"] == 1
+    assert baseline.properties["baseline_sha256"] == request.prior_baseline_sha256
+
+    missing = evaluate_mission_design_verification(
+        graph,
+        query.model_copy(update={"episode_id": "missing"}),
+    )
+    assert missing.action is MissionDesignRevisionAction.ABSTAIN
+    assert missing.reason is MissionDesignRevisionReason.EPISODE_MISSING_OR_AMBIGUOUS
+
+    payload = route.model_dump(mode="json")
+    payload["action"] = "support_retention_within_declared_scope"
+    with pytest.raises(ValueError, match="only a new Director route"):
+        MissionDesignRevisionRoute.model_validate(payload)
+
+    request_payload = request.model_dump(mode="json", exclude={"request_sha256"})
+    request_payload["graph_sha256"] = "0" * 64
+    spliced_request = DirectorRevisionRequest.model_validate(
+        {
+            **request_payload,
+            "request_sha256": _canonical_digest(request_payload),
+        }
+    )
+    route_payload = route.model_dump(mode="json", exclude={"route_sha256"})
+    route_payload["revision_request"] = spliced_request.model_dump(mode="json")
+    with pytest.raises(ValueError, match="not bound to its containing route"):
+        MissionDesignRevisionRoute.model_validate(
+            {
+                **route_payload,
+                "route_sha256": _canonical_digest(route_payload),
+            }
+        )
+
+
 def test_orchestration_reducer_fails_closed_and_holds_readiness(
     tmp_path: Path,
 ) -> None:
@@ -296,9 +480,7 @@ def test_orchestration_reducer_fails_closed_and_holds_readiness(
     assert missing_gate.disposition == OrchestrationDisposition.ABSTAIN
     assert missing_gate.reason_codes == (OrchestrationReason.MANUAL_REVIEW_GATE_MISSING_OR_INVALID,)
 
-    decision_payload = evaluate_mission_orchestration(graph, query).model_dump(
-        mode="json"
-    )
+    decision_payload = evaluate_mission_orchestration(graph, query).model_dump(mode="json")
     decision_payload["disposition"] = "hold"
     with pytest.raises(ValueError, match="decision digest mismatch"):
         MissionOrchestrationDecision.model_validate(decision_payload)
@@ -327,6 +509,57 @@ def _replace_graph_node_property(
 def _redigest_graph(graph: MissionKnowledgeGraph) -> MissionKnowledgeGraph:
     payload = graph.model_dump(mode="json", exclude={"graph_sha256"})
     return graph.model_copy(update={"graph_sha256": _canonical_digest(payload)})
+
+
+def _synthetic_revise_graph(graph: MissionKnowledgeGraph) -> MissionKnowledgeGraph:
+    episode = next(
+        node for node in graph.nodes if node.kind is KnowledgeNodeKind.VERIFICATION_EPISODE
+    )
+    disposition = next(
+        node
+        for node in graph.nodes
+        if node.kind is KnowledgeNodeKind.DECISION and node.source_id == episode.source_id
+    )
+    nodes = []
+    for node in graph.nodes:
+        properties = json.loads(json.dumps(node.properties))
+        if node.node_id == episode.node_id:
+            properties["disposition"] = "revise"
+            properties["reason"] = "declared_design_space_gate_failed"
+            properties["gate_assessments"][0]["passed"] = False
+            properties["gate_assessments"][0]["passed_samples"] = 7
+            properties["gate_assessments"][0]["observed_pass_fraction"] = 0.875
+        elif node.node_id == disposition.node_id:
+            properties["disposition"] = "revise"
+            properties["reason"] = "declared_design_space_gate_failed"
+        nodes.append(node.model_copy(update={"properties": properties}))
+    edges = []
+    for edge in graph.edges:
+        if edge.source_node_id == disposition.node_id and edge.relation == "supports_retention_of":
+            payload = {
+                "source_node_id": edge.source_node_id,
+                "relation": "requests_revision_of",
+                "target_node_id": edge.target_node_id,
+                "source_id": edge.source_id,
+                "properties": edge.properties,
+            }
+            edges.append(
+                KnowledgeEdge.model_validate({**payload, "edge_id": _canonical_digest(payload)})
+            )
+        else:
+            edges.append(edge)
+    graph_payload: dict[str, object] = graph.model_dump(
+        mode="json", exclude={"graph_sha256", "nodes", "edges"}
+    )
+    graph_payload["nodes"] = [
+        node.model_dump(mode="json") for node in sorted(nodes, key=lambda item: item.node_id)
+    ]
+    graph_payload["edges"] = [
+        edge.model_dump(mode="json") for edge in sorted(edges, key=lambda item: item.edge_id)
+    ]
+    return MissionKnowledgeGraph.model_validate(
+        {**graph_payload, "graph_sha256": _canonical_digest(graph_payload)}
+    )
 
 
 def test_graph_is_input_order_invariant_and_relocatable(tmp_path: Path) -> None:

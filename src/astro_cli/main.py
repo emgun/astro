@@ -191,6 +191,10 @@ from astro_operator.recording import (
     score_recorded_reasoner_behavior_corpus,
     write_reasoner_behavior_recording,
 )
+from astro_operator.revision import (
+    MissionDesignRevisionQuery,
+    evaluate_mission_design_verification,
+)
 from astro_operator.world_state import reduce_world_state
 from astro_reentry.backends import simulate_reentry_with_backend
 from astro_reentry.handoff import trajectory_to_reentry_scenario
@@ -1268,6 +1272,37 @@ def verify_mission_knowledge_graph_command(
         f"verified mission knowledge graph: sources={len(graph.sources)}, "
         f"nodes={len(graph.nodes)}, edges={len(graph.edges)}"
     )
+
+
+@app.command("evaluate-mission-design-verification")
+def evaluate_mission_design_verification_command(
+    output_dir: Annotated[
+        Path,
+        typer.Argument(exists=True, file_okay=False, readable=True),
+    ],
+    episode_id: Annotated[
+        str,
+        typer.Option("--episode-id", help="Exact verification execution or graph node ID."),
+    ],
+    baseline_id: Annotated[
+        str,
+        typer.Option("--baseline-id", help="Exact historical baseline or graph node ID."),
+    ],
+) -> None:
+    """Route one checked verification episode without mutating its baseline."""
+    try:
+        graph = verify_mission_knowledge_graph(output_dir)
+        route = evaluate_mission_design_verification(
+            graph,
+            MissionDesignRevisionQuery(
+                episode_id=episode_id,
+                baseline_id=baseline_id,
+            ),
+        )
+    except (InvalidScenarioError, OSError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    typer.echo(route.model_dump_json(indent=2))
 
 
 @app.command("trace-mission-baseline")
