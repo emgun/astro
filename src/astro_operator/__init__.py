@@ -21,10 +21,14 @@ from astro_operator.command_execution import (
     SQLiteCommandExecutionStore,
 )
 from astro_operator.director import (
+    AnalysisActivation,
     AnalysisNode,
     AnalysisPlan,
     CapabilityCatalog,
     CapabilitySpec,
+    ConditionalAnalysisDecision,
+    ConditionalAnalysisDisposition,
+    ConditionalAnalysisRule,
     DesignDecision,
     DesignDecisionDisposition,
     FidelityClass,
@@ -41,6 +45,7 @@ from astro_operator.director import (
     build_analysis_plan,
     build_mission_design_run,
     lifecycle_screen_capability,
+    lifecycle_uncertainty_capability,
 )
 from astro_operator.director_io import (
     MissionDesignManifest,
@@ -181,6 +186,7 @@ __all__ = [
     "AcquisitionStatus",
     "AdversarialCorpusScore",
     "AdversarialDecisionCorpus",
+    "AnalysisActivation",
     "AnalysisNode",
     "AnalysisPlan",
     "AuthorityGrant",
@@ -197,6 +203,9 @@ __all__ = [
     "CallCappedReasoner",
     "CapabilityCatalog",
     "CapabilitySpec",
+    "ConditionalAnalysisDecision",
+    "ConditionalAnalysisDisposition",
+    "ConditionalAnalysisRule",
     "ClaimDisposition",
     "CommandEnvelope",
     "CommandExecutionCoordinator",
@@ -315,6 +324,7 @@ __all__ = [
     "score_recorded_reasoner_behavior_corpus",
     "trace_baseline_justification",
     "lifecycle_screen_capability",
+    "lifecycle_uncertainty_capability",
     "validate_action_against_state",
     "validate_operator_state",
     "validate_reasoner_decision",

@@ -1,4 +1,4 @@
-schema_version: "1.0"
+schema_version: "1.1"
 base_scenario_path: ../lifecycle/leo_round_trip.yaml
 intent:
   intent_id: leo-mission-design
@@ -7,9 +7,11 @@ intent:
   objectives:
     - Retain a passing launch-to-reentry lifecycle.
     - Protect deorbit propellant reserve and entry-interface continuity.
-  allowed_capability_ids: [astro.mission_lifecycle_screen]
+  allowed_capability_ids:
+    - astro.mission_lifecycle_screen
+    - astro.mission_lifecycle_uncertainty
   authority_grant_id: checked-leo-design-director
-  max_analysis_cost_units: 4
+  max_analysis_cost_units: 7
   claim_boundary: deterministic multi-domain mission design screening, not flight qualification
 requirement_graph:
   graph_id: leo-mission-design-requirements
@@ -47,6 +49,27 @@ capability_catalog:
         - margin:deorbit:entry_interface_altitude_error
       applicability: Local integrated launch, orbit, digital-twin, deorbit, and reentry design screening for the declared lifecycle scenario.
       qualification_sha256: 4d291360a6ad3b340a424d9229a5f6b38633c1282a9674b1e84832a7ef724938
+    - capability_id: astro.mission_lifecycle_uncertainty
+      version: "1.0"
+      input_schema_sha256: bad6389c57b4572680c2b73280beafc214f68e5cf41b3b2d0dd0de83b5cc1030
+      output_schema_sha256: 8af2dfd5a02cf1020c1bc19a4af4cc366ff6efeeb603e10f472dd1c68a0a8fae
+      fidelity: uncertainty
+      deterministic: true
+      simulation_only: true
+      cost_units: 3
+      output_metric_ids:
+        - margin:deorbit:propellant_reserve
+        - margin:deorbit:entry_interface_altitude_error
+      applicability: Deterministic configured-design-space uncertainty campaign over the integrated mission lifecycle; frequencies are not operational probabilities.
+      qualification_sha256: cb5efffb9247a8fe1fa4bd6fefe87d1e41c9c672d568e644cb9f9a8361d33a63
+      depends_on: [astro.mission_lifecycle_screen]
+conditional_analysis_rules:
+  - rule_id: entry-interface-margin-near-boundary
+    requirement_id: entry-interface-continuity
+    capability_id: astro.mission_lifecycle_uncertainty
+    maximum_absolute_margin: 1.0
+    unit: km
+    rationale: Recommend uncertainty analysis only when the screened entry-interface margin lies within 1 km of its decision threshold.
 objective:
   objective_id: leo-lifecycle-propellant-trade
   summary: Find a passing lifecycle design with improved deorbit propellant reserve.

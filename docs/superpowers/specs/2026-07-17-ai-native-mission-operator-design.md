@@ -331,13 +331,25 @@ reasoning, versioned evidence acquisition, assertion-preserving world state, det
 claims, progressive grants, typed baseline context, and durable simulation-only command
 prepare/commit. Schemas `1.0` through `1.3` remain verifiable.
 
-The first Mission Design Director vertical slice is also implemented as an outer, digest-bound
+The Mission Design Director is implemented as an outer, digest-bound
 bundle without changing the released operator journal schemas. It compiles a typed mission intent,
-acyclic requirement graph, exact capability catalog, and bounded analysis plan; reuses the adaptive
+acyclic requirement graph, exact capability catalog, and bounded conditional analysis plan; reuses the adaptive
 lifecycle evaluator across launch, orbit, digital-twin subsystems, deorbit, and reentry; reduces the
 selected observation into exact-unit requirement assessments; and emits a versioned baseline only
 when every hard requirement passes. Its exact-inventory verifier reconstructs the decision from the
 verified operator journal without rerunning physics or invoking a provider.
+
+Director schema `1.1` registers the existing lifecycle uncertainty campaign as a costed capability
+that depends on the lifecycle screen. A typed rule declares the requirement, units, maximum
+absolute margin within which new evidence could plausibly change the decision, and rationale. The
+checked selected design has a `0.908437 km` entry-interface margin, so a declared `1.0 km` band
+recommends the uncertainty campaign; narrowing the band to `0.5 km` defers it. The relevance score
+is normalized distance to that declared boundary. It is deliberately not called expected
+information value because the screening observation does not carry a calibrated decision-change
+probability. A recommendation binds the exact candidate and eligible baseline. If any hard
+requirement remains unresolved, the baseline is absent and the analysis is deterministically
+deferred rather than exposed as an execution handoff. This slice recommends and reserves analysis;
+it does not execute the campaign.
 
 Public commands:
 
@@ -384,14 +396,14 @@ claim, exact predicate outcomes, applicability, conflicts, and named manual-revi
 
 The remaining path expands the kernel into the full north star:
 
-1. **Conditional design and verification planning:** expand beyond the completed baseline handoff
-   with additional typed capabilities, conditional analysis nodes, explicit information-value
-   estimates, and fidelity escalation while preserving the golden LEO workflow and its fail-closed
-   disposition reducer.
+1. **Execute conditional verification:** turn the recommended lifecycle uncertainty node into a
+   captured, resumable campaign; bind its result to the selected baseline; and deterministically
+   retain, revise, or abstain without weakening the existing screening claim boundary.
 2. **Knowledge and outcomes:** add verified operational outcome and residual contracts, then extend
    the graph and learning datasets without rewriting historical decisions.
-3. **Adaptive verification:** choose uncertainty, sensitivity, independent-backend, and
-   high-fidelity work according to decision relevance and information value.
+3. **Adaptive verification:** add calibrated decision-change probabilities where evidence supports
+   them, then choose uncertainty, sensitivity, independent-backend, and high-fidelity work by
+   expected information value rather than boundary proximity alone.
 4. **Surrogate lifecycle and active learning:** integrate the existing surrogate and campaign
    foundations with dataset lineage, applicability, uncertainty, shadow evaluation, promotion,
    rollback, and targeted high-fidelity acquisition.

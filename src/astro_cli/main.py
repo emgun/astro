@@ -1126,9 +1126,14 @@ def run_mission_design_director_command(
             shutil.rmtree(partial_dir)
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
+    recommended_count = sum(
+        item.disposition.value == "recommended"
+        for item in design_run.verification_plan.conditional_analyses
+    )
     typer.echo(
         f"mission design {design_run.decision.disposition.value}: "
-        f"candidate={design_run.decision.selected_candidate_id or 'none'}"
+        f"candidate={design_run.decision.selected_candidate_id or 'none'}, "
+        f"conditional_analyses_recommended={recommended_count}"
     )
     typer.echo(f"wrote mission design director bundle: {output_dir}")
 
@@ -1146,9 +1151,14 @@ def verify_mission_design_director_command(
     except (InvalidScenarioError, OSError, ValueError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=2) from exc
+    recommended_count = sum(
+        item.disposition.value == "recommended"
+        for item in run.verification_plan.conditional_analyses
+    )
     typer.echo(
         f"verified mission design director: {run.decision.disposition.value}, "
-        f"candidate={run.decision.selected_candidate_id or 'none'}"
+        f"candidate={run.decision.selected_candidate_id or 'none'}, "
+        f"conditional_analyses_recommended={recommended_count}"
     )
 
 
